@@ -1,0 +1,339 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import './Home.css';
+
+function useCounter(target, duration = 2200, started = false) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (!started) return;
+    let raf, start = null;
+    const step = (ts) => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / duration, 1);
+      const e = 1 - Math.pow(1 - p, 4);
+      setVal(Math.floor(e * target));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [started, target, duration]);
+  return val;
+}
+
+function useVisible(threshold = 0.15) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true); }, { threshold });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return [ref, visible];
+}
+
+const FEATURES = [
+  { icon:'🧠', tag:'AI Core',   title:'Deep UI Understanding',   desc:'Reads DOM structure, visual hierarchy, and interaction patterns — no selectors, no config, no manual work needed.' },
+  { icon:'⚡', tag:'Speed',     title:'Sub-3s Generation',        desc:'Full test suite in under 3 seconds. Hundreds of scenarios: happy paths, edge cases, race conditions, auth flows.' },
+  { icon:'🎯', tag:'Export',    title:'Selenium & Cypress Ready', desc:'Clean, readable, production-grade scripts. Drop directly into your CI/CD. Zero post-processing required.' },
+  { icon:'🛡️', tag:'Quality',  title:'Coverage Intelligence',    desc:'AI surfaces boundary conditions and accessibility scenarios your manual process would miss every single time.' },
+  { icon:'🔄', tag:'DevOps',   title:'Self-Healing Tests',        desc:'UI changed? TestForge detects diffs and regenerates only affected tests — your suite stays green automatically.' },
+  { icon:'📊', tag:'Insights', title:'Coverage Analytics',        desc:'Real-time dashboard with coverage heatmaps, flaky test detection, and actionable quality recommendations.' },
+];
+
+const STEPS = [
+  { n:'01', icon:'🔗', title:'Drop a URL',        desc:'Paste any URL — production, staging, or localhost via tunnel. We handle the rest.' },
+  { n:'02', icon:'🤖', title:'AI Maps the UI',    desc:'Every element, flow and state scanned and modeled in about 1.2 seconds.' },
+  { n:'03', icon:'📋', title:'Review Scenarios',  desc:'Read structured test cases in plain language. Edit or approve with one click.' },
+  { n:'04', icon:'🚀', title:'Run Anywhere',      desc:'Export Selenium or Cypress. Integrate with GitHub Actions, GitLab CI, Jenkins.' },
+];
+
+export default function HomePage() {
+  const [navSolid, setNavSolid] = useState(false);
+  const [statsRef, statsOn] = useVisible(0.3);
+  const [featRef,  featOn]  = useVisible(0.1);
+  const [howRef,   howOn]   = useVisible(0.1);
+
+  const c1 = useCounter(120000, 2400, statsOn);
+  const c2 = useCounter(5000,   2000, statsOn);
+  const c3 = useCounter(97,     1800, statsOn);
+  const c4 = useCounter(80,     1500, statsOn);
+  const fmt = v => v >= 1000 ? `${Math.floor(v/1000)}K` : v;
+
+  useEffect(() => {
+    const h = () => setNavSolid(window.scrollY > 40);
+    window.addEventListener('scroll', h, { passive: true });
+    return () => window.removeEventListener('scroll', h);
+  }, []);
+
+  return (
+    <div className="hp">
+
+      {/* ══ NAV ══ */}
+      <nav className={`nav ${navSolid ? 'nav--solid' : ''}`}>
+        <div className="nav__inner">
+          <Link to="/" className="nav__brand">
+            <div className="nav__gem">⚡</div>
+            <div>
+              <div className="nav__name">TestForge</div>
+              <div className="nav__sub">AI Platform</div>
+            </div>
+          </Link>
+          <ul className="nav__links">
+            {['Features','How it works','Stats'].map(l => (
+              <li key={l}><a href={`#${l.replace(/ /g,'').toLowerCase()}`}>{l}</a></li>
+            ))}
+          </ul>
+          <div className="nav__actions">
+            <Link to="/login"    className="nav__ghost">Sign In</Link>
+            <Link to="/register" className="nav__cta">Get Started →</Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* ══ HERO ══ */}
+      <section className="hero">
+        <div className="hero__bg" aria-hidden="true">
+          <div className="blob b1"/><div className="blob b2"/><div className="blob b3"/>
+          <div className="ring r1"/><div className="ring r2"/><div className="ring r3"/>
+          <div className="dot" style={{top:'12%',left:'6%',animationDelay:'0s'}}/>
+          <div className="dot" style={{top:'44%',left:'3.5%',animationDelay:'1.5s',width:'5px',height:'5px',opacity:.28}}/>
+          <div className="dot" style={{top:'70%',left:'8%',animationDelay:'2.8s',width:'9px',height:'9px'}}/>
+          <div className="dot" style={{top:'20%',right:'5%',animationDelay:'.8s',opacity:.25}}/>
+          <div className="dot" style={{bottom:'20%',right:'8%',animationDelay:'2s',width:'5px',height:'5px'}}/>
+          <div className="hero__grid"/>
+        </div>
+
+        <div className="hero__body">
+          {/* copy */}
+          <div className="hero__copy">
+            <div className="hero__kicker">
+              <span className="kicker__live"/> AI-Powered Test Automation
+              <span className="kicker__sep">·</span>
+              <span className="kicker__ver">v2.4</span>
+            </div>
+
+            <h1 className="hero__h1">
+              <span className="h1--plain">Generate</span>
+              <span className="h1--italic">Web Tests</span>
+              <span className="h1--gold">10× Faster</span>
+            </h1>
+
+            <p className="hero__lead">
+              Point TestForge at any web app — AI analyzes your UI, writes structured test
+              cases, and exports production-ready <strong>Selenium</strong> &amp; <strong>Cypress</strong> scripts. In seconds.
+            </p>
+
+            <div className="hero__actions">
+              <Link to="/register" className="btn btn--fill">
+                Start for free
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </Link>
+              <a href="#howit works" className="btn btn--ring">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M10 8l6 4-6 4V8z" fill="currentColor"/></svg>
+                Watch demo
+              </a>
+            </div>
+
+            <div className="hero__trust">
+              {['No credit card','Free forever','Up in 60s'].map(t => (
+                <span key={t} className="trust__item">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+                  {t}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* terminal */}
+          <div className="hero__visual">
+            <div className="chip chip--tl">
+              <span className="chip__dot chip__dot--green"/>
+              AI Engine Active
+            </div>
+            <div className="chip chip--br">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              Generated in <b>2.1s</b>
+            </div>
+
+            <div className="score">
+              <svg viewBox="0 0 36 36" className="score__ring">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(212,175,55,0.15)" strokeWidth="2.5"/>
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#d4af37" strokeWidth="2.5"
+                  strokeDasharray="97 100" strokeDashoffset="25" strokeLinecap="round"
+                  style={{animation:'scoreDraw 1.8s cubic-bezier(.22,1,.36,1) .5s both'}}/>
+              </svg>
+              <span className="score__val">97%</span>
+              <span className="score__lbl">Accuracy</span>
+            </div>
+
+            <div className="terminal">
+              <div className="term__bar">
+                <div className="term__dots">
+                  <span style={{background:'#ff5f57'}}/><span style={{background:'#febc2e'}}/><span style={{background:'#28c840'}}/>
+                </div>
+                <span className="term__title">testforge — analyze</span>
+                <span className="term__ver">v2.4.1</span>
+              </div>
+              <div className="term__body">
+                <p className="tl"><span className="p">❯</span><span className="cmd"> testforge analyze </span><span className="url">https://myapp.com</span></p>
+                <div className="gap"/>
+                <p className="tl dim"><span className="ico">◆</span> Connecting to target…</p>
+                <p className="tl dim"><span className="ico">◆</span> Scanning DOM — <b>24 elements</b> found</p>
+                <p className="tl dim"><span className="ico">◆</span> Mapping flows &amp; auth patterns</p>
+                <p className="tl dim"><span className="ico">◆</span> Running GPT analysis pipeline…</p>
+                <div className="gap"/>
+                <p className="tl ok"><span className="ico">✓</span> 42 test cases generated <span className="badge-time">2.1s</span></p>
+                <p className="tl ok"><span className="ico">✓</span> Selenium scripts exported</p>
+                <p className="tl ok"><span className="ico">✓</span> Cypress scripts exported</p>
+                <div className="gap"/>
+                <p className="tl"><span className="cur">▋</span></p>
+              </div>
+              <div className="term__foot">
+                <span className="pill">Selenium</span>
+                <span className="pill">Cypress</span>
+                <span className="pill pill--gold">42 tests ready</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="hero__scroll">
+          <div className="scroll__line"/>
+          <span className="scroll__lbl">Scroll</span>
+        </div>
+      </section>
+
+      {/* ══ BRAND BAND ══ */}
+      <div className="band">
+        <div className="band__inner">
+          <span className="band__label">Works with</span>
+          {['Selenium','Cypress','Jest','Playwright','GitHub Actions','GitLab CI','Jenkins'].map(t=>(
+            <span key={t} className="band__item">{t}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* ══ FEATURES ══ */}
+      <section className="sec features" id="features" ref={featRef}>
+        <div className="sec__wrap">
+          <div className="sec__head">
+            <div className="sec__left">
+              <span className="eyebrow">Features</span>
+              <h2 className="sec__h2">Everything your<br/><span className="h2__gold">QA team needs</span></h2>
+            </div>
+            <p className="sec__lead">From URL to full test suite — automated, accurate, zero configuration. No QA expertise required.</p>
+          </div>
+
+          <div className={`feat__grid ${featOn?'is-visible':''}`}>
+            {FEATURES.map((f,i)=>(
+              <div key={f.title} className="feat__card" style={{'--i':i}}>
+                <div className="feat__top">
+                  <div className="feat__icon">{f.icon}</div>
+                  <span className="feat__tag">{f.tag}</span>
+                </div>
+                <h3 className="feat__title">{f.title}</h3>
+                <p className="feat__desc">{f.desc}</p>
+                <span className="feat__more">Learn more <em>→</em></span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ HOW ══ */}
+      <section className="sec how" id="howitworks" ref={howRef}>
+        <div className="how__decor" aria-hidden="true">
+          <div className="how__orb how__orb--1"/><div className="how__orb how__orb--2"/>
+        </div>
+        <div className="sec__wrap">
+          <span className="eyebrow eyebrow--c">How It Works</span>
+          <h2 className="sec__h2 sec__h2--c">URL to test suite <span className="h2__gold">in 4 steps</span></h2>
+
+          <div className={`how__grid ${howOn?'is-visible':''}`}>
+            {STEPS.map((s,i)=>(
+              <div key={s.n} className="how__card" style={{'--i':i}}>
+                <div className="how__num">{s.n}</div>
+                <div className="how__icon">{s.icon}</div>
+                <h3 className="how__title">{s.title}</h3>
+                <p className="how__desc">{s.desc}</p>
+                {i < STEPS.length-1 && (
+                  <div className="how__arrow" aria-hidden="true">
+                    <div className="how__line"/><span className="how__arr">›</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ STATS ══ */}
+      <section className="sec stats" id="stats" ref={statsRef}>
+        <div className="sec__wrap">
+          <span className="eyebrow eyebrow--c">By the numbers</span>
+          <h2 className="sec__h2 sec__h2--c">Trusted worldwide</h2>
+
+          <div className="stats__grid">
+            {[
+              {icon:'🚀', val:fmt(c1), suf:'+', label:'Scripts Exported', accent:'#1a56db'},
+              {icon:'🔬', val:fmt(c2), suf:'+', label:'Apps Analyzed',    accent:'#d4af37'},
+              {icon:'🎯', val:c3,      suf:'%', label:'Accuracy Rate',    accent:'#10b981'},
+              {icon:'⏱️', val:c4,     suf:'%', label:'Faster QA Cycles', accent:'#f59e0b'},
+            ].map((s,i)=>(
+              <div key={s.label} className="stat__card" style={{'--accent':s.accent,'--i':i}}>
+                <span className="stat__ghost">{s.val}{s.suf}</span>
+                <span className="stat__icon">{s.icon}</span>
+                <div className="stat__val">{s.val}<span style={{color:s.accent}}>{s.suf}</span></div>
+                <div className="stat__label">{s.label}</div>
+                <div className="stat__bar"><div className="stat__fill" style={{background:s.accent}}/></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ CTA ══ */}
+      <section className="cta-sec">
+        <div className="cta__bg" aria-hidden="true">
+          <div className="cta__blob cta__blob--1"/><div className="cta__blob cta__blob--2"/>
+          <div className="cta__ring cta__ring--1"/><div className="cta__ring cta__ring--2"/>
+          <div className="cta__grid"/>
+        </div>
+        <div className="cta__body">
+          <span className="eyebrow eyebrow--c">Get Started Today</span>
+          <h2 className="cta__h2">Stop writing tests.<br/><span className="h2__gold">Start shipping faster.</span></h2>
+          <p className="cta__lead">Join thousands of developers who automated their QA workflow. Free plan forever — no credit card, no setup, no nonsense.</p>
+          <div className="cta__actions">
+            <Link to="/register" className="btn btn--fill btn--lg">
+              Create Free Account
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </Link>
+            <Link to="/login" className="cta__link">Already have an account →</Link>
+          </div>
+          <div className="cta__trust">
+            {[{icon:'🔒',t:'Enterprise-grade security'},{icon:'⚡',t:'99.9% uptime SLA'},{icon:'🌍',t:'5,000+ apps tested'}].map(x=>(
+              <span key={x.t} className="ctrust">{x.icon} {x.t}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ FOOTER ══ */}
+      <footer className="footer">
+        <div className="footer__inner">
+          <div className="footer__brand">
+            <div className="nav__gem">⚡</div>
+            <div>
+              <div className="nav__name">TestForge</div>
+              <div className="nav__sub" style={{color:'var(--gold)'}}>AI Platform</div>
+            </div>
+          </div>
+          <p className="footer__copy">© 2025 TestForge AI · Built for QA teams who move fast.</p>
+          <nav className="footer__links">
+            {['Privacy','Terms','Docs','Status'].map(l=><a key={l} href="#">{l}</a>)}
+          </nav>
+        </div>
+      </footer>
+    </div>
+  );
+}
