@@ -5,15 +5,8 @@ import LoginPage    from './pages/auth/LoginPage';
 import HomePage     from './pages/home/HomePage';
 import PrivateRoute from './components/PrivateRoute';
 
-// Dashboard temporaire
-function Dashboard() {
-  return (
-    <div style={{ padding: 40, background: '#EBF2FB', minHeight: '100vh' }}>
-      <h1>Dashboard 🎉</h1>
-      <p>Tu es connecté !</p>
-    </div>
-  );
-}
+
+
 
 export default function App() {
   return (
@@ -26,7 +19,7 @@ export default function App() {
           <Route path="/register"  element={<RegisterPage />} />
           <Route path="/dashboard" element={
             <PrivateRoute>
-              <Dashboard />
+              
             </PrivateRoute>
           } />
           {/* Toute route inconnue → HomePage */}
