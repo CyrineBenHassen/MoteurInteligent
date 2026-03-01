@@ -32,19 +32,49 @@ function useVisible(threshold = 0.15) {
 }
 
 const FEATURES = [
-  { icon:'🧠', tag:'AI Core',   title:'Deep UI Understanding',   desc:'Reads DOM structure, visual hierarchy, and interaction patterns — no selectors, no config, no manual work needed.' },
-  { icon:'⚡', tag:'Speed',     title:'Sub-3s Generation',        desc:'Full test suite in under 3 seconds. Hundreds of scenarios: happy paths, edge cases, race conditions, auth flows.' },
-  { icon:'🎯', tag:'Export',    title:'Selenium & Cypress Ready', desc:'Clean, readable, production-grade scripts. Drop directly into your CI/CD. Zero post-processing required.' },
-  { icon:'🛡️', tag:'Quality',  title:'Coverage Intelligence',    desc:'AI surfaces boundary conditions and accessibility scenarios your manual process would miss every single time.' },
-  { icon:'🔄', tag:'DevOps',   title:'Self-Healing Tests',        desc:'UI changed? TestForge detects diffs and regenerates only affected tests — your suite stays green automatically.' },
-  { icon:'📊', tag:'Insights', title:'Coverage Analytics',        desc:'Real-time dashboard with coverage heatmaps, flaky test detection, and actionable quality recommendations.' },
+  {
+    icon: '🧠',
+    tag: 'Generative AI',
+    title: 'Intelligent DOM Analysis',
+    desc: 'The engine automatically scans your application\'s DOM structure — forms, buttons, fields, links — with zero manual configuration required.',
+  },
+  {
+    icon: '⚡',
+    tag: 'Speed',
+    title: 'Generation in Under 3s',
+    desc: 'Dozens of functional test cases generated in seconds: happy paths, edge cases, authentication flows, and error scenarios — all at once.',
+  },
+  {
+    icon: '🎯',
+    tag: 'Export',
+    title: 'Selenium & Cypress Scripts',
+    desc: 'Clean, readable, production-ready scripts. Drop them directly into your CI/CD pipeline with zero post-processing required.',
+  },
+  {
+    icon: '🛡️',
+    tag: 'Quality',
+    title: 'Full Functional Coverage',
+    desc: 'The AI surfaces boundary conditions and accessibility scenarios that your manual process would consistently miss every single time.',
+  },
+  {
+    icon: '🔄',
+    tag: 'Reliability',
+    title: 'Self-Adapting Tests',
+    desc: 'UI changed? The engine detects the diff and regenerates only the affected tests — keeping your suite green and up-to-date automatically.',
+  },
+  {
+    icon: '📊',
+    tag: 'Reports',
+    title: 'Reports & History',
+    desc: 'View and download detailed reports. Track your analysis history and manage everything from your personal dashboard and notifications.',
+  },
 ];
 
 const STEPS = [
-  { n:'01', icon:'🔗', title:'Drop a URL',        desc:'Paste any URL — production, staging, or localhost via tunnel. We handle the rest.' },
-  { n:'02', icon:'🤖', title:'AI Maps the UI',    desc:'Every element, flow and state scanned and modeled in about 1.2 seconds.' },
-  { n:'03', icon:'📋', title:'Review Scenarios',  desc:'Read structured test cases in plain language. Edit or approve with one click.' },
-  { n:'04', icon:'🚀', title:'Run Anywhere',      desc:'Export Selenium or Cypress. Integrate with GitHub Actions, GitLab CI, Jenkins.' },
+  { n: '01', icon: '🔗', title: 'Provide a URL',         desc: 'Paste any web application URL — production, staging, or localhost via tunnel. The engine handles everything else.' },
+  { n: '02', icon: '🤖', title: 'AI Maps the Interface', desc: 'Every interactive element, flow, and application state is scanned and modeled by the AI engine within seconds.' },
+  { n: '03', icon: '📋', title: 'Review Test Scenarios',  desc: 'Read generated test cases written in plain language. Edit or approve them with a single click.' },
+  { n: '04', icon: '🚀', title: 'Export & Integrate',     desc: 'Download your Selenium or Cypress scripts. Plug them into GitHub Actions, GitLab CI, or Jenkins seamlessly.' },
 ];
 
 export default function HomePage() {
@@ -75,17 +105,18 @@ export default function HomePage() {
             <div className="nav__gem">⚡</div>
             <div>
               <div className="nav__name">TestForge</div>
-              <div className="nav__sub">AI Platform</div>
+              <div className="nav__sub">AI Engine</div>
             </div>
           </Link>
           <ul className="nav__links">
-            {['Features','How it works','Stats'].map(l => (
-              <li key={l}><a href={`#${l.replace(/ /g,'').toLowerCase()}`}>{l}</a></li>
-            ))}
+            {['Features', 'How it Works', 'Stats'].map((l, idx) => {
+              const ids = ['features', 'howitworks', 'stats'];
+              return <li key={l}><a href={`#${ids[idx]}`}>{l}</a></li>;
+            })}
           </ul>
           <div className="nav__actions">
             <Link to="/login"    className="nav__ghost">Sign In</Link>
-            <Link to="/register" className="nav__cta">Get Started →</Link>
+            <Link to="/register" className="nav__cta"><span>Get Started</span></Link>
           </div>
         </div>
       </nav>
@@ -96,31 +127,31 @@ export default function HomePage() {
           <div className="blob b1"/><div className="blob b2"/><div className="blob b3"/>
           <div className="ring r1"/><div className="ring r2"/><div className="ring r3"/>
           <div className="dot" style={{top:'12%',left:'6%',animationDelay:'0s'}}/>
-          <div className="dot" style={{top:'44%',left:'3.5%',animationDelay:'1.5s',width:'5px',height:'5px',opacity:.28}}/>
-          <div className="dot" style={{top:'70%',left:'8%',animationDelay:'2.8s',width:'9px',height:'9px'}}/>
-          <div className="dot" style={{top:'20%',right:'5%',animationDelay:'.8s',opacity:.25}}/>
-          <div className="dot" style={{bottom:'20%',right:'8%',animationDelay:'2s',width:'5px',height:'5px'}}/>
+          <div className="dot" style={{top:'44%',left:'3.5%',animationDelay:'1.5s',width:'4px',height:'4px',opacity:.2}}/>
+          <div className="dot" style={{top:'70%',left:'8%',animationDelay:'2.8s',width:'8px',height:'8px'}}/>
+          <div className="dot" style={{top:'20%',right:'5%',animationDelay:'.8s',opacity:.18}}/>
+          <div className="dot" style={{bottom:'20%',right:'8%',animationDelay:'2s',width:'4px',height:'4px'}}/>
           <div className="hero__grid"/>
         </div>
 
         <div className="hero__body">
-          {/* copy */}
           <div className="hero__copy">
             <div className="hero__kicker">
-              <span className="kicker__live"/> AI-Powered Test Automation
+              <span className="kicker__live"/> Generative AI Engine — Web Testing
               <span className="kicker__sep">·</span>
-              <span className="kicker__ver">v2.4</span>
+              <span className="kicker__ver">PFE 2025–2026</span>
             </div>
 
             <h1 className="hero__h1">
               <span className="h1--plain">Generate</span>
               <span className="h1--italic">Web Tests</span>
-              <span className="h1--gold">10× Faster</span>
+              <span className="h1--gold">Automatically</span>
             </h1>
 
             <p className="hero__lead">
-              Point TestForge at any web app — AI analyzes your UI, writes structured test
-              cases, and exports production-ready <strong>Selenium</strong> &amp; <strong>Cypress</strong> scripts. In seconds.
+              Provide your web application's URL — the engine analyzes your interface,
+              generates functional test cases, and exports ready-to-use
+              <strong> Selenium</strong> &amp; <strong>Cypress</strong> scripts. In seconds.
             </p>
 
             <div className="hero__actions">
@@ -128,23 +159,22 @@ export default function HomePage() {
                 Start for free
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </Link>
-              <a href="#howit works" className="btn btn--ring">
+              <a href="#howitworks" className="btn btn--ring">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M10 8l6 4-6 4V8z" fill="currentColor"/></svg>
-                Watch demo
+                See how it works
               </a>
             </div>
 
             <div className="hero__trust">
-              {['No credit card','Free forever','Up in 60s'].map(t => (
+              {['No credit card', 'Open-source AI', 'Results in 60s'].map(t => (
                 <span key={t} className="trust__item">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#c9a227" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
                   {t}
                 </span>
               ))}
             </div>
           </div>
 
-          {/* terminal */}
           <div className="hero__visual">
             <div className="chip chip--tl">
               <span className="chip__dot chip__dot--green"/>
@@ -152,15 +182,15 @@ export default function HomePage() {
             </div>
             <div className="chip chip--br">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-              Generated in <b>2.1s</b>
+              Generated in <b style={{color:'var(--gold)',marginLeft:3}}>2.1s</b>
             </div>
 
             <div className="score">
               <svg viewBox="0 0 36 36" className="score__ring">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(212,175,55,0.15)" strokeWidth="2.5"/>
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#d4af37" strokeWidth="2.5"
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(201,162,39,0.1)" strokeWidth="2.5"/>
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--gold)" strokeWidth="2.5"
                   strokeDasharray="97 100" strokeDashoffset="25" strokeLinecap="round"
-                  style={{animation:'scoreDraw 1.8s cubic-bezier(.22,1,.36,1) .5s both'}}/>
+                  style={{animation:'scoreDraw 2s cubic-bezier(.22,1,.36,1) .5s both'}}/>
               </svg>
               <span className="score__val">97%</span>
               <span className="score__lbl">Accuracy</span>
@@ -172,15 +202,15 @@ export default function HomePage() {
                   <span style={{background:'#ff5f57'}}/><span style={{background:'#febc2e'}}/><span style={{background:'#28c840'}}/>
                 </div>
                 <span className="term__title">testforge — analyze</span>
-                <span className="term__ver">v2.4.1</span>
+                <span className="term__ver">v1.0.0</span>
               </div>
               <div className="term__body">
                 <p className="tl"><span className="p">❯</span><span className="cmd"> testforge analyze </span><span className="url">https://myapp.com</span></p>
                 <div className="gap"/>
                 <p className="tl dim"><span className="ico">◆</span> Connecting to target…</p>
-                <p className="tl dim"><span className="ico">◆</span> Scanning DOM — <b>24 elements</b> found</p>
-                <p className="tl dim"><span className="ico">◆</span> Mapping flows &amp; auth patterns</p>
-                <p className="tl dim"><span className="ico">◆</span> Running GPT analysis pipeline…</p>
+                <p className="tl dim"><span className="ico">◆</span> Scanning DOM — <b>24 elements</b> detected</p>
+                <p className="tl dim"><span className="ico">◆</span> Mapping flows &amp; interactive components</p>
+                <p className="tl dim"><span className="ico">◆</span> Running generative AI pipeline…</p>
                 <div className="gap"/>
                 <p className="tl ok"><span className="ico">✓</span> 42 test cases generated <span className="badge-time">2.1s</span></p>
                 <p className="tl ok"><span className="ico">✓</span> Selenium scripts exported</p>
@@ -206,8 +236,8 @@ export default function HomePage() {
       {/* ══ BRAND BAND ══ */}
       <div className="band">
         <div className="band__inner">
-          <span className="band__label">Works with</span>
-          {['Selenium','Cypress','Jest','Playwright','GitHub Actions','GitLab CI','Jenkins'].map(t=>(
+          <span className="band__label">Built with</span>
+          {['React', 'Laravel', 'FastAPI', 'StarCoder2', 'PostgreSQL', 'Selenium', 'Cypress'].map(t => (
             <span key={t} className="band__item">{t}</span>
           ))}
         </div>
@@ -221,12 +251,12 @@ export default function HomePage() {
               <span className="eyebrow">Features</span>
               <h2 className="sec__h2">Everything your<br/><span className="h2__gold">QA team needs</span></h2>
             </div>
-            <p className="sec__lead">From URL to full test suite — automated, accurate, zero configuration. No QA expertise required.</p>
+            <p className="sec__lead">From URL to full test suite — automated, accurate, zero configuration. No prior QA expertise required.</p>
           </div>
 
-          <div className={`feat__grid ${featOn?'is-visible':''}`}>
-            {FEATURES.map((f,i)=>(
-              <div key={f.title} className="feat__card" style={{'--i':i}}>
+          <div className={`feat__grid ${featOn ? 'is-visible' : ''}`}>
+            {FEATURES.map((f, i) => (
+              <div key={f.title} className="feat__card" style={{'--i': i}}>
                 <div className="feat__top">
                   <div className="feat__icon">{f.icon}</div>
                   <span className="feat__tag">{f.tag}</span>
@@ -247,16 +277,16 @@ export default function HomePage() {
         </div>
         <div className="sec__wrap">
           <span className="eyebrow eyebrow--c">How It Works</span>
-          <h2 className="sec__h2 sec__h2--c">URL to test suite <span className="h2__gold">in 4 steps</span></h2>
+          <h2 className="sec__h2 sec__h2--c">From URL to tests <span className="h2__gold">in 4 steps</span></h2>
 
-          <div className={`how__grid ${howOn?'is-visible':''}`}>
-            {STEPS.map((s,i)=>(
-              <div key={s.n} className="how__card" style={{'--i':i}}>
+          <div className={`how__grid ${howOn ? 'is-visible' : ''}`}>
+            {STEPS.map((s, i) => (
+              <div key={s.n} className="how__card" style={{'--i': i}}>
                 <div className="how__num">{s.n}</div>
                 <div className="how__icon">{s.icon}</div>
                 <h3 className="how__title">{s.title}</h3>
                 <p className="how__desc">{s.desc}</p>
-                {i < STEPS.length-1 && (
+                {i < STEPS.length - 1 && (
                   <div className="how__arrow" aria-hidden="true">
                     <div className="how__line"/><span className="how__arr">›</span>
                   </div>
@@ -271,21 +301,21 @@ export default function HomePage() {
       <section className="sec stats" id="stats" ref={statsRef}>
         <div className="sec__wrap">
           <span className="eyebrow eyebrow--c">By the numbers</span>
-          <h2 className="sec__h2 sec__h2--c">Trusted worldwide</h2>
+          <h2 className="sec__h2 sec__h2--c">Concrete results</h2>
 
           <div className="stats__grid">
             {[
-              {icon:'🚀', val:fmt(c1), suf:'+', label:'Scripts Exported', accent:'#1a56db'},
-              {icon:'🔬', val:fmt(c2), suf:'+', label:'Apps Analyzed',    accent:'#d4af37'},
-              {icon:'🎯', val:c3,      suf:'%', label:'Accuracy Rate',    accent:'#10b981'},
-              {icon:'⏱️', val:c4,     suf:'%', label:'Faster QA Cycles', accent:'#f59e0b'},
-            ].map((s,i)=>(
-              <div key={s.label} className="stat__card" style={{'--accent':s.accent,'--i':i}}>
+              {icon:'🚀', val:fmt(c1), suf:'+', label:'Scripts Generated',  accent:'#4f86e8'},
+              {icon:'🔬', val:fmt(c2), suf:'+', label:'Apps Analyzed',       accent:'#c9a227'},
+              {icon:'🎯', val:c3,      suf:'%', label:'Accuracy Rate',       accent:'#4ade80'},
+              {icon:'⏱️', val:c4,     suf:'%', label:'Faster QA Cycles',    accent:'#fb923c'},
+            ].map((s, i) => (
+              <div key={s.label} className="stat__card" style={{'--accent': s.accent, '--i': i}}>
                 <span className="stat__ghost">{s.val}{s.suf}</span>
                 <span className="stat__icon">{s.icon}</span>
-                <div className="stat__val">{s.val}<span style={{color:s.accent}}>{s.suf}</span></div>
+                <div className="stat__val">{s.val}<span style={{color: s.accent}}>{s.suf}</span></div>
                 <div className="stat__label">{s.label}</div>
-                <div className="stat__bar"><div className="stat__fill" style={{background:s.accent}}/></div>
+                <div className="stat__bar"><div className="stat__fill" style={{background: s.accent}}/></div>
               </div>
             ))}
           </div>
@@ -302,16 +332,23 @@ export default function HomePage() {
         <div className="cta__body">
           <span className="eyebrow eyebrow--c">Get Started Today</span>
           <h2 className="cta__h2">Stop writing tests.<br/><span className="h2__gold">Start shipping faster.</span></h2>
-          <p className="cta__lead">Join thousands of developers who automated their QA workflow. Free plan forever — no credit card, no setup, no nonsense.</p>
+          <p className="cta__lead">
+            Join development teams who have automated their QA process with generative AI.
+            Free, no credit card, no complex setup required.
+          </p>
           <div className="cta__actions">
             <Link to="/register" className="btn btn--fill btn--lg">
-              Create Free Account
+              Create a free account
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </Link>
-            <Link to="/login" className="cta__link">Already have an account →</Link>
+            <Link to="/login" className="cta__link">Already have an account? Sign in →</Link>
           </div>
           <div className="cta__trust">
-            {[{icon:'🔒',t:'Enterprise-grade security'},{icon:'⚡',t:'99.9% uptime SLA'},{icon:'🌍',t:'5,000+ apps tested'}].map(x=>(
+            {[
+              {icon:'🔒', t:'Secured user data'},
+              {icon:'⚡', t:'99.9% uptime SLA'},
+              {icon:'🤖', t:'Open-source AI (StarCoder2)'},
+            ].map(x => (
               <span key={x.t} className="ctrust">{x.icon} {x.t}</span>
             ))}
           </div>
@@ -325,12 +362,14 @@ export default function HomePage() {
             <div className="nav__gem">⚡</div>
             <div>
               <div className="nav__name">TestForge</div>
-              <div className="nav__sub" style={{color:'var(--gold)'}}>AI Platform</div>
+              <div className="nav__sub">AI Engine</div>
             </div>
           </div>
-          <p className="footer__copy">© 2025 TestForge AI · Built for QA teams who move fast.</p>
+          <p className="footer__copy">© 2025–2026 TestForge · Software Engineering PFE — Cyrine Ben Hassen · Tac-Tic</p>
           <nav className="footer__links">
-            {['Privacy','Terms','Docs','Status'].map(l=><a key={l} href="#">{l}</a>)}
+            {['Privacy', 'Terms', 'Documentation', 'Status'].map(l => (
+              <a key={l} href="#">{l}</a>
+            ))}
           </nav>
         </div>
       </footer>
