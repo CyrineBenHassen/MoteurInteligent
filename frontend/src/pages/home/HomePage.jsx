@@ -102,10 +102,16 @@ export default function HomePage() {
       <nav className={`nav ${navSolid ? 'nav--solid' : ''}`}>
         <div className="nav__inner">
           <Link to="/" className="nav__brand">
-            <div className="nav__gem">⚡</div>
+            <div className="nav__gem">
+              <svg width="22" height="22" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="44" height="44" rx="11" fill="none"/>
+                <polyline points="8,14 22,30 36,14" stroke="#060e1e" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="8" y1="30" x2="36" y2="30" stroke="rgba(6,14,30,0.5)" strokeWidth="2.5" strokeLinecap="round"/>
+              </svg>
+            </div>
             <div>
-              <div className="nav__name">TestForge</div>
-              <div className="nav__sub">AI Engine</div>
+              <div className="nav__name">NexTest</div>
+              <div className="nav__sub">Test Automation</div>
             </div>
           </Link>
           <ul className="nav__links">
@@ -116,7 +122,7 @@ export default function HomePage() {
           </ul>
           <div className="nav__actions">
             <Link to="/login"    className="nav__ghost">Sign In</Link>
-            <Link to="/register" className="nav__cta"><span>Get Started</span></Link>
+            <Link to="/register" className="nav__cta"><span>Get Started →</span></Link>
           </div>
         </div>
       </nav>
@@ -137,7 +143,7 @@ export default function HomePage() {
         <div className="hero__body">
           <div className="hero__copy">
             <div className="hero__kicker">
-              <span className="kicker__live"/> Generative AI Engine — Web Testing
+              <span className="kicker__live"/> Generative AI Platform — Web Testing
               <span className="kicker__sep">·</span>
               <span className="kicker__ver">PFE 2025–2026</span>
             </div>
@@ -178,7 +184,7 @@ export default function HomePage() {
           <div className="hero__visual">
             <div className="chip chip--tl">
               <span className="chip__dot chip__dot--green"/>
-              AI Engine Active
+              AI Platform Active
             </div>
             <div className="chip chip--br">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
@@ -201,11 +207,11 @@ export default function HomePage() {
                 <div className="term__dots">
                   <span style={{background:'#ff5f57'}}/><span style={{background:'#febc2e'}}/><span style={{background:'#28c840'}}/>
                 </div>
-                <span className="term__title">testforge — analyze</span>
+                <span className="term__title">nextest — analyze</span>
                 <span className="term__ver">v1.0.0</span>
               </div>
               <div className="term__body">
-                <p className="tl"><span className="p">❯</span><span className="cmd"> testforge analyze </span><span className="url">https://myapp.com</span></p>
+                <p className="tl"><span className="p">❯</span><span className="cmd"> nextest analyze </span><span className="url">https://myapp.com</span></p>
                 <div className="gap"/>
                 <p className="tl dim"><span className="ico">◆</span> Connecting to target…</p>
                 <p className="tl dim"><span className="ico">◆</span> Scanning DOM — <b>24 elements</b> detected</p>
@@ -359,13 +365,19 @@ export default function HomePage() {
       <footer className="footer">
         <div className="footer__inner">
           <div className="footer__brand">
-            <div className="nav__gem">⚡</div>
+            <div className="nav__gem">
+              <svg width="22" height="22" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="44" height="44" rx="11" fill="none"/>
+                <polyline points="8,14 22,30 36,14" stroke="#060e1e" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="8" y1="30" x2="36" y2="30" stroke="rgba(6,14,30,0.5)" strokeWidth="2.5" strokeLinecap="round"/>
+              </svg>
+            </div>
             <div>
-              <div className="nav__name">TestForge</div>
-              <div className="nav__sub">AI Engine</div>
+              <div className="nav__name">NexTest</div>
+              <div className="nav__sub">Test Automation</div>
             </div>
           </div>
-          <p className="footer__copy">© 2025–2026 TestForge · Software Engineering PFE — Cyrine Ben Hassen · Tac-Tic</p>
+          <p className="footer__copy">© 2025–2026 NexTest · Software Engineering PFE — Cyrine Ben Hassen · Tac-Tic</p>
           <nav className="footer__links">
             {['Privacy', 'Terms', 'Documentation', 'Status'].map(l => (
               <a key={l} href="#">{l}</a>
