@@ -122,7 +122,7 @@ export default function HomePage() {
           </ul>
           <div className="nav__actions">
             <Link to="/login"    className="nav__ghost">Sign In</Link>
-            <Link to="/register" className="nav__cta"><span>Get Started →</span></Link>
+            <Link to="/register" className="nav__cta"><span>Get Started</span></Link>
           </div>
         </div>
       </nav>
@@ -142,11 +142,7 @@ export default function HomePage() {
 
         <div className="hero__body">
           <div className="hero__copy">
-            <div className="hero__kicker">
-              <span className="kicker__live"/> Generative AI Platform — Web Testing
-              <span className="kicker__sep">·</span>
-              <span className="kicker__ver">PFE 2025–2026</span>
-            </div>
+           
 
             <h1 className="hero__h1">
               <span className="h1--plain">Generate</span>
