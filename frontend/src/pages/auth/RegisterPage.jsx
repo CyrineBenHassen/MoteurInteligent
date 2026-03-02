@@ -57,7 +57,7 @@ export default function RegisterPage() {
     <>
       <div className="auth-root register-page">
 
-        {/* ── LEFT ── */}
+        
         <div className="auth-left">
           <div className="deco-orb-1" />
           <div className="deco-orb-2" />
@@ -99,7 +99,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* ── RIGHT ── */}
+       
         <div className="auth-right">
           <div className="form-card">
             <div className="card-box">
@@ -118,7 +118,7 @@ export default function RegisterPage() {
               )}
 
               <form onSubmit={handleSubmit}>
-                {/* Full Name */}
+               
                 <div className="field">
                   <label>Full Name</label>
                   <div className="input-wrap">
@@ -139,7 +139,7 @@ export default function RegisterPage() {
                   {fErr.name && <div className="field-err">✕ {fErr.name}</div>}
                 </div>
 
-                {/* Email */}
+                
                 <div className="field">
                   <label>Email Address</label>
                   <div className="input-wrap">

@@ -1,4 +1,12 @@
-/* ─── Reset global — thème clair ─── */
+/* ════════════════════════════════════════════════
+   index.css — Global styles
+   ✅ Dashboard styles sont dans Dashboard.css,
+      scoped sous .dash-root — aucun conflit
+   ════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
+
+/* ── Reset global ── */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -17,7 +25,7 @@ body {
   min-height: 100vh;
 }
 
-/* #root sans contraintes — chaque page gère son propre layout */
+/* ── #root : PAS de max-width ni padding — chaque page gère son layout ── */
 #root {
   min-height: 100vh;
   display: flex;
@@ -25,11 +33,11 @@ body {
 }
 
 a { color: inherit; text-decoration: none; }
-
 button, input, textarea, select { font-family: inherit; }
 
-/* Scrollbar légère */
+/* ── Scrollbar légère (pour Login/Register/HomePage) ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #f0f4f8; }
 ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,0.5); }
+
