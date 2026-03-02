@@ -13,7 +13,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* ✅ HomePage = page par défaut */}
+          
           <Route path="/"          element={<HomePage />} />
           <Route path="/login"     element={<LoginPage />} />
           <Route path="/register"  element={<RegisterPage />} />
@@ -22,7 +22,7 @@ export default function App() {
               
             </PrivateRoute>
           } />
-          {/* Toute route inconnue → HomePage */}
+        
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
