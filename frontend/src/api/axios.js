@@ -17,7 +17,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Intercepteur réponse : si 401 → rediriger vers login
+// Intercepteur réponse : si 401 rediriger vers login
 api.interceptors.response.use(
   (response) => response,
   (error) => {
