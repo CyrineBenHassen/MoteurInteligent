@@ -1,9 +1,3 @@
-/* ════════════════════════════════════════════════
-   index.css — Global styles
-   ✅ Dashboard styles sont dans Dashboard.css,
-      scoped sous .dash-root — aucun conflit
-   ════════════════════════════════════════════════ */
-
 @import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
 
 /* ── Reset global ── */
@@ -14,7 +8,6 @@
 }
 
 html {
-  color-scheme: light;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -25,19 +18,24 @@ body {
   min-height: 100vh;
 }
 
-/* ── #root : PAS de max-width ni padding — chaque page gère son layout ── */
+/* ══════════════════════════════════════════════════
+   #root — AUCUN max-width, AUCUN padding, 
+   AUCUN text-align — chaque page gère son layout
+   ══════════════════════════════════════════════════ */
 #root {
+  width: 100%;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  /* PAS de max-width — c'est ce qui causait le bug */
+  /* PAS de padding */
+  /* PAS de text-align: center */
 }
 
 a { color: inherit; text-decoration: none; }
 button, input, textarea, select { font-family: inherit; }
 
-/* ── Scrollbar légère (pour Login/Register/HomePage) ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #f0f4f8; }
-::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,0.5); }
-
+::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(201,162,39,0.5); }

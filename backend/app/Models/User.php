@@ -23,6 +23,6 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed', // Laravel 10+ : hash auto
+        'password' => 'hashed', 
     ];
 }
