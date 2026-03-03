@@ -161,7 +161,7 @@
 /* ══════════════════════════════════════
    MAIN
 ══════════════════════════════════════ */
-.dash-root .main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; width:0; flex-grow:1; }
+.dash-root .main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; overflow-x:hidden; }
 
 /* ══════════════════════════════════════
    HEADER
@@ -277,7 +277,7 @@
 /* ══════════════════════════════════════
    STATS GRID (Dashboard)
 ══════════════════════════════════════ */
-.dash-root .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; width:100%; }
+.dash-root .stats-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-bottom:24px; width:100%; }
 .dash-root .stat-card {
   background:var(--card); border:1.5px solid var(--border);
   border-radius:16px; padding:22px 20px;
@@ -481,54 +481,68 @@
   .dash-root .h-search{ display:none; }
 }
 
-/* ── Fix: panels & stats fill full width ── */
-.dash-root .panel { animation:dFadeUp .38s var(--ease) both; width:100%; box-sizing:border-box; }
-.dash-root .content { flex:1; overflow-y:auto; overflow-x:hidden; padding:32px 36px; background:var(--bg); width:100%; min-width:0; }
+/* ════════════════════════════════════════
+   LAYOUT FIX — stats occupent toute la largeur
+   ════════════════════════════════════════ */
 
-
-/* ═══════════════════════════════════════════════════
-   FIX CRITIQUE — Empêche que #root ou Vite 
-   écrasent le layout avec max-width / text-align
-   ═══════════════════════════════════════════════════ */
-
-/* Override au niveau du wrapper si nécessaire */
-.dash-root,
-.dash-root .main,
-.dash-root .content,
-.dash-root .panel {
+/* Le root prend tout le viewport */
+.dash-root {
+  display: flex !important;
+  width: 100vw !important;
+  height: 100vh !important;
   max-width: none !important;
-  text-align: left !important;
+  overflow: hidden !important;
 }
 
+/* La sidebar ne doit pas rétrécir */
+.dash-root .sidebar {
+  flex-shrink: 0 !important;
+}
+
+/* Le main prend tout l'espace restant */
+.dash-root .main {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: hidden !important;
+}
+
+/* Le content prend toute la largeur du main */
 .dash-root .content {
   flex: 1 !important;
   width: 100% !important;
   min-width: 0 !important;
+  max-width: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
 }
 
-.dash-root .main {
-  flex: 1 !important;
-  min-width: 0 !important;
-  width: 0 !important;  /* force flex-grow to work */
-  flex-grow: 1 !important;
+/* Le panel prend toute la largeur */
+.dash-root .panel {
+  width: 100% !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
 }
 
-/* Stats grid : colonnes égales, pleine largeur */
+/* Stats : 4 colonnes égales, toute la largeur */
 .dash-root .stats-grid {
   display: grid !important;
-  grid-template-columns: repeat(4, 1fr) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   width: 100% !important;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 16px !important;
+  margin-bottom: 24px !important;
 }
 
-/* Gen layout pleine largeur */
-.dash-root .gen-layout {
+/* Chaque carte prend toute la hauteur de la grille */
+.dash-root .stat-card {
   width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  min-height: 140px !important;
 }
 
-/* Execution summary pleine largeur */
-.dash-root .exec-summary {
-  width: 100% !important;
-  grid-template-columns: repeat(4, 1fr) !important;
+@media(max-width:1100px) {
+  .dash-root .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
 }
