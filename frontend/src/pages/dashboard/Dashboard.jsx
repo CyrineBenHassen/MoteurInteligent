@@ -87,7 +87,7 @@ function DashboardPanel({ user, goTo }) {
     <div className="panel">
       <div className="p-header">
         <div>
-          <h1 className="p-title">Welcome back, <span className="g">{user?.name?.split(' ')[0] || 'User'}</span> </h1>
+          <h1 className="p-title">Welcome back, <span className="g">{user?.name?.split(' ')[0] || 'User'}</span> 👋</h1>
           <p className="p-sub">Here's your AI test generation overview</p>
         </div>
         <button className="btn-primary" onClick={() => goTo('generate')}>
@@ -127,7 +127,7 @@ function DashboardPanel({ user, goTo }) {
       <div className="section-box">
         <div className="sb-head">
           <span className="sb-title">Recent Activity</span>
-          <span className="sb-action" onClick={() => goTo('history')}>View all</span>
+          <span className="sb-action" onClick={() => goTo('history')}>View all →</span>
         </div>
         <div className="empty-row">No recent activity — your generations will appear here.</div>
       </div>
@@ -480,7 +480,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="dash-root">
+    <div className="dash-root" style={{position:"fixed",top:0,left:0,right:0,bottom:0,width:"100vw",height:"100vh",display:"flex",flexDirection:"row",overflow:"hidden"}}>
 
       {/* ════ SIDEBAR ════ */}
       <aside className={`sidebar${collapsed?' collapsed':''}`}>

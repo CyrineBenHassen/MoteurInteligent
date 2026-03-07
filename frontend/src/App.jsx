@@ -3,8 +3,8 @@ import { AuthProvider } from './context/AuthContext';
 import RegisterPage from './pages/auth/RegisterPage';
 import LoginPage    from './pages/auth/LoginPage';
 import HomePage     from './pages/home/HomePage';
+import AuthCallback  from './pages/auth/AuthCallback';
 import Dashboard    from './pages/dashboard/Dashboard';
-
 import PrivateRoute from './components/PrivateRoute';
 
 export default function App() {
@@ -15,6 +15,7 @@ export default function App() {
           <Route path="/"          element={<HomePage />} />
           <Route path="/login"     element={<LoginPage />} />
           <Route path="/register"  element={<RegisterPage />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/dashboard" element={
             <PrivateRoute>
               <Dashboard />

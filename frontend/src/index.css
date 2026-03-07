@@ -1,8 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
 
-*,
-*::before,
-*::after {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -16,16 +14,14 @@ html {
 body {
   font-family: 'Raleway', sans-serif;
   background: #f0f4f8;
-  min-height: 100vh;
 }
 
-
+/* #root ne doit PAS avoir display:flex ni flex-direction:column
+   sinon .dash-root se retrouve en mode "colonne enfant" 
+   et perd sa largeur naturelle */
 #root {
   width: 100%;
   height: 100vh;
-  display: flex;
-  flex-direction: column;
- 
 }
 
 a { color: inherit; text-decoration: none; }

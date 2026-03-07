@@ -39,8 +39,19 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  // ✅ Appelé depuis AuthCallback après redirection Google
+  const setAuthFromGoogle = (token, userData) => {
+    localStorage.setItem('token', token);
+    setUser(userData);
+  };
+
+  // ✅ Redirige vers Google via Laravel
+  const loginWithGoogle = () => {
+    window.location.href = 'http://localhost:8000/auth/google';
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, register, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, register, login, logout, loginWithGoogle, setAuthFromGoogle }}>
       {children}
     </AuthContext.Provider>
   );
