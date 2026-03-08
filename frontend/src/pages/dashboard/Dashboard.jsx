@@ -87,7 +87,7 @@ function DashboardPanel({ user, goTo }) {
     <div className="panel">
       <div className="p-header">
         <div>
-          <h1 className="p-title">Welcome back, <span className="g">{user?.name?.split(' ')[0] || 'User'}</span> 👋</h1>
+          <h1 className="p-title">Welcome back, <span className="g">{user?.name?.split(' ')[0] || 'User'}</span> </h1>
           <p className="p-sub">Here's your AI test generation overview</p>
         </div>
         <button className="btn-primary" onClick={() => goTo('generate')}>
