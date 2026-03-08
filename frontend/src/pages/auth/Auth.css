@@ -410,3 +410,15 @@
   .auth-left  { display: none; }
   .auth-right { padding: 32px 20px !important; }
 }
+.success-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(52, 168, 83, 0.1);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+  color: #34a853;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}

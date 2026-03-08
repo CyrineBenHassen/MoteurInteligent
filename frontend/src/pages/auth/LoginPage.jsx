@@ -127,7 +127,7 @@ export default function LoginPage() {
                     <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
                     Remember me
                   </label>
-                  <a href="#" className="forgot">Forgot password?</a>
+                  <Link to="/forgot-password" className="forgot">Forgot password?</Link>
                 </div>
 
                 <button type="submit" className="submit-btn" disabled={loading}>
