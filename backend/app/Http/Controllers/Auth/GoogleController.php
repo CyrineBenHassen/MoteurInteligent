@@ -17,7 +17,7 @@ class GoogleController extends Controller
     public function callback()
     {
         try {
-            // ✅ Fix SSL Windows local
+            
             $guzzle = new Client(['verify' => false]);
             $googleUser = Socialite::driver('google')
                 ->setHttpClient($guzzle)

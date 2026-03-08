@@ -16,9 +16,7 @@ body {
   background: #f0f4f8;
 }
 
-/* #root ne doit PAS avoir display:flex ni flex-direction:column
-   sinon .dash-root se retrouve en mode "colonne enfant" 
-   et perd sa largeur naturelle */
+
 #root {
   width: 100%;
   height: 100vh;
