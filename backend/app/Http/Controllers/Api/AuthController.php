@@ -78,8 +78,15 @@ class AuthController extends Controller
     }
 
     # PROFIL (route protégée)
-    public function me(Request $request)
-    {
-        return response()->json($request->user());
+   public function me(Request $request)
+{
+    $user = $request->user();
+    
+    // Ajouter l'URL complète de l'avatar
+    if ($user->avatar) {
+        $user->avatar = asset('storage/' . $user->avatar);
     }
+    
+    return response()->json($user);
+}
 }

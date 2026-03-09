@@ -527,3 +527,12 @@
   .dash-root .header  { padding: 0 16px; }
   .dash-root .h-search { display: none; }
 }
+
+.error-msg {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(239,68,68,.1);
+  border: 1px solid rgba(239,68,68,.3);
+  color: #ef4444; padding: 10px 14px;
+  border-radius: 8px; font-size: 13px;
+  margin-bottom: 16px;
+}

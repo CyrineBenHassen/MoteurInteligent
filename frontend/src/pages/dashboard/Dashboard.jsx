@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../api/axios';
 import './Dashboard.css';
 
 
@@ -385,32 +386,350 @@ function HistoryPanel() {
 
 
 function AccountPanel({ user }) {
+  const { setUser } = useAuth();
+  const [name,       setName]       = useState(user?.name  || '');
+  const [email,      setEmail]      = useState(user?.email || '');
+  const [currPwd,    setCurrPwd]    = useState('');
+  const [newPwd,     setNewPwd]     = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [msg,        setMsg]        = useState('');
+  const [error,      setError]      = useState('');
+  const [loading,    setLoading]    = useState(false);
+
+  const saveProfile = async () => {
+    setLoading(true); setMsg(''); setError('');
+    try {
+      const res = await api.put('/profile/update', { name, email });
+      setUser(res.data.user);
+      setMsg('Profile updated successfully!');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error occurred');
+    }
+    setLoading(false);
+  };
+
+  const changePassword = async () => {
+    if (newPwd !== confirmPwd) { setError('Passwords do not match'); return; }
+    setLoading(true); setMsg(''); setError('');
+    try {
+      await api.put('/profile/password', {
+        current_password: currPwd,
+        new_password: newPwd,
+        new_password_confirmation: confirmPwd
+      });
+      setMsg('Password changed successfully!');
+      setCurrPwd(''); setNewPwd(''); setConfirmPwd('');
+    } catch (err) {
+      setError(err.response?.data?.errors?.current_password?.[0] || 'Error occurred');
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="panel">
+      {/* Header */}
       <div className="p-header">
         <div>
           <h1 className="p-title">My <span className="g">Account</span></h1>
           <p className="p-sub">Manage your profile and access</p>
         </div>
       </div>
-      <div className="acc-hero">
-        <div className="acc-avatar">
-          {user?.avatar
-            ? <img src={user.avatar} alt="av" style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover'}}/>
-            : <span>{user?.name?.[0]?.toUpperCase() || 'U'}</span>}
-        </div>
-        <div>
-          <div className="acc-name">{user?.name || 'User'}</div>
-          <div className="acc-email">{user?.email || '—'}</div>
-          {user?.google_id && <div className="acc-pill">✓ Connected with Google</div>}
-        </div>
+
+      {/* Messages */}
+      {msg   && <div className="success-msg">✓ {msg}</div>}
+      {error && <div className="error-msg">✗ {error}</div>}
+
+      {/* Hero Banner */}
+<div style={{
+  background: 'linear-gradient(135deg, var(--navy) 0%, #0f2744 50%, var(--navy2) 100%)',
+  borderRadius: 20, padding: '32px 36px', marginBottom: 28,
+  position: 'relative', overflow: 'hidden',
+  border: '1px solid rgba(201,162,39,.15)',
+  boxShadow: '0 8px 32px rgba(6,14,30,.2)'
+}}>
+  {/* Background decorations */}
+  <div style={{
+    position:'absolute', top:-60, right:-60, width:220, height:220,
+    borderRadius:'50%',
+    background:'radial-gradient(circle, rgba(201,162,39,.12) 0%, transparent 70%)'
+  }}/>
+  <div style={{
+    position:'absolute', bottom:-40, left:'40%', width:160, height:160,
+    borderRadius:'50%',
+    background:'radial-gradient(circle, rgba(201,162,39,.06) 0%, transparent 70%)'
+  }}/>
+
+  <div style={{display:'flex', alignItems:'center', gap:28, position:'relative'}}>
+
+    {/* Avatar with upload button */}
+    <div style={{position:'relative', flexShrink:0}}>
+      <div style={{
+        width:88, height:88, borderRadius:'50%',
+        background:'linear-gradient(135deg, var(--gold), var(--gold2))',
+        display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:36, fontFamily:'var(--C)', fontWeight:700, color:'var(--navy)',
+        border:'3px solid rgba(255,255,255,.15)',
+        boxShadow:'0 4px 20px rgba(201,162,39,.35)',
+        overflow:'hidden'
+      }}>
+        {user?.avatar
+          ? <img src={user.avatar} alt="av"
+              style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+          : <span>{user?.name?.[0]?.toUpperCase() || 'U'}</span>}
       </div>
-      <div className="acc-fields">
-        <div className="acc-fields-title">Profile Information</div>
-        <div className="field"><label>Full Name</label><div className="field-wrap"><input type="text" defaultValue={user?.name || ''}/></div></div>
-        <div className="field"><label>Email</label><div className="field-wrap"><input type="email" defaultValue={user?.email || ''}/></div></div>
-        <div className="field"><label>New Password</label><div className="field-wrap"><input type="password" placeholder="Leave blank to keep current"/></div></div>
-        <button className="btn-primary" style={{width:'fit-content'}}>Save Changes</button>
+      {/* Upload button */}
+      {/* Input file caché */}
+<input
+  type="file"
+  id="avatar-upload"
+  accept="image/*"
+  style={{display:'none'}}
+  onChange={async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('avatar', file);
+    try {
+      const res = await api.post('/profile/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setUser(prev => ({ ...prev, avatar: res.data.avatar }));
+    } catch (err) {
+      console.error(err);
+    }
+  }}
+/>
+{/* Bouton caméra */}
+<button
+  style={{
+    position:'absolute', bottom:0, right:0,
+    width:28, height:28, borderRadius:'50%',
+    background:'linear-gradient(135deg, var(--gold), var(--gold2))',
+    border:'2px solid var(--navy)',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    cursor:'pointer', boxShadow:'0 2px 8px rgba(0,0,0,.3)',
+    transition:'transform .2s'
+  }}
+  onMouseEnter={e => e.currentTarget.style.transform='scale(1.15)'}
+  onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}
+  onClick={() => document.getElementById('avatar-upload').click()}
+  title="Change photo"
+>
+  <svg width="13" height="13" fill="none" stroke="var(--navy)"
+       strokeWidth="2.5" viewBox="0 0 24 24">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+    <circle cx="12" cy="13" r="4"/>
+  </svg>
+</button>
+    </div>
+
+    {/* User info */}
+    <div style={{flex:1}}>
+      <div style={{
+        fontFamily:'var(--C)', fontSize:28, fontWeight:700,
+        color:'#fff', marginBottom:4, lineHeight:1
+      }}>
+        {user?.name || 'User'}
+      </div>
+      <div style={{
+        fontSize:13, color:'rgba(255,255,255,.5)', marginBottom:12
+      }}>
+        {user?.email || '—'}
+      </div>
+      <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+        <span style={{
+          display:'inline-flex', alignItems:'center', gap:5,
+          fontSize:11, fontWeight:600,
+          color:'rgba(255,255,255,.6)',
+          background:'rgba(255,255,255,.07)',
+          border:'1px solid rgba(255,255,255,.1)',
+          padding:'4px 12px', borderRadius:20
+        }}>
+          <svg width="11" height="11" fill="none" stroke="currentColor"
+               strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          QA Engineer
+        </span>
+        {user?.google_id && (
+          <span style={{
+            display:'inline-flex', alignItems:'center', gap:5,
+            fontSize:11, fontWeight:600,
+            color:'rgba(255,255,255,.6)',
+            background:'rgba(255,255,255,.07)',
+            border:'1px solid rgba(255,255,255,.1)',
+            padding:'4px 12px', borderRadius:20
+          }}>
+            ✓ Connected with Google
+          </span>
+        )}
+      </div>
+    </div>
+
+    {/* Right side stats */}
+    <div style={{
+      display:'flex', flexDirection:'column', alignItems:'flex-end',
+      gap:8, flexShrink:0
+    }}>
+      <div style={{
+        background:'rgba(201,162,39,.1)',
+        border:'1px solid rgba(201,162,39,.25)',
+        borderRadius:12, padding:'12px 20px', textAlign:'center'
+      }}>
+        <div style={{
+          fontFamily:'var(--C)', fontSize:28, fontWeight:700,
+          color:'var(--gold)', lineHeight:1
+        }}>0</div>
+        <div style={{
+          fontSize:10, fontWeight:700, letterSpacing:'1.5px',
+          textTransform:'uppercase', color:'rgba(201,162,39,.7)',
+          marginTop:4
+        }}>Tests Generated</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+      {/* Two column layout */}
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:20}}>
+
+        {/* LEFT — Profile Information */}
+        <div className="set-group">
+          <div className="set-group-title">Profile Information</div>
+
+          <div style={{padding:'20px 20px', display:'flex', flexDirection:'column', gap:16}}>
+            <div className="field">
+              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)',
+                             letterSpacing:'1.5px', textTransform:'uppercase',
+                             marginBottom:6, display:'block'}}>
+                Full Name
+              </label>
+              <div className="field-wrap">
+                <svg width="15" height="15" fill="none" stroke="currentColor"
+                     strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}>
+                  <circle cx="12" cy="8" r="4"/>
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                </svg>
+                <input type="text" value={name}
+                  placeholder="Your full name"
+                  onChange={e => setName(e.target.value)}/>
+              </div>
+            </div>
+
+            <div className="field">
+              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)',
+                             letterSpacing:'1.5px', textTransform:'uppercase',
+                             marginBottom:6, display:'block'}}>
+                Email Address
+              </label>
+              <div className="field-wrap">
+                <svg width="15" height="15" fill="none" stroke="currentColor"
+                     strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}>
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                  <polyline points="22,6 12,13 2,6"/>
+                </svg>
+                <input type="email" value={email}
+                  placeholder="Your email"
+                  onChange={e => setEmail(e.target.value)}/>
+              </div>
+            </div>
+
+            <button className="btn-primary"
+              style={{width:'100%', justifyContent:'center', marginTop:4}}
+              onClick={saveProfile}
+              disabled={loading}>
+              {loading
+                ? <><span className="spinner"/>Saving…</>
+                : <>
+                    <svg width="13" height="13" fill="none" stroke="currentColor"
+                         strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                      <polyline points="17 21 17 13 7 13 7 21"/>
+                      <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    Save Changes
+                  </>}
+            </button>
+          </div>
+        </div>
+
+        {/* RIGHT — Change Password */}
+        <div className="set-group">
+          <div className="set-group-title">Change Password</div>
+
+          <div style={{padding:'20px 20px', display:'flex', flexDirection:'column', gap:16}}>
+            <div className="field">
+              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)',
+                             letterSpacing:'1.5px', textTransform:'uppercase',
+                             marginBottom:6, display:'block'}}>
+                Current Password
+              </label>
+              <div className="field-wrap">
+                <svg width="15" height="15" fill="none" stroke="currentColor"
+                     strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}>
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                <input type="password" value={currPwd}
+                  placeholder="Enter current password"
+                  onChange={e => setCurrPwd(e.target.value)}/>
+              </div>
+            </div>
+
+            <div className="field">
+              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)',
+                             letterSpacing:'1.5px', textTransform:'uppercase',
+                             marginBottom:6, display:'block'}}>
+                New Password
+              </label>
+              <div className="field-wrap">
+                <svg width="15" height="15" fill="none" stroke="currentColor"
+                     strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}>
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                <input type="password" value={newPwd}
+                  placeholder="Min 8 characters"
+                  onChange={e => setNewPwd(e.target.value)}/>
+              </div>
+            </div>
+
+            <div className="field">
+              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)',
+                             letterSpacing:'1.5px', textTransform:'uppercase',
+                             marginBottom:6, display:'block'}}>
+                Confirm New Password
+              </label>
+              <div className="field-wrap">
+                <svg width="15" height="15" fill="none" stroke="currentColor"
+                     strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}>
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                <input type="password" value={confirmPwd}
+                  placeholder="Confirm new password"
+                  onChange={e => setConfirmPwd(e.target.value)}/>
+              </div>
+            </div>
+
+            <button className="btn-primary"
+              style={{width:'100%', justifyContent:'center', marginTop:4}}
+              onClick={changePassword}
+              disabled={loading}>
+              {loading
+                ? <><span className="spinner"/>Updating…</>
+                : <>
+                    <svg width="13" height="13" fill="none" stroke="currentColor"
+                         strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    Update Password
+                  </>}
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   );
@@ -418,8 +737,37 @@ function AccountPanel({ user }) {
 
 
 function SettingsPanel() {
-  const [notifs, setNotifs] = useState(true);
-  const [weekly, setWeekly] = useState(false);
+  const [notifs,    setNotifs]    = useState(true);
+  const [weekly,    setWeekly]    = useState(false);
+  const [framework, setFramework] = useState('Selenium');
+  const [msg,       setMsg]       = useState('');
+  const [loading,   setLoading]   = useState(false);
+
+  // Charger settings au démarrage
+  useEffect(() => {
+    api.get('/settings').then(res => {
+      setNotifs(res.data.email_notifications);
+      setWeekly(res.data.weekly_report);
+      setFramework(res.data.default_framework);
+    });
+  }, []);
+
+  const saveSettings = async () => {
+    setLoading(true); setMsg('');
+    try {
+      await api.put('/settings/update', {
+        email_notifications: notifs,
+        weekly_report:       weekly,
+        default_framework:   framework
+      });
+      setMsg('Settings saved!');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="panel">
       <div className="p-header">
@@ -427,23 +775,59 @@ function SettingsPanel() {
           <h1 className="p-title">App <span className="g">Settings</span></h1>
           <p className="p-sub">Customize your NexTest experience</p>
         </div>
+        <button className="btn-primary"
+          onClick={saveSettings}
+          disabled={loading}>
+          {loading ? 'Saving…' : 'Save Settings'}
+        </button>
       </div>
+
+      {msg && <div className="success-msg">✓ {msg}</div>}
+
       <div className="set-group">
         <div className="set-group-title">Notifications</div>
         <div className="set-row">
-          <div><div className="set-name">Email Notifications</div><div className="set-desc">Get notified when a generation is complete</div></div>
-          <div className={`toggle${notifs?' on':''}`} onClick={() => setNotifs(p => !p)}><span className="toggle-knob"/></div>
+          <div>
+            <div className="set-name">Email Notifications</div>
+            <div className="set-desc">
+              Get notified when a generation is complete
+            </div>
+          </div>
+          <div className={`toggle${notifs?' on':''}`}
+            onClick={() => setNotifs(p => !p)}>
+            <span className="toggle-knob"/>
+          </div>
         </div>
         <div className="set-row">
-          <div><div className="set-name">Weekly Report</div><div className="set-desc">Summary of your weekly test activity</div></div>
-          <div className={`toggle${weekly?' on':''}`} onClick={() => setWeekly(p => !p)}><span className="toggle-knob"/></div>
+          <div>
+            <div className="set-name">Weekly Report</div>
+            <div className="set-desc">
+              Summary of your weekly test activity
+            </div>
+          </div>
+          <div className={`toggle${weekly?' on':''}`}
+            onClick={() => setWeekly(p => !p)}>
+            <span className="toggle-knob"/>
+          </div>
         </div>
       </div>
+
       <div className="set-group">
         <div className="set-group-title">Export Defaults</div>
         <div className="set-row">
-          <div><div className="set-name">Default Framework</div><div className="set-desc">Pre-selected for new generations</div></div>
-          <select className="set-select"><option>Selenium</option><option>Cypress</option><option>Both</option></select>
+          <div>
+            <div className="set-name">Default Framework</div>
+            <div className="set-desc">
+              Pre-selected for new generations
+            </div>
+          </div>
+          <select className="set-select"
+            value={framework}
+            onChange={e => setFramework(e.target.value)}>
+            <option>Selenium</option>
+            <option>Cypress</option>
+            <option>Both</option>
+          </select>
         </div>
       </div>
     </div>
