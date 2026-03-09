@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLang } from '../../context/LanguageContext';
 import api from '../../api/axios';
 import './Dashboard.css';
 
@@ -7,33 +8,20 @@ import './Dashboard.css';
 function NexLogo() {
   return (
     <div className="s-logo">
-    
       <div className="nav__gem">
         <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
           <rect width="44" height="44" rx="11" fill="none"/>
-          <polyline
-            points="8,14 22,30 36,14"
-            stroke="#060e1e" strokeWidth="4" fill="none"
-            strokeLinecap="round" strokeLinejoin="round"
-          />
-          <line
-            x1="8" y1="30" x2="36" y2="30"
-            stroke="rgba(6,14,30,0.5)" strokeWidth="2.5" strokeLinecap="round"
-          />
+          <polyline points="8,14 22,30 36,14" stroke="#060e1e" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          <line x1="8" y1="30" x2="36" y2="30" stroke="rgba(6,14,30,0.5)" strokeWidth="2.5" strokeLinecap="round"/>
         </svg>
       </div>
-
-     
       <div className="logo-words">
-        
         <div className="nav__name">NexTest</div>
-       
         <div className="nav__sub">Test Automation</div>
       </div>
     </div>
   );
 }
-
 
 const IC = {
   dashboard: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
@@ -45,24 +33,9 @@ const IC = {
   logout:    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>,
 };
 
-const NAV_MAIN = [
-  { id:'dashboard', label:'Dashboard',      badge:null  },
-  { id:'generate',  label:'New Generation', badge:'New' },
-  { id:'execution', label:'Test Execution', badge:null  },
-  { id:'history',   label:'History',        badge:null  },
-];
-const NAV_USER = [
-  { id:'account',  label:'Account'  },
-  { id:'settings', label:'Settings' },
-];
-
 function SItem({ id, label, badge, active, collapsed, onClick }) {
   return (
-    <button
-      className={`s-item${active ? ' active' : ''}`}
-      onClick={() => onClick(id)}
-      title={collapsed ? label : ''}
-    >
+    <button className={`s-item${active ? ' active' : ''}`} onClick={() => onClick(id)} title={collapsed ? label : ''}>
       <span className="s-icon">{IC[id]}</span>
       {!collapsed && <span className="s-label-txt">{label}</span>}
       {!collapsed && badge && <span className="s-badge">{badge}</span>}
@@ -73,22 +46,25 @@ function SItem({ id, label, badge, active, collapsed, onClick }) {
 
 
 function DashboardPanel({ user, goTo }) {
+  const { t } = useLang();
+
   const STATS = [
-    { icon:'🚀', val:'0',  lbl:'Scripts Generated', accent:'linear-gradient(90deg,#4f86e8,#6fa3ff)', trend:'+0%' },
-    { icon:'🔬', val:'0',  lbl:'Apps Analyzed',      accent:'linear-gradient(90deg,#c9a227,#e8c84a)', trend:'+0%' },
-    { icon:'🎯', val:'0%', lbl:'Avg. Coverage',      accent:'linear-gradient(90deg,#10b981,#34d399)', trend:'—'   },
-    { icon:'⚡', val:'0s', lbl:'Avg. Gen. Time',     accent:'linear-gradient(90deg,#f97316,#fb923c)', trend:'—'   },
+    { icon:'🚀', val:'0',  lbl: t('scriptsGenerated'), accent:'linear-gradient(90deg,#4f86e8,#6fa3ff)', trend:'+0%' },
+    { icon:'🔬', val:'0',  lbl: t('appsAnalyzed'),     accent:'linear-gradient(90deg,#c9a227,#e8c84a)', trend:'+0%' },
+    { icon:'🎯', val:'0%', lbl: t('avgCoverage'),      accent:'linear-gradient(90deg,#10b981,#34d399)', trend:'—'   },
+    { icon:'⚡', val:'0s', lbl: t('avgGenTime'),       accent:'linear-gradient(90deg,#f97316,#fb923c)', trend:'—'   },
   ];
+
   return (
     <div className="panel">
       <div className="p-header">
         <div>
-          <h1 className="p-title">Welcome back, <span className="g">{user?.name?.split(' ')[0] || 'User'}</span> </h1>
-          <p className="p-sub">Here's your AI test generation overview</p>
+          <h1 className="p-title">{t('welcome')}, <span className="g">{user?.name?.split(' ')[0] || 'User'}</span></h1>
+          <p className="p-sub">{t('overview')}</p>
         </div>
         <button className="btn-primary" onClick={() => goTo('generate')}>
           <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          New Generation
+          {t('newGeneration')}
         </button>
       </div>
 
@@ -112,20 +88,20 @@ function DashboardPanel({ user, goTo }) {
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
           </svg>
         </div>
-        <h3>No generations yet</h3>
-        <p>Provide a URL — the AI engine analyzes your interface and exports Selenium & Cypress scripts automatically.</p>
+        <h3>{t('noGenerations')}</h3>
+        <p>{t('noGenerationsDesc')}</p>
         <button className="btn-gold" onClick={() => goTo('generate')}>
           <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          Generate your first tests
+          {t('generateFirst')}
         </button>
       </div>
 
       <div className="section-box">
         <div className="sb-head">
-          <span className="sb-title">Recent Activity</span>
-          <span className="sb-action" onClick={() => goTo('history')}>View all →</span>
+          <span className="sb-title">{t('recentActivity')}</span>
+          <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')} →</span>
         </div>
-        <div className="empty-row">No recent activity — your generations will appear here.</div>
+        <div className="empty-row">{t('noActivity')}</div>
       </div>
     </div>
   );
@@ -133,6 +109,7 @@ function DashboardPanel({ user, goTo }) {
 
 
 function GeneratePanel({ goTo }) {
+  const { t } = useLang();
   const [url,     setUrl]  = useState('');
   const [fw,      setFw]   = useState('Selenium');
   const [loading, setLoad] = useState(false);
@@ -148,15 +125,15 @@ function GeneratePanel({ goTo }) {
     <div className="panel">
       <div className="p-header">
         <div>
-          <h1 className="p-title">New <span className="g">Generation</span></h1>
-          <p className="p-sub">Provide a URL — AI analyzes and generates test scripts</p>
+          <h1 className="p-title">{t('new')} <span className="g">{t('generation')}</span></h1>
+          <p className="p-sub">{t('generateDesc')}</p>
         </div>
       </div>
       <div className="gen-layout">
         <div className="gen-card">
           <form className="gen-form" onSubmit={submit}>
             <div className="field">
-              <label>Target URL</label>
+              <label>{t('targetUrl')}</label>
               <div className="field-wrap">
                 <span className="field-ico">
                   <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -165,7 +142,7 @@ function GeneratePanel({ goTo }) {
               </div>
             </div>
             <div className="field">
-              <label>Export Framework</label>
+              <label>{t('exportFramework')}</label>
               <div className="fw-tabs">
                 {['Selenium','Cypress','Both'].map(f => (
                   <button key={f} type="button" className={`fw-tab${fw===f?' on':''}`} onClick={() => setFw(f)}>{f}</button>
@@ -174,28 +151,28 @@ function GeneratePanel({ goTo }) {
             </div>
             <button type="submit" className="btn-gen" disabled={loading || !url}>
               {loading
-                ? <><span className="spinner"/>Analyzing…</>
-                : <><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Generate Tests</>}
+                ? <><span className="spinner"/>{t('analyzing')}</>
+                : <><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>{t('generateTests')}</>}
             </button>
           </form>
         </div>
 
         <div className="steps-card">
-          <div className="steps-title">How it works</div>
+          <div className="steps-title">{t('howItWorks')}</div>
           {[
-            ['01','DOM Scanning',    'All elements and interactions detected'],
-            ['02','AI Analysis',     'Maps flows and edge cases automatically'],
-            ['03','Test Generation', 'Functional test cases in plain language'],
-            ['04','Script Export',   'Ready-to-run Selenium & Cypress scripts'],
-          ].map(([n,t,d], i, arr) => (
+            ['01', t('domScanning'),    t('domScanningDesc')],
+            ['02', t('aiAnalysis'),     t('aiAnalysisDesc')],
+            ['03', t('testGeneration'), t('testGenerationDesc')],
+            ['04', t('scriptExport'),   t('scriptExportDesc')],
+          ].map(([n,title,desc], i, arr) => (
             <div className="i-step" key={n}>
               <div className="i-step-l">
                 <div className="i-step-num">{n}</div>
                 {i < arr.length - 1 && <div className="i-step-line"/>}
               </div>
               <div className="i-step-body">
-                <div className="i-step-t">{t}</div>
-                <div className="i-step-d">{d}</div>
+                <div className="i-step-t">{title}</div>
+                <div className="i-step-d">{desc}</div>
               </div>
             </div>
           ))}
@@ -224,6 +201,7 @@ function StatusIcon({ s }) {
 }
 
 function ExecutionPanel() {
+  const { t } = useLang();
   const [running,  setRunning]  = useState(false);
   const [progress, setProgress] = useState(0);
   const [done,     setDone]     = useState(false);
@@ -244,45 +222,38 @@ function ExecutionPanel() {
   const fail = TESTS.filter(t => t.status==='fail').length;
   const skip = TESTS.filter(t => t.status==='skip').length;
   const rate = Math.round((pass / TESTS.length) * 100);
-
   const shown = filter==='all' ? TESTS : TESTS.filter(t => t.status===filter);
 
   return (
     <div className="panel">
-     
       <div className="p-header">
         <div>
-          <h1 className="p-title">Test <span className="g">Execution</span></h1>
-          <p className="p-sub">Run and monitor your generated test suites in real time</p>
+          <h1 className="p-title">{t('test')} <span className="g">{t('execution')}</span></h1>
+          <p className="p-sub">{t('executionDesc')}</p>
         </div>
         <div style={{display:'flex', gap:10, alignItems:'center', flexWrap:'wrap'}}>
           <div className="fw-tabs">
             {['Selenium','Cypress'].map(f => (
-              <button key={f} type="button"
-                className={`fw-tab${fw===f?' on':''}`}
-                onClick={() => setFw(f)}
-                style={{minWidth:90}}
-              >{f}</button>
+              <button key={f} type="button" className={`fw-tab${fw===f?' on':''}`} onClick={() => setFw(f)} style={{minWidth:90}}>{f}</button>
             ))}
           </div>
           <button className="btn-primary" onClick={runAll} disabled={running}>
             {running
-              ? <><span className="spinner"/>Running…</>
+              ? <><span className="spinner"/>{t('running')}</>
               : done
-                ? <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-3.71"/></svg>Re-run All</>
-                : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>Run All Tests</>}
+                ? <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-3.71"/></svg>{t('rerunAll')}</>
+                : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>{t('runAllTests')}</>}
           </button>
         </div>
       </div>
 
-      
       {(running || done) && (
         <div className="exec-progress-wrap">
           <div className="exec-progress-header">
             <span className="exec-progress-label">
-              {done ? '✓ Execution complete' : `Running tests… ${Math.round(progress)}%`}
+              {done ? `✓ ${t('executionComplete')}` : `${t('runningTests')} ${Math.round(progress)}%`}
             </span>
-            {done && <span className="exec-progress-done">{TESTS.length} tests · 6.5s total</span>}
+            {done && <span className="exec-progress-done">{TESTS.length} {t('tests')} · 6.5s {t('total')}</span>}
           </div>
           <div className="exec-progress-bar">
             <div className="exec-progress-fill" style={{width:`${progress}%`}}/>
@@ -290,70 +261,62 @@ function ExecutionPanel() {
         </div>
       )}
 
-     
       {done && (
         <div className="exec-summary">
-          <div className="exec-sum-card exec-sum-pass"><div className="exec-sum-val">{pass}</div><div className="exec-sum-lbl">Passed</div></div>
-          <div className="exec-sum-card exec-sum-fail"><div className="exec-sum-val">{fail}</div><div className="exec-sum-lbl">Failed</div></div>
-          <div className="exec-sum-card exec-sum-skip"><div className="exec-sum-val">{skip}</div><div className="exec-sum-lbl">Skipped</div></div>
-          <div className="exec-sum-card exec-sum-rate"><div className="exec-sum-val">{rate}%</div><div className="exec-sum-lbl">Pass Rate</div></div>
+          <div className="exec-sum-card exec-sum-pass"><div className="exec-sum-val">{pass}</div><div className="exec-sum-lbl">{t('passed')}</div></div>
+          <div className="exec-sum-card exec-sum-fail"><div className="exec-sum-val">{fail}</div><div className="exec-sum-lbl">{t('failed')}</div></div>
+          <div className="exec-sum-card exec-sum-skip"><div className="exec-sum-val">{skip}</div><div className="exec-sum-lbl">{t('skipped')}</div></div>
+          <div className="exec-sum-card exec-sum-rate"><div className="exec-sum-val">{rate}%</div><div className="exec-sum-lbl">{t('passRate')}</div></div>
         </div>
       )}
 
-      
       {(done || running) && (
         <div className="exec-filters">
-          <button className={`exec-filter${filter==='all' ?' on':''}`} onClick={() => setFilter('all')}>All ({TESTS.length})</button>
-          <button className={`exec-filter${filter==='pass'?' on':''}`} onClick={() => setFilter('pass')}>✓ Passed ({pass})</button>
-          <button className={`exec-filter${filter==='fail'?' on':''}`} onClick={() => setFilter('fail')}>✗ Failed ({fail})</button>
-          <button className={`exec-filter${filter==='skip'?' on':''}`} onClick={() => setFilter('skip')}>⚠ Skipped ({skip})</button>
+          <button className={`exec-filter${filter==='all' ?' on':''}`} onClick={() => setFilter('all')}>{t('all')} ({TESTS.length})</button>
+          <button className={`exec-filter${filter==='pass'?' on':''}`} onClick={() => setFilter('pass')}>✓ {t('passed')} ({pass})</button>
+          <button className={`exec-filter${filter==='fail'?' on':''}`} onClick={() => setFilter('fail')}>✗ {t('failed')} ({fail})</button>
+          <button className={`exec-filter${filter==='skip'?' on':''}`} onClick={() => setFilter('skip')}>⚠ {t('skipped')} ({skip})</button>
         </div>
       )}
 
-    
       <div className="exec-list">
         {!done && !running && (
           <div className="exec-empty">
             <div className="exec-empty-icon">
               <svg width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             </div>
-            <p>Click <strong>Run All Tests</strong> to execute your {fw} suite</p>
+            <p>{t('clickRun')} <strong>{t('runAllTests')}</strong> {t('toExecute')} {fw} {t('suite')}</p>
           </div>
         )}
 
-        {(done || running) && shown.map((t, i) => (
-          <div
-            key={t.id}
-            className={`exec-row exec-row--${done ? t.status : 'pending'}`}
-            style={{animationDelay:`${i * 0.045}s`}}
-          >
+        {(done || running) && shown.map((test, i) => (
+          <div key={test.id} className={`exec-row exec-row--${done ? test.status : 'pending'}`} style={{animationDelay:`${i * 0.045}s`}}>
             <div className="exec-row-status">
-              {done ? <StatusIcon s={t.status}/> : <span className="exec-spinner-sm"/>}
+              {done ? <StatusIcon s={test.status}/> : <span className="exec-spinner-sm"/>}
             </div>
             <div className="exec-row-info">
-              <div className="exec-row-name">{t.name}</div>
-              <div className="exec-row-suite">{t.suite}</div>
+              <div className="exec-row-name">{test.name}</div>
+              <div className="exec-row-suite">{test.suite}</div>
             </div>
             <div className="exec-row-meta">
-              <span className={`exec-badge exec-badge--${done ? t.status : 'pending'}`}>
-                {done ? t.status : 'running'}
+              <span className={`exec-badge exec-badge--${done ? test.status : 'pending'}`}>
+                {done ? test.status : t('running').replace('…','')}
               </span>
-              <span className="exec-duration">{done ? t.duration : '…'}</span>
+              <span className="exec-duration">{done ? test.duration : '…'}</span>
             </div>
           </div>
         ))}
       </div>
 
-      
       {done && (
         <div style={{marginTop:18, display:'flex', gap:10}}>
           <button className="btn-primary" style={{fontSize:11, padding:'9px 18px'}}>
             <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Download Report
+            {t('downloadReport')}
           </button>
           <button className="btn-outline" style={{fontSize:11, padding:'9px 18px'}}>
             <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            Share Results
+            {t('shareResults')}
           </button>
         </div>
       )}
@@ -363,12 +326,13 @@ function ExecutionPanel() {
 
 
 function HistoryPanel() {
+  const { t } = useLang();
   return (
     <div className="panel">
       <div className="p-header">
         <div>
-          <h1 className="p-title">Generation <span className="g">History</span></h1>
-          <p className="p-sub">All your past test generations</p>
+          <h1 className="p-title">{t('generation')} <span className="g">{t('history')}</span></h1>
+          <p className="p-sub">{t('historyDesc')}</p>
         </div>
       </div>
       <div className="hist-empty">
@@ -377,8 +341,8 @@ function HistoryPanel() {
             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
           </svg>
         </div>
-        <h3>No history yet</h3>
-        <p>Your past generations will appear here once you start analyzing your first web app.</p>
+        <h3>{t('noHistoryYet')}</h3>
+        <p>{t('noHistoryDesc')}</p>
       </div>
     </div>
   );
@@ -387,6 +351,7 @@ function HistoryPanel() {
 
 function AccountPanel({ user }) {
   const { setUser } = useAuth();
+  const { t } = useLang();
   const [name,       setName]       = useState(user?.name  || '');
   const [email,      setEmail]      = useState(user?.email || '');
   const [currPwd,    setCurrPwd]    = useState('');
@@ -401,15 +366,15 @@ function AccountPanel({ user }) {
     try {
       const res = await api.put('/profile/update', { name, email });
       setUser(res.data.user);
-      setMsg('Profile updated successfully!');
+      setMsg(t('profileUpdated'));
     } catch (err) {
-      setError(err.response?.data?.message || 'Error occurred');
+      setError(err.response?.data?.message || t('errorOccurred'));
     }
     setLoading(false);
   };
 
   const changePassword = async () => {
-    if (newPwd !== confirmPwd) { setError('Passwords do not match'); return; }
+    if (newPwd !== confirmPwd) { setError(t('passwordMismatch')); return; }
     setLoading(true); setMsg(''); setError('');
     try {
       await api.put('/profile/password', {
@@ -417,319 +382,163 @@ function AccountPanel({ user }) {
         new_password: newPwd,
         new_password_confirmation: confirmPwd
       });
-      setMsg('Password changed successfully!');
+      setMsg(t('passwordChanged'));
       setCurrPwd(''); setNewPwd(''); setConfirmPwd('');
     } catch (err) {
-      setError(err.response?.data?.errors?.current_password?.[0] || 'Error occurred');
+      setError(err.response?.data?.errors?.current_password?.[0] || t('errorOccurred'));
     }
     setLoading(false);
   };
 
   return (
     <div className="panel">
-      {/* Header */}
       <div className="p-header">
         <div>
-          <h1 className="p-title">My <span className="g">Account</span></h1>
-          <p className="p-sub">Manage your profile and access</p>
+          <h1 className="p-title">{t('my')} <span className="g">{t('account')}</span></h1>
+          <p className="p-sub">{t('accountDesc')}</p>
         </div>
       </div>
 
-      {/* Messages */}
       {msg   && <div className="success-msg">✓ {msg}</div>}
       {error && <div className="error-msg">✗ {error}</div>}
 
-      {/* Hero Banner */}
-<div style={{
-  background: 'linear-gradient(135deg, var(--navy) 0%, #0f2744 50%, var(--navy2) 100%)',
-  borderRadius: 20, padding: '32px 36px', marginBottom: 28,
-  position: 'relative', overflow: 'hidden',
-  border: '1px solid rgba(201,162,39,.15)',
-  boxShadow: '0 8px 32px rgba(6,14,30,.2)'
-}}>
-  {/* Background decorations */}
-  <div style={{
-    position:'absolute', top:-60, right:-60, width:220, height:220,
-    borderRadius:'50%',
-    background:'radial-gradient(circle, rgba(201,162,39,.12) 0%, transparent 70%)'
-  }}/>
-  <div style={{
-    position:'absolute', bottom:-40, left:'40%', width:160, height:160,
-    borderRadius:'50%',
-    background:'radial-gradient(circle, rgba(201,162,39,.06) 0%, transparent 70%)'
-  }}/>
-
-  <div style={{display:'flex', alignItems:'center', gap:28, position:'relative'}}>
-
-    {/* Avatar with upload button */}
-    <div style={{position:'relative', flexShrink:0}}>
       <div style={{
-        width:88, height:88, borderRadius:'50%',
-        background:'linear-gradient(135deg, var(--gold), var(--gold2))',
-        display:'flex', alignItems:'center', justifyContent:'center',
-        fontSize:36, fontFamily:'var(--C)', fontWeight:700, color:'var(--navy)',
-        border:'3px solid rgba(255,255,255,.15)',
-        boxShadow:'0 4px 20px rgba(201,162,39,.35)',
-        overflow:'hidden'
+        background: 'linear-gradient(135deg, var(--navy) 0%, #0f2744 50%, var(--navy2) 100%)',
+        borderRadius: 20, padding: '32px 36px', marginBottom: 28,
+        position: 'relative', overflow: 'hidden',
+        border: '1px solid rgba(201,162,39,.15)',
+        boxShadow: '0 8px 32px rgba(6,14,30,.2)'
       }}>
-        {user?.avatar
-          ? <img src={user.avatar} alt="av"
-              style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-          : <span>{user?.name?.[0]?.toUpperCase() || 'U'}</span>}
-      </div>
-      {/* Upload button */}
-      {/* Input file caché */}
-<input
-  type="file"
-  id="avatar-upload"
-  accept="image/*"
-  style={{display:'none'}}
-  onChange={async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('avatar', file);
-    try {
-      const res = await api.post('/profile/avatar', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setUser(prev => ({ ...prev, avatar: res.data.avatar }));
-    } catch (err) {
-      console.error(err);
-    }
-  }}
-/>
-{/* Bouton caméra */}
-<button
-  style={{
-    position:'absolute', bottom:0, right:0,
-    width:28, height:28, borderRadius:'50%',
-    background:'linear-gradient(135deg, var(--gold), var(--gold2))',
-    border:'2px solid var(--navy)',
-    display:'flex', alignItems:'center', justifyContent:'center',
-    cursor:'pointer', boxShadow:'0 2px 8px rgba(0,0,0,.3)',
-    transition:'transform .2s'
-  }}
-  onMouseEnter={e => e.currentTarget.style.transform='scale(1.15)'}
-  onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}
-  onClick={() => document.getElementById('avatar-upload').click()}
-  title="Change photo"
->
-  <svg width="13" height="13" fill="none" stroke="var(--navy)"
-       strokeWidth="2.5" viewBox="0 0 24 24">
-    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-    <circle cx="12" cy="13" r="4"/>
-  </svg>
-</button>
-    </div>
+        <div style={{position:'absolute', top:-60, right:-60, width:220, height:220, borderRadius:'50%', background:'radial-gradient(circle, rgba(201,162,39,.12) 0%, transparent 70%)'}}/>
+        <div style={{position:'absolute', bottom:-40, left:'40%', width:160, height:160, borderRadius:'50%', background:'radial-gradient(circle, rgba(201,162,39,.06) 0%, transparent 70%)'}}/>
 
-    {/* User info */}
-    <div style={{flex:1}}>
-      <div style={{
-        fontFamily:'var(--C)', fontSize:28, fontWeight:700,
-        color:'#fff', marginBottom:4, lineHeight:1
-      }}>
-        {user?.name || 'User'}
-      </div>
-      <div style={{
-        fontSize:13, color:'rgba(255,255,255,.5)', marginBottom:12
-      }}>
-        {user?.email || '—'}
-      </div>
-      <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-        <span style={{
-          display:'inline-flex', alignItems:'center', gap:5,
-          fontSize:11, fontWeight:600,
-          color:'rgba(255,255,255,.6)',
-          background:'rgba(255,255,255,.07)',
-          border:'1px solid rgba(255,255,255,.1)',
-          padding:'4px 12px', borderRadius:20
-        }}>
-          <svg width="11" height="11" fill="none" stroke="currentColor"
-               strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-          QA Engineer
-        </span>
-        {user?.google_id && (
-          <span style={{
-            display:'inline-flex', alignItems:'center', gap:5,
-            fontSize:11, fontWeight:600,
-            color:'rgba(255,255,255,.6)',
-            background:'rgba(255,255,255,.07)',
-            border:'1px solid rgba(255,255,255,.1)',
-            padding:'4px 12px', borderRadius:20
-          }}>
-            ✓ Connected with Google
-          </span>
-        )}
-      </div>
-    </div>
+        <div style={{display:'flex', alignItems:'center', gap:28, position:'relative'}}>
+          <div style={{position:'relative', flexShrink:0}}>
+            <div style={{
+              width:88, height:88, borderRadius:'50%',
+              background:'linear-gradient(135deg, var(--gold), var(--gold2))',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:36, fontFamily:'var(--C)', fontWeight:700, color:'var(--navy)',
+              border:'3px solid rgba(255,255,255,.15)',
+              boxShadow:'0 4px 20px rgba(201,162,39,.35)',
+              overflow:'hidden'
+            }}>
+              {user?.avatar
+                ? <img src={user.avatar} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                : <span>{user?.name?.[0]?.toUpperCase() || 'U'}</span>}
+            </div>
+            <input type="file" id="avatar-upload" accept="image/*" style={{display:'none'}}
+              onChange={async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const formData = new FormData();
+                formData.append('avatar', file);
+                try {
+                  const res = await api.post('/profile/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                  setUser(prev => ({ ...prev, avatar: res.data.avatar }));
+                } catch (err) { console.error(err); }
+              }}
+            />
+            <button style={{
+              position:'absolute', bottom:0, right:0, width:28, height:28, borderRadius:'50%',
+              background:'linear-gradient(135deg, var(--gold), var(--gold2))',
+              border:'2px solid var(--navy)', display:'flex', alignItems:'center', justifyContent:'center',
+              cursor:'pointer', boxShadow:'0 2px 8px rgba(0,0,0,.3)', transition:'transform .2s'
+            }}
+              onMouseEnter={e => e.currentTarget.style.transform='scale(1.15)'}
+              onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}
+              onClick={() => document.getElementById('avatar-upload').click()}
+              title={t('changePhoto')}
+            >
+              <svg width="13" height="13" fill="none" stroke="var(--navy)" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </button>
+          </div>
 
-    {/* Right side stats */}
-    <div style={{
-      display:'flex', flexDirection:'column', alignItems:'flex-end',
-      gap:8, flexShrink:0
-    }}>
-      <div style={{
-        background:'rgba(201,162,39,.1)',
-        border:'1px solid rgba(201,162,39,.25)',
-        borderRadius:12, padding:'12px 20px', textAlign:'center'
-      }}>
-        <div style={{
-          fontFamily:'var(--C)', fontSize:28, fontWeight:700,
-          color:'var(--gold)', lineHeight:1
-        }}>0</div>
-        <div style={{
-          fontSize:10, fontWeight:700, letterSpacing:'1.5px',
-          textTransform:'uppercase', color:'rgba(201,162,39,.7)',
-          marginTop:4
-        }}>Tests Generated</div>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:'var(--C)', fontSize:28, fontWeight:700, color:'#fff', marginBottom:4, lineHeight:1}}>
+              {user?.name || 'User'}
+            </div>
+            <div style={{fontSize:13, color:'rgba(255,255,255,.5)', marginBottom:12}}>
+              {user?.email || '—'}
+            </div>
+            <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+              <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:11, fontWeight:600, color:'rgba(255,255,255,.6)', background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.1)', padding:'4px 12px', borderRadius:20}}>
+                <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                {t('qaEngineer')}
+              </span>
+              {user?.google_id && (
+                <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:11, fontWeight:600, color:'rgba(255,255,255,.6)', background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.1)', padding:'4px 12px', borderRadius:20}}>
+                  ✓ {t('connectedGoogle')}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:8, flexShrink:0}}>
+            <div style={{background:'rgba(201,162,39,.1)', border:'1px solid rgba(201,162,39,.25)', borderRadius:12, padding:'12px 20px', textAlign:'center'}}>
+              <div style={{fontFamily:'var(--C)', fontSize:28, fontWeight:700, color:'var(--gold)', lineHeight:1}}>0</div>
+              <div style={{fontSize:10, fontWeight:700, letterSpacing:'1.5px', textTransform:'uppercase', color:'rgba(201,162,39,.7)', marginTop:4}}>{t('testsGenerated')}</div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-  </div>
-</div>
-
-      {/* Two column layout */}
       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:20}}>
-
-        {/* LEFT — Profile Information */}
         <div className="set-group">
-          <div className="set-group-title">Profile Information</div>
-
+          <div className="set-group-title">{t('profileInformation')}</div>
           <div style={{padding:'20px 20px', display:'flex', flexDirection:'column', gap:16}}>
             <div className="field">
-              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)',
-                             letterSpacing:'1.5px', textTransform:'uppercase',
-                             marginBottom:6, display:'block'}}>
-                Full Name
-              </label>
+              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:6, display:'block'}}>{t('fullName')}</label>
               <div className="field-wrap">
-                <svg width="15" height="15" fill="none" stroke="currentColor"
-                     strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}>
-                  <circle cx="12" cy="8" r="4"/>
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-                </svg>
-                <input type="text" value={name}
-                  placeholder="Your full name"
-                  onChange={e => setName(e.target.value)}/>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                <input type="text" value={name} placeholder={t('yourFullName')} onChange={e => setName(e.target.value)}/>
               </div>
             </div>
-
             <div className="field">
-              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)',
-                             letterSpacing:'1.5px', textTransform:'uppercase',
-                             marginBottom:6, display:'block'}}>
-                Email Address
-              </label>
+              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:6, display:'block'}}>{t('emailAddress')}</label>
               <div className="field-wrap">
-                <svg width="15" height="15" fill="none" stroke="currentColor"
-                     strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}>
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                  <polyline points="22,6 12,13 2,6"/>
-                </svg>
-                <input type="email" value={email}
-                  placeholder="Your email"
-                  onChange={e => setEmail(e.target.value)}/>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <input type="email" value={email} placeholder={t('yourEmail')} onChange={e => setEmail(e.target.value)}/>
               </div>
             </div>
-
-            <button className="btn-primary"
-              style={{width:'100%', justifyContent:'center', marginTop:4}}
-              onClick={saveProfile}
-              disabled={loading}>
-              {loading
-                ? <><span className="spinner"/>Saving…</>
-                : <>
-                    <svg width="13" height="13" fill="none" stroke="currentColor"
-                         strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                      <polyline points="17 21 17 13 7 13 7 21"/>
-                      <polyline points="7 3 7 8 15 8"/>
-                    </svg>
-                    Save Changes
-                  </>}
+            <button className="btn-primary" style={{width:'100%', justifyContent:'center', marginTop:4}} onClick={saveProfile} disabled={loading}>
+              {loading ? <><span className="spinner"/>{t('saving')}</> : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>{t('saveChanges')}</>}
             </button>
           </div>
         </div>
 
-        {/* RIGHT — Change Password */}
         <div className="set-group">
-          <div className="set-group-title">Change Password</div>
-
+          <div className="set-group-title">{t('changePassword')}</div>
           <div style={{padding:'20px 20px', display:'flex', flexDirection:'column', gap:16}}>
             <div className="field">
-              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)',
-                             letterSpacing:'1.5px', textTransform:'uppercase',
-                             marginBottom:6, display:'block'}}>
-                Current Password
-              </label>
+              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:6, display:'block'}}>{t('currentPassword')}</label>
               <div className="field-wrap">
-                <svg width="15" height="15" fill="none" stroke="currentColor"
-                     strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}>
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                <input type="password" value={currPwd}
-                  placeholder="Enter current password"
-                  onChange={e => setCurrPwd(e.target.value)}/>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" value={currPwd} placeholder={t('enterCurrentPassword')} onChange={e => setCurrPwd(e.target.value)}/>
               </div>
             </div>
-
             <div className="field">
-              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)',
-                             letterSpacing:'1.5px', textTransform:'uppercase',
-                             marginBottom:6, display:'block'}}>
-                New Password
-              </label>
+              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:6, display:'block'}}>{t('newPassword')}</label>
               <div className="field-wrap">
-                <svg width="15" height="15" fill="none" stroke="currentColor"
-                     strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}>
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                <input type="password" value={newPwd}
-                  placeholder="Min 8 characters"
-                  onChange={e => setNewPwd(e.target.value)}/>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" value={newPwd} placeholder={t('minChars')} onChange={e => setNewPwd(e.target.value)}/>
               </div>
             </div>
-
             <div className="field">
-              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)',
-                             letterSpacing:'1.5px', textTransform:'uppercase',
-                             marginBottom:6, display:'block'}}>
-                Confirm New Password
-              </label>
+              <label style={{fontSize:11, fontWeight:700, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:6, display:'block'}}>{t('confirmNewPassword')}</label>
               <div className="field-wrap">
-                <svg width="15" height="15" fill="none" stroke="currentColor"
-                     strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}>
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                <input type="password" value={confirmPwd}
-                  placeholder="Confirm new password"
-                  onChange={e => setConfirmPwd(e.target.value)}/>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" value={confirmPwd} placeholder={t('confirmNewPassword')} onChange={e => setConfirmPwd(e.target.value)}/>
               </div>
             </div>
-
-            <button className="btn-primary"
-              style={{width:'100%', justifyContent:'center', marginTop:4}}
-              onClick={changePassword}
-              disabled={loading}>
-              {loading
-                ? <><span className="spinner"/>Updating…</>
-                : <>
-                    <svg width="13" height="13" fill="none" stroke="currentColor"
-                         strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                    Update Password
-                  </>}
+            <button className="btn-primary" style={{width:'100%', justifyContent:'center', marginTop:4}} onClick={changePassword} disabled={loading}>
+              {loading ? <><span className="spinner"/>{t('updating')}</> : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{t('updatePassword')}</>}
             </button>
           </div>
         </div>
-
       </div>
     </div>
   );
@@ -737,6 +546,7 @@ function AccountPanel({ user }) {
 
 
 function SettingsPanel() {
+  const { t, setLanguage: applyLang } = useLang();
   const [notifs,    setNotifs]    = useState(true);
   const [weekly,    setWeekly]    = useState(false);
   const [framework, setFramework] = useState('Selenium');
@@ -754,7 +564,7 @@ function SettingsPanel() {
       setLanguage(res.data.language || 'en');
     });
   }, []);
-   
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
@@ -769,7 +579,8 @@ function SettingsPanel() {
         theme,
         language
       });
-      setMsg('Settings saved!');
+      applyLang(language);
+      setMsg(t('settingsSaved'));
       setTimeout(() => setMsg(''), 3000);
     } catch (err) {
       console.error(err);
@@ -787,36 +598,25 @@ function SettingsPanel() {
     <div className="panel">
       <div className="p-header">
         <div>
-          <h1 className="p-title">App <span className="g">Settings</span></h1>
-          <p className="p-sub">Customize your NexTest experience</p>
+          <h1 className="p-title">{t('appSettings')} <span className="g">{t('settings')}</span></h1>
+          <p className="p-sub">{t('customize')}</p>
         </div>
         <button className="btn-primary" onClick={saveSettings} disabled={loading}>
           {loading
-            ? <><span className="spinner"/>Saving…</>
-            : <>
-                <svg width="13" height="13" fill="none" stroke="currentColor"
-                     strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                  <polyline points="17 21 17 13 7 13 7 21"/>
-                  <polyline points="7 3 7 8 15 8"/>
-                </svg>
-                Save Settings
-              </>}
+            ? <><span className="spinner"/>{t('saving')}</>
+            : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>{t('saveSettings')}</>}
         </button>
       </div>
 
       {msg && <div className="success-msg">✓ {msg}</div>}
 
-      {/* 2 colonnes */}
       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20}}>
-
-        {/* LEFT — Notifications */}
         <div className="set-group">
-          <div className="set-group-title">Notifications</div>
+          <div className="set-group-title">{t('notifications')}</div>
           <div className="set-row">
             <div>
-              <div className="set-name">Email Notifications</div>
-              <div className="set-desc">Get notified when a generation is complete</div>
+              <div className="set-name">{t('emailNotif')}</div>
+              <div className="set-desc">{t('emailNotifDesc')}</div>
             </div>
             <div className={`toggle${notifs?' on':''}`} onClick={() => setNotifs(p => !p)}>
               <span className="toggle-knob"/>
@@ -824,8 +624,8 @@ function SettingsPanel() {
           </div>
           <div className="set-row">
             <div>
-              <div className="set-name">Weekly Report</div>
-              <div className="set-desc">Summary of your weekly test activity</div>
+              <div className="set-name">{t('weeklyReport')}</div>
+              <div className="set-desc">{t('weeklyReportDesc')}</div>
             </div>
             <div className={`toggle${weekly?' on':''}`} onClick={() => setWeekly(p => !p)}>
               <span className="toggle-knob"/>
@@ -833,145 +633,73 @@ function SettingsPanel() {
           </div>
         </div>
 
-        {/* RIGHT — Export Defaults */}
         <div className="set-group">
-          <div className="set-group-title">Export Defaults</div>
+          <div className="set-group-title">{t('exportDefaults')}</div>
           <div className="set-row">
             <div>
-              <div className="set-name">Default Framework</div>
-              <div className="set-desc">Pre-selected for new generations</div>
+              <div className="set-name">{t('defaultFramework')}</div>
+              <div className="set-desc">{t('defaultFrameworkDesc')}</div>
             </div>
-            <select className="set-select" value={framework}
-              onChange={e => setFramework(e.target.value)}>
+            <select className="set-select" value={framework} onChange={e => setFramework(e.target.value)}>
               <option>Selenium</option>
               <option>Cypress</option>
               <option>Both</option>
             </select>
           </div>
         </div>
-
       </div>
 
-      {/* 2 colonnes */}
       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:20}}>
-
-        {/* LEFT — Appearance */}
         <div className="set-group">
-          <div className="set-group-title">Appearance</div>
+          <div className="set-group-title">{t('appearance')}</div>
           <div style={{padding:'16px 20px'}}>
-            <div className="set-name" style={{marginBottom:4}}>Theme</div>
-            <div className="set-desc" style={{marginBottom:14}}>
-              Choose your preferred interface theme
-            </div>
+            <div className="set-name" style={{marginBottom:4}}>{t('theme')}</div>
+            <div className="set-desc" style={{marginBottom:14}}>{t('themeDesc')}</div>
             <div style={{display:'flex', gap:12}}>
-
-              {/* Light */}
-              <div onClick={() => setTheme('light')} style={{
-                flex:1, padding:'14px 12px', borderRadius:12, cursor:'pointer',
-                border: theme==='light'
-                  ? '2px solid var(--gold)'
-                  : '1.5px solid var(--border)',
-                background: theme==='light' ? 'var(--goldbg)' : 'var(--bg)',
-                transition:'all .2s', textAlign:'center'
-              }}>
-                <div style={{fontSize:24, marginBottom:6}}>☀️</div>
-                <div style={{
-                  fontSize:12, fontWeight:700,
-                  color: theme==='light' ? 'var(--gold)' : 'var(--muted)'
-                }}>Light</div>
-                {theme==='light' && (
-                  <div style={{
-                    width:8, height:8, borderRadius:'50%',
-                    background:'var(--gold)', margin:'6px auto 0'
-                  }}/>
-                )}
-              </div>
-
-              {/* Dark */}
-              <div onClick={() => setTheme('dark')} style={{
-                flex:1, padding:'14px 12px', borderRadius:12, cursor:'pointer',
-                border: theme==='dark'
-                  ? '2px solid var(--gold)'
-                  : '1.5px solid var(--border)',
-                background: theme==='dark' ? 'var(--goldbg)' : 'var(--bg)',
-                transition:'all .2s', textAlign:'center'
-              }}>
-                <div style={{fontSize:24, marginBottom:6}}>🌙</div>
-                <div style={{
-                  fontSize:12, fontWeight:700,
-                  color: theme==='dark' ? 'var(--gold)' : 'var(--muted)'
-                }}>Dark</div>
-                {theme==='dark' && (
-                  <div style={{
-                    width:8, height:8, borderRadius:'50%',
-                    background:'var(--gold)', margin:'6px auto 0'
-                  }}/>
-                )}
-              </div>
-
-              {/* System */}
-              <div onClick={() => setTheme('system')} style={{
-                flex:1, padding:'14px 12px', borderRadius:12, cursor:'pointer',
-                border: theme==='system'
-                  ? '2px solid var(--gold)'
-                  : '1.5px solid var(--border)',
-                background: theme==='system' ? 'var(--goldbg)' : 'var(--bg)',
-                transition:'all .2s', textAlign:'center'
-              }}>
-                <div style={{fontSize:24, marginBottom:6}}>💻</div>
-                <div style={{
-                  fontSize:12, fontWeight:700,
-                  color: theme==='system' ? 'var(--gold)' : 'var(--muted)'
-                }}>System</div>
-                {theme==='system' && (
-                  <div style={{
-                    width:8, height:8, borderRadius:'50%',
-                    background:'var(--gold)', margin:'6px auto 0'
-                  }}/>
-                )}
-              </div>
-
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT — Language */}
-        <div className="set-group">
-          <div className="set-group-title">Language</div>
-          <div style={{padding:'16px 20px'}}>
-            <div className="set-name" style={{marginBottom:4}}>Interface Language</div>
-            <div className="set-desc" style={{marginBottom:14}}>
-              Select your preferred language
-            </div>
-            <div style={{display:'flex', flexDirection:'column', gap:10}}>
-              {LANGS.map(l => (
-                <div key={l.code} onClick={() => setLanguage(l.code)} style={{
-                  display:'flex', alignItems:'center', gap:12,
-                  padding:'12px 16px', borderRadius:10, cursor:'pointer',
-                  border: language===l.code
-                    ? '2px solid var(--gold)'
-                    : '1.5px solid var(--border)',
-                  background: language===l.code ? 'var(--goldbg)' : 'var(--bg)',
-                  transition:'all .2s'
+              {[
+                { key:'light', emoji:'☀️', label:'Light' },
+                { key:'dark',  emoji:'🌙', label:'Dark'  },
+                { key:'system',emoji:'💻', label:'System'},
+              ].map(th => (
+                <div key={th.key} onClick={() => setTheme(th.key)} style={{
+                  flex:1, padding:'14px 12px', borderRadius:12, cursor:'pointer',
+                  border: theme===th.key ? '2px solid var(--gold)' : '1.5px solid var(--border)',
+                  background: theme===th.key ? 'var(--goldbg)' : 'var(--bg)',
+                  transition:'all .2s', textAlign:'center'
                 }}>
-                  <span style={{fontSize:20}}>{l.flag}</span>
-                  <span style={{
-                    fontSize:13, fontWeight:600,
-                    color: language===l.code ? 'var(--navy)' : 'var(--muted)',
-                    flex:1
-                  }}>{l.label}</span>
-                  {language===l.code && (
-                    <svg width="16" height="16" fill="none" stroke="var(--gold)"
-                         strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path d="M20 6L9 17l-5-5"/>
-                    </svg>
-                  )}
+                  <div style={{fontSize:24, marginBottom:6}}>{th.emoji}</div>
+                  <div style={{fontSize:12, fontWeight:700, color: theme===th.key ? 'var(--gold)' : 'var(--muted)'}}>{th.label}</div>
+                  {theme===th.key && <div style={{width:8, height:8, borderRadius:'50%', background:'var(--gold)', margin:'6px auto 0'}}/>}
                 </div>
               ))}
             </div>
           </div>
         </div>
 
+        <div className="set-group">
+          <div className="set-group-title">{t('language')}</div>
+          <div style={{padding:'16px 20px'}}>
+            <div className="set-name" style={{marginBottom:4}}>{t('interfaceLang')}</div>
+            <div className="set-desc" style={{marginBottom:14}}>{t('langDesc')}</div>
+            <div style={{display:'flex', flexDirection:'column', gap:10}}>
+              {LANGS.map(l => (
+                <div key={l.code} onClick={() => setLanguage(l.code)} style={{
+                  display:'flex', alignItems:'center', gap:12,
+                  padding:'12px 16px', borderRadius:10, cursor:'pointer',
+                  border: language===l.code ? '2px solid var(--gold)' : '1.5px solid var(--border)',
+                  background: language===l.code ? 'var(--goldbg)' : 'var(--bg)',
+                  transition:'all .2s'
+                }}>
+                  <span style={{fontSize:20}}>{l.flag}</span>
+                  <span style={{fontSize:13, fontWeight:600, color: language===l.code ? 'var(--navy)' : 'var(--muted)', flex:1}}>{l.label}</span>
+                  {language===l.code && (
+                    <svg width="16" height="16" fill="none" stroke="var(--gold)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -982,61 +710,61 @@ export default function Dashboard() {
   const [page,      setPage]     = useState('dashboard');
   const [collapsed, setCollapse] = useState(false);
   const { user, logout }         = useAuth();
+  const { t }                    = useLang();
+
+  const NAV_MAIN = [
+    { id:'dashboard', label: t('dashboard'),     badge: null   },
+    { id:'generate',  label: t('newGeneration'), badge: t('new') },
+    { id:'execution', label: t('testExecution'), badge: null   },
+    { id:'history',   label: t('history'),       badge: null   },
+  ];
+  const NAV_USER = [
+    { id:'account',  label: t('account')  },
+    { id:'settings', label: t('settings') },
+  ];
 
   const LABELS = {
-    dashboard:'Dashboard', generate:'New Generation',
-    execution:'Test Execution', history:'History',
-    account:'Account', settings:'Settings',
+    dashboard: t('dashboard'),
+    generate:  t('newGeneration'),
+    execution: t('testExecution'),
+    history:   t('history'),
+    account:   t('account'),
+    settings:  t('settings'),
   };
 
   return (
     <div className="dash-root" style={{position:"fixed",top:0,left:0,right:0,bottom:0,width:"100vw",height:"100vh",display:"flex",flexDirection:"row",overflow:"hidden"}}>
-
-      
       <aside className={`sidebar${collapsed?' collapsed':''}`}>
-
-       
         <NexLogo collapsed={collapsed}/>
-
-       
         <button className="s-toggle" onClick={() => setCollapse(p => !p)}>
           <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            {collapsed
-              ? <path d="M9 18l6-6-6-6"/>
-              : <path d="M15 18l-6-6 6-6"/>}
+            {collapsed ? <path d="M9 18l6-6-6-6"/> : <path d="M15 18l-6-6 6-6"/>}
           </svg>
         </button>
-
-       
         <nav className="s-nav">
           <div className="s-group">
-            {!collapsed && <div className="s-label">Main</div>}
+            {!collapsed && <div className="s-label">{t('main')}</div>}
             {NAV_MAIN.map(it => (
               <SItem key={it.id} {...it} active={page===it.id} collapsed={collapsed} onClick={setPage}/>
             ))}
           </div>
           <div className="s-divider"/>
           <div className="s-group">
-            {!collapsed && <div className="s-label">User</div>}
+            {!collapsed && <div className="s-label">{t('user')}</div>}
             {NAV_USER.map(it => (
               <SItem key={it.id} {...it} active={page===it.id} collapsed={collapsed} onClick={setPage}/>
             ))}
           </div>
         </nav>
-
-      
         <div className="s-footer">
-          <button className="s-item s-logout" onClick={logout} title="Logout">
+          <button className="s-item s-logout" onClick={logout} title={t('logout')}>
             <span className="s-icon">{IC.logout}</span>
-            {!collapsed && <span className="s-label-txt">Logout</span>}
+            {!collapsed && <span className="s-label-txt">{t('logout')}</span>}
           </button>
         </div>
       </aside>
 
-     
       <div className="main">
-
-        
         <header className="header">
           <div className="h-left">
             <div className="h-breadcrumb">
@@ -1047,14 +775,12 @@ export default function Dashboard() {
               <span className="h-bc-page">{LABELS[page]}</span>
             </div>
           </div>
-
           <div className="h-search">
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'#9ca3af',flexShrink:0}}>
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
-            <input type="text" placeholder="Search generations, history…"/>
+            <input type="text" placeholder={t('searchPlaceholder')}/>
           </div>
-
           <div className="h-right">
             <button className="h-icon-btn">
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
@@ -1070,12 +796,11 @@ export default function Dashboard() {
             </div>
             <div>
               <div className="h-user-name">{user?.name?.split(' ')[0] || 'User'}</div>
-              <div className="h-user-role">QA Engineer</div>
+              <div className="h-user-role">{t('qaEngineer')}</div>
             </div>
           </div>
         </header>
 
-       
         <div className="content">
           {page==='dashboard' && <DashboardPanel user={user} goTo={setPage}/>}
           {page==='generate'  && <GeneratePanel  goTo={setPage}/>}
