@@ -73,15 +73,15 @@ export default function RegisterPage() {
           <div className="left-headline">
             <h1>Smart Testing<br />Starts <span className="gold">Here</span></h1>
             <div className="gold-line" />
-            <p>Stop writing tests manually. Let our AI engine analyze your web app and generate production-ready scripts in seconds.</p>
+           <p>Stop writing tests manually. Our generative AI engine crawls your web app, identifies interactive elements, and instantly produces Selenium & Cypress automation scripts.</p>
           </div>
 
           <div className="steps">
             {[
               { n: '01', t: 'Sign up for free', d: 'Instant access — no setup, no credit card' },
-              { n: '02', t: 'Point to your web app', d: 'Drop a URL and let the engine do the rest' },
-              { n: '03', t: 'AI generates test cases', d: 'Covers happy paths, edge cases & error flows' },
-              { n: '04', t: 'Download & run scripts', d: 'Clean Selenium & Cypress code, zero config' },
+              { n: '02', t: 'Submit your app URL', d: 'Drop a URL and let the engine do the rest' },
+              { n: '03', t:'AI generates test cases', d: 'Covers functional scenarios, edge cases & error flows automatically'},
+              { n: '04', t: 'Download Selenium & Cypress scripts', d: 'Production-ready scripts with a full PDF report, zero manual effort' },
             ].map((s, i, arr) => (
               <div className="step" key={s.n}>
                 <div className="step-left">

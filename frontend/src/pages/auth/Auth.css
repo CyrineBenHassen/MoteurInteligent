@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
 
 
@@ -130,7 +129,7 @@
   height: 100%; padding: 20px 0;
 }
 
-.left-tagline { text-align: center; margin-bottom: 52px; }
+.left-tagline { text-align: center; margin-bottom: 48px; }
 .left-tagline h1 {
   font-family: 'Josefin Sans', sans-serif;
   font-size: 48px; font-weight: 700;
@@ -140,6 +139,7 @@
 .left-tagline h1 .gold { color: #d4af37; }
 .left-tagline p { font-size: 14px; color: rgba(255,255,255,0.4); font-weight: 400; }
 
+/* ─── Stats Grid (kept for reference, replaced by benefits on login) ─── */
 .stats-grid {
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 16px; width: 100%; max-width: 400px; margin-bottom: 36px;
@@ -170,6 +170,44 @@
   font-size: 11px; font-weight: 600;
   color: rgba(255,255,255,0.4);
   text-transform: uppercase; letter-spacing: 1.5px;
+}
+
+/* ─── Benefits List (Login page) ─── */
+.benefits-list {
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 400px;
+}
+
+.benefit-item {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 4px 0;
+}
+
+.benefit-check {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(212,175,55,0.1);
+  border: 1px solid rgba(212,175,55,0.3);
+  color: #d4af37; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 2px;
+}
+
+.benefit-text { display: flex; flex-direction: column; gap: 3px; }
+
+.benefit-title {
+  font-size: 15px; font-weight: 700;
+  color: rgba(255,255,255,0.9);
+}
+
+.benefit-desc {
+  font-size: 13px; font-weight: 400;
+  color: rgba(255,255,255,0.4); line-height: 1.5;
+}
+
+.benefit-sep {
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, rgba(212,175,55,0.15), transparent);
+  margin: 14px 0;
 }
 
 
@@ -401,6 +439,7 @@
   .auth-left  { display: none; }
   .auth-right { padding: 32px 20px !important; }
 }
+
 .success-msg {
   display: flex;
   align-items: center;

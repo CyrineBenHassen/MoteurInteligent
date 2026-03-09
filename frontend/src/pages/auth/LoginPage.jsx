@@ -30,7 +30,6 @@ export default function LoginPage() {
     <>
       <div className="auth-root login-page">
 
-       
         <div className="auth-left">
           <div className="deco-orb-1" />
           <div className="deco-orb-2" />
@@ -45,33 +44,37 @@ export default function LoginPage() {
           <div className="left-content">
             <div className="left-tagline">
               <h1>Test Smarter,<br />Ship <span className="gold">Faster</span></h1>
-              <p>Trusted by QA teams worldwide</p>
+              <p>Your AI-powered engine for automated web test generation</p>
             </div>
 
-            <div className="stats-grid">
+            <div className="benefits-list">
               {[
-                { icon: '🚀', value: '120K+', label: 'Scripts Exported' },
-                { icon: '🛡️', value: '99.9%', label: 'Uptime' },
-                { icon: '🔬', value: '5,000+', label: 'Apps Analyzed' },
-                { icon: '💡', value: '3.2x', label: 'Faster QA Cycles' },
-              ].map(s => (
-                <div className="stat-card" key={s.label}>
-                  <span className="stat-icon">{s.icon}</span>
-                  <span className="stat-value">{s.value}</span>
-                  <span className="stat-label">{s.label}</span>
+                { title: 'Automated DOM Crawling',     desc: 'Instantly maps every interactive element of your app' },
+                { title: 'AI-Generated Test Cases',    desc: 'Covers functional flows, edge cases & error scenarios' },
+                { title: 'Selenium & Cypress Scripts', desc: 'Production-ready code, zero manual effort' },
+                { title: 'Downloadable PDF Report',    desc: 'Full documentation of every generated test' },
+              ].map((item, i, arr) => (
+                <div key={i}>
+                  <div className="benefit-item">
+                    <div className="benefit-check">✓</div>
+                    <div className="benefit-text">
+                      <span className="benefit-title">{item.title}</span>
+                      <span className="benefit-desc">{item.desc}</span>
+                    </div>
+                  </div>
+                  {i < arr.length - 1 && <div className="benefit-sep" />}
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-       
         <div className="auth-right">
           <div className="form-card">
             <div className="card-box">
               <div className="form-header">
                 <h2>WELCOME BACK</h2>
-                <p>No account yet? <Link to="/register">Create your account </Link></p>
+                <p>No account yet? <Link to="/register">Create your account</Link></p>
               </div>
 
               {error && (
@@ -139,7 +142,6 @@ export default function LoginPage() {
                 <span /><small>or</small><span />
               </div>
 
-              
               <button type="button" className="google-btn" onClick={loginWithGoogle}>
                 <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z" />
