@@ -10,5 +10,7 @@ class UserSetting extends Model
         'email_notifications',
         'weekly_report',
         'default_framework',
+        'theme',
+        'language',
     ];
 }

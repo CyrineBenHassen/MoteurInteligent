@@ -740,17 +740,24 @@ function SettingsPanel() {
   const [notifs,    setNotifs]    = useState(true);
   const [weekly,    setWeekly]    = useState(false);
   const [framework, setFramework] = useState('Selenium');
+  const [theme,     setTheme]     = useState('light');
+  const [language,  setLanguage]  = useState('en');
   const [msg,       setMsg]       = useState('');
   const [loading,   setLoading]   = useState(false);
 
-  // Charger settings au démarrage
   useEffect(() => {
     api.get('/settings').then(res => {
       setNotifs(res.data.email_notifications);
       setWeekly(res.data.weekly_report);
       setFramework(res.data.default_framework);
+      setTheme(res.data.theme || 'light');
+      setLanguage(res.data.language || 'en');
     });
   }, []);
+   
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   const saveSettings = async () => {
     setLoading(true); setMsg('');
@@ -758,7 +765,9 @@ function SettingsPanel() {
       await api.put('/settings/update', {
         email_notifications: notifs,
         weekly_report:       weekly,
-        default_framework:   framework
+        default_framework:   framework,
+        theme,
+        language
       });
       setMsg('Settings saved!');
       setTimeout(() => setMsg(''), 3000);
@@ -768,6 +777,12 @@ function SettingsPanel() {
     setLoading(false);
   };
 
+  const LANGS = [
+    { code:'en', label:'English',  flag:'🇬🇧' },
+    { code:'fr', label:'Français', flag:'🇫🇷' },
+    { code:'ar', label:'العربية',  flag:'🇹🇳' },
+  ];
+
   return (
     <div className="panel">
       <div className="p-header">
@@ -775,60 +790,188 @@ function SettingsPanel() {
           <h1 className="p-title">App <span className="g">Settings</span></h1>
           <p className="p-sub">Customize your NexTest experience</p>
         </div>
-        <button className="btn-primary"
-          onClick={saveSettings}
-          disabled={loading}>
-          {loading ? 'Saving…' : 'Save Settings'}
+        <button className="btn-primary" onClick={saveSettings} disabled={loading}>
+          {loading
+            ? <><span className="spinner"/>Saving…</>
+            : <>
+                <svg width="13" height="13" fill="none" stroke="currentColor"
+                     strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                  <polyline points="17 21 17 13 7 13 7 21"/>
+                  <polyline points="7 3 7 8 15 8"/>
+                </svg>
+                Save Settings
+              </>}
         </button>
       </div>
 
       {msg && <div className="success-msg">✓ {msg}</div>}
 
-      <div className="set-group">
-        <div className="set-group-title">Notifications</div>
-        <div className="set-row">
-          <div>
-            <div className="set-name">Email Notifications</div>
-            <div className="set-desc">
-              Get notified when a generation is complete
+      {/* 2 colonnes */}
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20}}>
+
+        {/* LEFT — Notifications */}
+        <div className="set-group">
+          <div className="set-group-title">Notifications</div>
+          <div className="set-row">
+            <div>
+              <div className="set-name">Email Notifications</div>
+              <div className="set-desc">Get notified when a generation is complete</div>
+            </div>
+            <div className={`toggle${notifs?' on':''}`} onClick={() => setNotifs(p => !p)}>
+              <span className="toggle-knob"/>
             </div>
           </div>
-          <div className={`toggle${notifs?' on':''}`}
-            onClick={() => setNotifs(p => !p)}>
-            <span className="toggle-knob"/>
-          </div>
-        </div>
-        <div className="set-row">
-          <div>
-            <div className="set-name">Weekly Report</div>
-            <div className="set-desc">
-              Summary of your weekly test activity
+          <div className="set-row">
+            <div>
+              <div className="set-name">Weekly Report</div>
+              <div className="set-desc">Summary of your weekly test activity</div>
+            </div>
+            <div className={`toggle${weekly?' on':''}`} onClick={() => setWeekly(p => !p)}>
+              <span className="toggle-knob"/>
             </div>
           </div>
-          <div className={`toggle${weekly?' on':''}`}
-            onClick={() => setWeekly(p => !p)}>
-            <span className="toggle-knob"/>
+        </div>
+
+        {/* RIGHT — Export Defaults */}
+        <div className="set-group">
+          <div className="set-group-title">Export Defaults</div>
+          <div className="set-row">
+            <div>
+              <div className="set-name">Default Framework</div>
+              <div className="set-desc">Pre-selected for new generations</div>
+            </div>
+            <select className="set-select" value={framework}
+              onChange={e => setFramework(e.target.value)}>
+              <option>Selenium</option>
+              <option>Cypress</option>
+              <option>Both</option>
+            </select>
           </div>
         </div>
+
       </div>
 
-      <div className="set-group">
-        <div className="set-group-title">Export Defaults</div>
-        <div className="set-row">
-          <div>
-            <div className="set-name">Default Framework</div>
-            <div className="set-desc">
-              Pre-selected for new generations
+      {/* 2 colonnes */}
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:20}}>
+
+        {/* LEFT — Appearance */}
+        <div className="set-group">
+          <div className="set-group-title">Appearance</div>
+          <div style={{padding:'16px 20px'}}>
+            <div className="set-name" style={{marginBottom:4}}>Theme</div>
+            <div className="set-desc" style={{marginBottom:14}}>
+              Choose your preferred interface theme
+            </div>
+            <div style={{display:'flex', gap:12}}>
+
+              {/* Light */}
+              <div onClick={() => setTheme('light')} style={{
+                flex:1, padding:'14px 12px', borderRadius:12, cursor:'pointer',
+                border: theme==='light'
+                  ? '2px solid var(--gold)'
+                  : '1.5px solid var(--border)',
+                background: theme==='light' ? 'var(--goldbg)' : 'var(--bg)',
+                transition:'all .2s', textAlign:'center'
+              }}>
+                <div style={{fontSize:24, marginBottom:6}}>☀️</div>
+                <div style={{
+                  fontSize:12, fontWeight:700,
+                  color: theme==='light' ? 'var(--gold)' : 'var(--muted)'
+                }}>Light</div>
+                {theme==='light' && (
+                  <div style={{
+                    width:8, height:8, borderRadius:'50%',
+                    background:'var(--gold)', margin:'6px auto 0'
+                  }}/>
+                )}
+              </div>
+
+              {/* Dark */}
+              <div onClick={() => setTheme('dark')} style={{
+                flex:1, padding:'14px 12px', borderRadius:12, cursor:'pointer',
+                border: theme==='dark'
+                  ? '2px solid var(--gold)'
+                  : '1.5px solid var(--border)',
+                background: theme==='dark' ? 'var(--goldbg)' : 'var(--bg)',
+                transition:'all .2s', textAlign:'center'
+              }}>
+                <div style={{fontSize:24, marginBottom:6}}>🌙</div>
+                <div style={{
+                  fontSize:12, fontWeight:700,
+                  color: theme==='dark' ? 'var(--gold)' : 'var(--muted)'
+                }}>Dark</div>
+                {theme==='dark' && (
+                  <div style={{
+                    width:8, height:8, borderRadius:'50%',
+                    background:'var(--gold)', margin:'6px auto 0'
+                  }}/>
+                )}
+              </div>
+
+              {/* System */}
+              <div onClick={() => setTheme('system')} style={{
+                flex:1, padding:'14px 12px', borderRadius:12, cursor:'pointer',
+                border: theme==='system'
+                  ? '2px solid var(--gold)'
+                  : '1.5px solid var(--border)',
+                background: theme==='system' ? 'var(--goldbg)' : 'var(--bg)',
+                transition:'all .2s', textAlign:'center'
+              }}>
+                <div style={{fontSize:24, marginBottom:6}}>💻</div>
+                <div style={{
+                  fontSize:12, fontWeight:700,
+                  color: theme==='system' ? 'var(--gold)' : 'var(--muted)'
+                }}>System</div>
+                {theme==='system' && (
+                  <div style={{
+                    width:8, height:8, borderRadius:'50%',
+                    background:'var(--gold)', margin:'6px auto 0'
+                  }}/>
+                )}
+              </div>
+
             </div>
           </div>
-          <select className="set-select"
-            value={framework}
-            onChange={e => setFramework(e.target.value)}>
-            <option>Selenium</option>
-            <option>Cypress</option>
-            <option>Both</option>
-          </select>
         </div>
+
+        {/* RIGHT — Language */}
+        <div className="set-group">
+          <div className="set-group-title">Language</div>
+          <div style={{padding:'16px 20px'}}>
+            <div className="set-name" style={{marginBottom:4}}>Interface Language</div>
+            <div className="set-desc" style={{marginBottom:14}}>
+              Select your preferred language
+            </div>
+            <div style={{display:'flex', flexDirection:'column', gap:10}}>
+              {LANGS.map(l => (
+                <div key={l.code} onClick={() => setLanguage(l.code)} style={{
+                  display:'flex', alignItems:'center', gap:12,
+                  padding:'12px 16px', borderRadius:10, cursor:'pointer',
+                  border: language===l.code
+                    ? '2px solid var(--gold)'
+                    : '1.5px solid var(--border)',
+                  background: language===l.code ? 'var(--goldbg)' : 'var(--bg)',
+                  transition:'all .2s'
+                }}>
+                  <span style={{fontSize:20}}>{l.flag}</span>
+                  <span style={{
+                    fontSize:13, fontWeight:600,
+                    color: language===l.code ? 'var(--navy)' : 'var(--muted)',
+                    flex:1
+                  }}>{l.label}</span>
+                  {language===l.code && (
+                    <svg width="16" height="16" fill="none" stroke="var(--gold)"
+                         strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );

@@ -26,6 +26,8 @@ class SettingsController extends Controller
             'email_notifications' => 'boolean',
             'weekly_report'       => 'boolean',
             'default_framework'   => 'in:Selenium,Cypress,Both',
+            'theme'               => 'in:light,dark,system',  
+            'language'            => 'in:en,fr,ar',            
         ]);
 
         $settings = UserSetting::updateOrCreate(

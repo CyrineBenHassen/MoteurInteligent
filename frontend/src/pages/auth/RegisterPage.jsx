@@ -44,7 +44,7 @@ export default function RegisterPage() {
     if (!agreed) { setError('Please accept the Terms of Service to continue.'); return; }
     setError(''); setLoading(true);
     try {
-      await register({ name: form.name, email: form.email, password: form.password });
+      await register({ name: form.name, email: form.email, password: form.password, password_confirmation: form.confirm });
       navigate('/dashboard');
     } catch (err) {
       setError(err?.response?.data?.message || 'Registration failed. Please try again.');

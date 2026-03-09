@@ -17,6 +17,8 @@ return new class extends Migration
             $table->boolean('weekly_report')->default(false);
             $table->string('default_framework')->default('Selenium');
             $table->timestamps();
+            $table->string('theme')->default('light');
+            $table->string('language')->default('en');
         });
     }
 

@@ -536,3 +536,16 @@
   border-radius: 8px; font-size: 13px;
   margin-bottom: 16px;
 }
+
+/* Dark theme */
+[data-theme="dark"] .dash-root {
+  --white: #0f1929;
+  --bg: #0a1120;
+  --bg2: #111d30;
+  --card: #0f1929;
+  --text: #e5e7f0;
+  --border: #1e2d45;
+  --border2: #1a2840;
+  --sub: #8899aa;
+  --muted: #556677;
+}
