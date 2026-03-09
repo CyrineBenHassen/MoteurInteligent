@@ -7,7 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Au démarrage : si un token existe → récupérer l'utilisateur connecté
+ 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -39,13 +39,13 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  // ✅ Appelé depuis AuthCallback après redirection Google
+
   const setAuthFromGoogle = (token, userData) => {
     localStorage.setItem('token', token);
     setUser(userData);
   };
 
-  // ✅ Redirige vers Google via Laravel
+  
   const loginWithGoogle = () => {
     window.location.href = 'http://localhost:8000/auth/google';
   };

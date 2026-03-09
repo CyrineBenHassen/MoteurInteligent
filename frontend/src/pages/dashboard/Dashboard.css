@@ -1,8 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&display=swap');
 
-/* ══════════════════════════════════════════════════════
-   Dashboard.css — scoped under .dash-root
-   ══════════════════════════════════════════════════════ */
+
+
 
 .dash-root {
   --white:#ffffff;
@@ -50,7 +49,7 @@
 .dash-root button { cursor: pointer; font-family: inherit; border: none; background: none; }
 .dash-root input, .dash-root select { font-family: inherit; outline: none; }
 
-/* ══ SIDEBAR ══ */
+
 .dash-root .sidebar {
   width: var(--sw);
   min-width: var(--sw);
@@ -68,7 +67,7 @@
 }
 .dash-root .sidebar.collapsed { width: var(--sc); min-width: var(--sc); }
 
-/* Logo */
+
 .dash-root .s-logo {
   display: flex; align-items: center; gap: 14px;
   padding: 14px 16px;
@@ -105,7 +104,7 @@
   margin-top: 4px; display: block; opacity: .8;
 }
 
-/* Toggle */
+
 .dash-root .s-toggle {
   position: absolute; top: 21px; right: -12px;
   width: 24px; height: 24px; border-radius: 50%;
@@ -115,7 +114,7 @@
 }
 .dash-root .s-toggle:hover { color: var(--gold); border-color: var(--goldborder); background: var(--goldbg); }
 
-/* Nav items */
+
 .dash-root .s-nav {
   flex: 1; padding: 12px 10px; overflow-y: auto; overflow-x: hidden;
   display: flex; flex-direction: column; gap: 1px;
@@ -160,17 +159,17 @@
 .dash-root .s-logout { color: #ef4444; opacity: .7; }
 .dash-root .s-logout:hover { color: #dc2626 !important; background: rgba(239,68,68,.07) !important; opacity: 1; }
 
-/* ══ MAIN ══ */
+
 .dash-root .main {
   flex: 1 1 0%;
   min-width: 0;
-  width: 0; /* ✅ force flex child to shrink properly */
+  width: 0; 
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-/* ══ HEADER ══ */
+
 .dash-root .header {
   height: var(--hh); min-height: var(--hh); flex-shrink: 0;
   background: var(--white); border-bottom: 1px solid var(--border);
@@ -221,7 +220,7 @@
 .dash-root .h-user-name { font-size: 13px; font-weight: 700; color: var(--navy); }
 .dash-root .h-user-role { font-size: 10px; color: var(--muted); margin-top: 1px; }
 
-/* ══ CONTENT — zone scrollable pleine largeur ══ */
+
 .dash-root .content {
   flex: 1 1 0%;
   min-height: 0;
@@ -236,7 +235,7 @@
 .dash-root .content::-webkit-scrollbar { width: 4px; }
 .dash-root .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-/* ══ PANEL — pleine largeur ══ */
+
 .dash-root .panel {
   width: 100%;
   max-width: 100%;
@@ -253,7 +252,7 @@
 .dash-root .p-title .g { color: var(--gold); font-style: italic; font-weight: 300; }
 .dash-root .p-sub { font-size: 13.5px; color: var(--sub); font-weight: 400; }
 
-/* ══ BUTTONS ══ */
+
 .dash-root .btn-primary {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
@@ -286,9 +285,7 @@
 }
 .dash-root .btn-outline:hover { border-color: var(--goldborder); background: var(--goldbg); color: var(--gold); }
 
-/* ══════════════════════════════════════
-   STATS GRID — 4 cartes pleine largeur
-══════════════════════════════════════ */
+
 .dash-root .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -375,7 +372,7 @@
   height: 5px;
 }
 
-/* ══ QUICK START ══ */
+
 .dash-root .quick-start {
   background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 100%);
   border-radius: 20px; padding: 40px 36px; text-align: center;
@@ -396,7 +393,7 @@
 .dash-root .quick-start h3 { font-family: var(--C); font-size: 26px; font-weight: 700; color: #fff; margin-bottom: 10px; position: relative; }
 .dash-root .quick-start p  { font-size: 14px; color: rgba(255,255,255,.6); max-width: 400px; margin: 0 auto 24px; line-height: 1.8; position: relative; }
 
-/* ══ SECTION BOX ══ */
+
 .dash-root .section-box { background: var(--card); border: 1.5px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); }
 .dash-root .sb-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border2); }
 .dash-root .sb-title { font-size: 13px; font-weight: 700; color: var(--navy); }
@@ -404,7 +401,7 @@
 .dash-root .sb-action:hover { opacity: .7; }
 .dash-root .empty-row { padding: 36px 20px; text-align: center; font-size: 13px; color: var(--muted); }
 
-/* ══ GENERATE ══ */
+
 .dash-root .gen-layout { display: grid; grid-template-columns: 1fr 300px; gap: 20px; align-items: start; width: 100%; }
 .dash-root .gen-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 18px; padding: 28px; box-shadow: var(--shadow); }
 .dash-root .gen-form { display: flex; flex-direction: column; gap: 20px; }
@@ -434,7 +431,7 @@
 .dash-root .i-step-t { font-size: 12.5px; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
 .dash-root .i-step-d { font-size: 11.5px; color: var(--sub); line-height: 1.6; }
 
-/* ══ TEST EXECUTION ══ */
+
 .dash-root .exec-progress-wrap { background: var(--card); border: 1.5px solid var(--border); border-radius: 14px; padding: 18px 22px; margin-bottom: 18px; box-shadow: var(--shadow); animation: dFadeUp .35s var(--ease) both; }
 .dash-root .exec-progress-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .dash-root .exec-progress-label { font-size: 13px; font-weight: 600; color: var(--navy); }
@@ -481,13 +478,13 @@
 .dash-root .exec-duration { font-size: 12px; font-weight: 600; color: var(--muted); min-width: 32px; text-align: right; }
 .dash-root .exec-spinner-sm { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--gold); animation: dSpin .8s linear infinite; display: inline-block; }
 
-/* ══ HISTORY ══ */
+
 .dash-root .hist-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 32px; background: var(--card); border: 1.5px solid var(--border); border-radius: 18px; text-align: center; box-shadow: var(--shadow); }
 .dash-root .he-ring { width: 80px; height: 80px; border-radius: 50%; border: 1.5px solid var(--goldborder); background: var(--goldbg); display: flex; align-items: center; justify-content: center; color: var(--gold); margin-bottom: 22px; }
 .dash-root .hist-empty h3 { font-family: var(--C); font-size: 26px; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
 .dash-root .hist-empty p { font-size: 13.5px; color: var(--sub); max-width: 340px; line-height: 1.8; }
 
-/* ══ ACCOUNT ══ */
+
 .dash-root .acc-hero { background: linear-gradient(135deg, var(--navy), var(--navy2)); border-radius: 18px; padding: 28px; margin-bottom: 22px; display: flex; align-items: center; gap: 22px; position: relative; overflow: hidden; box-shadow: var(--shadow2); }
 .dash-root .acc-hero::before { content: ''; position: absolute; top: -40px; right: -40px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(201,162,39,.12) 0%, transparent 70%); }
 .dash-root .acc-avatar { width: 68px; height: 68px; border-radius: 50%; flex-shrink: 0; background: linear-gradient(135deg, var(--gold), var(--gold2)); display: flex; align-items: center; justify-content: center; font-family: var(--C); font-size: 28px; font-weight: 700; color: var(--navy); border: 3px solid rgba(255,255,255,.2); box-shadow: 0 4px 16px rgba(0,0,0,.2); overflow: hidden; }
@@ -497,7 +494,7 @@
 .dash-root .acc-fields { display: flex; flex-direction: column; gap: 16px; max-width: 460px; }
 .dash-root .acc-fields-title { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
 
-/* ══ SETTINGS ══ */
+
 .dash-root .set-group { background: var(--card); border: 1.5px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 16px; box-shadow: var(--shadow); }
 .dash-root .set-group-title { font-size: 9.5px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); padding: 14px 20px 10px; border-bottom: 1px solid var(--border2); }
 .dash-root .set-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border2); gap: 20px; }
@@ -511,7 +508,7 @@
 .dash-root .set-select { background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; }
 .dash-root .set-select option { background: var(--white); }
 
-/* ══ SUCCESS MSG ══ */
+
 .success-msg {
   display: flex; align-items: center; gap: 8px;
   background: rgba(52,168,83,.1); border: 1px solid rgba(52,168,83,.3);
@@ -519,7 +516,7 @@
   font-size: 13px; margin-bottom: 16px;
 }
 
-/* ══ RESPONSIVE ══ */
+
 @media (max-width: 1100px) {
   .dash-root .stats-grid   { grid-template-columns: repeat(2, 1fr); }
   .dash-root .exec-summary { grid-template-columns: repeat(2, minmax(0,1fr)); }

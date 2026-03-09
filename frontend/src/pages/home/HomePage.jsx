@@ -127,7 +127,7 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* ══ HERO ══ */}
+      
       <section className="hero">
         <div className="hero__bg" aria-hidden="true">
           <div className="blob b1"/><div className="blob b2"/><div className="blob b3"/>
@@ -235,7 +235,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ══ BRAND BAND ══ */}
+    
       <div className="band">
         <div className="band__inner">
           <span className="band__label">Built with</span>
@@ -245,7 +245,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ══ FEATURES ══ */}
+     
       <section className="sec features" id="features" ref={featRef}>
         <div className="sec__wrap">
           <div className="sec__head">
@@ -272,7 +272,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ══ HOW ══ */}
+    
       <section className="sec how" id="howitworks" ref={howRef}>
         <div className="how__decor" aria-hidden="true">
           <div className="how__orb how__orb--1"/><div className="how__orb how__orb--2"/>
@@ -299,7 +299,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ══ STATS ══ */}
+      
       <section className="sec stats" id="stats" ref={statsRef}>
         <div className="sec__wrap">
           <span className="eyebrow eyebrow--c">By the numbers</span>
@@ -324,7 +324,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ══ CTA ══ */}
+     
       <section className="cta-sec">
         <div className="cta__bg" aria-hidden="true">
           <div className="cta__blob cta__blob--1"/><div className="cta__blob cta__blob--2"/>

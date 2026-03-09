@@ -19,7 +19,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [fErr, setFErr] = useState({});
   const [loading, setLoading] = useState(false);
-  const { register, loginWithGoogle } = useAuth(); // ✅ ajout loginWithGoogle
+  const { register, loginWithGoogle } = useAuth(); 
   const navigate = useNavigate();
 
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -219,7 +219,7 @@ export default function RegisterPage() {
                 <span /><small>or</small><span />
               </div>
 
-              {/* ✅ BOUTON GOOGLE MIS À JOUR */}
+             
               <button type="button" className="google-btn" onClick={loginWithGoogle}>
                 <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z" />

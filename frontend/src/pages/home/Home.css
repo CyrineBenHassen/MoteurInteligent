@@ -1,10 +1,8 @@
-/* ═══════════════════════════════════════════════════
-   Home.css · TestForge AI · Dark Navy Premium
-   ═══════════════════════════════════════════════════ */
+
 
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
 
-/* ── Tokens ── */
+
 :root {
   --navy:    #060e1e;
   --navy2:   #0b1829;
@@ -41,9 +39,7 @@ html { scroll-behavior: smooth; }
   overflow-x: hidden;
 }
 
-/* ═══════════════════════════════════════════════════
-   NAV
-   ═══════════════════════════════════════════════════ */
+
 .nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 200;
   height: 72px; padding: 0 56px;
@@ -129,9 +125,7 @@ html { scroll-behavior: smooth; }
 .nav__cta:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(201,162,39,0.5); }
 .nav__cta span { position: relative; }
 
-/* ═══════════════════════════════════════════════════
-   BUTTONS
-   ═══════════════════════════════════════════════════ */
+
 .btn {
   display: inline-flex; align-items: center; gap: 10px;
   font-family: var(--D); font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
@@ -162,9 +156,7 @@ html { scroll-behavior: smooth; }
 }
 .btn--ring:hover { border-color: var(--border); color: var(--offwhite); background: rgba(255,255,255,0.07); }
 
-/* ═══════════════════════════════════════════════════
-   HERO
-   ═══════════════════════════════════════════════════ */
+
 .hero {
   min-height: 100vh; padding: 130px 56px 80px;
   display: flex; flex-direction: column;
@@ -175,7 +167,7 @@ html { scroll-behavior: smooth; }
   position: relative; overflow: hidden;
 }
 
-/* BG elements */
+
 .hero__bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 
 .blob, .ring, .dot { position: absolute; }
@@ -209,7 +201,7 @@ html { scroll-behavior: smooth; }
   mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 5%, transparent 100%);
 }
 
-/* ── Noise texture overlay ── */
+
 .hero::after {
   content: '';
   position: absolute; inset: 0;
@@ -223,7 +215,7 @@ html { scroll-behavior: smooth; }
   flex: 1; position: relative; z-index: 1;
 }
 
-/* Copy */
+
 .hero__copy { flex: 1; max-width: 580px; animation: fadeUp 0.85s var(--ease) both; }
 
 .hero__kicker {
@@ -280,7 +272,7 @@ html { scroll-behavior: smooth; }
 }
 .trust__item svg { flex-shrink: 0; }
 
-/* Visual / Terminal */
+
 .hero__visual {
   flex: 0 0 500px; width: 500px; position: relative;
   animation: fadeUp 0.85s var(--ease) 0.25s both;
@@ -384,7 +376,7 @@ html { scroll-behavior: smooth; }
   border-color: rgba(201,162,39,0.2);
 }
 
-/* scroll hint */
+
 .hero__scroll {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
   position: relative; z-index: 1; margin: 56px auto 0;
@@ -397,9 +389,7 @@ html { scroll-behavior: smooth; }
 .scroll__lbl { font-size: 9.5px; font-weight: 500; color: var(--dimmed); letter-spacing: 3px; text-transform: uppercase; }
 @keyframes scrollAnim { 0%,100%{opacity:.2; transform:scaleY(.7);} 50%{opacity:.8; transform:scaleY(1);} }
 
-/* ═══════════════════════════════════════════════════
-   BAND
-   ═══════════════════════════════════════════════════ */
+
 .band {
   background: rgba(201,162,39,0.04);
   border-top: 1px solid rgba(201,162,39,0.1);
@@ -422,9 +412,7 @@ html { scroll-behavior: smooth; }
 }
 .band__item:hover { color: var(--gold); }
 
-/* ═══════════════════════════════════════════════════
-   SECTION SHARED
-   ═══════════════════════════════════════════════════ */
+
 .sec { padding: 140px 0; }
 .sec__wrap { max-width: 1280px; margin: 0 auto; padding: 0 56px; }
 
@@ -452,9 +440,7 @@ html { scroll-behavior: smooth; }
   font-size: 15px; color: var(--muted); line-height: 1.95; font-weight: 300;
 }
 
-/* ═══════════════════════════════════════════════════
-   FEATURES
-   ═══════════════════════════════════════════════════ */
+
 .features {
   background:
     radial-gradient(ellipse 80% 50% at 50% 0%, rgba(201,162,39,0.04) 0%, transparent 60%),
@@ -529,9 +515,7 @@ html { scroll-behavior: smooth; }
 .feat__card:hover .feat__more { color: var(--gold); }
 .feat__card:hover .feat__more em { transform: translateX(6px); }
 
-/* ═══════════════════════════════════════════════════
-   HOW IT WORKS
-   ═══════════════════════════════════════════════════ */
+
 .how {
   background:
     radial-gradient(ellipse 100% 60% at 0% 50%, rgba(201,162,39,0.04) 0%, transparent 50%),
@@ -588,9 +572,7 @@ html { scroll-behavior: smooth; }
 }
 .how__arr { font-size: 18px; color: rgba(201,162,39,0.35); line-height: 1; }
 
-/* ═══════════════════════════════════════════════════
-   STATS
-   ═══════════════════════════════════════════════════ */
+
 .stats {
   background:
     radial-gradient(ellipse 80% 50% at 50% 100%, rgba(201,162,39,0.05) 0%, transparent 60%),
@@ -632,9 +614,7 @@ html { scroll-behavior: smooth; }
 }
 @keyframes barGrow { from{ width: 0; } }
 
-/* ═══════════════════════════════════════════════════
-   CTA
-   ═══════════════════════════════════════════════════ */
+
 .cta-sec {
   padding: 160px 56px; position: relative; overflow: hidden;
   background: linear-gradient(165deg, #08111f 0%, #0a1428 50%, #0c1530 100%);
@@ -704,9 +684,7 @@ html { scroll-behavior: smooth; }
 }
 .footer__links a:hover { color: var(--gold); }
 
-/* ═══════════════════════════════════════════════════
-   KEYFRAMES
-   ═══════════════════════════════════════════════════ */
+
 @keyframes spin     { to { transform: rotate(360deg); } }
 @keyframes floatDot {
   0%,100%{ transform: translateY(0); opacity: .35; }
@@ -717,9 +695,7 @@ html { scroll-behavior: smooth; }
   to  { opacity: 1; transform: translateY(0); }
 }
 
-/* ═══════════════════════════════════════════════════
-   RESPONSIVE
-   ═══════════════════════════════════════════════════ */
+
 @media (max-width: 1100px) {
   .hero__body { flex-direction: column; gap: 60px; }
   .hero__copy { max-width: 100%; }

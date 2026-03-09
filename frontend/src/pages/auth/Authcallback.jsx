@@ -22,11 +22,11 @@ export default function AuthCallback() {
     try {
       const user = JSON.parse(decodeURIComponent(userRaw));
 
-      // ✅ Sauvegarde directement dans localStorage SANS passer par le contexte
+      
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
 
-      // ✅ Redirige — AuthContext lira localStorage automatiquement
+      
       navigate('/dashboard', { replace: true });
     } catch {
       navigate('/login?error=parse_failed');

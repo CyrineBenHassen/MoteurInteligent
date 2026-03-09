@@ -7,11 +7,11 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-
+# Routes pour l'authentification Google
 Route::get('/auth/google', [GoogleController::class, 'redirect']);
 Route::get('/auth/google/callback', [GoogleController::class, 'callback']);
 
-// ✅ Route pour le lien de reset password dans l'email
+#Route pour le lien de reset password dans l'email
 Route::get('/reset-password/{token}', function ($token) {
     $email = request('email');
     $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');

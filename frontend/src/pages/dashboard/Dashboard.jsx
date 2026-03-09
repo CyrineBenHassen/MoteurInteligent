@@ -2,14 +2,11 @@ import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import './Dashboard.css';
 
-/* ══════════════════════════════════════════════════════
-   LOGO — 100% identique à nav__brand de HomePage.jsx
-   Gem dorée gradient + NexTest (Cormorant) + Test Automation
-══════════════════════════════════════════════════════ */
+
 function NexLogo() {
   return (
     <div className="s-logo">
-      {/* .nav__gem copié exactement depuis Home.css */}
+    
       <div className="nav__gem">
         <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
           <rect width="44" height="44" rx="11" fill="none"/>
@@ -25,18 +22,18 @@ function NexLogo() {
         </svg>
       </div>
 
-      {/* .logo-words masqué quand collapsed */}
+     
       <div className="logo-words">
-        {/* .nav__name — Cormorant Garamond 700, uppercase, letter-spacing 3px */}
+        
         <div className="nav__name">NexTest</div>
-        {/* .nav__sub — DM Sans 500, gold, uppercase, letter-spacing 4px */}
+       
         <div className="nav__sub">Test Automation</div>
       </div>
     </div>
   );
 }
 
-/* ══ ICÔNES SVG pour la nav ══ */
+
 const IC = {
   dashboard: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
   generate:  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
@@ -73,9 +70,7 @@ function SItem({ id, label, badge, active, collapsed, onClick }) {
   );
 }
 
-/* ══════════════════════════════════════
-   PANEL : DASHBOARD
-══════════════════════════════════════ */
+
 function DashboardPanel({ user, goTo }) {
   const STATS = [
     { icon:'🚀', val:'0',  lbl:'Scripts Generated', accent:'linear-gradient(90deg,#4f86e8,#6fa3ff)', trend:'+0%' },
@@ -135,9 +130,7 @@ function DashboardPanel({ user, goTo }) {
   );
 }
 
-/* ══════════════════════════════════════
-   PANEL : GENERATE
-══════════════════════════════════════ */
+
 function GeneratePanel({ goTo }) {
   const [url,     setUrl]  = useState('');
   const [fw,      setFw]   = useState('Selenium');
@@ -211,9 +204,7 @@ function GeneratePanel({ goTo }) {
   );
 }
 
-/* ══════════════════════════════════════
-   PANEL : TEST EXECUTION
-══════════════════════════════════════ */
+
 const TESTS = [
   { id:1, name:'Login — valid credentials',        status:'pass', duration:'0.8s', suite:'Authentication' },
   { id:2, name:'Login — invalid password',         status:'pass', duration:'0.5s', suite:'Authentication' },
@@ -257,7 +248,7 @@ function ExecutionPanel() {
 
   return (
     <div className="panel">
-      {/* Header */}
+     
       <div className="p-header">
         <div>
           <h1 className="p-title">Test <span className="g">Execution</span></h1>
@@ -283,7 +274,7 @@ function ExecutionPanel() {
         </div>
       </div>
 
-      {/* Progress */}
+      
       {(running || done) && (
         <div className="exec-progress-wrap">
           <div className="exec-progress-header">
@@ -298,7 +289,7 @@ function ExecutionPanel() {
         </div>
       )}
 
-      {/* Summary cards */}
+     
       {done && (
         <div className="exec-summary">
           <div className="exec-sum-card exec-sum-pass"><div className="exec-sum-val">{pass}</div><div className="exec-sum-lbl">Passed</div></div>
@@ -308,7 +299,7 @@ function ExecutionPanel() {
         </div>
       )}
 
-      {/* Filters */}
+      
       {(done || running) && (
         <div className="exec-filters">
           <button className={`exec-filter${filter==='all' ?' on':''}`} onClick={() => setFilter('all')}>All ({TESTS.length})</button>
@@ -318,7 +309,7 @@ function ExecutionPanel() {
         </div>
       )}
 
-      {/* Test rows */}
+    
       <div className="exec-list">
         {!done && !running && (
           <div className="exec-empty">
@@ -352,7 +343,7 @@ function ExecutionPanel() {
         ))}
       </div>
 
-      {/* Export actions */}
+      
       {done && (
         <div style={{marginTop:18, display:'flex', gap:10}}>
           <button className="btn-primary" style={{fontSize:11, padding:'9px 18px'}}>
@@ -369,9 +360,7 @@ function ExecutionPanel() {
   );
 }
 
-/* ══════════════════════════════════════
-   PANEL : HISTORY
-══════════════════════════════════════ */
+
 function HistoryPanel() {
   return (
     <div className="panel">
@@ -394,9 +383,7 @@ function HistoryPanel() {
   );
 }
 
-/* ══════════════════════════════════════
-   PANEL : ACCOUNT
-══════════════════════════════════════ */
+
 function AccountPanel({ user }) {
   return (
     <div className="panel">
@@ -429,9 +416,7 @@ function AccountPanel({ user }) {
   );
 }
 
-/* ══════════════════════════════════════
-   PANEL : SETTINGS
-══════════════════════════════════════ */
+
 function SettingsPanel() {
   const [notifs, setNotifs] = useState(true);
   const [weekly, setWeekly] = useState(false);
@@ -465,9 +450,7 @@ function SettingsPanel() {
   );
 }
 
-/* ══════════════════════════════════════
-   COMPOSANT PRINCIPAL
-══════════════════════════════════════ */
+
 export default function Dashboard() {
   const [page,      setPage]     = useState('dashboard');
   const [collapsed, setCollapse] = useState(false);
@@ -482,13 +465,13 @@ export default function Dashboard() {
   return (
     <div className="dash-root" style={{position:"fixed",top:0,left:0,right:0,bottom:0,width:"100vw",height:"100vh",display:"flex",flexDirection:"row",overflow:"hidden"}}>
 
-      {/* ════ SIDEBAR ════ */}
+      
       <aside className={`sidebar${collapsed?' collapsed':''}`}>
 
-        {/* Logo identique à HomePage nav */}
+       
         <NexLogo collapsed={collapsed}/>
 
-        {/* Bouton collapse */}
+       
         <button className="s-toggle" onClick={() => setCollapse(p => !p)}>
           <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             {collapsed
@@ -497,7 +480,7 @@ export default function Dashboard() {
           </svg>
         </button>
 
-        {/* Navigation */}
+       
         <nav className="s-nav">
           <div className="s-group">
             {!collapsed && <div className="s-label">Main</div>}
@@ -514,7 +497,7 @@ export default function Dashboard() {
           </div>
         </nav>
 
-        {/* Logout */}
+      
         <div className="s-footer">
           <button className="s-item s-logout" onClick={logout} title="Logout">
             <span className="s-icon">{IC.logout}</span>
@@ -523,10 +506,10 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* ════ MAIN ════ */}
+     
       <div className="main">
 
-        {/* Header */}
+        
         <header className="header">
           <div className="h-left">
             <div className="h-breadcrumb">
@@ -565,7 +548,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Content */}
+       
         <div className="content">
           {page==='dashboard' && <DashboardPanel user={user} goTo={setPage}/>}
           {page==='generate'  && <GeneratePanel  goTo={setPage}/>}

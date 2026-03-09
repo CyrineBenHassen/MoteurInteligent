@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    // ✅ INSCRIPTION
+    # Register
     public function register(Request $request)
     {
         $request->validate([
@@ -25,7 +25,7 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        // Créer un token Sanctum
+        # Créer un token Sanctum
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -36,7 +36,7 @@ class AuthController extends Controller
         ], 201);
     }
 
-    // ✅ CONNEXION
+    # Login
     public function login(Request $request)
     {
         $request->validate([
@@ -46,14 +46,14 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        // Vérification user + mot de passe
+        # Vérification user et le  mot de passe
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Identifiants incorrects.'],
             ]);
         }
 
-        // Supprimer les anciens tokens (optionnel mais sécurisé)
+        # Supprimer les anciens tokens 
         $user->tokens()->delete();
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -66,7 +66,7 @@ class AuthController extends Controller
         ]);
     }
 
-    // ✅ DÉCONNEXION
+    # Logout
     public function logout(Request $request)
     {
         // Supprime le token actuel
@@ -77,7 +77,7 @@ class AuthController extends Controller
         ]);
     }
 
-    // ✅ PROFIL (route protégée)
+    # PROFIL (route protégée)
     public function me(Request $request)
     {
         return response()->json($request->user());

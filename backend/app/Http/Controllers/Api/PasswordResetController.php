@@ -11,7 +11,7 @@ use Illuminate\Auth\Events\PasswordReset;
 
 class PasswordResetController extends Controller
 {
-    // ✅ Étape 1 : Envoyer le lien par email
+    # Envoye le lien par email
     public function forgotPassword(Request $request)
     {
         $request->validate([
@@ -33,7 +33,7 @@ class PasswordResetController extends Controller
         ], 422);
     }
 
-    // ✅ Étape 2 : Réinitialiser le mot de passe
+    # Réinitialiser le mot de passe
     public function resetPassword(Request $request)
     {
         $request->validate([

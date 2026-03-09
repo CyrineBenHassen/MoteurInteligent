@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, loginWithGoogle } = useAuth(); // ✅ ajout loginWithGoogle
+  const { login, loginWithGoogle } = useAuth(); 
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -30,7 +30,7 @@ export default function LoginPage() {
     <>
       <div className="auth-root login-page">
 
-        {/* ── LEFT ── */}
+       
         <div className="auth-left">
           <div className="deco-orb-1" />
           <div className="deco-orb-2" />
@@ -65,7 +65,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* ── RIGHT ── */}
+       
         <div className="auth-right">
           <div className="form-card">
             <div className="card-box">
@@ -139,7 +139,7 @@ export default function LoginPage() {
                 <span /><small>or</small><span />
               </div>
 
-              {/* ✅ BOUTON GOOGLE MIS À JOUR */}
+              
               <button type="button" className="google-btn" onClick={loginWithGoogle}>
                 <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z" />
