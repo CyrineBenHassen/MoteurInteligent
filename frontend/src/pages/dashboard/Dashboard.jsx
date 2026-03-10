@@ -1,12 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useLang } from '../../context/LanguageContext';
 import api from '../../api/axios';
 import './Dashboard.css';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell,
 } from 'recharts';
+
+
+// ── Animated counter hook ──────────────────────────────────────────────────
+function useCountUp(target, duration = 1200) {
+  const [value, setValue] = useState(0);
+  const raf = useRef(null);
+  useEffect(() => {
+    let start = null;
+    const numeric = parseFloat(target);
+    if (isNaN(numeric) || numeric === 0) { setValue(target); return; }
+    const step = (ts) => {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const current = Math.round(eased * numeric);
+      // preserve suffix (%, s)
+      const suffix = String(target).replace(/[\d.]/g, '');
+      setValue(current + suffix);
+      if (progress < 1) raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf.current);
+  }, [target, duration]);
+  return value;
+}
+
+function AnimatedStat({ val }) {
+  const display = useCountUp(val);
+  return <span>{display}</span>;
+}
 
 
 function NexLogo() {
@@ -48,25 +78,95 @@ function SItem({ id, label, badge, active, collapsed, onClick }) {
   );
 }
 
-// Custom label for donut center
-function DonutLabel({ cx, cy, pass, total }) {
-  const rate = total > 0 ? Math.round((pass / total) * 100) : 0;
+
+// ── Top URLs mock data ─────────────────────────────────────────────────────
+const TOP_URLS = [
+  { url: 'https://github.com/login',        framework: 'Selenium', tests: 12, pass: 10, date: '2h ago'   },
+  { url: 'https://trello.com/login',        framework: 'Cypress',  tests: 8,  pass: 8,  date: '1d ago'   },
+  { url: 'https://app.slack.com/sign-in',   framework: 'Both',     tests: 15, pass: 12, date: '3d ago'   },
+];
+
+function TopURLsSection({ goTo }) {
+  const { t } = useLang();
   return (
-    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-      <tspan x={cx} dy="-8" fontSize="22" fontWeight="700" fill="#10b981">{rate}%</tspan>
-      <tspan x={cx} dy="20" fontSize="11" fill="var(--muted)">pass rate</tspan>
-    </text>
+    <div className="section-box" style={{ marginBottom: 24 }}>
+      <div className="sb-head">
+        <span className="sb-title">🔗 {t('topUrls') || 'Top Tested URLs'}</span>
+        <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll') || 'View all'} →</span>
+      </div>
+      <div style={{ padding: '8px 0' }}>
+        {TOP_URLS.map((item, i) => {
+          const rate = Math.round((item.pass / item.tests) * 100);
+          const statusColor = rate === 100 ? '#10b981' : rate >= 75 ? '#f59e0b' : '#ef4444';
+          return (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 16,
+              padding: '12px 20px',
+              borderBottom: i < TOP_URLS.length - 1 ? '1px solid var(--border)' : 'none',
+              transition: 'background .15s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              {/* Index */}
+              <div style={{
+                width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                background: 'var(--goldbg)', border: '1px solid rgba(201,162,39,.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 700, color: 'var(--gold)'
+              }}>{i + 1}</div>
+
+              {/* URL */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 13, fontWeight: 600, color: 'var(--navy)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                }}>{item.url}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                  {item.tests} tests · {item.date}
+                </div>
+              </div>
+
+              {/* Framework badge */}
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '1px',
+                padding: '3px 10px', borderRadius: 20,
+                background: 'rgba(79,134,232,.1)', color: '#4f86e8',
+                border: '1px solid rgba(79,134,232,.2)', flexShrink: 0
+              }}>{item.framework}</span>
+
+              {/* Pass rate bar */}
+              <div style={{ width: 80, flexShrink: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>pass rate</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{rate}%</span>
+                </div>
+                <div style={{ height: 4, borderRadius: 4, background: 'var(--border)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 4,
+                    width: `${rate}%`,
+                    background: statusColor,
+                    transition: 'width 1s ease'
+                  }}/>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
+
 
 function DashboardPanel({ user, goTo }) {
   const { t } = useLang();
 
   const STATS = [
-    { icon:'🚀', val:'0',  lbl: t('scriptsGenerated'), accent:'linear-gradient(90deg,#4f86e8,#6fa3ff)', trend:'+0%' },
-    { icon:'🔬', val:'0',  lbl: t('appsAnalyzed'),     accent:'linear-gradient(90deg,#c9a227,#e8c84a)', trend:'+0%' },
-    { icon:'🎯', val:'0%', lbl: t('avgCoverage'),      accent:'linear-gradient(90deg,#10b981,#34d399)', trend:'—'   },
-    { icon:'⚡', val:'0s', lbl: t('avgGenTime'),       accent:'linear-gradient(90deg,#f97316,#fb923c)', trend:'—'   },
+    { icon: '🚀', val: '12',  lbl: t('scriptsGenerated'), accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)', trend: '+12%' },
+    { icon: '🔬', val: '3',   lbl: t('appsAnalyzed'),     accent: 'linear-gradient(90deg,#c9a227,#e8c84a)', trend: '+3%'  },
+    { icon: '🎯', val: '82%', lbl: t('avgCoverage'),      accent: 'linear-gradient(90deg,#10b981,#34d399)', trend: '—'    },
+    { icon: '⚡', val: '2s',  lbl: t('avgGenTime'),       accent: 'linear-gradient(90deg,#f97316,#fb923c)', trend: '—'    },
   ];
 
   const barData = [
@@ -80,8 +180,8 @@ function DashboardPanel({ user, goTo }) {
   ];
 
   const donutData = [
-    { name: 'Passed', value: 62, color: '#10b981' },
-    { name: 'Failed', value: 23, color: '#ef4444' },
+    { name: 'Passed',  value: 62, color: '#10b981' },
+    { name: 'Failed',  value: 23, color: '#ef4444' },
     { name: 'Skipped', value: 15, color: '#f59e0b' },
   ];
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0);
@@ -100,7 +200,7 @@ function DashboardPanel({ user, goTo }) {
         </button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards — animated */}
       <div className="stats-grid">
         {STATS.map((s, i) => (
           <div className="stat-card" key={s.lbl} style={{'--i': i}}>
@@ -108,20 +208,19 @@ function DashboardPanel({ user, goTo }) {
               <div className="stat-icon-wrap">{s.icon}</div>
               <span className="stat-trend">{s.trend}</span>
             </div>
-            <span className="stat-val">{s.val}</span>
+            <span className="stat-val"><AnimatedStat val={s.val} /></span>
             <span className="stat-lbl">{s.lbl}</span>
             <div className="stat-accent" style={{background: s.accent}} />
           </div>
         ))}
       </div>
 
-      {/* Charts Row — Bar left, Donut right */}
+      {/* Charts Row */}
       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:24}}>
-
         {/* Bar Chart */}
         <div className="section-box">
           <div className="sb-head">
-            <span className="sb-title">📈 {t('generationsPerWeek') || 'Generations this week'}</span>
+            <span className="sb-title"> {t('generationsPerWeek') || 'Generations this week'}</span>
           </div>
           <div style={{padding:'12px 8px 8px'}}>
             <ResponsiveContainer width="100%" height={220}>
@@ -150,12 +249,9 @@ function DashboardPanel({ user, goTo }) {
               <PieChart>
                 <Pie
                   data={donutData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={80}
-                  paddingAngle={3}
-                  dataKey="value"
+                  cx="50%" cy="50%"
+                  innerRadius={55} outerRadius={80}
+                  paddingAngle={3} dataKey="value"
                   labelLine={false}
                 >
                   {donutData.map((entry, index) => (
@@ -166,7 +262,6 @@ function DashboardPanel({ user, goTo }) {
                   contentStyle={{background:'var(--card)', border:'1px solid var(--border)', borderRadius:10, color:'var(--navy)', fontSize:12}}
                   formatter={(val, name) => [`${val}%`, name]}
                 />
-                {/* Center label */}
                 <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
                   <tspan x="50%" dy="-8" fontSize="20" fontWeight="700" fill="#10b981">
                     {Math.round((donutData[0].value / donutTotal) * 100)}%
@@ -175,18 +270,22 @@ function DashboardPanel({ user, goTo }) {
                 </text>
               </PieChart>
             </ResponsiveContainer>
-            {/* Legend */}
             <div style={{display:'flex', gap:20, justifyContent:'center', marginTop:4}}>
               {donutData.map(d => (
                 <div key={d.name} style={{display:'flex', alignItems:'center', gap:6}}>
                   <div style={{width:10, height:10, borderRadius:'50%', background:d.color, flexShrink:0}}/>
-                  <span style={{fontSize:11, color:'var(--muted)', fontWeight:600}}>{d.name} <span style={{color:'var(--navy)'}}>{d.value}%</span></span>
+                  <span style={{fontSize:11, color:'var(--muted)', fontWeight:600}}>
+                    {d.name} <span style={{color:'var(--navy)'}}>{d.value}%</span>
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Top URLs */}
+      <TopURLsSection goTo={goTo} />
 
       {/* Recent Activity */}
       <div className="section-box" style={{marginBottom:24}}>
@@ -197,7 +296,7 @@ function DashboardPanel({ user, goTo }) {
         <div className="empty-row">{t('noActivity')}</div>
       </div>
 
-      {/* Quick Start — en bas car état vide */}
+      {/* Quick Start */}
       <div className="quick-start">
         <div className="qs-icon-wrap">
           <svg width="32" height="32" fill="none" stroke="rgba(201,162,39,.8)" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
@@ -626,15 +725,12 @@ function SettingsPanel({ theme, setTheme }) {
         email_notifications: notifs,
         weekly_report:       weekly,
         default_framework:   framework,
-        theme,
-        language
+        theme, language
       });
       applyLang(language);
       setMsg(t('settingsSaved'));
       setTimeout(() => setMsg(''), 3000);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
     setLoading(false);
   };
 
@@ -652,9 +748,7 @@ function SettingsPanel({ theme, setTheme }) {
           <p className="p-sub">{t('customize')}</p>
         </div>
         <button className="btn-primary" onClick={saveSettings} disabled={loading}>
-          {loading
-            ? <><span className="spinner"/>{t('saving')}</>
-            : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>{t('saveSettings')}</>}
+          {loading?<><span className="spinner"/>{t('saving')}</>:<><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>{t('saveSettings')}</>}
         </button>
       </div>
       {msg && <div className="success-msg">✓ {msg}</div>}
