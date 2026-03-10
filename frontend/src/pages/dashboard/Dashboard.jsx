@@ -92,7 +92,7 @@ function TopURLsSection({ goTo }) {
     <div className="section-box" style={{ marginBottom: 24 }}>
       <div className="sb-head">
         <span className="sb-title">🔗 {t('topUrls') || 'Top Tested URLs'}</span>
-        <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll') || 'View all'} →</span>
+        <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll') || 'View all'} </span>
       </div>
       <div style={{ padding: '8px 0' }}>
         {TOP_URLS.map((item, i) => {
@@ -291,7 +291,7 @@ function DashboardPanel({ user, goTo }) {
       <div className="section-box" style={{marginBottom:24}}>
         <div className="sb-head">
           <span className="sb-title">{t('recentActivity')}</span>
-          <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')} →</span>
+          <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')} </span>
         </div>
         <div className="empty-row">{t('noActivity')}</div>
       </div>
