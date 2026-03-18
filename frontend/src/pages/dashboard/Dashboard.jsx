@@ -8,35 +8,39 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts';
 
-
-// ── Animated counter hook ──────────────────────────────────────────────────
 function useCountUp(target, duration = 1200) {
-  const [value, setValue] = useState(0);
-  const raf = useRef(null);
+  const ref = useRef(null);
+
   useEffect(() => {
-    let start = null;
     const numeric = parseFloat(target);
-    if (isNaN(numeric) || numeric === 0) { setValue(target); return; }
+    const suffix = String(target).replace(/[\d.]/g, '');
+    if (!ref.current || isNaN(numeric)) return;
+
+    let start = null;
+    let raf;
+
     const step = (ts) => {
       if (!start) start = ts;
       const progress = Math.min((ts - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
       const current = Math.round(eased * numeric);
-      // preserve suffix (%, s)
-      const suffix = String(target).replace(/[\d.]/g, '');
-      setValue(current + suffix);
-      if (progress < 1) raf.current = requestAnimationFrame(step);
+      if (ref.current) ref.current.textContent = current + suffix;
+      if (progress < 1) raf = requestAnimationFrame(step);
     };
-    raf.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf.current);
+
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
   }, [target, duration]);
-  return value;
+
+  return ref;
 }
 
 function AnimatedStat({ val }) {
-  const display = useCountUp(val);
-  return <span>{display}</span>;
+  const ref = useCountUp(val);
+  return <span ref={ref}>{val}</span>;
 }
+
+
 
 
 function NexLogo() {
