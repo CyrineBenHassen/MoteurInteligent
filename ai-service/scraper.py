@@ -4,10 +4,9 @@ def scrape_page(url: str) -> dict:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        
+
         try:
             page.goto(url, timeout=30000, wait_until="domcontentloaded")
-            
         except Exception as e:
             browser.close()
             return {"error": str(e), "url": url}
@@ -57,13 +56,47 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
+        # Select (listes déroulantes)
+        selects = page.eval_on_selector_all(
+            "select",
+            """els => els.map(el => ({
+                name: el.name || '',
+                id: el.id || '',
+                options: Array.from(el.options).map(o => o.value).slice(0, 5)
+            }))"""
+        )
+
+        # Textareas
+        textareas = page.eval_on_selector_all(
+            "textarea",
+            """els => els.map(el => ({
+                name: el.name || '',
+                id: el.id || '',
+                placeholder: el.placeholder || ''
+            }))"""
+        )
+
+        # Checkboxes et radios
+        checkboxes = page.eval_on_selector_all(
+            "input[type='checkbox'], input[type='radio']",
+            """els => els.map(el => ({
+                type: el.type,
+                name: el.name || '',
+                id: el.id || '',
+                value: el.value || ''
+            }))"""
+        )
+
         browser.close()
 
         return {
-            "url": url,
-            "title": title,
-            "inputs": inputs,
-            "buttons": buttons,
-            "links": links,
-            "forms": forms
+            "url":       url,
+            "title":     title,
+            "inputs":    inputs,
+            "buttons":   buttons,
+            "links":     links,
+            "forms":     forms,
+            "selects":   selects,
+            "textareas": textareas,
+            "checkboxes": checkboxes,
         }
