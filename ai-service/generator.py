@@ -1,12 +1,15 @@
 import os
 import json
 import re
-from groq import Groq
+from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+)
 
 def build_prompt(scraped: dict, framework: str) -> str:
     url        = scraped.get("url", "")
@@ -79,7 +82,7 @@ def generate_tests(scraped: dict, framework: str) -> dict:
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen/qwen-2.5-coder-32b-instruct",
             messages=[
                 {
                     "role": "system",
@@ -105,7 +108,7 @@ def generate_tests(scraped: dict, framework: str) -> dict:
         # Supprimer les caractères de contrôle
         content = re.sub(r'[\x00-\x1f\x7f]', ' ', content)
 
-        # Trouver SEULEMENT le premier JSON complet entre { }
+        # Trouver le premier JSON complet
         depth = 0
         start = None
         end = None
