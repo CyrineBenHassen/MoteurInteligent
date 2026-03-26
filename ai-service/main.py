@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from scraper import scrape_page
+from generator import generate_tests
 
 app = FastAPI(title="NexTest AI Service")
 
@@ -14,3 +15,27 @@ def scrape(data: dict):
         return {"error": "URL is required"}
     result = scrape_page(url)
     return result
+
+@app.post("/generate")
+def generate(data: dict):
+    url       = data.get("url")
+    framework = data.get("framework", "Selenium")
+    
+    if not url:
+        return {"error": "URL is required"}
+    
+    # Étape 1 — Scraper la page
+    scraped = scrape_page(url)
+    
+    if "error" in scraped:
+        return {"error": scraped["error"]}
+    
+    # Étape 2 — Générer les tests avec Groq
+    result = generate_tests(scraped, framework)
+    
+    return {
+        "url": url,
+        "framework": framework,
+        "scraped": scraped,
+        "result": result
+    }
