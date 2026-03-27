@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://api.groq.com/openai/v1",
+    api_key=os.getenv("GROQ_API_KEY"),
 )
 
 def build_prompt(scraped: dict, framework: str) -> str:
@@ -82,7 +82,7 @@ def generate_tests(scraped: dict, framework: str) -> dict:
 
     try:
         response = client.chat.completions.create(
-            model="qwen/qwen-2.5-coder-32b-instruct",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "system",
@@ -94,7 +94,7 @@ def generate_tests(scraped: dict, framework: str) -> dict:
                 }
             ],
             temperature=0.3,
-            max_tokens=8000,
+            max_tokens=4000
         )
 
         content = response.choices[0].message.content.strip()
