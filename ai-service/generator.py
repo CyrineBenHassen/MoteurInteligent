@@ -98,6 +98,10 @@ def generate_tests(scraped: dict, framework: str) -> dict:
         )
 
         content = response.choices[0].message.content.strip()
+        
+        print("=== RAW RESPONSE ===")
+        print(content)
+        print("=== END RESPONSE ===")
 
         # Nettoyer les backticks markdown
         if "```json" in content:
