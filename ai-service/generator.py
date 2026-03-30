@@ -94,7 +94,8 @@ def generate_tests(scraped: dict, framework: str) -> dict:
                 }
             ],
             temperature=0.3,
-            max_tokens=4000
+            max_tokens=4000,
+
         )
 
         content = response.choices[0].message.content.strip()
