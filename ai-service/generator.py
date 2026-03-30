@@ -12,22 +12,35 @@ client = OpenAI(
 )
 
 def build_prompt(scraped: dict, framework: str) -> str:
-    url        = scraped.get("url", "")
-    title      = scraped.get("title", "")
-    is_spa     = scraped.get("is_spa", False)  # ✅ AJOUT 1
-    inputs     = scraped.get("inputs", [])
-    buttons    = scraped.get("buttons", [])
-    forms      = scraped.get("forms", [])
-    selects    = scraped.get("selects", [])
-    textareas  = scraped.get("textareas", [])
-    checkboxes = scraped.get("checkboxes", [])
+    url          = scraped.get("url", "")
+    title        = scraped.get("title", "")
+    is_spa       = scraped.get("is_spa", False)
+    load_time    = scraped.get("load_time_ms", 0)
+    inputs       = scraped.get("inputs", [])[:15]
+    buttons      = scraped.get("buttons", [])[:10]
+    forms        = scraped.get("forms", [])[:5]
+    selects      = scraped.get("selects", [])[:5]
+    textareas    = scraped.get("textareas", [])[:5]
+    checkboxes   = scraped.get("checkboxes", [])[:10]
+    add_to_cart  = scraped.get("add_to_cart", [])[:5]   # 🆕
+    pagination   = scraped.get("pagination", [])[:5]     # 🆕
+    nav_links    = scraped.get("nav_links", [])[:10]     # 🆕
+    modals       = scraped.get("modals", [])[:5]         # 🆕
+    images       = scraped.get("images", [])[:10]        # 🆕
+    alerts       = scraped.get("alerts", [])[:5]         # 🆕
 
-    inputs_str     = "\n".join([f"  - input: type={i['type']}, name={i['name']}, id={i['id']}" for i in inputs])
-    buttons_str    = "\n".join([f"  - button: text='{b['text']}', id={b['id']}" for b in buttons])
-    forms_str      = "\n".join([f"  - form: action={f['action']}, method={f['method']}" for f in forms])
-    selects_str    = "\n".join([f"  - select: name={s['name']}, options={s['options']}" for s in selects])
-    textareas_str  = "\n".join([f"  - textarea: name={t['name']}, id={t['id']}" for t in textareas])
-    checkboxes_str = "\n".join([f"  - {c['type']}: name={c['name']}, value={c['value']}" for c in checkboxes])
+    inputs_str      = "\n".join([f"  - input: type={i['type']}, name={i['name']}, id={i['id']}, required={i.get('required', False)}" for i in inputs])
+    buttons_str     = "\n".join([f"  - button: text='{b['text']}', id={b['id']}" for b in buttons])
+    forms_str       = "\n".join([f"  - form: action={f['action']}, method={f['method']}" for f in forms])
+    selects_str     = "\n".join([f"  - select: name={s['name']}, options={s['options']}" for s in selects])
+    textareas_str   = "\n".join([f"  - textarea: name={t['name']}, id={t['id']}" for t in textareas])
+    checkboxes_str  = "\n".join([f"  - {c['type']}: name={c['name']}, value={c['value']}" for c in checkboxes])
+    cart_str        = "\n".join([f"  - add_to_cart: text='{c['text']}', id={c['id']}" for c in add_to_cart])
+    pagination_str  = "\n".join([f"  - page: text='{p['text']}', href={p['href']}" for p in pagination])
+    nav_str         = "\n".join([f"  - nav: text='{n['text']}', href={n['href']}" for n in nav_links])
+    modals_str      = "\n".join([f"  - modal: id={m['id']}, visible={m['visible']}" for m in modals])
+    images_str      = "\n".join([f"  - image: src={i['src'][:50]}, loaded={i['loaded']}" for i in images])
+    alerts_str      = "\n".join([f"  - alert: text='{a['text']}', class={a['class']}" for a in alerts])
 
     prompt = f"""You are a QA automation expert. Analyze this web page and generate test cases.
 
@@ -35,6 +48,7 @@ PAGE INFO:
 - URL: {url}
 - Title: {title}
 - Is SPA (React/Angular/Vue): {is_spa}
+- Load Time: {load_time}ms
 
 {f"IMPORTANT: This is a SPA application. Use explicit waits (WebDriverWait) for ALL elements in the script." if is_spa else ""}
 
@@ -57,12 +71,36 @@ Textareas:
 Checkboxes:
 {checkboxes_str}
 
+Add to Cart Buttons:
+{cart_str}
+
+Pagination:
+{pagination_str}
+
+Navigation Links:
+{nav_str}
+
+Modals/Popups:
+{modals_str}
+
+Images:
+{images_str}
+
+Alerts/Notifications:
+{alerts_str}
+
 TASK:
 Generate comprehensive test cases for {framework} covering:
 1. Happy path (valid inputs)
 2. Invalid inputs / negative cases
 3. Empty fields validation
 4. Boundary cases if applicable
+5. Navigation testing (if nav_links exist)
+6. Add to cart testing (if add_to_cart exists)
+7. Pagination testing (if pagination exists)
+8. Modal/Popup testing (if modals exist)
+9. Image loading verification (if images exist)
+10. Performance check (load time > 3000ms is slow)
 
 IMPORTANT: Return ONLY a valid JSON object. No markdown, no backticks, no extra text.
 {{
