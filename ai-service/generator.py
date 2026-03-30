@@ -14,6 +14,7 @@ client = OpenAI(
 def build_prompt(scraped: dict, framework: str) -> str:
     url        = scraped.get("url", "")
     title      = scraped.get("title", "")
+    is_spa     = scraped.get("is_spa", False)  # ✅ AJOUT 1
     inputs     = scraped.get("inputs", [])
     buttons    = scraped.get("buttons", [])
     forms      = scraped.get("forms", [])
@@ -33,6 +34,9 @@ def build_prompt(scraped: dict, framework: str) -> str:
 PAGE INFO:
 - URL: {url}
 - Title: {title}
+- Is SPA (React/Angular/Vue): {is_spa}
+
+{f"IMPORTANT: This is a SPA application. Use explicit waits (WebDriverWait) for ALL elements in the script." if is_spa else ""}
 
 PAGE ELEMENTS:
 Inputs:
@@ -95,25 +99,21 @@ def generate_tests(scraped: dict, framework: str) -> dict:
             ],
             temperature=0.3,
             max_tokens=4000,
-
         )
 
         content = response.choices[0].message.content.strip()
-        
+
         print("=== RAW RESPONSE ===")
         print(content)
         print("=== END RESPONSE ===")
 
-        # Nettoyer les backticks markdown
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
             content = content.split("```")[1].split("```")[0].strip()
 
-        # Supprimer les caractères de contrôle
         content = re.sub(r'[\x00-\x1f\x7f]', ' ', content)
 
-        # Trouver le premier JSON complet
         depth = 0
         start = None
         end = None
