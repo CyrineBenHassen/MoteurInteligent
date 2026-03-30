@@ -20,7 +20,7 @@ def scrape_page(url: str) -> dict:
 
         title = page.title()
 
-        # ✅ Inputs
+        # Inputs
         inputs = page.eval_on_selector_all(
             "input:not([type='hidden'])",
             """els => els.map(el => ({
@@ -32,7 +32,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # ✅ Boutons
+        # Boutons
         buttons = page.eval_on_selector_all(
             "button, input[type='submit'], input[type='button'], [role='button']",
             """els => els.map(el => ({
@@ -43,7 +43,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # ✅ Liens
+        # Liens
         links = page.eval_on_selector_all(
             "a[href]",
             """els => els.slice(0, 15).map(el => ({
@@ -52,7 +52,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # ✅ Formulaires
+        # Formulaires
         forms = page.eval_on_selector_all(
             "form",
             """els => els.map(el => ({
@@ -62,7 +62,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # ✅ Selects
+        # Selects
         selects = page.eval_on_selector_all(
             "select",
             """els => els.map(el => ({
@@ -72,7 +72,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # ✅ Textareas
+        # Textareas
         textareas = page.eval_on_selector_all(
             "textarea",
             """els => els.map(el => ({
@@ -82,7 +82,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # ✅ Checkboxes
+        # Checkboxes
         checkboxes = page.eval_on_selector_all(
             "input[type='checkbox'], input[type='radio']",
             """els => els.map(el => ({
@@ -93,7 +93,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # 🆕 Boutons Ajouter au panier
+        # Boutons Ajouter au panier
         add_to_cart = page.eval_on_selector_all(
             "[class*='cart'], [id*='cart'], [class*='add-to'], [id*='add-to'], [class*='addto'], [id*='addto']",
             """els => els.slice(0, 10).map(el => ({
@@ -103,7 +103,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # 🆕 Pagination
+        # Pagination
         pagination = page.eval_on_selector_all(
             ".pagination a, [class*='pagination'] a, [class*='page-'] a, [aria-label*='page']",
             """els => els.slice(0, 10).map(el => ({
@@ -113,7 +113,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # 🆕 Navigation links
+        # Navigation links
         nav_links = page.eval_on_selector_all(
             "nav a, [class*='nav'] a, [class*='menu'] a, header a",
             """els => els.slice(0, 15).map(el => ({
@@ -122,7 +122,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # 🆕 Popups / Modals
+        # Popups / Modals
         modals = page.eval_on_selector_all(
             "[class*='modal'], [class*='popup'], [class*='dialog'], [role='dialog']",
             """els => els.slice(0, 5).map(el => ({
@@ -132,7 +132,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # 🆕 Images
+        #  Images
         images = page.eval_on_selector_all(
             "img",
             """els => els.slice(0, 10).map(el => ({
@@ -142,7 +142,7 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # 🆕 Alertes / Notifications
+        # Alertes / Notifications
         alerts = page.eval_on_selector_all(
             "[class*='alert'], [class*='error'], [class*='success'], [class*='warning'], [role='alert']",
             """els => els.slice(0, 5).map(el => ({
@@ -151,13 +151,13 @@ def scrape_page(url: str) -> dict:
             }))"""
         )
 
-        # 🆕 Performance
+        # Performance
         load_time = page.evaluate("""() => {
             const timing = performance.timing;
             return timing.loadEventEnd - timing.navigationStart;
         }""")
 
-        # ✅ Détecter SPA
+        # Détecter SPA
         is_spa = page.evaluate("""() => {
             return !!(window.React || window.angular || window.Vue || 
                      window.__NEXT_DATA__ || window.nuxt)
@@ -169,7 +169,7 @@ def scrape_page(url: str) -> dict:
             "url":          url,
             "title":        title,
             "is_spa":       is_spa,
-            "load_time_ms": load_time,      # 🆕
+            "load_time_ms": load_time,      
             "inputs":       inputs,
             "buttons":      buttons,
             "links":        links,
@@ -177,10 +177,10 @@ def scrape_page(url: str) -> dict:
             "selects":      selects,
             "textareas":    textareas,
             "checkboxes":   checkboxes,
-            "add_to_cart":  add_to_cart,    # 🆕
-            "pagination":   pagination,      # 🆕
-            "nav_links":    nav_links,       # 🆕
-            "modals":       modals,          # 🆕
-            "images":       images,          # 🆕
-            "alerts":       alerts,          # 🆕
+            "add_to_cart":  add_to_cart,    
+            "pagination":   pagination,      
+            "nav_links":    nav_links,       
+            "modals":       modals,          
+            "images":       images,          
+            "alerts":       alerts,          
         }

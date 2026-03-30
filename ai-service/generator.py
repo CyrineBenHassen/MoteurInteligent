@@ -22,12 +22,12 @@ def build_prompt(scraped: dict, framework: str) -> str:
     selects      = scraped.get("selects", [])[:5]
     textareas    = scraped.get("textareas", [])[:5]
     checkboxes   = scraped.get("checkboxes", [])[:10]
-    add_to_cart  = scraped.get("add_to_cart", [])[:5]   # 🆕
-    pagination   = scraped.get("pagination", [])[:5]     # 🆕
-    nav_links    = scraped.get("nav_links", [])[:10]     # 🆕
-    modals       = scraped.get("modals", [])[:5]         # 🆕
-    images       = scraped.get("images", [])[:10]        # 🆕
-    alerts       = scraped.get("alerts", [])[:5]         # 🆕
+    add_to_cart  = scraped.get("add_to_cart", [])[:5]   
+    pagination   = scraped.get("pagination", [])[:5]     
+    nav_links    = scraped.get("nav_links", [])[:10]     
+    modals       = scraped.get("modals", [])[:5]         
+    images       = scraped.get("images", [])[:10]        
+    alerts       = scraped.get("alerts", [])[:5]         
 
     inputs_str      = "\n".join([f"  - input: type={i['type']}, name={i['name']}, id={i['id']}, required={i.get('required', False)}" for i in inputs])
     buttons_str     = "\n".join([f"  - button: text='{b['text']}', id={b['id']}" for b in buttons])
