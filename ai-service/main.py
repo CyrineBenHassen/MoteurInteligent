@@ -41,7 +41,7 @@ def generate(data: dict):
         "result": result
     }
 
-# 🆕 Nouveau endpoint analyse des erreurs
+# Nouveau endpoint analyse des erreurs
 @app.post("/analyze")
 def analyze(data: dict):
     error     = data.get("error")
