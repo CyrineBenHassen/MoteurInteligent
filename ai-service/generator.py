@@ -11,6 +11,7 @@ client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY"),
 )
 
+
 def build_prompt(scraped: dict, framework: str) -> str:
     url          = scraped.get("url", "")
     title        = scraped.get("title", "")
@@ -22,25 +23,50 @@ def build_prompt(scraped: dict, framework: str) -> str:
     selects      = scraped.get("selects", [])[:5]
     textareas    = scraped.get("textareas", [])[:5]
     checkboxes   = scraped.get("checkboxes", [])[:10]
-    add_to_cart  = scraped.get("add_to_cart", [])[:5]   
-    pagination   = scraped.get("pagination", [])[:5]     
-    nav_links    = scraped.get("nav_links", [])[:10]     
-    modals       = scraped.get("modals", [])[:5]         
-    images       = scraped.get("images", [])[:10]        
-    alerts       = scraped.get("alerts", [])[:5]         
+    add_to_cart  = scraped.get("add_to_cart", [])[:5]
+    pagination   = scraped.get("pagination", [])[:5]
+    nav_links    = scraped.get("nav_links", [])[:10]
+    modals       = scraped.get("modals", [])[:5]
+    images       = scraped.get("images", [])[:10]
+    alerts       = scraped.get("alerts", [])[:5]
 
-    inputs_str      = "\n".join([f"  - input: type={i['type']}, name={i['name']}, id={i['id']}, required={i.get('required', False)}" for i in inputs])
-    buttons_str     = "\n".join([f"  - button: text='{b['text']}', id={b['id']}" for b in buttons])
-    forms_str       = "\n".join([f"  - form: action={f['action']}, method={f['method']}" for f in forms])
-    selects_str     = "\n".join([f"  - select: name={s['name']}, options={s['options']}" for s in selects])
-    textareas_str   = "\n".join([f"  - textarea: name={t['name']}, id={t['id']}" for t in textareas])
-    checkboxes_str  = "\n".join([f"  - {c['type']}: name={c['name']}, value={c['value']}" for c in checkboxes])
-    cart_str        = "\n".join([f"  - add_to_cart: text='{c['text']}', id={c['id']}" for c in add_to_cart])
-    pagination_str  = "\n".join([f"  - page: text='{p['text']}', href={p['href']}" for p in pagination])
-    nav_str         = "\n".join([f"  - nav: text='{n['text']}', href={n['href']}" for n in nav_links])
-    modals_str      = "\n".join([f"  - modal: id={m['id']}, visible={m['visible']}" for m in modals])
-    images_str      = "\n".join([f"  - image: src={i['src'][:50]}, loaded={i['loaded']}" for i in images])
-    alerts_str      = "\n".join([f"  - alert: text='{a['text']}', class={a['class']}" for a in alerts])
+    inputs_str     = "\n".join([f"  - input: type={i['type']}, name={i['name']}, id={i['id']}, required={i.get('required', False)}" for i in inputs])
+    buttons_str    = "\n".join([f"  - button: text='{b['text']}', id={b['id']}" for b in buttons])
+    forms_str      = "\n".join([f"  - form: action={f['action']}, method={f['method']}" for f in forms])
+    selects_str    = "\n".join([f"  - select: name={s['name']}, options={s['options']}" for s in selects])
+    textareas_str  = "\n".join([f"  - textarea: name={t['name']}, id={t['id']}" for t in textareas])
+    checkboxes_str = "\n".join([f"  - {c['type']}: name={c['name']}, value={c['value']}" for c in checkboxes])
+    cart_str       = "\n".join([f"  - add_to_cart: text='{c['text']}', id={c['id']}" for c in add_to_cart])
+    pagination_str = "\n".join([f"  - page: text='{p['text']}', href={p['href']}" for p in pagination])
+    nav_str        = "\n".join([f"  - nav: text='{n['text']}', href={n['href']}" for n in nav_links])
+    modals_str     = "\n".join([f"  - modal: id={m['id']}, visible={m['visible']}" for m in modals])
+    images_str     = "\n".join([f"  - image: src={i['src'][:50]}, loaded={i['loaded']}" for i in images])
+    alerts_str     = "\n".join([f"  - alert: text='{a['text']}', class={a['class']}" for a in alerts])
+
+    spa_warning = "IMPORTANT: This is a SPA application. Use explicit waits (WebDriverWait) for ALL elements." if is_spa else ""
+
+    if framework.lower() == "selenium":
+        script_rules = """
+SELENIUM SCRIPT RULES (follow strictly):
+- Always import: webdriver, By, WebDriverWait, expected_conditions as EC, time
+- Always use WebDriverWait(driver, 10).until() for ALL element interactions
+- Use By.ID when id is available and not empty
+- Use By.NAME when name is available and not empty
+- Use By.XPATH as last resort
+- Handle apostrophes in XPath using double quotes inside: By.XPATH, "//a[text()=\\"S\\'identifier\\"]"
+- Each test must be a separate function def test_xxx():
+- Call all test functions at the end
+- Always add driver.quit() at the very end
+- Add try/except in each test function"""
+    else:
+        script_rules = """
+CYPRESS SCRIPT RULES (follow strictly):
+- Use describe() and it() blocks
+- Use cy.visit() to navigate
+- Use cy.get() with CSS selectors
+- Use cy.contains() for text-based selection
+- Use cy.should() for assertions
+- Add beforeEach() to reset state between tests"""
 
     prompt = f"""You are a QA automation expert. Analyze this web page and generate test cases.
 
@@ -49,8 +75,7 @@ PAGE INFO:
 - Title: {title}
 - Is SPA (React/Angular/Vue): {is_spa}
 - Load Time: {load_time}ms
-
-{f"IMPORTANT: This is a SPA application. Use explicit waits (WebDriverWait) for ALL elements in the script." if is_spa else ""}
+{spa_warning}
 
 PAGE ELEMENTS:
 Inputs:
@@ -102,7 +127,16 @@ Generate comprehensive test cases for {framework} covering:
 9. Image loading verification (if images exist)
 10. Performance check (load time > 3000ms is slow)
 
-IMPORTANT: Return ONLY a valid JSON object. No markdown, no backticks, no extra text.
+{script_rules}
+
+SCRIPT STRING RULES (very important):
+- The "script" field must be a single valid JSON string
+- Use \\n for newlines inside the script string
+- Use \\" for double quotes inside the script string
+- Never use raw unescaped backslashes
+- Never use actual newline characters inside the script string
+
+IMPORTANT: Return ONLY a valid JSON object. No markdown, no backticks, no extra text before or after.
 {{
   "test_cases": [
     {{
@@ -114,7 +148,7 @@ IMPORTANT: Return ONLY a valid JSON object. No markdown, no backticks, no extra 
       "type": "positive"
     }}
   ],
-  "script": "complete {framework} script here"
+  "script": "complete {framework} script as single line string with \\n for newlines"
 }}"""
     return prompt
 
@@ -128,7 +162,7 @@ def generate_tests(scraped: dict, framework: str) -> dict:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a QA automation expert. Always respond with valid JSON only. No markdown, no backticks, no extra text before or after the JSON."
+                    "content": "You are a QA automation expert. Always respond with valid JSON only. No markdown, no backticks, no extra text. The script field must be a valid JSON string with \\n for newlines."
                 },
                 {
                     "role": "user",
@@ -136,25 +170,27 @@ def generate_tests(scraped: dict, framework: str) -> dict:
                 }
             ],
             temperature=0.3,
-            max_tokens=4000,
+            max_tokens=8000,
         )
 
         content = response.choices[0].message.content.strip()
 
-        print("=== RAW RESPONSE ===")
-        print(content)
-        print("=== END RESPONSE ===")
-
+        # Nettoyer les backticks markdown
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
             content = content.split("```")[1].split("```")[0].strip()
 
-        content = re.sub(r'[\x00-\x1f\x7f]', ' ', content)
+        # Supprimer les caractères de contrôle sauf \n et \t
+        content = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', ' ', content)
 
+        # Fix backslashes mal échappés
+        content = re.sub(r'(?<!\\)\\(?!["\\/bfnrtu])', r'\\\\', content)
+
+        # Trouver le premier JSON complet
         depth = 0
         start = None
-        end = None
+        end   = None
         for i, char in enumerate(content):
             if char == '{':
                 if depth == 0:
