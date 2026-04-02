@@ -449,14 +449,29 @@ function ExecutionPanel({ generation }) {
   const rate = tests.length > 0 ? Math.round((pass / tests.length) * 100) : 0;
   const shown = filter === 'all' ? tests : tests.filter(t => t.status === filter);
 
-  const downloadScript = () => {
-    const ext  = framework === 'Cypress' ? 'js' : 'py';
-    const blob = new Blob([script], { type: 'text/plain' });
+
+const downloadScript = (type = 'selenium') => {
+    let content, filename;
+    
+    if (framework === 'Both') {
+        if (type === 'selenium') {
+            content  = generation?.result?.script_selenium || '';
+            filename = 'test_selenium.py';
+        } else {
+            content  = generation?.result?.script_cypress || '';
+            filename = 'test_cypress.js';
+        }
+    } else {
+        content  = generation?.result?.script || '';
+        filename = framework === 'Cypress' ? 'test_cypress.js' : 'test_selenium.py';
+    }
+
+    const blob = new Blob([content], { type: 'text/plain' });
     const link = document.createElement('a');
     link.href  = URL.createObjectURL(blob);
-    link.download = `test_${framework.toLowerCase()}.${ext}`;
+    link.download = filename;
     link.click();
-  };
+};
 
   if (!generation) {
     return (
@@ -484,10 +499,35 @@ function ExecutionPanel({ generation }) {
           <h1 className="p-title">{t('test')} <span className="g">{t('execution')}</span></h1>
           <p className="p-sub" style={{wordBreak:'break-all'}}>{url} · {framework}</p>
         </div>
-        <button className="btn-primary" onClick={downloadScript}>
-          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          {t('downloadReport')}
+        {framework === 'Both' ? (
+    <div style={{display:'flex', gap:'8px'}}>
+        <button className="btn-primary" onClick={() => downloadScript('selenium')}>
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download Selenium
         </button>
+        <button className="btn-primary" onClick={() => downloadScript('cypress')}>
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download Cypress
+        </button>
+    </div>
+) : (
+    <button className="btn-primary" onClick={() => downloadScript()}>
+        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        {t('downloadReport')}
+    </button>
+)}
       </div>
 
       <div className="exec-summary">

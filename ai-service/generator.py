@@ -43,30 +43,25 @@ def build_prompt(scraped: dict, framework: str) -> str:
     images_str     = "\n".join([f"  - image: src={i['src'][:50]}, loaded={i['loaded']}" for i in images])
     alerts_str     = "\n".join([f"  - alert: text='{a['text']}', class={a['class']}" for a in alerts])
 
-    spa_warning = "IMPORTANT: This is a SPA application. Use explicit waits (WebDriverWait) for ALL elements." if is_spa else ""
+    spa_warning = "IMPORTANT: This is a SPA application. Use explicit waits for ALL elements." if is_spa else ""
 
     if framework.lower() == "selenium":
         script_rules = """
-SELENIUM SCRIPT RULES (follow strictly):
-- Always import: webdriver, By, WebDriverWait, expected_conditions as EC, time
-- Always use WebDriverWait(driver, 10).until() for ALL element interactions
-- Use By.ID when id is available and not empty
-- Use By.NAME when name is available and not empty
-- Use By.XPATH as last resort
-- Handle apostrophes in XPath using double quotes inside: By.XPATH, "//a[text()=\\"S\\'identifier\\"]"
-- Each test must be a separate function def test_xxx():
+SELENIUM SCRIPT RULES:
+- Always import: webdriver, By, WebDriverWait, expected_conditions as EC
+- Use WebDriverWait(driver, 10).until() for ALL elements
+- Use By.ID when id is available
+- Each test must be a separate def test_xxx():
 - Call all test functions at the end
-- Always add driver.quit() at the very end
-- Add try/except in each test function"""
+- Always add driver.quit() at the end"""
     else:
         script_rules = """
-CYPRESS SCRIPT RULES (follow strictly):
+CYPRESS SCRIPT RULES:
 - Use describe() and it() blocks
 - Use cy.visit() to navigate
 - Use cy.get() with CSS selectors
-- Use cy.contains() for text-based selection
 - Use cy.should() for assertions
-- Add beforeEach() to reset state between tests"""
+- Add beforeEach() to reset state"""
 
     prompt = f"""You are a QA automation expert. Analyze this web page and generate test cases.
 
@@ -129,14 +124,7 @@ Generate comprehensive test cases for {framework} covering:
 
 {script_rules}
 
-SCRIPT STRING RULES (very important):
-- The "script" field must be a single valid JSON string
-- Use \\n for newlines inside the script string
-- Use \\" for double quotes inside the script string
-- Never use raw unescaped backslashes
-- Never use actual newline characters inside the script string
-
-IMPORTANT: Return ONLY a valid JSON object. No markdown, no backticks, no extra text before or after.
+IMPORTANT: Return ONLY a valid JSON object. No markdown, no backticks, no extra text.
 {{
   "test_cases": [
     {{
@@ -148,12 +136,13 @@ IMPORTANT: Return ONLY a valid JSON object. No markdown, no backticks, no extra 
       "type": "positive"
     }}
   ],
-  "script": "complete {framework} script as single line string with \\n for newlines"
+  "script": "complete {framework} script with \\n for newlines"
 }}"""
     return prompt
 
 
-def generate_tests(scraped: dict, framework: str) -> dict:
+def generate_single(scraped: dict, framework: str) -> dict:
+    """Génère les tests pour un seul framework"""
     prompt = build_prompt(scraped, framework)
 
     try:
@@ -162,7 +151,7 @@ def generate_tests(scraped: dict, framework: str) -> dict:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a QA automation expert. Always respond with valid JSON only. No markdown, no backticks, no extra text. The script field must be a valid JSON string with \\n for newlines."
+                    "content": "You are a QA automation expert. Always respond with valid JSON only. No markdown, no backticks, no extra text."
                 },
                 {
                     "role": "user",
@@ -170,24 +159,19 @@ def generate_tests(scraped: dict, framework: str) -> dict:
                 }
             ],
             temperature=0.3,
-            max_tokens=8000,
+            max_tokens=4000,
         )
 
         content = response.choices[0].message.content.strip()
 
-        # Nettoyer les backticks markdown
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
             content = content.split("```")[1].split("```")[0].strip()
 
-        # Supprimer les caractères de contrôle sauf \n et \t
         content = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', ' ', content)
-
-        # Fix backslashes mal échappés
         content = re.sub(r'(?<!\\)\\(?!["\\/bfnrtu])', r'\\\\', content)
 
-        # Trouver le premier JSON complet
         depth = 0
         start = None
         end   = None
@@ -205,8 +189,29 @@ def generate_tests(scraped: dict, framework: str) -> dict:
         if start is not None and end is not None:
             content = content[start:end]
 
-        result = json.loads(content)
-        return result
+        return json.loads(content)
 
     except Exception as e:
         return {"error": str(e)}
+
+
+def generate_tests(scraped: dict, framework: str) -> dict:
+    """Génère les tests — supporte Selenium, Cypress, Both"""
+
+    # ✅ Both → 2 appels séparés
+    if framework.lower() == "both":
+        print("=== GENERATING SELENIUM ===")
+        selenium_result = generate_single(scraped, "Selenium")
+
+        print("=== GENERATING CYPRESS ===")
+        cypress_result  = generate_single(scraped, "Cypress")
+
+        return {
+            "test_cases":      selenium_result.get("test_cases", []),
+            "script_selenium": selenium_result.get("script", ""),
+            "script_cypress":  cypress_result.get("script", ""),
+        }
+
+    # ✅ Selenium ou Cypress → 1 seul appel
+    result = generate_single(scraped, framework)
+    return result
