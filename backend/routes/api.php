@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\GenerationController;
 
 # Register and login
 Route::prefix('auth')->group(function () {
@@ -31,4 +32,12 @@ Route::middleware('auth:sanctum')->group(function () {
     
     #update avatar
     Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar']);
+
+
+    # Generations
+    Route::post('/generate',              [GenerationController::class, 'generate']);
+    Route::get('/generations',            [GenerationController::class, 'index']);
+    Route::get('/generations/{id}',       [GenerationController::class, 'show']);
+    Route::delete('/generations/{id}',    [GenerationController::class, 'destroy']);
+    Route::post('/analyze',               [GenerationController::class, 'analyze']);
 });
