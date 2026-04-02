@@ -425,7 +425,16 @@ function ExecutionPanel({ generation }) {
   const tests = generation?.result?.test_cases?.map((tc, i) => ({
     id:       tc.id || i + 1,
     name:     tc.name,
-    status:   tc.type === 'positive' ? 'pass' : tc.type === 'negative' ? 'fail' : 'skip',
+    status: tc.type === 'positive'    ? 'pass'
+      : tc.type === 'negative'    ? 'fail'
+      : tc.type === 'boundary'    ? 'skip'
+      : tc.type === 'navigation'  ? 'pass'
+      : tc.type === 'add_to_cart' ? 'pass'
+      : tc.type === 'pagination'  ? 'pass'
+      : tc.type === 'modal'       ? 'pass'
+      : tc.type === 'image'       ? 'pass'
+      : tc.type === 'performance' ? 'pass'
+      : 'skip',
     duration: '—',
     suite:    tc.description?.slice(0, 40) || 'Test',
   })) || [];
