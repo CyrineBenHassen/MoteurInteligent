@@ -317,22 +317,32 @@ function DashboardPanel({ user, goTo }) {
 }
 
 
-function GeneratePanel({ goTo }) {
+function GeneratePanel({ goTo, setGeneration }) {
   const { t } = useLang();
-  const [url, setUrl] = useState('');
-  const [fw,  setFw]  = useState('Selenium');
-  const [loading, setLoad] = useState(false);
+  const [url,     setUrl]   = useState('');
+  const [fw,      setFw]    = useState('Selenium');
+  const [loading, setLoad]  = useState(false);
+  const [error,   setError] = useState('');
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!url) return;
     setLoad(true);
-    setTimeout(() => { setLoad(false); goTo('execution'); }, 2800);
+    setError('');
+    try {
+      const res = await api.post('/generate', { url, framework: fw });
+      setGeneration(res.data);
+      goTo('execution');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Une erreur est survenue');
+    }
+    setLoad(false);
   };
 
   return (
     <div className="panel">
       <div className="p-header">
+        {error && <div className="error-msg">✗ {error}</div>}
         <div>
           <h1 className="p-title">{t('new')} <span className="g">{t('generation')}</span></h1>
           <p className="p-sub">{t('generateDesc')}</p>
@@ -408,120 +418,98 @@ function StatusIcon({ s }) {
   return <svg width="15" height="15" fill="none" stroke="#f59e0b" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>;
 }
 
-function ExecutionPanel() {
+function ExecutionPanel({ generation }) {
   const { t } = useLang();
-  const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [done, setDone] = useState(false);
-  const [fw, setFw] = useState('Selenium');
   const [filter, setFilter] = useState('all');
 
-  const runAll = () => {
-    setRunning(true); setDone(false); setProgress(0); setFilter('all');
-    let p = 0;
-    const iv = setInterval(() => {
-      p += Math.random() * 11 + 4;
-      if (p >= 100) { p = 100; clearInterval(iv); setRunning(false); setDone(true); }
-      setProgress(Math.min(p, 100));
-    }, 180);
+  const tests = generation?.result?.test_cases?.map((tc, i) => ({
+    id:       tc.id || i + 1,
+    name:     tc.name,
+    status:   tc.type === 'positive' ? 'pass' : tc.type === 'negative' ? 'fail' : 'skip',
+    duration: '—',
+    suite:    tc.description?.slice(0, 40) || 'Test',
+  })) || [];
+
+  const script    = generation?.result?.script || '';
+  const url       = generation?.generation?.url || '';
+  const framework = generation?.generation?.framework || 'Selenium';
+
+  const pass = tests.filter(t => t.status === 'pass').length;
+  const fail = tests.filter(t => t.status === 'fail').length;
+  const skip = tests.filter(t => t.status === 'skip').length;
+  const rate = tests.length > 0 ? Math.round((pass / tests.length) * 100) : 0;
+  const shown = filter === 'all' ? tests : tests.filter(t => t.status === filter);
+
+  const downloadScript = () => {
+    const ext  = framework === 'Cypress' ? 'js' : 'py';
+    const blob = new Blob([script], { type: 'text/plain' });
+    const link = document.createElement('a');
+    link.href  = URL.createObjectURL(blob);
+    link.download = `test_${framework.toLowerCase()}.${ext}`;
+    link.click();
   };
 
-  const pass = TESTS.filter(t => t.status==='pass').length;
-  const fail = TESTS.filter(t => t.status==='fail').length;
-  const skip = TESTS.filter(t => t.status==='skip').length;
-  const rate = Math.round((pass / TESTS.length) * 100);
-  const shown = filter==='all' ? TESTS : TESTS.filter(t => t.status===filter);
+  if (!generation) {
+    return (
+      <div className="panel">
+        <div className="p-header">
+          <div>
+            <h1 className="p-title">{t('test')} <span className="g">{t('execution')}</span></h1>
+            <p className="p-sub">{t('executionDesc')}</p>
+          </div>
+        </div>
+        <div className="exec-empty">
+          <div className="exec-empty-icon">
+            <svg width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          <p>Génère d'abord des tests depuis <strong>New Generation</strong></p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="panel">
       <div className="p-header">
         <div>
           <h1 className="p-title">{t('test')} <span className="g">{t('execution')}</span></h1>
-          <p className="p-sub">{t('executionDesc')}</p>
+          <p className="p-sub" style={{wordBreak:'break-all'}}>{url} · {framework}</p>
         </div>
-        <div style={{display:'flex', gap:10, alignItems:'center', flexWrap:'wrap'}}>
-          <div className="fw-tabs">
-            {['Selenium','Cypress'].map(f => (
-              <button key={f} type="button" className={`fw-tab${fw===f?' on':''}`} onClick={() => setFw(f)} style={{minWidth:90}}>{f}</button>
-            ))}
-          </div>
-          <button className="btn-primary" onClick={runAll} disabled={running}>
-            {running
-              ? <><span className="spinner"/>{t('running')}</>
-              : done
-                ? <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-3.71"/></svg>{t('rerunAll')}</>
-                : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>{t('runAllTests')}</>}
-          </button>
-        </div>
+        <button className="btn-primary" onClick={downloadScript}>
+          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          {t('downloadReport')}
+        </button>
       </div>
-      {(running || done) && (
-        <div className="exec-progress-wrap">
-          <div className="exec-progress-header">
-            <span className="exec-progress-label">
-              {done ? `✓ ${t('executionComplete')}` : `${t('runningTests')} ${Math.round(progress)}%`}
-            </span>
-            {done && <span className="exec-progress-done">{TESTS.length} {t('tests')} · 6.5s {t('total')}</span>}
-          </div>
-          <div className="exec-progress-bar">
-            <div className="exec-progress-fill" style={{width:`${progress}%`}}/>
-          </div>
-        </div>
-      )}
-      {done && (
-        <div className="exec-summary">
-          <div className="exec-sum-card exec-sum-pass"><div className="exec-sum-val">{pass}</div><div className="exec-sum-lbl">{t('passed')}</div></div>
-          <div className="exec-sum-card exec-sum-fail"><div className="exec-sum-val">{fail}</div><div className="exec-sum-lbl">{t('failed')}</div></div>
-          <div className="exec-sum-card exec-sum-skip"><div className="exec-sum-val">{skip}</div><div className="exec-sum-lbl">{t('skipped')}</div></div>
-          <div className="exec-sum-card exec-sum-rate"><div className="exec-sum-val">{rate}%</div><div className="exec-sum-lbl">{t('passRate')}</div></div>
-        </div>
-      )}
-      {(done || running) && (
-        <div className="exec-filters">
-          <button className={`exec-filter${filter==='all' ?' on':''}`} onClick={() => setFilter('all')}>{t('all')} ({TESTS.length})</button>
-          <button className={`exec-filter${filter==='pass'?' on':''}`} onClick={() => setFilter('pass')}>✓ {t('passed')} ({pass})</button>
-          <button className={`exec-filter${filter==='fail'?' on':''}`} onClick={() => setFilter('fail')}>✗ {t('failed')} ({fail})</button>
-          <button className={`exec-filter${filter==='skip'?' on':''}`} onClick={() => setFilter('skip')}>⚠ {t('skipped')} ({skip})</button>
-        </div>
-      )}
+
+      <div className="exec-summary">
+        <div className="exec-sum-card exec-sum-pass"><div className="exec-sum-val">{pass}</div><div className="exec-sum-lbl">{t('passed')}</div></div>
+        <div className="exec-sum-card exec-sum-fail"><div className="exec-sum-val">{fail}</div><div className="exec-sum-lbl">{t('failed')}</div></div>
+        <div className="exec-sum-card exec-sum-skip"><div className="exec-sum-val">{skip}</div><div className="exec-sum-lbl">{t('skipped')}</div></div>
+        <div className="exec-sum-card exec-sum-rate"><div className="exec-sum-val">{rate}%</div><div className="exec-sum-lbl">{t('passRate')}</div></div>
+      </div>
+
+      <div className="exec-filters">
+        <button className={`exec-filter${filter==='all' ?' on':''}`} onClick={() => setFilter('all')}>{t('all')} ({tests.length})</button>
+        <button className={`exec-filter${filter==='pass'?' on':''}`} onClick={() => setFilter('pass')}>✓ {t('passed')} ({pass})</button>
+        <button className={`exec-filter${filter==='fail'?' on':''}`} onClick={() => setFilter('fail')}>✗ {t('failed')} ({fail})</button>
+        <button className={`exec-filter${filter==='skip'?' on':''}`} onClick={() => setFilter('skip')}>⚠ {t('skipped')} ({skip})</button>
+      </div>
+
       <div className="exec-list">
-        {!done && !running && (
-          <div className="exec-empty">
-            <div className="exec-empty-icon">
-              <svg width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            </div>
-            <p>{t('clickRun')} <strong>{t('runAllTests')}</strong> {t('toExecute')} {fw} {t('suite')}</p>
-          </div>
-        )}
-        {(done || running) && shown.map((test, i) => (
-          <div key={test.id} className={`exec-row exec-row--${done ? test.status : 'pending'}`} style={{animationDelay:`${i * 0.045}s`}}>
-            <div className="exec-row-status">
-              {done ? <StatusIcon s={test.status}/> : <span className="exec-spinner-sm"/>}
-            </div>
+        {shown.map((test, i) => (
+          <div key={test.id} className={`exec-row exec-row--${test.status}`} style={{animationDelay:`${i*0.045}s`}}>
+            <div className="exec-row-status"><StatusIcon s={test.status}/></div>
             <div className="exec-row-info">
               <div className="exec-row-name">{test.name}</div>
               <div className="exec-row-suite">{test.suite}</div>
             </div>
             <div className="exec-row-meta">
-              <span className={`exec-badge exec-badge--${done ? test.status : 'pending'}`}>
-                {done ? test.status : t('running').replace('…','')}
-              </span>
-              <span className="exec-duration">{done ? test.duration : '…'}</span>
+              <span className={`exec-badge exec-badge--${test.status}`}>{test.status}</span>
+              <span className="exec-duration">{test.duration}</span>
             </div>
           </div>
         ))}
       </div>
-      {done && (
-        <div style={{marginTop:18, display:'flex', gap:10}}>
-          <button className="btn-primary" style={{fontSize:11, padding:'9px 18px'}}>
-            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            {t('downloadReport')}
-          </button>
-          <button className="btn-outline" style={{fontSize:11, padding:'9px 18px'}}>
-            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            {t('shareResults')}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -821,6 +809,7 @@ export default function Dashboard() {
   const [page,      setPage]     = useState('dashboard');
   const [collapsed, setCollapse] = useState(false);
   const [theme,     setTheme]    = useState('light');
+  const [generation, setGeneration] = useState(null);
   const { user, logout }         = useAuth();
   const { t }                    = useLang();
 
@@ -903,8 +892,8 @@ export default function Dashboard() {
 
         <div className="content">
           {page==='dashboard'&&<DashboardPanel user={user} goTo={setPage}/>}
-          {page==='generate' &&<GeneratePanel  goTo={setPage}/>}
-          {page==='execution'&&<ExecutionPanel/>}
+          {page==='generate' &&<GeneratePanel  goTo={setPage} setGeneration={setGeneration}/>}
+          {page==='execution'&&<ExecutionPanel generation={generation}/>}
           {page==='history'  &&<HistoryPanel/>}
           {page==='account'  &&<AccountPanel   user={user}/>}
           {page==='settings' &&<SettingsPanel  theme={theme} setTheme={setTheme}/>}
