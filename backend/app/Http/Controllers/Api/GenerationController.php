@@ -11,7 +11,7 @@ class GenerationController extends Controller
 {
     public function generate(Request $request)
     {
-         set_time_limit(120);
+        set_time_limit(120);
         $request->validate([
             'url'       => 'required|url',
             'framework' => 'in:Selenium,Cypress,Both',
@@ -30,23 +30,51 @@ class GenerationController extends Controller
                 return response()->json(['error' => 'AI service error'], 500);
             }
 
-            $data = $response->json();
+            $data   = $response->json();
+            $result = $data['result'] ?? [];
+
+            // ✅ Récupérer les test_cases
+            $testCases = $result['test_cases'] ?? [];
+
+            // ✅ Calculer les stats
+            $pass = 0; $fail = 0; $skip = 0;
+            foreach ($testCases as $tc) {
+                $type = $tc['type'] ?? '';
+                if ($type === 'positive') {
+                    $pass++;
+                } elseif ($type === 'negative') {
+                    $fail++;
+                } else {
+                    // boundary, navigation, image, performance... = skip
+                    $skip++;
+                }
+            }
+            $total = $pass + $fail + $skip;
+            $rate  = $total > 0 ? round(($pass / $total) * 100) : 0;
 
             $generation = Generation::create([
-                'user_id'      => auth()->id(),
-                'url'          => $url,
-                'framework'    => $framework,
-                'status'       => 'completed',
-                'test_cases'   => $data['result']['test_cases'] ?? [],
-                'script'       => $data['result']['script'] ?? '',
-                'load_time_ms' => $data['scraped']['load_time_ms'] ?? 0,
-                'is_spa'       => $data['scraped']['is_spa'] ?? false,
+                'user_id'             => auth()->id(),
+                'url'                 => $url,
+                'framework'           => $framework,
+                'status'              => 'completed',
+                'test_cases'          => $testCases,
+                'script'              => $result['script']          ?? '',
+                'script_selenium'     => $result['script_selenium'] ?? '', // 🆕
+                'script_cypress'      => $result['script_cypress']  ?? '', // 🆕
+                'test_cases_selenium' => $result['test_cases_selenium'] ?? [], // 🆕
+                'test_cases_cypress'  => $result['test_cases_cypress']  ?? [], // 🆕
+                'load_time_ms'        => $data['scraped']['load_time_ms'] ?? 0,
+                'is_spa'              => $data['scraped']['is_spa']       ?? false,
+                'pass_count'          => $pass,  // 🆕
+                'fail_count'          => $fail,  // 🆕
+                'skip_count'          => $skip,  // 🆕
+                'pass_rate'           => $rate,  // 🆕
             ]);
 
             return response()->json([
                 'message'    => 'Tests generated successfully',
                 'generation' => $generation,
-                'result'     => $data['result'],
+                'result'     => $result,
                 'scraped'    => $data['scraped'],
             ]);
 

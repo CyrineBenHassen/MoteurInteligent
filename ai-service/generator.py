@@ -196,9 +196,6 @@ def generate_single(scraped: dict, framework: str) -> dict:
 
 
 def generate_tests(scraped: dict, framework: str) -> dict:
-    """Génère les tests — supporte Selenium, Cypress, Both"""
-
-    # ✅ Both → 2 appels séparés
     if framework.lower() == "both":
         print("=== GENERATING SELENIUM ===")
         selenium_result = generate_single(scraped, "Selenium")
@@ -207,11 +204,12 @@ def generate_tests(scraped: dict, framework: str) -> dict:
         cypress_result  = generate_single(scraped, "Cypress")
 
         return {
-            "test_cases":      selenium_result.get("test_cases", []),
-            "script_selenium": selenium_result.get("script", ""),
-            "script_cypress":  cypress_result.get("script", ""),
+            "test_cases":          selenium_result.get("test_cases", []),  # pour compatibilité
+            "test_cases_selenium": selenium_result.get("test_cases", []),  # 🆕
+            "test_cases_cypress":  cypress_result.get("test_cases", []),   # 🆕
+            "script_selenium":     selenium_result.get("script", ""),
+            "script_cypress":      cypress_result.get("script", ""),
         }
 
-    # ✅ Selenium ou Cypress → 1 seul appel
     result = generate_single(scraped, framework)
     return result

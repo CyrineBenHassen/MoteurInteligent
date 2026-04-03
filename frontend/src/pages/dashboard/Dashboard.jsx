@@ -421,57 +421,73 @@ function StatusIcon({ s }) {
 function ExecutionPanel({ generation }) {
   const { t } = useLang();
   const [filter, setFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('selenium'); // 🆕 tab pour Both
 
-  const tests = generation?.result?.test_cases?.map((tc, i) => ({
-    id:       tc.id || i + 1,
-    name:     tc.name,
-    status: tc.type === 'positive'    ? 'pass'
-      : tc.type === 'negative'    ? 'fail'
-      : tc.type === 'boundary'    ? 'skip'
-      : tc.type === 'navigation'  ? 'pass'
-      : tc.type === 'add_to_cart' ? 'pass'
-      : tc.type === 'pagination'  ? 'pass'
-      : tc.type === 'modal'       ? 'pass'
-      : tc.type === 'image'       ? 'pass'
-      : tc.type === 'performance' ? 'pass'
-      : 'skip',
-    duration: '—',
-    suite:    tc.description?.slice(0, 40) || 'Test',
-  })) || [];
+  const framework = generation?.framework || 
+                    generation?.generation?.framework || 
+                    'Selenium';
 
-  const script    = generation?.result?.script || '';
-  const url       = generation?.generation?.url || '';
-  const framework = generation?.generation?.framework || 'Selenium';
+  // Fonction pour mapper les types en status
+  const mapStatus = (type) =>
+    type === 'positive'    ? 'pass'
+    : type === 'negative'  ? 'fail'
+    : type === 'boundary'  ? 'skip'
+    : ['navigation','add_to_cart','pagination','modal','image','performance'].includes(type) ? 'pass'
+    : 'skip';
 
+  // Tests selon framework
+  const buildTests = (test_cases) =>
+    (test_cases || []).map((tc, i) => ({
+      id:       tc.id || i + 1,
+      name:     tc.name,
+      status:   mapStatus(tc.type),
+      duration: '—',
+      suite:    tc.description?.slice(0, 40) || 'Test',
+    }));
+
+  // 🆕 Pour Both — 2 listes séparées
+  const testsSelenium = buildTests(generation?.result?.test_cases_selenium);
+  const testsCypress  = buildTests(generation?.result?.test_cases_cypress);
+
+  // Pour Selenium ou Cypress — 1 seule liste
+  const testsSingle = buildTests(generation?.result?.test_cases);
+
+  // Choisir quelle liste afficher
+  const isBoth  = framework === 'Both';
+  const tests   = isBoth
+    ? (activeTab === 'selenium' ? testsSelenium : testsCypress)
+    : testsSingle;
+
+  // Stats
   const pass = tests.filter(t => t.status === 'pass').length;
   const fail = tests.filter(t => t.status === 'fail').length;
   const skip = tests.filter(t => t.status === 'skip').length;
   const rate = tests.length > 0 ? Math.round((pass / tests.length) * 100) : 0;
   const shown = filter === 'all' ? tests : tests.filter(t => t.status === filter);
 
+  const url = generation?.url || generation?.generation?.url || '';
 
-const downloadScript = (type = 'selenium') => {
+  // Download
+  const downloadScript = (type = 'selenium') => {
     let content, filename;
-    
-    if (framework === 'Both') {
-        if (type === 'selenium') {
-            content  = generation?.result?.script_selenium || '';
-            filename = 'test_selenium.py';
-        } else {
-            content  = generation?.result?.script_cypress || '';
-            filename = 'test_cypress.js';
-        }
+    if (isBoth) {
+      if (type === 'selenium') {
+        content  = generation?.result?.script_selenium || '';
+        filename = 'test_selenium.py';
+      } else {
+        content  = generation?.result?.script_cypress || '';
+        filename = 'test_cypress.js';
+      }
     } else {
-        content  = generation?.result?.script || '';
-        filename = framework === 'Cypress' ? 'test_cypress.js' : 'test_selenium.py';
+      content  = generation?.result?.script || '';
+      filename = framework === 'Cypress' ? 'test_cypress.js' : 'test_selenium.py';
     }
-
     const blob = new Blob([content], { type: 'text/plain' });
     const link = document.createElement('a');
     link.href  = URL.createObjectURL(blob);
     link.download = filename;
     link.click();
-};
+  };
 
   if (!generation) {
     return (
@@ -499,37 +515,58 @@ const downloadScript = (type = 'selenium') => {
           <h1 className="p-title">{t('test')} <span className="g">{t('execution')}</span></h1>
           <p className="p-sub" style={{wordBreak:'break-all'}}>{url} · {framework}</p>
         </div>
-        {framework === 'Both' ? (
-    <div style={{display:'flex', gap:'8px'}}>
-        <button className="btn-primary" onClick={() => downloadScript('selenium')}>
-            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Download Selenium
-        </button>
-        <button className="btn-primary" onClick={() => downloadScript('cypress')}>
-            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Download Cypress
-        </button>
-    </div>
-) : (
-    <button className="btn-primary" onClick={() => downloadScript()}>
-        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        {t('downloadReport')}
-    </button>
-)}
+        {isBoth ? (
+          <div style={{display:'flex', gap:'8px'}}>
+            <button className="btn-primary" onClick={() => downloadScript('selenium')}>
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Selenium
+            </button>
+            <button className="btn-primary" onClick={() => downloadScript('cypress')}>
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Cypress
+            </button>
+          </div>
+        ) : (
+          <button className="btn-primary" onClick={() => downloadScript()}>
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            {t('downloadReport')}
+          </button>
+        )}
       </div>
 
+      {/* 🆕 Tabs pour Both */}
+      {isBoth && (
+        <div style={{display:'flex', gap:'8px', marginBottom:'20px'}}>
+          <button
+            onClick={() => { setActiveTab('selenium'); setFilter('all'); }}
+            style={{
+              padding: '8px 20px', borderRadius: '20px', fontWeight: 700,
+              fontSize: 13, cursor: 'pointer', border: '2px solid',
+              borderColor: activeTab === 'selenium' ? 'var(--gold)' : 'var(--border)',
+              background:  activeTab === 'selenium' ? 'var(--goldbg)' : 'transparent',
+              color:       activeTab === 'selenium' ? 'var(--gold)' : 'var(--muted)',
+              transition: 'all .2s'
+            }}
+          >
+            🐍 Selenium ({testsSelenium.length})
+          </button>
+          <button
+            onClick={() => { setActiveTab('cypress'); setFilter('all'); }}
+            style={{
+              padding: '8px 20px', borderRadius: '20px', fontWeight: 700,
+              fontSize: 13, cursor: 'pointer', border: '2px solid',
+              borderColor: activeTab === 'cypress' ? 'var(--gold)' : 'var(--border)',
+              background:  activeTab === 'cypress' ? 'var(--goldbg)' : 'transparent',
+              color:       activeTab === 'cypress' ? 'var(--gold)' : 'var(--muted)',
+              transition: 'all .2s'
+            }}
+          >
+            🌲 Cypress ({testsCypress.length})
+          </button>
+        </div>
+      )}
+
+      {/* Stats */}
       <div className="exec-summary">
         <div className="exec-sum-card exec-sum-pass"><div className="exec-sum-val">{pass}</div><div className="exec-sum-lbl">{t('passed')}</div></div>
         <div className="exec-sum-card exec-sum-fail"><div className="exec-sum-val">{fail}</div><div className="exec-sum-lbl">{t('failed')}</div></div>
@@ -537,6 +574,31 @@ const downloadScript = (type = 'selenium') => {
         <div className="exec-sum-card exec-sum-rate"><div className="exec-sum-val">{rate}%</div><div className="exec-sum-lbl">{t('passRate')}</div></div>
       </div>
 
+
+      {/* Progress Bar */}
+<div className="exec-progress-wrap" style={{marginBottom: 18}}>
+  <div className="exec-progress-header">
+    <span className="exec-progress-label">
+      ✓ {tests.length} tests generated · {generation?.generation?.load_time_ms || 0}ms load time
+    </span>
+    <span className="exec-progress-done">{rate}% pass rate</span>
+  </div>
+  <div className="exec-progress-bar">
+    <div
+      className="exec-progress-fill"
+      style={{
+        width: `${rate}%`,
+        background: rate >= 80
+  ? 'linear-gradient(90deg, #10b981, #34d399)'   // vert
+  : rate >= 50
+    ? 'linear-gradient(90deg, #f59e0b, #fbbf24)' // orange
+    : 'linear-gradient(90deg, #ef4444, #f87171)' // rouge
+      }}
+    />
+  </div>
+</div>
+
+      {/* Filtres */}
       <div className="exec-filters">
         <button className={`exec-filter${filter==='all' ?' on':''}`} onClick={() => setFilter('all')}>{t('all')} ({tests.length})</button>
         <button className={`exec-filter${filter==='pass'?' on':''}`} onClick={() => setFilter('pass')}>✓ {t('passed')} ({pass})</button>
@@ -544,6 +606,7 @@ const downloadScript = (type = 'selenium') => {
         <button className={`exec-filter${filter==='skip'?' on':''}`} onClick={() => setFilter('skip')}>⚠ {t('skipped')} ({skip})</button>
       </div>
 
+      {/* Liste des tests */}
       <div className="exec-list">
         {shown.map((test, i) => (
           <div key={test.id} className={`exec-row exec-row--${test.status}`} style={{animationDelay:`${i*0.045}s`}}>
@@ -564,25 +627,285 @@ const downloadScript = (type = 'selenium') => {
 }
 
 
-function HistoryPanel() {
+function HistoryPanel({ goTo, setGeneration }) {
   const { t } = useLang();
+  const [histories, setHistories] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [deleting,  setDeleting]  = useState(null);
+  const [search,    setSearch]    = useState('');
+  const [filterFw,  setFilterFw]  = useState('all');
+
+  useEffect(() => {
+    api.get('/generations')
+      .then(res => setHistories(res.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleDelete = async (id) => {
+    setDeleting(id);
+    try {
+      await api.delete(`/generations/${id}`);
+      setHistories(prev => prev.filter(h => h.id !== id));
+    } catch (e) { console.error(e); }
+    setDeleting(null);
+  };
+
+  const handleReview = (item) => {
+    setGeneration({
+      url: item.url, framework: item.framework,
+      result: {
+        test_cases:          item.test_cases          || [],
+        test_cases_selenium: item.test_cases_selenium || [],
+        test_cases_cypress:  item.test_cases_cypress  || [],
+        script:              item.script              || '',
+        script_selenium:     item.script_selenium     || '',
+        script_cypress:      item.script_cypress      || '',
+      }
+    });
+    goTo('execution');
+  };
+
+  const timeAgo = (dateStr) => {
+    const diff = (Date.now() - new Date(dateStr)) / 1000;
+    if (diff < 60)    return `${Math.floor(diff)}s ago`;
+    if (diff < 3600)  return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return `${Math.floor(diff/86400)}d ago`;
+  };
+
+  const fwConfig = {
+    Selenium: { color: '#4f86e8', bg: 'rgba(79,134,232,.1)',  border: 'rgba(79,134,232,.2)',  emoji: '🐍' },
+    Cypress:  { color: '#10b981', bg: 'rgba(16,185,129,.1)',  border: 'rgba(16,185,129,.2)',  emoji: '🌲' },
+    Both:     { color: '#c9a227', bg: 'rgba(201,162,39,.1)',  border: 'rgba(201,162,39,.2)',  emoji: '⚡' },
+  };
+
+  const filtered = histories.filter(h => {
+    const matchSearch = h.url.toLowerCase().includes(search.toLowerCase());
+    const matchFw     = filterFw === 'all' || h.framework === filterFw;
+    return matchSearch && matchFw;
+  });
+
+  // Stats globales
+  const totalTests  = histories.reduce((s, h) => s + (h.pass_count||0) + (h.fail_count||0) + (h.skip_count||0), 0);
+  const totalPass   = histories.reduce((s, h) => s + (h.pass_count||0), 0);
+  const avgRate     = histories.length > 0 ? Math.round(histories.reduce((s,h) => s + (h.pass_rate||0), 0) / histories.length) : 0;
+
   return (
     <div className="panel">
+      {/* Header */}
       <div className="p-header">
         <div>
           <h1 className="p-title">{t('generation')} <span className="g">{t('history')}</span></h1>
           <p className="p-sub">{t('historyDesc')}</p>
         </div>
+        <button className="btn-primary" onClick={() => goTo('generate')}>
+          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          New Generation
+        </button>
       </div>
-      <div className="hist-empty">
-        <div className="he-ring">
-          <svg width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-          </svg>
+
+      {/* Stats globales */}
+      {histories.length > 0 && (
+        <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24}}>
+          {[
+            { label:'Total Generations', val: histories.length, color:'var(--gold)',   icon:'🚀' },
+            { label:'Total Tests',       val: totalTests,       color:'#4f86e8',       icon:'🔬' },
+            { label:'Tests Passed',      val: totalPass,        color:'#10b981',       icon:'✅' },
+            { label:'Avg Pass Rate',     val: `${avgRate}%`,    color:'#f59e0b',       icon:'🎯' },
+          ].map((s, i) => (
+            <div key={i} style={{
+              background:'var(--card)', border:'1.5px solid var(--border)',
+              borderRadius:14, padding:'18px 20px', boxShadow:'var(--shadow)',
+              display:'flex', alignItems:'center', gap:14
+            }}>
+              <div style={{
+                width:44, height:44, borderRadius:12, background:'var(--bg2)',
+                display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0
+              }}>{s.icon}</div>
+              <div>
+                <div style={{fontFamily:'var(--C)', fontSize:28, fontWeight:700, color:s.color, lineHeight:1}}>{s.val}</div>
+                <div style={{fontSize:10, fontWeight:700, letterSpacing:'1.5px', textTransform:'uppercase', color:'var(--muted)', marginTop:4}}>{s.label}</div>
+              </div>
+            </div>
+          ))}
         </div>
-        <h3>{t('noHistoryYet')}</h3>
-        <p>{t('noHistoryDesc')}</p>
-      </div>
+      )}
+
+      {/* Search + Filter */}
+      {histories.length > 0 && (
+        <div style={{display:'flex', gap:12, marginBottom:20, alignItems:'center'}}>
+          {/* Search */}
+          <div style={{
+            flex:1, display:'flex', alignItems:'center', gap:10,
+            background:'var(--card)', border:'1.5px solid var(--border)',
+            borderRadius:10, padding:'10px 14px'
+          }}>
+            <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input
+              type="text" placeholder="Search by URL..."
+              value={search} onChange={e => setSearch(e.target.value)}
+              style={{background:'none', border:'none', color:'var(--text)', fontSize:13, width:'100%'}}
+            />
+          </div>
+          {/* Framework filter */}
+          <div style={{display:'flex', gap:6}}>
+            {['all','Selenium','Cypress','Both'].map(fw => (
+              <button key={fw} onClick={() => setFilterFw(fw)} style={{
+                padding:'8px 16px', borderRadius:8, fontSize:11, fontWeight:700,
+                cursor:'pointer', border:'1.5px solid',
+                borderColor: filterFw === fw ? 'var(--navy)' : 'var(--border)',
+                background:  filterFw === fw ? 'var(--navy)' : 'var(--card)',
+                color:       filterFw === fw ? '#fff' : 'var(--muted)',
+                transition:'all .2s'
+              }}>
+                {fw === 'all' ? 'All' : `${fwConfig[fw]?.emoji} ${fw}`}
+              </button>
+            ))}
+          </div>
+          {/* Count */}
+          <div style={{fontSize:12, color:'var(--muted)', fontWeight:600, flexShrink:0}}>
+            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+      )}
+
+      {/* Content */}
+      {loading ? (
+        <div style={{textAlign:'center', padding:'60px 0', color:'var(--muted)'}}>
+          <span className="spinner" style={{marginRight:8}}/>Loading...
+        </div>
+      ) : histories.length === 0 ? (
+        <div className="hist-empty">
+          <div className="he-ring">
+            <svg width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <h3>{t('noHistoryYet')}</h3>
+          <p>{t('noHistoryDesc')}</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="hist-empty">
+          <div className="he-ring">🔍</div>
+          <h3>No results found</h3>
+          <p>Try a different search or filter</p>
+        </div>
+      ) : (
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(480px, 1fr))', gap:16}}>
+          {filtered.map((item, i) => {
+            const rate        = item.pass_rate || 0;
+            const total       = (item.pass_count||0) + (item.fail_count||0) + (item.skip_count||0);
+            const statusColor = rate === 100 ? '#10b981' : rate >= 75 ? '#f59e0b' : '#ef4444';
+            const fw          = fwConfig[item.framework] || fwConfig['Selenium'];
+
+            return (
+              <div key={item.id} style={{
+                background:'var(--card)', border:'1.5px solid var(--border)',
+                borderRadius:16, overflow:'hidden', boxShadow:'var(--shadow)',
+                transition:'all .25s', animation:`dFadeUp .4s cubic-bezier(.22,1,.36,1) ${i*.05}s both`
+              }}
+                onMouseEnter={e => { e.currentTarget.style.transform='translateY(-3px)'; e.currentTarget.style.boxShadow='var(--shadow2)'; e.currentTarget.style.borderColor=fw.border; }}
+                onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='var(--shadow)'; e.currentTarget.style.borderColor='var(--border)'; }}
+              >
+                {/* Top bar colorée */}
+                <div style={{height:4, background:`linear-gradient(90deg, ${fw.color}, ${statusColor})`}}/>
+
+                <div style={{padding:'20px'}}>
+                  {/* Header de la carte */}
+                  <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:16}}>
+                    <div style={{flex:1, minWidth:0}}>
+                      {/* URL */}
+                      <div style={{
+                        fontSize:13, fontWeight:700, color:'var(--navy)',
+                        whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                        marginBottom:6
+                      }}>
+                        🔗 {item.url}
+                      </div>
+                      {/* Meta */}
+                      <div style={{display:'flex', alignItems:'center', gap:10, flexWrap:'wrap'}}>
+                        <span style={{
+                          fontSize:10, fontWeight:700, letterSpacing:'1px',
+                          padding:'3px 10px', borderRadius:20,
+                          background: fw.bg, color: fw.color, border:`1px solid ${fw.border}`
+                        }}>{fw.emoji} {item.framework}</span>
+                        <span style={{fontSize:11, color:'var(--muted)'}}>🕐 {timeAgo(item.created_at)}</span>
+                        <span style={{fontSize:11, color:'var(--muted)'}}>📋 {total} tests</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stats row */}
+                  <div style={{
+                    display:'grid', gridTemplateColumns:'repeat(3,1fr)',
+                    gap:8, marginBottom:16
+                  }}>
+                    {[
+                      { label:'Passed', val: item.pass_count||0, color:'#10b981', bg:'rgba(16,185,129,.08)', border:'rgba(16,185,129,.15)' },
+                      { label:'Failed', val: item.fail_count||0, color:'#ef4444', bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.15)'  },
+                      { label:'Skipped',val: item.skip_count||0, color:'#f59e0b', bg:'rgba(245,158,11,.08)', border:'rgba(245,158,11,.15)' },
+                    ].map(s => (
+                      <div key={s.label} style={{
+                        background:s.bg, border:`1px solid ${s.border}`,
+                        borderRadius:10, padding:'10px', textAlign:'center'
+                      }}>
+                        <div style={{fontFamily:'var(--C)', fontSize:24, fontWeight:700, color:s.color, lineHeight:1}}>{s.val}</div>
+                        <div style={{fontSize:10, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:s.color, opacity:.8, marginTop:4}}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pass rate bar */}
+                  <div style={{marginBottom:16}}>
+                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
+                      <span style={{fontSize:11, fontWeight:600, color:'var(--muted)'}}>Pass Rate</span>
+                      <span style={{fontSize:13, fontWeight:700, color:statusColor}}>{rate}%</span>
+                    </div>
+                    <div style={{height:6, borderRadius:6, background:'var(--border)', overflow:'hidden'}}>
+                      <div style={{
+                        height:'100%', borderRadius:6,
+                        width:`${rate}%`, background:`linear-gradient(90deg, ${fw.color}, ${statusColor})`,
+                        transition:'width 1s ease'
+                      }}/>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{display:'flex', gap:8}}>
+                    <button onClick={() => handleReview(item)} style={{
+                      flex:1, padding:'9px', borderRadius:9, fontSize:12,
+                      fontWeight:700, cursor:'pointer',
+                      border:'1.5px solid var(--border)',
+                      background:'var(--bg)', color:'var(--navy)',
+                      display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                      transition:'all .2s'
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.background='var(--navy)'; e.currentTarget.style.color='#fff'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background='var(--bg)'; e.currentTarget.style.color='var(--navy)'; }}
+                    >
+                      <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      View Results
+                    </button>
+                    <button onClick={() => handleDelete(item.id)} disabled={deleting === item.id} style={{
+                      padding:'9px 14px', borderRadius:9, fontSize:12,
+                      fontWeight:700, cursor:'pointer',
+                      border:'1.5px solid rgba(239,68,68,.3)',
+                      background:'rgba(239,68,68,.05)', color:'#ef4444',
+                      transition:'all .2s'
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.background='#ef4444'; e.currentTarget.style.color='#fff'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background='rgba(239,68,68,.05)'; e.currentTarget.style.color='#ef4444'; }}
+                    >
+                      {deleting === item.id ? '...' : '🗑'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -943,7 +1266,7 @@ export default function Dashboard() {
           {page==='dashboard'&&<DashboardPanel user={user} goTo={setPage}/>}
           {page==='generate' &&<GeneratePanel  goTo={setPage} setGeneration={setGeneration}/>}
           {page==='execution'&&<ExecutionPanel generation={generation}/>}
-          {page==='history'  &&<HistoryPanel/>}
+          {page==='history' && <HistoryPanel goTo={setPage} setGeneration={setGeneration}/>}
           {page==='account'  &&<AccountPanel   user={user}/>}
           {page==='settings' &&<SettingsPanel  theme={theme} setTheme={setTheme}/>}
         </div>

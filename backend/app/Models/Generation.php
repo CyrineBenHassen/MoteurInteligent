@@ -13,13 +13,23 @@ class Generation extends Model
         'status',
         'test_cases',
         'script',
+        'script_selenium',      // 🆕
+        'script_cypress',       // 🆕
+        'test_cases_selenium',  // 🆕
+        'test_cases_cypress',   // 🆕
         'load_time_ms',
         'is_spa',
+        'pass_count',           // 🆕
+        'fail_count',           // 🆕
+        'skip_count',           // 🆕
+        'pass_rate',            // 🆕
     ];
 
     protected $casts = [
-        'test_cases' => 'array',
-        'is_spa'     => 'boolean',
+        'test_cases'          => 'array',
+        'test_cases_selenium' => 'array', // 🆕
+        'test_cases_cypress'  => 'array', // 🆕
+        'is_spa'              => 'boolean',
     ];
 
     public function user()
