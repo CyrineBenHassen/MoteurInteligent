@@ -40,4 +40,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/generations/{id}',       [GenerationController::class, 'show']);
     Route::delete('/generations/{id}',    [GenerationController::class, 'destroy']);
     Route::post('/analyze',               [GenerationController::class, 'analyze']);
+    Route::get('/generations/{id}/pdf', [GenerationController::class, 'downloadPdf']);
 });

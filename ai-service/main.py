@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from scraper import scrape_page
 from generator import generate_tests
-from analyzer import analyze_error  # 🆕 import
+from analyzer import analyze_error  
+from fastapi.responses import Response
+from pdf_generator import generate_pdf
 
 app = FastAPI(title="NexTest AI Service")
 
@@ -60,3 +62,18 @@ def analyze(data: dict):
         "original_error": error,
         "analysis": result
     }
+    
+@app.post("/generate-pdf")
+def generate_pdf_report(data: dict):
+    try:
+        pdf_bytes = generate_pdf(data)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=nextest_report.pdf"
+            }
+        )
+    except Exception as e:
+        return {"error": str(e)}
+   

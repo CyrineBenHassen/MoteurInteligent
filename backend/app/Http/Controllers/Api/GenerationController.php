@@ -131,4 +131,36 @@ class GenerationController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+ public function downloadPdf($id)
+{
+    set_time_limit(60);
+    
+    $generation = Generation::where('user_id', auth()->id())
+        ->findOrFail($id);
+
+    try {
+        $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-pdf', [
+            'url'                 => $generation->url,
+            'framework'           => $generation->framework,
+            'test_cases'          => $generation->test_cases          ?? [],
+            'test_cases_selenium' => $generation->test_cases_selenium ?? [],  // ✅
+            'test_cases_cypress'  => $generation->test_cases_cypress  ?? [],  // ✅
+            'script'              => $generation->script              ?? '',
+            'script_selenium'     => $generation->script_selenium     ?? '',  // ✅
+            'script_cypress'      => $generation->script_cypress      ?? '',  // ✅
+            'load_time_ms'        => $generation->load_time_ms,
+            'is_spa'              => $generation->is_spa,
+            'created_at'          => $generation->created_at,
+        ]);
+
+        return response($response->body(), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="nextest_report.pdf"',
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
 }

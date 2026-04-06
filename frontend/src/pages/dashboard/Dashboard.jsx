@@ -10,15 +10,12 @@ import {
 
 function useCountUp(target, duration = 1200) {
   const ref = useRef(null);
-
   useEffect(() => {
     const numeric = parseFloat(target);
     const suffix = String(target).replace(/[\d.]/g, '');
     if (!ref.current || isNaN(numeric)) return;
-
     let start = null;
     let raf;
-
     const step = (ts) => {
       if (!start) start = ts;
       const progress = Math.min((ts - start) / duration, 1);
@@ -27,11 +24,9 @@ function useCountUp(target, duration = 1200) {
       if (ref.current) ref.current.textContent = current + suffix;
       if (progress < 1) raf = requestAnimationFrame(step);
     };
-
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
   }, [target, duration]);
-
   return ref;
 }
 
@@ -39,9 +34,6 @@ function AnimatedStat({ val }) {
   const ref = useCountUp(val);
   return <span ref={ref}>{val}</span>;
 }
-
-
-
 
 function NexLogo() {
   return (
@@ -82,12 +74,10 @@ function SItem({ id, label, badge, active, collapsed, onClick }) {
   );
 }
 
-
-// ── Top URLs mock data ─────────────────────────────────────────────────────
 const TOP_URLS = [
-  { url: 'https://github.com/login',        framework: 'Selenium', tests: 12, pass: 10, date: '2h ago'   },
-  { url: 'https://trello.com/login',        framework: 'Cypress',  tests: 8,  pass: 8,  date: '1d ago'   },
-  { url: 'https://app.slack.com/sign-in',   framework: 'Both',     tests: 15, pass: 12, date: '3d ago'   },
+  { url: 'https://github.com/login',       framework: 'Selenium', tests: 12, pass: 10, date: '2h ago' },
+  { url: 'https://trello.com/login',       framework: 'Cypress',  tests: 8,  pass: 8,  date: '1d ago' },
+  { url: 'https://app.slack.com/sign-in',  framework: 'Both',     tests: 15, pass: 12, date: '3d ago' },
 ];
 
 function TopURLsSection({ goTo }) {
@@ -101,57 +91,25 @@ function TopURLsSection({ goTo }) {
       <div style={{ padding: '8px 0' }}>
         {TOP_URLS.map((item, i) => {
           const rate = Math.round((item.pass / item.tests) * 100);
-          const statusColor = rate === 100 ? '#10b981' : rate >= 75 ? '#f59e0b' : '#ef4444';
+          const statusColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
           return (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: 16,
-              padding: '12px 20px',
-              borderBottom: i < TOP_URLS.length - 1 ? '1px solid var(--border)' : 'none',
-              transition: 'background .15s',
-            }}
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:16, padding:'12px 20px', borderBottom: i < TOP_URLS.length-1 ? '1px solid var(--border)' : 'none', transition:'background .15s' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
-              {/* Index */}
-              <div style={{
-                width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
-                background: 'var(--goldbg)', border: '1px solid rgba(201,162,39,.3)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 11, fontWeight: 700, color: 'var(--gold)'
-              }}>{i + 1}</div>
-
-              {/* URL */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: 13, fontWeight: 600, color: 'var(--navy)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                }}>{item.url}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                  {item.tests} tests · {item.date}
-                </div>
+              <div style={{ width:26, height:26, borderRadius:'50%', flexShrink:0, background:'var(--goldbg)', border:'1px solid rgba(201,162,39,.3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'var(--gold)' }}>{i + 1}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:'var(--navy)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.url}</div>
+                <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>{item.tests} tests · {item.date}</div>
               </div>
-
-              {/* Framework badge */}
-              <span style={{
-                fontSize: 10, fontWeight: 700, letterSpacing: '1px',
-                padding: '3px 10px', borderRadius: 20,
-                background: 'rgba(79,134,232,.1)', color: '#4f86e8',
-                border: '1px solid rgba(79,134,232,.2)', flexShrink: 0
-              }}>{item.framework}</span>
-
-              {/* Pass rate bar */}
-              <div style={{ width: 80, flexShrink: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>pass rate</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{rate}%</span>
+              <span style={{ fontSize:10, fontWeight:700, letterSpacing:'1px', padding:'3px 10px', borderRadius:20, background:'rgba(79,134,232,.1)', color:'#4f86e8', border:'1px solid rgba(79,134,232,.2)', flexShrink:0 }}>{item.framework}</span>
+              <div style={{ width:80, flexShrink:0 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                  <span style={{ fontSize:10, color:'var(--muted)' }}>pass rate</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:statusColor }}>{rate}%</span>
                 </div>
-                <div style={{ height: 4, borderRadius: 4, background: 'var(--border)', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 4,
-                    width: `${rate}%`,
-                    background: statusColor,
-                    transition: 'width 1s ease'
-                  }}/>
+                <div style={{ height:4, borderRadius:4, background:'var(--border)', overflow:'hidden' }}>
+                  <div style={{ height:'100%', borderRadius:4, width:`${rate}%`, background:statusColor, transition:'width 1s ease' }}/>
                 </div>
               </div>
             </div>
@@ -162,37 +120,27 @@ function TopURLsSection({ goTo }) {
   );
 }
 
-
 function DashboardPanel({ user, goTo }) {
   const { t } = useLang();
-
   const STATS = [
-    { icon: '🚀', val: '12',  lbl: t('scriptsGenerated'), accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)', trend: '+12%' },
-    { icon: '🔬', val: '3',   lbl: t('appsAnalyzed'),     accent: 'linear-gradient(90deg,#c9a227,#e8c84a)', trend: '+3%'  },
-    { icon: '🎯', val: '82%', lbl: t('avgCoverage'),      accent: 'linear-gradient(90deg,#10b981,#34d399)', trend: '—'    },
-    { icon: '⚡', val: '2s',  lbl: t('avgGenTime'),       accent: 'linear-gradient(90deg,#f97316,#fb923c)', trend: '—'    },
+    { icon:'🚀', val:'12',  lbl:t('scriptsGenerated'), accent:'linear-gradient(90deg,#4f86e8,#6fa3ff)', trend:'+12%' },
+    { icon:'🔬', val:'3',   lbl:t('appsAnalyzed'),     accent:'linear-gradient(90deg,#c9a227,#e8c84a)', trend:'+3%'  },
+    { icon:'🎯', val:'82%', lbl:t('avgCoverage'),      accent:'linear-gradient(90deg,#10b981,#34d399)', trend:'—'    },
+    { icon:'⚡', val:'2s',  lbl:t('avgGenTime'),       accent:'linear-gradient(90deg,#f97316,#fb923c)', trend:'—'    },
   ];
-
   const barData = [
-    { day: 'Mon', count: 3 },
-    { day: 'Tue', count: 7 },
-    { day: 'Wed', count: 2 },
-    { day: 'Thu', count: 9 },
-    { day: 'Fri', count: 5 },
-    { day: 'Sat', count: 1 },
-    { day: 'Sun', count: 4 },
+    { day:'Mon', count:3 }, { day:'Tue', count:7 }, { day:'Wed', count:2 },
+    { day:'Thu', count:9 }, { day:'Fri', count:5 }, { day:'Sat', count:1 }, { day:'Sun', count:4 },
   ];
-
   const donutData = [
-    { name: 'Passed',  value: 62, color: '#10b981' },
-    { name: 'Failed',  value: 23, color: '#ef4444' },
-    { name: 'Skipped', value: 15, color: '#f59e0b' },
+    { name:'Passed',  value:62, color:'#10b981' },
+    { name:'Failed',  value:23, color:'#ef4444' },
+    { name:'Skipped', value:15, color:'#f59e0b' },
   ];
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0);
 
   return (
     <div className="panel">
-      {/* Header */}
       <div className="p-header">
         <div>
           <h1 className="p-title">{t('welcome')}, <span className="g">{user?.name?.split(' ')[0] || 'User'}</span> </h1>
@@ -203,8 +151,6 @@ function DashboardPanel({ user, goTo }) {
           {t('newGeneration')}
         </button>
       </div>
-
-      {/* Stats Cards — animated */}
       <div className="stats-grid">
         {STATS.map((s, i) => (
           <div className="stat-card" key={s.lbl} style={{'--i': i}}>
@@ -218,58 +164,32 @@ function DashboardPanel({ user, goTo }) {
           </div>
         ))}
       </div>
-
-      {/* Charts Row */}
       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:24}}>
-        {/* Bar Chart */}
         <div className="section-box">
-          <div className="sb-head">
-            <span className="sb-title"> {t('generationsPerWeek') || 'Generations this week'}</span>
-          </div>
+          <div className="sb-head"><span className="sb-title">{t('generationsPerWeek') || 'Generations this week'}</span></div>
           <div style={{padding:'12px 8px 8px'}}>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={barData} barSize={26}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
                 <XAxis dataKey="day" tick={{fill:'var(--muted)', fontSize:11}} axisLine={false} tickLine={false}/>
                 <YAxis tick={{fill:'var(--muted)', fontSize:11}} axisLine={false} tickLine={false} width={24}/>
-                <Tooltip
-                  contentStyle={{background:'var(--card)', border:'1px solid var(--border)', borderRadius:10, color:'var(--navy)', fontSize:12}}
-                  cursor={{fill:'rgba(201,162,39,0.07)'}}
-                  formatter={(val) => [val, 'Generations']}
-                />
+                <Tooltip contentStyle={{background:'var(--card)', border:'1px solid var(--border)', borderRadius:10, color:'var(--navy)', fontSize:12}} cursor={{fill:'rgba(201,162,39,0.07)'}} formatter={(val) => [val, 'Generations']}/>
                 <Bar dataKey="count" fill="#c9a227" radius={[6,6,0,0]}/>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
-
-        {/* Donut Chart */}
         <div className="section-box">
-          <div className="sb-head">
-            <span className="sb-title"> {t('testResults') || 'Test Results'}</span>
-          </div>
+          <div className="sb-head"><span className="sb-title">{t('testResults') || 'Test Results'}</span></div>
           <div style={{padding:'12px 8px 8px', display:'flex', flexDirection:'column', alignItems:'center'}}>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
-                <Pie
-                  data={donutData}
-                  cx="50%" cy="50%"
-                  innerRadius={55} outerRadius={80}
-                  paddingAngle={3} dataKey="value"
-                  labelLine={false}
-                >
-                  {donutData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} stroke="none"/>
-                  ))}
+                <Pie data={donutData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value" labelLine={false}>
+                  {donutData.map((entry, index) => (<Cell key={index} fill={entry.color} stroke="none"/>))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{background:'var(--card)', border:'1px solid var(--border)', borderRadius:10, color:'var(--navy)', fontSize:12}}
-                  formatter={(val, name) => [`${val}%`, name]}
-                />
+                <Tooltip contentStyle={{background:'var(--card)', border:'1px solid var(--border)', borderRadius:10, color:'var(--navy)', fontSize:12}} formatter={(val, name) => [`${val}%`, name]}/>
                 <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
-                  <tspan x="50%" dy="-8" fontSize="20" fontWeight="700" fill="#10b981">
-                    {Math.round((donutData[0].value / donutTotal) * 100)}%
-                  </tspan>
+                  <tspan x="50%" dy="-8" fontSize="20" fontWeight="700" fill="#10b981">{Math.round((donutData[0].value / donutTotal) * 100)}%</tspan>
                   <tspan x="50%" dy="18" fontSize="10" fill="var(--muted)">pass rate</tspan>
                 </text>
               </PieChart>
@@ -278,20 +198,14 @@ function DashboardPanel({ user, goTo }) {
               {donutData.map(d => (
                 <div key={d.name} style={{display:'flex', alignItems:'center', gap:6}}>
                   <div style={{width:10, height:10, borderRadius:'50%', background:d.color, flexShrink:0}}/>
-                  <span style={{fontSize:11, color:'var(--muted)', fontWeight:600}}>
-                    {d.name} <span style={{color:'var(--navy)'}}>{d.value}%</span>
-                  </span>
+                  <span style={{fontSize:11, color:'var(--muted)', fontWeight:600}}>{d.name} <span style={{color:'var(--navy)'}}>{d.value}%</span></span>
                 </div>
               ))}
             </div>
           </div>
         </div>
       </div>
-
-      {/* Top URLs */}
       <TopURLsSection goTo={goTo} />
-
-      {/* Recent Activity */}
       <div className="section-box" style={{marginBottom:24}}>
         <div className="sb-head">
           <span className="sb-title">{t('recentActivity')}</span>
@@ -299,8 +213,6 @@ function DashboardPanel({ user, goTo }) {
         </div>
         <div className="empty-row">{t('noActivity')}</div>
       </div>
-
-      {/* Quick Start */}
       <div className="quick-start">
         <div className="qs-icon-wrap">
           <svg width="32" height="32" fill="none" stroke="rgba(201,162,39,.8)" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
@@ -315,7 +227,6 @@ function DashboardPanel({ user, goTo }) {
     </div>
   );
 }
-
 
 function GeneratePanel({ goTo, setGeneration }) {
   const { t } = useLang();
@@ -400,18 +311,6 @@ function GeneratePanel({ goTo, setGeneration }) {
   );
 }
 
-
-const TESTS = [
-  { id:1, name:'Login — valid credentials',        status:'pass', duration:'0.8s', suite:'Authentication' },
-  { id:2, name:'Login — invalid password',         status:'pass', duration:'0.5s', suite:'Authentication' },
-  { id:3, name:'Login — empty fields validation',  status:'pass', duration:'0.4s', suite:'Authentication' },
-  { id:4, name:'Register — new user flow',         status:'fail', duration:'1.2s', suite:'Registration'   },
-  { id:5, name:'Register — duplicate email',       status:'pass', duration:'0.6s', suite:'Registration'   },
-  { id:6, name:'Dashboard — stats load',           status:'pass', duration:'0.9s', suite:'Dashboard'      },
-  { id:7, name:'Navigation — sidebar links',       status:'skip', duration:'—',    suite:'Navigation'     },
-  { id:8, name:'Generate — URL submission',        status:'fail', duration:'2.1s', suite:'Generation'     },
-];
-
 function StatusIcon({ s }) {
   if (s==='pass') return <svg width="15" height="15" fill="none" stroke="#10b981" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>;
   if (s==='fail') return <svg width="15" height="15" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>;
@@ -420,22 +319,19 @@ function StatusIcon({ s }) {
 
 function ExecutionPanel({ generation }) {
   const { t } = useLang();
-  const [filter, setFilter] = useState('all');
-  const [activeTab, setActiveTab] = useState('selenium'); // 🆕 tab pour Both
+  const [filter,    setFilter]    = useState('all');
+  const [activeTab, setActiveTab] = useState('selenium');
+  const [pdfLoading, setPdfLoading] = useState(false);
 
-  const framework = generation?.framework || 
-                    generation?.generation?.framework || 
-                    'Selenium';
+  const framework = generation?.framework || generation?.generation?.framework || 'Selenium';
 
-  // Fonction pour mapper les types en status
   const mapStatus = (type) =>
-    type === 'positive'    ? 'pass'
-    : type === 'negative'  ? 'fail'
-    : type === 'boundary'  ? 'skip'
+    type === 'positive'   ? 'pass'
+    : type === 'negative' ? 'fail'
+    : type === 'boundary' ? 'skip'
     : ['navigation','add_to_cart','pagination','modal','image','performance'].includes(type) ? 'pass'
     : 'skip';
 
-  // Tests selon framework
   const buildTests = (test_cases) =>
     (test_cases || []).map((tc, i) => ({
       id:       tc.id || i + 1,
@@ -445,20 +341,15 @@ function ExecutionPanel({ generation }) {
       suite:    tc.description?.slice(0, 40) || 'Test',
     }));
 
-  // 🆕 Pour Both — 2 listes séparées
   const testsSelenium = buildTests(generation?.result?.test_cases_selenium);
   const testsCypress  = buildTests(generation?.result?.test_cases_cypress);
+  const testsSingle   = buildTests(generation?.result?.test_cases);
 
-  // Pour Selenium ou Cypress — 1 seule liste
-  const testsSingle = buildTests(generation?.result?.test_cases);
-
-  // Choisir quelle liste afficher
-  const isBoth  = framework === 'Both';
-  const tests   = isBoth
+  const isBoth = framework === 'Both';
+  const tests  = isBoth
     ? (activeTab === 'selenium' ? testsSelenium : testsCypress)
     : testsSingle;
 
-  // Stats
   const pass = tests.filter(t => t.status === 'pass').length;
   const fail = tests.filter(t => t.status === 'fail').length;
   const skip = tests.filter(t => t.status === 'skip').length;
@@ -467,17 +358,19 @@ function ExecutionPanel({ generation }) {
 
   const url = generation?.url || generation?.generation?.url || '';
 
-  // Download
+  const progressColor = rate >= 80
+    ? 'linear-gradient(90deg, #10b981, #34d399)'
+    : rate >= 50
+      ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+      : 'linear-gradient(90deg, #ef4444, #f87171)';
+
+  const progressTextColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+
   const downloadScript = (type = 'selenium') => {
     let content, filename;
     if (isBoth) {
-      if (type === 'selenium') {
-        content  = generation?.result?.script_selenium || '';
-        filename = 'test_selenium.py';
-      } else {
-        content  = generation?.result?.script_cypress || '';
-        filename = 'test_cypress.js';
-      }
+      content  = type === 'selenium' ? generation?.result?.script_selenium : generation?.result?.script_cypress;
+      filename = type === 'selenium' ? 'test_selenium.py' : 'test_cypress.js';
     } else {
       content  = generation?.result?.script || '';
       filename = framework === 'Cypress' ? 'test_cypress.js' : 'test_selenium.py';
@@ -487,6 +380,24 @@ function ExecutionPanel({ generation }) {
     link.href  = URL.createObjectURL(blob);
     link.download = filename;
     link.click();
+  };
+
+  const downloadPdf = async () => {
+    try {
+      setPdfLoading(true);
+      const id = generation?.generation?.id;
+      if (!id) return;
+      const res = await api.get(`/generations/${id}/pdf`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href  = URL.createObjectURL(blob);
+      link.download = `nextest_report_${id}.pdf`;
+      link.click();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   if (!generation) {
@@ -510,57 +421,44 @@ function ExecutionPanel({ generation }) {
 
   return (
     <div className="panel">
+      {/* Header */}
       <div className="p-header">
         <div>
           <h1 className="p-title">{t('test')} <span className="g">{t('execution')}</span></h1>
           <p className="p-sub" style={{wordBreak:'break-all'}}>{url} · {framework}</p>
         </div>
-        {isBoth ? (
-          <div style={{display:'flex', gap:'8px'}}>
-            <button className="btn-primary" onClick={() => downloadScript('selenium')}>
+        <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+          {isBoth ? (
+            <>
+              <button className="btn-outline" style={{fontSize:11, padding:'9px 18px'}} onClick={() => downloadScript('selenium')}>
+                🐍 Selenium .py
+              </button>
+              <button className="btn-outline" style={{fontSize:11, padding:'9px 18px'}} onClick={() => downloadScript('cypress')}>
+                🌲 Cypress .js
+              </button>
+            </>
+          ) : (
+            <button className="btn-outline" style={{fontSize:11, padding:'9px 18px'}} onClick={() => downloadScript()}>
               <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download Selenium
+              Download Script
             </button>
-            <button className="btn-primary" onClick={() => downloadScript('cypress')}>
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download Cypress
-            </button>
-          </div>
-        ) : (
-          <button className="btn-primary" onClick={() => downloadScript()}>
-            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            {t('downloadReport')}
+          )}
+          {/* ✅ Bouton PDF */}
+          <button className="btn-primary" style={{fontSize:11, padding:'9px 18px'}} onClick={downloadPdf} disabled={pdfLoading}>
+            {pdfLoading
+              ? <><span className="spinner"/>Generating...</>
+              : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>📄 Download PDF</>}
           </button>
-        )}
+        </div>
       </div>
 
-      {/* 🆕 Tabs pour Both */}
+      {/* Tabs pour Both */}
       {isBoth && (
         <div style={{display:'flex', gap:'8px', marginBottom:'20px'}}>
-          <button
-            onClick={() => { setActiveTab('selenium'); setFilter('all'); }}
-            style={{
-              padding: '8px 20px', borderRadius: '20px', fontWeight: 700,
-              fontSize: 13, cursor: 'pointer', border: '2px solid',
-              borderColor: activeTab === 'selenium' ? 'var(--gold)' : 'var(--border)',
-              background:  activeTab === 'selenium' ? 'var(--goldbg)' : 'transparent',
-              color:       activeTab === 'selenium' ? 'var(--gold)' : 'var(--muted)',
-              transition: 'all .2s'
-            }}
-          >
+          <button onClick={() => { setActiveTab('selenium'); setFilter('all'); }} style={{ padding:'8px 20px', borderRadius:'20px', fontWeight:700, fontSize:13, cursor:'pointer', border:'2px solid', borderColor: activeTab==='selenium' ? 'var(--gold)' : 'var(--border)', background: activeTab==='selenium' ? 'var(--goldbg)' : 'transparent', color: activeTab==='selenium' ? 'var(--gold)' : 'var(--muted)', transition:'all .2s' }}>
             🐍 Selenium ({testsSelenium.length})
           </button>
-          <button
-            onClick={() => { setActiveTab('cypress'); setFilter('all'); }}
-            style={{
-              padding: '8px 20px', borderRadius: '20px', fontWeight: 700,
-              fontSize: 13, cursor: 'pointer', border: '2px solid',
-              borderColor: activeTab === 'cypress' ? 'var(--gold)' : 'var(--border)',
-              background:  activeTab === 'cypress' ? 'var(--goldbg)' : 'transparent',
-              color:       activeTab === 'cypress' ? 'var(--gold)' : 'var(--muted)',
-              transition: 'all .2s'
-            }}
-          >
+          <button onClick={() => { setActiveTab('cypress'); setFilter('all'); }} style={{ padding:'8px 20px', borderRadius:'20px', fontWeight:700, fontSize:13, cursor:'pointer', border:'2px solid', borderColor: activeTab==='cypress' ? 'var(--gold)' : 'var(--border)', background: activeTab==='cypress' ? 'var(--goldbg)' : 'transparent', color: activeTab==='cypress' ? 'var(--gold)' : 'var(--muted)', transition:'all .2s' }}>
             🌲 Cypress ({testsCypress.length})
           </button>
         </div>
@@ -574,29 +472,20 @@ function ExecutionPanel({ generation }) {
         <div className="exec-sum-card exec-sum-rate"><div className="exec-sum-val">{rate}%</div><div className="exec-sum-lbl">{t('passRate')}</div></div>
       </div>
 
-
-      {/* Progress Bar */}
-<div className="exec-progress-wrap" style={{marginBottom: 18}}>
-  <div className="exec-progress-header">
-    <span className="exec-progress-label">
-      ✓ {tests.length} tests generated · {generation?.generation?.load_time_ms || 0}ms load time
-    </span>
-    <span className="exec-progress-done">{rate}% pass rate</span>
-  </div>
-  <div className="exec-progress-bar">
-    <div
-      className="exec-progress-fill"
-      style={{
-        width: `${rate}%`,
-        background: rate >= 80
-  ? 'linear-gradient(90deg, #10b981, #34d399)'   // vert
-  : rate >= 50
-    ? 'linear-gradient(90deg, #f59e0b, #fbbf24)' // orange
-    : 'linear-gradient(90deg, #ef4444, #f87171)' // rouge
-      }}
-    />
-  </div>
-</div>
+      {/* ✅ Progress Bar colorée */}
+      <div className="exec-progress-wrap" style={{marginBottom:18}}>
+        <div className="exec-progress-header">
+          <span className="exec-progress-label">
+            ✓ {tests.length} tests generated · {generation?.generation?.load_time_ms || 0}ms load time
+          </span>
+          <span className="exec-progress-done" style={{color: progressTextColor}}>
+            {rate}% pass rate
+          </span>
+        </div>
+        <div className="exec-progress-bar">
+          <div className="exec-progress-fill" style={{ width:`${rate}%`, background: progressColor }}/>
+        </div>
+      </div>
 
       {/* Filtres */}
       <div className="exec-filters">
@@ -626,7 +515,6 @@ function ExecutionPanel({ generation }) {
   );
 }
 
-
 function HistoryPanel({ goTo, setGeneration }) {
   const { t } = useLang();
   const [histories, setHistories] = useState([]);
@@ -654,6 +542,7 @@ function HistoryPanel({ goTo, setGeneration }) {
   const handleReview = (item) => {
     setGeneration({
       url: item.url, framework: item.framework,
+      generation: { id: item.id, url: item.url, framework: item.framework, load_time_ms: item.load_time_ms },
       result: {
         test_cases:          item.test_cases          || [],
         test_cases_selenium: item.test_cases_selenium || [],
@@ -675,9 +564,9 @@ function HistoryPanel({ goTo, setGeneration }) {
   };
 
   const fwConfig = {
-    Selenium: { color: '#4f86e8', bg: 'rgba(79,134,232,.1)',  border: 'rgba(79,134,232,.2)',  emoji: '🐍' },
-    Cypress:  { color: '#10b981', bg: 'rgba(16,185,129,.1)',  border: 'rgba(16,185,129,.2)',  emoji: '🌲' },
-    Both:     { color: '#c9a227', bg: 'rgba(201,162,39,.1)',  border: 'rgba(201,162,39,.2)',  emoji: '⚡' },
+    Selenium: { color:'#4f86e8', bg:'rgba(79,134,232,.1)',  border:'rgba(79,134,232,.2)',  emoji:'🐍' },
+    Cypress:  { color:'#10b981', bg:'rgba(16,185,129,.1)',  border:'rgba(16,185,129,.2)',  emoji:'🌲' },
+    Both:     { color:'#c9a227', bg:'rgba(201,162,39,.1)',  border:'rgba(201,162,39,.2)',  emoji:'⚡' },
   };
 
   const filtered = histories.filter(h => {
@@ -686,14 +575,12 @@ function HistoryPanel({ goTo, setGeneration }) {
     return matchSearch && matchFw;
   });
 
-  // Stats globales
-  const totalTests  = histories.reduce((s, h) => s + (h.pass_count||0) + (h.fail_count||0) + (h.skip_count||0), 0);
-  const totalPass   = histories.reduce((s, h) => s + (h.pass_count||0), 0);
-  const avgRate     = histories.length > 0 ? Math.round(histories.reduce((s,h) => s + (h.pass_rate||0), 0) / histories.length) : 0;
+  const totalTests = histories.reduce((s, h) => s + (h.pass_count||0) + (h.fail_count||0) + (h.skip_count||0), 0);
+  const totalPass  = histories.reduce((s, h) => s + (h.pass_count||0), 0);
+  const avgRate    = histories.length > 0 ? Math.round(histories.reduce((s,h) => s + (h.pass_rate||0), 0) / histories.length) : 0;
 
   return (
     <div className="panel">
-      {/* Header */}
       <div className="p-header">
         <div>
           <h1 className="p-title">{t('generation')} <span className="g">{t('history')}</span></h1>
@@ -705,24 +592,16 @@ function HistoryPanel({ goTo, setGeneration }) {
         </button>
       </div>
 
-      {/* Stats globales */}
       {histories.length > 0 && (
         <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24}}>
           {[
-            { label:'Total Generations', val: histories.length, color:'var(--gold)',   icon:'🚀' },
-            { label:'Total Tests',       val: totalTests,       color:'#4f86e8',       icon:'🔬' },
-            { label:'Tests Passed',      val: totalPass,        color:'#10b981',       icon:'✅' },
-            { label:'Avg Pass Rate',     val: `${avgRate}%`,    color:'#f59e0b',       icon:'🎯' },
+            { label:'Total Generations', val: histories.length, color:'var(--gold)', icon:'🚀' },
+            { label:'Total Tests',       val: totalTests,       color:'#4f86e8',     icon:'🔬' },
+            { label:'Tests Passed',      val: totalPass,        color:'#10b981',     icon:'✅' },
+            { label:'Avg Pass Rate',     val: `${avgRate}%`,    color:'#f59e0b',     icon:'🎯' },
           ].map((s, i) => (
-            <div key={i} style={{
-              background:'var(--card)', border:'1.5px solid var(--border)',
-              borderRadius:14, padding:'18px 20px', boxShadow:'var(--shadow)',
-              display:'flex', alignItems:'center', gap:14
-            }}>
-              <div style={{
-                width:44, height:44, borderRadius:12, background:'var(--bg2)',
-                display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0
-              }}>{s.icon}</div>
+            <div key={i} style={{ background:'var(--card)', border:'1.5px solid var(--border)', borderRadius:14, padding:'18px 20px', boxShadow:'var(--shadow)', display:'flex', alignItems:'center', gap:14 }}>
+              <div style={{ width:44, height:44, borderRadius:12, background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>{s.icon}</div>
               <div>
                 <div style={{fontFamily:'var(--C)', fontSize:28, fontWeight:700, color:s.color, lineHeight:1}}>{s.val}</div>
                 <div style={{fontSize:10, fontWeight:700, letterSpacing:'1.5px', textTransform:'uppercase', color:'var(--muted)', marginTop:4}}>{s.label}</div>
@@ -732,56 +611,28 @@ function HistoryPanel({ goTo, setGeneration }) {
         </div>
       )}
 
-      {/* Search + Filter */}
       {histories.length > 0 && (
         <div style={{display:'flex', gap:12, marginBottom:20, alignItems:'center'}}>
-          {/* Search */}
-          <div style={{
-            flex:1, display:'flex', alignItems:'center', gap:10,
-            background:'var(--card)', border:'1.5px solid var(--border)',
-            borderRadius:10, padding:'10px 14px'
-          }}>
+          <div style={{ flex:1, display:'flex', alignItems:'center', gap:10, background:'var(--card)', border:'1.5px solid var(--border)', borderRadius:10, padding:'10px 14px' }}>
             <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input
-              type="text" placeholder="Search by URL..."
-              value={search} onChange={e => setSearch(e.target.value)}
-              style={{background:'none', border:'none', color:'var(--text)', fontSize:13, width:'100%'}}
-            />
+            <input type="text" placeholder="Search by URL..." value={search} onChange={e => setSearch(e.target.value)} style={{background:'none', border:'none', color:'var(--text)', fontSize:13, width:'100%'}}/>
           </div>
-          {/* Framework filter */}
           <div style={{display:'flex', gap:6}}>
             {['all','Selenium','Cypress','Both'].map(fw => (
-              <button key={fw} onClick={() => setFilterFw(fw)} style={{
-                padding:'8px 16px', borderRadius:8, fontSize:11, fontWeight:700,
-                cursor:'pointer', border:'1.5px solid',
-                borderColor: filterFw === fw ? 'var(--navy)' : 'var(--border)',
-                background:  filterFw === fw ? 'var(--navy)' : 'var(--card)',
-                color:       filterFw === fw ? '#fff' : 'var(--muted)',
-                transition:'all .2s'
-              }}>
+              <button key={fw} onClick={() => setFilterFw(fw)} style={{ padding:'8px 16px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1.5px solid', borderColor: filterFw===fw ? 'var(--navy)' : 'var(--border)', background: filterFw===fw ? 'var(--navy)' : 'var(--card)', color: filterFw===fw ? '#fff' : 'var(--muted)', transition:'all .2s' }}>
                 {fw === 'all' ? 'All' : `${fwConfig[fw]?.emoji} ${fw}`}
               </button>
             ))}
           </div>
-          {/* Count */}
-          <div style={{fontSize:12, color:'var(--muted)', fontWeight:600, flexShrink:0}}>
-            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-          </div>
+          <div style={{fontSize:12, color:'var(--muted)', fontWeight:600, flexShrink:0}}>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</div>
         </div>
       )}
 
-      {/* Content */}
       {loading ? (
-        <div style={{textAlign:'center', padding:'60px 0', color:'var(--muted)'}}>
-          <span className="spinner" style={{marginRight:8}}/>Loading...
-        </div>
+        <div style={{textAlign:'center', padding:'60px 0', color:'var(--muted)'}}><span className="spinner" style={{marginRight:8}}/>Loading...</div>
       ) : histories.length === 0 ? (
         <div className="hist-empty">
-          <div className="he-ring">
-            <svg width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-            </svg>
-          </div>
+          <div className="he-ring"><svg width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
           <h3>{t('noHistoryYet')}</h3>
           <p>{t('noHistoryDesc')}</p>
         </div>
@@ -796,104 +647,55 @@ function HistoryPanel({ goTo, setGeneration }) {
           {filtered.map((item, i) => {
             const rate        = item.pass_rate || 0;
             const total       = (item.pass_count||0) + (item.fail_count||0) + (item.skip_count||0);
-            const statusColor = rate === 100 ? '#10b981' : rate >= 75 ? '#f59e0b' : '#ef4444';
+            const statusColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
             const fw          = fwConfig[item.framework] || fwConfig['Selenium'];
-
             return (
-              <div key={item.id} style={{
-                background:'var(--card)', border:'1.5px solid var(--border)',
-                borderRadius:16, overflow:'hidden', boxShadow:'var(--shadow)',
-                transition:'all .25s', animation:`dFadeUp .4s cubic-bezier(.22,1,.36,1) ${i*.05}s both`
-              }}
+              <div key={item.id} style={{ background:'var(--card)', border:'1.5px solid var(--border)', borderRadius:16, overflow:'hidden', boxShadow:'var(--shadow)', transition:'all .25s', animation:`dFadeUp .4s cubic-bezier(.22,1,.36,1) ${i*.05}s both` }}
                 onMouseEnter={e => { e.currentTarget.style.transform='translateY(-3px)'; e.currentTarget.style.boxShadow='var(--shadow2)'; e.currentTarget.style.borderColor=fw.border; }}
                 onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='var(--shadow)'; e.currentTarget.style.borderColor='var(--border)'; }}
               >
-                {/* Top bar colorée */}
                 <div style={{height:4, background:`linear-gradient(90deg, ${fw.color}, ${statusColor})`}}/>
-
                 <div style={{padding:'20px'}}>
-                  {/* Header de la carte */}
                   <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:16}}>
                     <div style={{flex:1, minWidth:0}}>
-                      {/* URL */}
-                      <div style={{
-                        fontSize:13, fontWeight:700, color:'var(--navy)',
-                        whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
-                        marginBottom:6
-                      }}>
-                        🔗 {item.url}
-                      </div>
-                      {/* Meta */}
+                      <div style={{fontSize:13, fontWeight:700, color:'var(--navy)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:6}}>🔗 {item.url}</div>
                       <div style={{display:'flex', alignItems:'center', gap:10, flexWrap:'wrap'}}>
-                        <span style={{
-                          fontSize:10, fontWeight:700, letterSpacing:'1px',
-                          padding:'3px 10px', borderRadius:20,
-                          background: fw.bg, color: fw.color, border:`1px solid ${fw.border}`
-                        }}>{fw.emoji} {item.framework}</span>
+                        <span style={{fontSize:10, fontWeight:700, letterSpacing:'1px', padding:'3px 10px', borderRadius:20, background:fw.bg, color:fw.color, border:`1px solid ${fw.border}`}}>{fw.emoji} {item.framework}</span>
                         <span style={{fontSize:11, color:'var(--muted)'}}>🕐 {timeAgo(item.created_at)}</span>
                         <span style={{fontSize:11, color:'var(--muted)'}}>📋 {total} tests</span>
                       </div>
                     </div>
                   </div>
-
-                  {/* Stats row */}
-                  <div style={{
-                    display:'grid', gridTemplateColumns:'repeat(3,1fr)',
-                    gap:8, marginBottom:16
-                  }}>
+                  <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom:16}}>
                     {[
-                      { label:'Passed', val: item.pass_count||0, color:'#10b981', bg:'rgba(16,185,129,.08)', border:'rgba(16,185,129,.15)' },
-                      { label:'Failed', val: item.fail_count||0, color:'#ef4444', bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.15)'  },
-                      { label:'Skipped',val: item.skip_count||0, color:'#f59e0b', bg:'rgba(245,158,11,.08)', border:'rgba(245,158,11,.15)' },
+                      { label:'Passed',  val:item.pass_count||0, color:'#10b981', bg:'rgba(16,185,129,.08)', border:'rgba(16,185,129,.15)' },
+                      { label:'Failed',  val:item.fail_count||0, color:'#ef4444', bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.15)'  },
+                      { label:'Skipped', val:item.skip_count||0, color:'#f59e0b', bg:'rgba(245,158,11,.08)', border:'rgba(245,158,11,.15)' },
                     ].map(s => (
-                      <div key={s.label} style={{
-                        background:s.bg, border:`1px solid ${s.border}`,
-                        borderRadius:10, padding:'10px', textAlign:'center'
-                      }}>
+                      <div key={s.label} style={{background:s.bg, border:`1px solid ${s.border}`, borderRadius:10, padding:'10px', textAlign:'center'}}>
                         <div style={{fontFamily:'var(--C)', fontSize:24, fontWeight:700, color:s.color, lineHeight:1}}>{s.val}</div>
                         <div style={{fontSize:10, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:s.color, opacity:.8, marginTop:4}}>{s.label}</div>
                       </div>
                     ))}
                   </div>
-
-                  {/* Pass rate bar */}
                   <div style={{marginBottom:16}}>
                     <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
                       <span style={{fontSize:11, fontWeight:600, color:'var(--muted)'}}>Pass Rate</span>
                       <span style={{fontSize:13, fontWeight:700, color:statusColor}}>{rate}%</span>
                     </div>
                     <div style={{height:6, borderRadius:6, background:'var(--border)', overflow:'hidden'}}>
-                      <div style={{
-                        height:'100%', borderRadius:6,
-                        width:`${rate}%`, background:`linear-gradient(90deg, ${fw.color}, ${statusColor})`,
-                        transition:'width 1s ease'
-                      }}/>
+                      <div style={{height:'100%', borderRadius:6, width:`${rate}%`, background:`linear-gradient(90deg, ${fw.color}, ${statusColor})`, transition:'width 1s ease'}}/>
                     </div>
                   </div>
-
-                  {/* Actions */}
                   <div style={{display:'flex', gap:8}}>
-                    <button onClick={() => handleReview(item)} style={{
-                      flex:1, padding:'9px', borderRadius:9, fontSize:12,
-                      fontWeight:700, cursor:'pointer',
-                      border:'1.5px solid var(--border)',
-                      background:'var(--bg)', color:'var(--navy)',
-                      display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-                      transition:'all .2s'
-                    }}
+                    <button onClick={() => handleReview(item)} style={{ flex:1, padding:'9px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border:'1.5px solid var(--border)', background:'var(--bg)', color:'var(--navy)', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all .2s' }}
                       onMouseEnter={e => { e.currentTarget.style.background='var(--navy)'; e.currentTarget.style.color='#fff'; }}
                       onMouseLeave={e => { e.currentTarget.style.background='var(--bg)'; e.currentTarget.style.color='var(--navy)'; }}
                     >
                       <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       View Results
                     </button>
-                    <button onClick={() => handleDelete(item.id)} disabled={deleting === item.id} style={{
-                      padding:'9px 14px', borderRadius:9, fontSize:12,
-                      fontWeight:700, cursor:'pointer',
-                      border:'1.5px solid rgba(239,68,68,.3)',
-                      background:'rgba(239,68,68,.05)', color:'#ef4444',
-                      transition:'all .2s'
-                    }}
+                    <button onClick={() => handleDelete(item.id)} disabled={deleting === item.id} style={{ padding:'9px 14px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border:'1.5px solid rgba(239,68,68,.3)', background:'rgba(239,68,68,.05)', color:'#ef4444', transition:'all .2s' }}
                       onMouseEnter={e => { e.currentTarget.style.background='#ef4444'; e.currentTarget.style.color='#fff'; }}
                       onMouseLeave={e => { e.currentTarget.style.background='rgba(239,68,68,.05)'; e.currentTarget.style.color='#ef4444'; }}
                     >
@@ -909,7 +711,6 @@ function HistoryPanel({ goTo, setGeneration }) {
     </div>
   );
 }
-
 
 function AccountPanel({ user }) {
   const { setUser } = useAuth();
@@ -929,9 +730,7 @@ function AccountPanel({ user }) {
       const res = await api.put('/profile/update', { name, email });
       setUser(res.data.user);
       setMsg(t('profileUpdated'));
-    } catch (err) {
-      setError(err.response?.data?.message || t('errorOccurred'));
-    }
+    } catch (err) { setError(err.response?.data?.message || t('errorOccurred')); }
     setLoading(false);
   };
 
@@ -939,16 +738,10 @@ function AccountPanel({ user }) {
     if (newPwd !== confirmPwd) { setError(t('passwordMismatch')); return; }
     setLoading(true); setMsg(''); setError('');
     try {
-      await api.put('/profile/password', {
-        current_password: currPwd,
-        new_password: newPwd,
-        new_password_confirmation: confirmPwd
-      });
+      await api.put('/profile/password', { current_password:currPwd, new_password:newPwd, new_password_confirmation:confirmPwd });
       setMsg(t('passwordChanged'));
       setCurrPwd(''); setNewPwd(''); setConfirmPwd('');
-    } catch (err) {
-      setError(err.response?.data?.errors?.current_password?.[0] || t('errorOccurred'));
-    }
+    } catch (err) { setError(err.response?.data?.errors?.current_password?.[0] || t('errorOccurred')); }
     setLoading(false);
   };
 
@@ -962,7 +755,6 @@ function AccountPanel({ user }) {
       </div>
       {msg   && <div className="success-msg">✓ {msg}</div>}
       {error && <div className="error-msg">✗ {error}</div>}
-
       <div style={{background:'linear-gradient(135deg,#060e1e 0%,#0f2744 50%,#0b1829 100%)',borderRadius:20,padding:'32px 36px',marginBottom:28,position:'relative',overflow:'hidden',border:'1px solid rgba(201,162,39,.15)',boxShadow:'0 8px 32px rgba(6,14,30,.2)'}}>
         <div style={{position:'absolute',top:-60,right:-60,width:220,height:220,borderRadius:'50%',background:'radial-gradient(circle,rgba(201,162,39,.12) 0%,transparent 70%)'}}/>
         <div style={{position:'absolute',bottom:-40,left:'40%',width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(201,162,39,.06) 0%,transparent 70%)'}}/>
@@ -971,15 +763,8 @@ function AccountPanel({ user }) {
             <div style={{width:88,height:88,borderRadius:'50%',background:'linear-gradient(135deg,#c9a227,#e8c84a)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:36,fontFamily:'Cormorant Garamond,serif',fontWeight:700,color:'#060e1e',border:'3px solid rgba(255,255,255,.15)',boxShadow:'0 4px 20px rgba(201,162,39,.35)',overflow:'hidden'}}>
               {user?.avatar?<img src={user.avatar} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span>{user?.name?.[0]?.toUpperCase()||'U'}</span>}
             </div>
-            <input type="file" id="avatar-upload" accept="image/*" style={{display:'none'}}
-              onChange={async(e)=>{const file=e.target.files[0];if(!file)return;const fd=new FormData();fd.append('avatar',file);try{const res=await api.post('/profile/avatar',fd,{headers:{'Content-Type':'multipart/form-data'}});setUser(prev=>({...prev,avatar:res.data.avatar}));}catch(err){console.error(err);}}}
-            />
-            <button style={{position:'absolute',bottom:0,right:0,width:28,height:28,borderRadius:'50%',background:'linear-gradient(135deg,#c9a227,#e8c84a)',border:'2px solid #060e1e',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,.3)',transition:'transform .2s'}}
-              onMouseEnter={e=>e.currentTarget.style.transform='scale(1.15)'}
-              onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}
-              onClick={()=>document.getElementById('avatar-upload').click()}
-              title={t('changePhoto')}
-            >
+            <input type="file" id="avatar-upload" accept="image/*" style={{display:'none'}} onChange={async(e)=>{const file=e.target.files[0];if(!file)return;const fd=new FormData();fd.append('avatar',file);try{const res=await api.post('/profile/avatar',fd,{headers:{'Content-Type':'multipart/form-data'}});setUser(prev=>({...prev,avatar:res.data.avatar}));}catch(err){console.error(err);}}}/>
+            <button style={{position:'absolute',bottom:0,right:0,width:28,height:28,borderRadius:'50%',background:'linear-gradient(135deg,#c9a227,#e8c84a)',border:'2px solid #060e1e',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,.3)',transition:'transform .2s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.15)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'} onClick={()=>document.getElementById('avatar-upload').click()} title={t('changePhoto')}>
               <svg width="13" height="13" fill="none" stroke="#060e1e" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
             </button>
           </div>
@@ -1002,7 +787,6 @@ function AccountPanel({ user }) {
           </div>
         </div>
       </div>
-
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
         <div className="set-group">
           <div className="set-group-title">{t('profileInformation')}</div>
@@ -1060,7 +844,6 @@ function AccountPanel({ user }) {
   );
 }
 
-
 function SettingsPanel({ theme, setTheme }) {
   const { t, setLanguage: applyLang } = useLang();
   const [notifs,    setNotifs]    = useState(true);
@@ -1075,9 +858,7 @@ function SettingsPanel({ theme, setTheme }) {
       setNotifs(res.data.email_notifications);
       setWeekly(res.data.weekly_report);
       setFramework(res.data.default_framework);
-      if (!theme || theme === 'light') {
-        setTheme(res.data.theme || 'light');
-      }
+      if (!theme || theme === 'light') setTheme(res.data.theme || 'light');
       setLanguage(res.data.language || 'en');
     });
   }, []);
@@ -1085,12 +866,7 @@ function SettingsPanel({ theme, setTheme }) {
   const saveSettings = async () => {
     setLoading(true); setMsg('');
     try {
-      await api.put('/settings/update', {
-        email_notifications: notifs,
-        weekly_report:       weekly,
-        default_framework:   framework,
-        theme, language
-      });
+      await api.put('/settings/update', { email_notifications:notifs, weekly_report:weekly, default_framework:framework, theme, language });
       applyLang(language);
       setMsg(t('settingsSaved'));
       setTimeout(() => setMsg(''), 3000);
@@ -1176,14 +952,13 @@ function SettingsPanel({ theme, setTheme }) {
   );
 }
 
-
 export default function Dashboard() {
-  const [page,      setPage]     = useState('dashboard');
-  const [collapsed, setCollapse] = useState(false);
-  const [theme,     setTheme]    = useState('light');
+  const [page,       setPage]      = useState('dashboard');
+  const [collapsed,  setCollapse]  = useState(false);
+  const [theme,      setTheme]     = useState('light');
   const [generation, setGeneration] = useState(null);
-  const { user, logout }         = useAuth();
-  const { t }                    = useLang();
+  const { user, logout } = useAuth();
+  const { t }            = useLang();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -1266,7 +1041,7 @@ export default function Dashboard() {
           {page==='dashboard'&&<DashboardPanel user={user} goTo={setPage}/>}
           {page==='generate' &&<GeneratePanel  goTo={setPage} setGeneration={setGeneration}/>}
           {page==='execution'&&<ExecutionPanel generation={generation}/>}
-          {page==='history' && <HistoryPanel goTo={setPage} setGeneration={setGeneration}/>}
+          {page==='history'  &&<HistoryPanel   goTo={setPage} setGeneration={setGeneration}/>}
           {page==='account'  &&<AccountPanel   user={user}/>}
           {page==='settings' &&<SettingsPanel  theme={theme} setTheme={setTheme}/>}
         </div>
