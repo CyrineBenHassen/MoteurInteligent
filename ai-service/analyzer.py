@@ -49,7 +49,7 @@ IMPORTANT: Return ONLY a valid JSON object. No markdown, no backticks, no extra 
         "content": prompt
     }
 ],
-            temperature=0.3,
+            temperature=0.0,
             max_tokens=4000,
         )
 

@@ -9,7 +9,7 @@ app = FastAPI(title="NexTest AI Service")
 
 @app.get("/")
 def root():
-    return {"message": "NexTest AI Service is running 🚀"}
+    return {"message": "NexTest AI Service is running "}
 
 @app.post("/scrape")
 def scrape(data: dict):

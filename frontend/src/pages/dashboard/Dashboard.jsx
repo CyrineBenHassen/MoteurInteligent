@@ -7,6 +7,8 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell,
 } from 'recharts';
+import { useMemo } from "react";
+
 
 function useCountUp(target, duration = 1200) {
   const ref = useRef(null);
@@ -123,10 +125,10 @@ function TopURLsSection({ goTo }) {
 function DashboardPanel({ user, goTo }) {
   const { t } = useLang();
   const STATS = [
-    { icon:'🚀', val:'12',  lbl:t('scriptsGenerated'), accent:'linear-gradient(90deg,#4f86e8,#6fa3ff)', trend:'+12%' },
-    { icon:'🔬', val:'3',   lbl:t('appsAnalyzed'),     accent:'linear-gradient(90deg,#c9a227,#e8c84a)', trend:'+3%'  },
-    { icon:'🎯', val:'82%', lbl:t('avgCoverage'),      accent:'linear-gradient(90deg,#10b981,#34d399)', trend:'—'    },
-    { icon:'⚡', val:'2s',  lbl:t('avgGenTime'),       accent:'linear-gradient(90deg,#f97316,#fb923c)', trend:'—'    },
+    { icon:'🚀', val:'12',  lbl:t('scriptsGenerated'), accent:'linear-gradient(90deg,#4f86e8,#6fa3ff)' },
+    { icon:'🔬', val:'3',   lbl:t('appsAnalyzed'),     accent:'linear-gradient(90deg,#c9a227,#e8c84a)' },
+    { icon:'🎯', val:'82%', lbl:t('avgCoverage'),      accent:'linear-gradient(90deg,#10b981,#34d399)' },
+    { icon:'⚡', val:'2s',  lbl:t('avgGenTime'),       accent:'linear-gradient(90deg,#f97316,#fb923c)',},
   ];
   const barData = [
     { day:'Mon', count:3 }, { day:'Tue', count:7 }, { day:'Wed', count:2 },

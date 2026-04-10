@@ -158,7 +158,7 @@ def generate_single(scraped: dict, framework: str) -> dict:
                     "content": prompt
                 }
             ],
-            temperature=0.3,
+            temperature=0.0,
             max_tokens=4000,
         )
 
