@@ -15,6 +15,7 @@ class Generation extends Model
         'script',
         'script_selenium',      // 🆕
         'script_cypress',       // 🆕
+         'execution_results', // 🆕
         'test_cases_selenium',  // 🆕
         'test_cases_cypress',   // 🆕
         'load_time_ms',
@@ -29,6 +30,7 @@ class Generation extends Model
         'test_cases'          => 'array',
         'test_cases_selenium' => 'array', // 🆕
         'test_cases_cypress'  => 'array', // 🆕
+        'execution_results'   => 'array',
         'is_spa'              => 'boolean',
     ];
 

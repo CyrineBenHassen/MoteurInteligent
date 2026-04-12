@@ -6,10 +6,10 @@ import sys
 import time
 
 
-def run_selenium_script(script: str) -> dict:
+def run_selenium_script(script: str, test_cases: list = None) -> dict:
     """
     Exécute un script Selenium et retourne les vrais résultats.
-    Retourne: { results, pass_count, fail_count, skip_count, pass_rate, total }
+    test_cases: liste des cas de test pour récupérer les vrais noms.
     """
 
     # ── 1. Patcher le script pour le mode headless ───────────────────────────
@@ -44,7 +44,7 @@ def run_selenium_script(script: str) -> dict:
             pass
 
     # ── 4. Parser les résultats ──────────────────────────────────────────────
-    results = _parse_output(output, script)
+    results = _parse_output(output, script, test_cases or [])
 
     pass_count = sum(1 for r in results if r["status"] == "pass")
     fail_count = sum(1 for r in results if r["status"] == "fail")
@@ -60,7 +60,7 @@ def run_selenium_script(script: str) -> dict:
         "pass_rate":  pass_rate,
         "total":      total,
         "duration_s": elapsed,
-        "raw_output": output[:1000],  # pour debug
+        "raw_output": output[:1000],
     }
 
 
@@ -69,10 +69,7 @@ def run_selenium_script(script: str) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _patch_headless(script: str) -> str:
-    """
-    Remplace setup_driver() pour injecter Chrome headless automatiquement.
-    Utilise webdriver-manager pour gérer ChromeDriver automatiquement.
-    """
+    """Remplace setup_driver() pour injecter Chrome headless automatiquement."""
     headless_block = (
         "def setup_driver():\n"
         "    from selenium.webdriver.chrome.options import Options\n"
@@ -88,28 +85,26 @@ def _patch_headless(script: str) -> str:
         "    return webdriver.Chrome(service=service, options=opts)\n"
     )
 
-    # Remplacer la fonction setup_driver existante
     script = re.sub(
         r'def setup_driver\(\):.*?(?=\ndef |\nif |\Z)',
         headless_block + '\n',
         script,
         flags=re.DOTALL,
     )
-
     return script
 
 
-def _parse_output(output: str, script: str) -> list:
+def _parse_output(output: str, script: str, test_cases: list = []) -> list:
     """
     Parse la sortie du script pour extraire pass/fail par test.
-    Le script génère: 'Test 1: PASSED' ou 'Test 1: FAILED'
+    Utilise les vrais noms depuis test_cases si disponibles.
     """
     results = []
 
-    # Extraire les noms des fonctions de test
-    test_names = re.findall(r'def (test_\w+)\(driver\)', script)
+    # Extraire les noms des fonctions de test depuis le script
+    test_fns = re.findall(r'def (test_\w+)\(driver\)', script)
 
-    if not test_names:
+    if not test_fns:
         return [{
             "name":     "Script Error",
             "status":   "fail",
@@ -125,8 +120,14 @@ def _parse_output(output: str, script: str) -> list:
         int(m) for m in re.findall(r'Test\s+(\d+).*?FAILED', output, re.IGNORECASE)
     )
 
-    for i, fn_name in enumerate(test_names, start=1):
-        display = fn_name.replace('test_', '').replace('_', ' ').title()
+    for i, fn_name in enumerate(test_fns, start=1):
+        # ✅ Utiliser le vrai nom du test case si disponible
+        if test_cases and (i - 1) < len(test_cases):
+            display = test_cases[i - 1].get("name", "")
+            if not display:
+                display = fn_name.replace('test_', '').replace('_', ' ').title()
+        else:
+            display = fn_name.replace('test_', '').replace('_', ' ').title()
 
         if i in passed_ids:
             status = 'pass'
@@ -135,8 +136,6 @@ def _parse_output(output: str, script: str) -> list:
             status = 'fail'
             error  = _extract_error(output, fn_name)
         else:
-            # Le test n'a pas été trouvé dans la sortie
-            # → probablement une exception avant d'arriver à ce test
             status = 'fail'
             error  = _extract_error(output, fn_name) or 'Test did not execute'
 

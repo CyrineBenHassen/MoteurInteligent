@@ -327,25 +327,35 @@ function ExecutionPanel({ generation }) {
 
   const framework = generation?.framework || generation?.generation?.framework || 'Selenium';
 
-  const mapStatus = (type) =>
-    type === 'positive'   ? 'pass'
-    : type === 'negative' ? 'fail'
-    : type === 'boundary' ? 'skip'
-    : ['navigation','add_to_cart','pagination','modal','image','performance'].includes(type) ? 'pass'
-    : 'skip';
+  
+  
 
-  const buildTests = (test_cases) =>
-    (test_cases || []).map((tc, i) => ({
-      id:       tc.id || i + 1,
-      name:     tc.name,
-      status:   mapStatus(tc.type),
-      duration: '—',
-      suite:    tc.description?.slice(0, 40) || 'Test',
+ 
+
+const buildTests = (test_cases, execution_results) => {
+  if (execution_results && execution_results.length > 0) {
+    return execution_results.map((r, i) => ({
+      id:       i + 1,
+      name:     r.name,
+      status:   r.status,
+      duration: r.duration || '—',
+      suite: r.error || (test_cases && test_cases[i]?.description?.slice(0, 40)) || 'Test',
     }));
+  }
+  return (test_cases || []).map((tc, i) => ({
+    id:       tc.id || i + 1,
+    name:     tc.name,
+    status:   'skip',
+    duration: '—',
+    suite:    tc.description?.slice(0, 40) || 'Not executed',
+  }));
+};
 
-  const testsSelenium = buildTests(generation?.result?.test_cases_selenium);
-  const testsCypress  = buildTests(generation?.result?.test_cases_cypress);
-  const testsSingle   = buildTests(generation?.result?.test_cases);
+const executionResults = generation?.result?.execution_results || [];
+
+const testsSelenium = buildTests(generation?.result?.test_cases_selenium, executionResults);
+const testsCypress  = buildTests(generation?.result?.test_cases_cypress, []);
+const testsSingle   = buildTests(generation?.result?.test_cases, executionResults);
 
   const isBoth = framework === 'Both';
   const tests  = isBoth

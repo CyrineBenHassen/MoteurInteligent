@@ -31,6 +31,7 @@ SELENIUM_BG    = HexColor('#e8f5e9')
 CYPRESS_COLOR  = HexColor('#1565c0')
 CYPRESS_BG     = HexColor('#e3f2fd')
 
+
 # ── Page decorations ───────────────────────────────────────────
 def on_page(canvas, doc):
     W, H = A4
@@ -51,7 +52,8 @@ def on_page(canvas, doc):
     canvas.drawRightString(W - 20*mm, 5*mm, f'Page {doc.page}  •  {datetime.now().strftime("%Y-%m-%d")}')
     canvas.restoreState()
 
-# ── Reusable helpers ───────────────────────────────────────────
+
+# ── Helpers ────────────────────────────────────────────────────
 def section_header(emoji, text):
     data = [[Paragraph(f'{emoji}  {text}',
                        ParagraphStyle('SH', fontSize=11, fontName='Helvetica-Bold',
@@ -63,6 +65,7 @@ def section_header(emoji, text):
         ('TOPPADDING',    (0,0), (-1,-1), 0),
     ]))
     return tbl
+
 
 def framework_banner(label, color, bg):
     data = [[Paragraph(label, ParagraphStyle(
@@ -76,6 +79,7 @@ def framework_banner(label, color, bg):
         ('LEFTPADDING',   (0,0), (-1,-1), 10),
     ]))
     return tbl
+
 
 def stat_card(value, label, val_color, bg_color):
     inner = [[Paragraph(
@@ -92,21 +96,69 @@ def stat_card(value, label, val_color, bg_color):
     ]))
     return t
 
-def build_stats_section(elements, test_cases):
-    pass_count = sum(1 for t in test_cases if t.get('type') == 'positive')
-    fail_count = sum(1 for t in test_cases if t.get('type') == 'negative')
-    skip_count = len(test_cases) - pass_count - fail_count
-    total      = len(test_cases)
-    rate       = round((pass_count / total) * 100) if total > 0 else 0
-    rate_hex   = '#10b981' if rate >= 80 else '#f59e0b' if rate >= 50 else '#ef4444'
-    rate_bg    = GREEN_BG  if rate >= 80 else ORANGE_BG  if rate >= 50 else RED_BG
+
+def _get_status(tc_index: int, tc_type: str, execution_results: list) -> tuple:
+    """
+    Retourne (type_color, type_label) en utilisant les vrais résultats
+    d'exécution si disponibles, sinon fallback sur le type du test case.
+    """
+    if execution_results and tc_index < len(execution_results):
+        real_status = execution_results[tc_index].get('status', 'skip')
+        if real_status == 'pass':
+            return '#10b981', '✓  PASS'
+        elif real_status == 'fail':
+            return '#ef4444', '✗  FAIL'
+        else:
+            return '#f59e0b', '■  SKIP'
+
+    # Fallback sur le type
+    if tc_type == 'positive':
+        return '#10b981', '✓  PASS'
+    elif tc_type == 'negative':
+        return '#ef4444', '✗  FAIL'
+    else:
+        return '#f59e0b', '■  SKIP'
+
+
+def _calc_stats(test_cases: list, execution_results: list) -> tuple:
+    """
+    Calcule pass/fail/skip/rate depuis les vrais résultats si disponibles,
+    sinon depuis les types des test cases.
+    """
+    total = len(test_cases)
+    if not total:
+        return 0, 0, 0, 0
+
+    if execution_results:
+        pass_count = sum(1 for r in execution_results if r.get('status') == 'pass')
+        fail_count = sum(1 for r in execution_results if r.get('status') == 'fail')
+        skip_count = sum(1 for r in execution_results if r.get('status') == 'skip')
+        # Ajuster si execution_results a moins d'éléments que test_cases
+        missing = total - len(execution_results)
+        skip_count += max(missing, 0)
+    else:
+        pass_count = sum(1 for t in test_cases if t.get('type') == 'positive')
+        fail_count = sum(1 for t in test_cases if t.get('type') == 'negative')
+        skip_count = total - pass_count - fail_count
+
+    rate = round((pass_count / total) * 100) if total > 0 else 0
+    return pass_count, fail_count, skip_count, rate
+
+
+def build_stats_section(elements, test_cases, execution_results=None):
+    pass_count, fail_count, skip_count, rate = _calc_stats(
+        test_cases, execution_results or []
+    )
+    total    = len(test_cases)
+    rate_hex = '#10b981' if rate >= 80 else '#f59e0b' if rate >= 50 else '#ef4444'
+    rate_bg  = GREEN_BG  if rate >= 80 else ORANGE_BG  if rate >= 50 else RED_BG
 
     stats_data = [[
-        stat_card(pass_count, 'PASSED',    '#10b981', GREEN_BG),
-        stat_card(fail_count, 'FAILED',    '#ef4444', RED_BG),
-        stat_card(skip_count, 'SKIPPED',   '#f59e0b', ORANGE_BG),
-        stat_card(f'{rate}%', 'PASS RATE', rate_hex,  rate_bg),
-        stat_card(total,      'TOTAL',     '#3b82f6', BLUE_BG),
+        stat_card(pass_count,  'PASSED',    '#10b981', GREEN_BG),
+        stat_card(fail_count,  'FAILED',    '#ef4444', RED_BG),
+        stat_card(skip_count,  'SKIPPED',   '#f59e0b', ORANGE_BG),
+        stat_card(f'{rate}%',  'PASS RATE', rate_hex,  rate_bg),
+        stat_card(total,       'TOTAL',     '#3b82f6', BLUE_BG),
     ]]
     outer = Table(stats_data, colWidths=[33.6*mm]*5)
     outer.setStyle(TableStyle([
@@ -116,29 +168,36 @@ def build_stats_section(elements, test_cases):
     ]))
     elements.append(outer)
 
-def build_test_cases_table(elements, test_cases):
+
+def build_test_cases_table(elements, test_cases, execution_results=None):
     col_w = [10*mm, 78*mm, 24*mm, 56*mm]
     header_row = [
         Paragraph('<font color="#ffffff"><b>#</b></font>',
                   ParagraphStyle('TH', fontSize=8.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
         Paragraph('<font color="#ffffff"><b>Test Name</b></font>',
                   ParagraphStyle('TH', fontSize=8.5, fontName='Helvetica-Bold')),
-        Paragraph('<font color="#ffffff"><b>Type</b></font>',
+        Paragraph('<font color="#ffffff"><b>Status</b></font>',
                   ParagraphStyle('TH', fontSize=8.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
         Paragraph('<font color="#ffffff"><b>Expected Result</b></font>',
                   ParagraphStyle('TH', fontSize=8.5, fontName='Helvetica-Bold')),
     ]
     tc_rows = [header_row]
+
     for i, tc in enumerate(test_cases):
         tc_type = tc.get('type', 'positive')
-        if tc_type == 'positive':
-            type_color, type_label = '#10b981', '✓  PASS'
-        elif tc_type == 'negative':
-            type_color, type_label = '#ef4444', '✗  FAIL'
-        else:
-            type_color, type_label = '#f59e0b', '⚠  SKIP'
 
-        desc      = tc.get('description', '')
+        # ✅ Utiliser les vrais résultats d'exécution
+        type_color, type_label = _get_status(i, tc_type, execution_results or [])
+
+        # Récupérer le message d'erreur si le test a échoué
+        error_msg = ''
+        if execution_results and i < len(execution_results):
+            err = execution_results[i].get('error')
+            if err:
+                short_err = err[:60] + '…' if len(err) > 60 else err
+                error_msg = f'<br/><font color="#ef4444" size="7"><i>{short_err}</i></font>'
+
+        desc       = tc.get('description', '')
         desc_short = desc[:70] + '…' if len(desc) > 70 else desc
         exp        = tc.get('expected', '')
         exp_short  = exp[:65] + '…' if len(exp) > 65 else exp
@@ -148,7 +207,8 @@ def build_test_cases_table(elements, test_cases):
                       ParagraphStyle('IDC', fontSize=8.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
             Paragraph(
                 f'<b><font color="#1e293b">{tc.get("name","")}</font></b><br/>'
-                f'<font color="#94a3b8" size="7.5">{desc_short}</font>',
+                f'<font color="#94a3b8" size="7.5">{desc_short}</font>'
+                f'{error_msg}',
                 ParagraphStyle('TCN', fontSize=9, fontName='Helvetica', leading=13)),
             Paragraph(
                 f'<font color="{type_color}"><b>{type_label}</b></font>',
@@ -174,6 +234,7 @@ def build_test_cases_table(elements, test_cases):
         ('ALIGN',         (2,0), (2,-1), 'CENTER'),
     ]))
     elements.append(tc_tbl)
+
 
 def build_script_section(elements, script, framework_label):
     if not script:
@@ -218,6 +279,7 @@ def build_script_section(elements, script, framework_label):
             '<font color="#94a3b8"><i>… script truncated — download full version for complete output</i></font>',
             ParagraphStyle('Trunc', fontSize=7.5, fontName='Helvetica', alignment=TA_CENTER)))
 
+
 # ── Main ───────────────────────────────────────────────────────
 def generate_pdf(generation_data: dict) -> bytes:
     buffer = BytesIO()
@@ -225,11 +287,8 @@ def generate_pdf(generation_data: dict) -> bytes:
                             rightMargin=20*mm, leftMargin=22*mm,
                             topMargin=58*mm, bottomMargin=20*mm)
 
-    title_style = ParagraphStyle('Title', fontSize=22, textColor=WHITE,
-                                  fontName='Helvetica-Bold', spaceAfter=2, alignment=TA_LEFT)
-
     url       = generation_data.get('url', '')
-    framework = generation_data.get('framework', 'Selenium')  # 'Selenium' | 'Cypress' | 'Both'
+    framework = generation_data.get('framework', 'Selenium')
     load_time = generation_data.get('load_time_ms', 0)
     is_spa    = generation_data.get('is_spa', False)
 
@@ -239,6 +298,9 @@ def generate_pdf(generation_data: dict) -> bytes:
     script              = generation_data.get('script', '')
     script_selenium     = generation_data.get('script_selenium', '')
     script_cypress      = generation_data.get('script_cypress', '')
+
+    # ✅ Récupérer les vrais résultats d'exécution
+    execution_results = generation_data.get('execution_results', [])
 
     elements = []
 
@@ -252,14 +314,16 @@ def generate_pdf(generation_data: dict) -> bytes:
     ]]
     header_tbl = Table(header_data, colWidths=[90*mm, 78*mm])
     header_tbl.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 0),
+        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING',    (0,0), (-1,-1), 0),
         ('BOTTOMPADDING', (0,0), (-1,-1), 0),
     ]))
     elements.append(Spacer(1, -38*mm))
     elements.append(header_tbl)
     elements.append(Spacer(1, 6*mm))
-    elements.append(Paragraph('Test Automation Report', title_style))
+    elements.append(Paragraph('Test Automation Report',
+                               ParagraphStyle('Title', fontSize=22, textColor=WHITE,
+                                              fontName='Helvetica-Bold', spaceAfter=2)))
     elements.append(Spacer(1, 14*mm))
 
     # ── Info Box ──────────────────────────────────────────────
@@ -271,7 +335,7 @@ def generate_pdf(generation_data: dict) -> bytes:
                          ParagraphStyle('IV', fontSize=8.5, fontName='Helvetica', leading=12))
 
     load_badge_color = '#ef4444' if load_time > 3000 else '#10b981'
-    load_badge       = 'SLOW' if load_time > 3000 else 'GOOD'
+    load_badge       = 'SLOW'    if load_time > 3000 else 'GOOD'
     fw_display       = 'Selenium + Cypress' if framework == 'Both' else framework
 
     info_data = [
@@ -299,7 +363,7 @@ def generate_pdf(generation_data: dict) -> bytes:
     elements.append(Spacer(1, 20))
 
     # ══════════════════════════════════════════════════════════
-    # CASE 1 : Both → deux sections séparées Selenium + Cypress
+    # CASE 1 : Both → deux sections séparées
     # ══════════════════════════════════════════════════════════
     if framework == 'Both':
 
@@ -308,11 +372,12 @@ def generate_pdf(generation_data: dict) -> bytes:
         elements.append(Spacer(1, 10))
         elements.append(section_header('📊', 'Test Summary — Selenium'))
         elements.append(Spacer(1, 8))
-        build_stats_section(elements, test_cases_selenium)
+        # ✅ Passer execution_results pour Selenium
+        build_stats_section(elements, test_cases_selenium, execution_results)
         elements.append(Spacer(1, 18))
         elements.append(section_header('🧪', 'Test Cases — Selenium'))
         elements.append(Spacer(1, 8))
-        build_test_cases_table(elements, test_cases_selenium)
+        build_test_cases_table(elements, test_cases_selenium, execution_results)
         build_script_section(elements, script_selenium, 'Selenium')
 
         elements.append(Spacer(1, 30))
@@ -322,91 +387,28 @@ def generate_pdf(generation_data: dict) -> bytes:
         elements.append(Spacer(1, 10))
         elements.append(section_header('📊', 'Test Summary — Cypress'))
         elements.append(Spacer(1, 8))
-        build_stats_section(elements, test_cases_cypress)
+        # Cypress pas d'exécution réelle → fallback sur types
+        build_stats_section(elements, test_cases_cypress, [])
         elements.append(Spacer(1, 18))
         elements.append(section_header('🧪', 'Test Cases — Cypress'))
         elements.append(Spacer(1, 8))
-        build_test_cases_table(elements, test_cases_cypress)
+        build_test_cases_table(elements, test_cases_cypress, [])
         build_script_section(elements, script_cypress, 'Cypress')
 
     # ══════════════════════════════════════════════════════════
-    # CASE 2 : Selenium ou Cypress → une seule section
+    # CASE 2 : Selenium ou Cypress seul
     # ══════════════════════════════════════════════════════════
     else:
         elements.append(section_header('📊', 'Test Summary'))
         elements.append(Spacer(1, 8))
-        build_stats_section(elements, test_cases)
+        # ✅ Passer les vrais résultats
+        build_stats_section(elements, test_cases, execution_results)
         elements.append(Spacer(1, 22))
         elements.append(section_header('🧪', 'Test Cases'))
         elements.append(Spacer(1, 8))
-        build_test_cases_table(elements, test_cases)
+        build_test_cases_table(elements, test_cases, execution_results)
         build_script_section(elements, script, framework)
 
     elements.append(Spacer(1, 20))
     doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
     return buffer.getvalue()
-
-
-# ── Demo ──────────────────────────────────────────────────────
-if __name__ == '__main__':
-    sample = {
-        'url': 'https://www.netflix.com/tn-fr/',
-        'framework': 'Both',
-        'load_time_ms': 4207,
-        'is_spa': False,
-        'test_cases': [],
-        'test_cases_selenium': [
-            {'id':1,'name':'Happy Path Test','type':'positive','description':'Verifies that the user can successfully navigate to the login page','expected':'The user is redirected to the next page'},
-            {'id':2,'name':'Invalid Email Test','type':'negative','description':'Verifies that the form does not submit with an invalid email address','expected':'An error message is displayed'},
-            {'id':3,'name':'Empty Email Field Test','type':'negative','description':'Verifies that the form does not submit with an empty email field','expected':'An error message is displayed'},
-            {'id':4,'name':'Language Select Test','type':'positive','description':'Verifies that the language select dropdown is functional','expected':'The language is changed successfully'},
-            {'id':5,'name':'Performance Test','type':'positive','description':'Verifies that the page load time is within the acceptable range','expected':'The page load time is less than 3000ms'},
-        ],
-        'test_cases_cypress': [
-            {'id':1,'name':'Happy Path Test','type':'positive','description':'Verifies that the user can successfully navigate to the login page','expected':'The user is redirected to the next page'},
-            {'id':2,'name':'Invalid Email Test','type':'negative','description':'Verifies that the form does not submit with an invalid email address','expected':'An error message is displayed'},
-            {'id':3,'name':'Navigation Test','type':'positive','description':'Verifies that the navigation links are functional','expected':'The user is redirected to the login page'},
-            {'id':4,'name':'Image Loading Test','type':'positive','description':'Verifies that the images on the page are loaded successfully','expected':'All images are loaded successfully'},
-        ],
-        'script': '',
-        'script_selenium': """from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
-driver = webdriver.Chrome()
-driver.get('https://www.netflix.com/tn-fr/')
-
-def test_happy_path():
-    email_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, ':r0:')))
-    email_input.send_keys('test@example.com')
-
-def test_invalid_email():
-    email_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, ':r0:')))
-    email_input.send_keys('invalid_email')
-
-test_happy_path()
-test_invalid_email()
-driver.quit()""",
-        'script_cypress': """describe('Netflix Tests', () => {
-  beforeEach(() => {
-    cy.visit('https://www.netflix.com/tn-fr/')
-  })
-
-  it('Happy Path Test', () => {
-    cy.get('#\\:r0\\:').type('test@example.com')
-    cy.contains('button', 'Commencer').click()
-  })
-
-  it('Invalid Email Test', () => {
-    cy.get('#\\:r0\\:').type('invalid_email')
-    cy.contains('button', 'Commencer').click()
-    cy.get('.grecaptcha-error').should('be.visible')
-  })
-})""",
-    }
-
-    pdf_bytes = generate_pdf(sample)
-    with open('/mnt/user-data/outputs/nextest_report_improved.pdf', 'wb') as f:
-        f.write(pdf_bytes)
-    print('Done!')
