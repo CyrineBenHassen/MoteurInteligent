@@ -31,8 +31,21 @@ SELENIUM_BG    = HexColor('#e8f5e9')
 CYPRESS_COLOR  = HexColor('#1565c0')
 CYPRESS_BG     = HexColor('#e3f2fd')
 
+# ── Priority colors ────────────────────────────────────────────
+PRIORITY_COLORS = {
+    'high':   '#ef4444',
+    'medium': '#f59e0b',
+    'low':    '#10b981',
+}
+CATEGORY_COLORS = {
+    'functional':  '#3b82f6',
+    'performance': '#8b5cf6',
+    'ui':          '#ec4899',
+    'security':    '#ef4444',
+    'navigation':  '#10b981',
+}
 
-# ── Page decorations ───────────────────────────────────────────
+
 def on_page(canvas, doc):
     W, H = A4
     canvas.saveState()
@@ -53,7 +66,6 @@ def on_page(canvas, doc):
     canvas.restoreState()
 
 
-# ── Helpers ────────────────────────────────────────────────────
 def section_header(emoji, text):
     data = [[Paragraph(f'{emoji}  {text}',
                        ParagraphStyle('SH', fontSize=11, fontName='Helvetica-Bold',
@@ -98,44 +110,58 @@ def stat_card(value, label, val_color, bg_color):
 
 
 def _get_status(tc_index: int, tc_type: str, execution_results: list) -> tuple:
-    """
-    Retourne (type_color, type_label) en utilisant les vrais résultats
-    d'exécution si disponibles, sinon fallback sur le type du test case.
-    """
     if execution_results and tc_index < len(execution_results):
-        real_status = execution_results[tc_index].get('status', 'skip')
-        if real_status == 'pass':
-            return '#10b981', '✓  PASS'
-        elif real_status == 'fail':
-            return '#ef4444', '✗  FAIL'
-        else:
-            return '#f59e0b', '■  SKIP'
+        s = execution_results[tc_index].get('status', 'skip')
+        if s == 'pass':   return '#10b981', '✓  PASS'
+        elif s == 'fail': return '#ef4444', '✗  FAIL'
+        else:             return '#f59e0b', '■  SKIP'
+    if tc_type == 'positive':  return '#10b981', '✓  PASS'
+    elif tc_type == 'negative': return '#ef4444', '✗  FAIL'
+    else: return '#f59e0b', '■  SKIP'
 
-    # Fallback sur le type
-    if tc_type == 'positive':
-        return '#10b981', '✓  PASS'
-    elif tc_type == 'negative':
-        return '#ef4444', '✗  FAIL'
+
+def _get_reason_text(tc_index: int, tc: dict, execution_results: list) -> tuple:
+    """
+    Retourne (reason_text, reason_color, bg_color) avec raison détaillée.
+    Utilise reason_pass / reason / reason_skip depuis runner.py.
+    """
+    tc_type  = tc.get('type', 'positive')
+    expected = tc.get('expected', '')
+
+    # ── Pas de résultats d'exécution → fallback sur le type ──
+    if not execution_results or tc_index >= len(execution_results):
+        if tc_type == 'positive':
+            return "Test positif — verifie le comportement attendu.", '#059669', HexColor('#f0fdf4')
+        elif tc_type == 'negative':
+            return "Test negatif — verifie la gestion des erreurs.", '#dc2626', HexColor('#fef2f2')
+        else:
+            return "Test ignore — conditions non remplies.", '#b45309', HexColor('#fffbeb')
+
+    exec_r = execution_results[tc_index]
+    status = exec_r.get('status', 'skip')
+
+    if status == 'pass':
+        reason = exec_r.get('reason_pass') or "Test reussi — toutes les assertions validees."
+        return reason, '#059669', HexColor('#f0fdf4')
+
+    elif status == 'fail':
+        reason = exec_r.get('reason') or exec_r.get('error') or "Test echoue — voir le script pour details."
+        return reason, '#dc2626', HexColor('#fef2f2')
+
     else:
-        return '#f59e0b', '■  SKIP'
+        reason = exec_r.get('reason_skip') or "Test ignore — element ou condition non detecte."
+        return reason, '#b45309', HexColor('#fffbeb')
 
 
 def _calc_stats(test_cases: list, execution_results: list) -> tuple:
-    """
-    Calcule pass/fail/skip/rate depuis les vrais résultats si disponibles,
-    sinon depuis les types des test cases.
-    """
     total = len(test_cases)
-    if not total:
-        return 0, 0, 0, 0
+    if not total: return 0, 0, 0, 0
 
     if execution_results:
         pass_count = sum(1 for r in execution_results if r.get('status') == 'pass')
         fail_count = sum(1 for r in execution_results if r.get('status') == 'fail')
         skip_count = sum(1 for r in execution_results if r.get('status') == 'skip')
-        # Ajuster si execution_results a moins d'éléments que test_cases
-        missing = total - len(execution_results)
-        skip_count += max(missing, 0)
+        skip_count += max(total - len(execution_results), 0)
     else:
         pass_count = sum(1 for t in test_cases if t.get('type') == 'positive')
         fail_count = sum(1 for t in test_cases if t.get('type') == 'negative')
@@ -146,93 +172,119 @@ def _calc_stats(test_cases: list, execution_results: list) -> tuple:
 
 
 def build_stats_section(elements, test_cases, execution_results=None):
-    pass_count, fail_count, skip_count, rate = _calc_stats(
-        test_cases, execution_results or []
-    )
+    pass_count, fail_count, skip_count, rate = _calc_stats(test_cases, execution_results or [])
     total    = len(test_cases)
     rate_hex = '#10b981' if rate >= 80 else '#f59e0b' if rate >= 50 else '#ef4444'
     rate_bg  = GREEN_BG  if rate >= 80 else ORANGE_BG  if rate >= 50 else RED_BG
 
     stats_data = [[
-        stat_card(pass_count,  'PASSED',    '#10b981', GREEN_BG),
-        stat_card(fail_count,  'FAILED',    '#ef4444', RED_BG),
-        stat_card(skip_count,  'SKIPPED',   '#f59e0b', ORANGE_BG),
-        stat_card(f'{rate}%',  'PASS RATE', rate_hex,  rate_bg),
-        stat_card(total,       'TOTAL',     '#3b82f6', BLUE_BG),
+        stat_card(pass_count, 'PASSED',    '#10b981', GREEN_BG),
+        stat_card(fail_count, 'FAILED',    '#ef4444', RED_BG),
+        stat_card(skip_count, 'SKIPPED',   '#f59e0b', ORANGE_BG),
+        stat_card(f'{rate}%', 'PASS RATE', rate_hex,  rate_bg),
+        stat_card(total,      'TOTAL',     '#3b82f6', BLUE_BG),
     ]]
     outer = Table(stats_data, colWidths=[33.6*mm]*5)
     outer.setStyle(TableStyle([
-        ('ALIGN',   (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN',  (0,0), (-1,-1), 'MIDDLE'),
-        ('PADDING', (0,0), (-1,-1), 2),
+        ('ALIGN',  (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('PADDING',(0,0), (-1,-1), 2),
     ]))
     elements.append(outer)
 
 
 def build_test_cases_table(elements, test_cases, execution_results=None):
-    col_w = [10*mm, 78*mm, 24*mm, 56*mm]
+    # ── 5 colonnes: #, Test Name + badges, Status, Expected, Reason détaillée ──
+    col_w = [8*mm, 48*mm, 20*mm, 42*mm, 50*mm]
+
     header_row = [
         Paragraph('<font color="#ffffff"><b>#</b></font>',
-                  ParagraphStyle('TH', fontSize=8.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+                  ParagraphStyle('TH', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
         Paragraph('<font color="#ffffff"><b>Test Name</b></font>',
-                  ParagraphStyle('TH', fontSize=8.5, fontName='Helvetica-Bold')),
+                  ParagraphStyle('TH', fontSize=8, fontName='Helvetica-Bold')),
         Paragraph('<font color="#ffffff"><b>Status</b></font>',
-                  ParagraphStyle('TH', fontSize=8.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Expected Result</b></font>',
-                  ParagraphStyle('TH', fontSize=8.5, fontName='Helvetica-Bold')),
+                  ParagraphStyle('TH', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Expected</b></font>',
+                  ParagraphStyle('TH', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Reason</b></font>',
+                  ParagraphStyle('TH', fontSize=8, fontName='Helvetica-Bold')),
     ]
-    tc_rows = [header_row]
+    tc_rows    = [header_row]
+    row_styles = []
 
     for i, tc in enumerate(test_cases):
-        tc_type = tc.get('type', 'positive')
+        tc_type   = tc.get('type', 'positive')
+        priority  = tc.get('priority', 'medium')
+        category  = tc.get('category', 'functional')
 
-        # ✅ Utiliser les vrais résultats d'exécution
-        type_color, type_label = _get_status(i, tc_type, execution_results or [])
+        type_color, type_label          = _get_status(i, tc_type, execution_results or [])
+        reason_text, reason_color, reason_bg = _get_reason_text(i, tc, execution_results or [])
 
-        # Récupérer le message d'erreur si le test a échoué
-        error_msg = ''
-        if execution_results and i < len(execution_results):
-            err = execution_results[i].get('error')
-            if err:
-                short_err = err[:60] + '…' if len(err) > 60 else err
-                error_msg = f'<br/><font color="#ef4444" size="7"><i>{short_err}</i></font>'
+        # ── Couleurs des badges priority et category ──
+        pri_color = PRIORITY_COLORS.get(priority, '#94a3b8')
+        cat_color = CATEGORY_COLORS.get(category, '#3b82f6')
 
-        desc       = tc.get('description', '')
-        desc_short = desc[:70] + '…' if len(desc) > 70 else desc
-        exp        = tc.get('expected', '')
-        exp_short  = exp[:65] + '…' if len(exp) > 65 else exp
+        # ── Tronquer les textes ──
+        desc_short   = tc.get('description', '')
+        desc_short   = desc_short[:60] + '…' if len(desc_short) > 60 else desc_short
+        exp_short    = tc.get('expected', '')
+        exp_short    = exp_short[:55] + '…' if len(exp_short) > 55 else exp_short
+        reason_short = reason_text[:180] + '…' if len(reason_text) > 180 else reason_text
+
+        # ── Colonne 2: Nom + description + badges priority/category ──
+        name_cell = Paragraph(
+            f'<b><font color="#1e293b" size="8.5">{tc.get("name","")}</font></b><br/>'
+            f'<font color="#94a3b8" size="6.5">{desc_short}</font><br/>'
+            f'<font color="{pri_color}" size="6"><b>{priority.upper()}</b></font>'
+            f'<font color="#94a3b8" size="6">  |  </font>'
+            f'<font color="{cat_color}" size="6"><b>{category.upper()}</b></font>',
+            ParagraphStyle('TCN', fontSize=8.5, fontName='Helvetica', leading=11)
+        )
+
+        # ── Colonne 5: Reason avec icône selon statut ──
+        status_icon = '✓' if type_label.startswith('✓') else '✗' if type_label.startswith('✗') else '■'
+        reason_cell = Paragraph(
+            f'<font color="{reason_color}" size="7"><b>{status_icon}</b> {reason_short}</font>',
+            ParagraphStyle('RSN', fontSize=7, fontName='Helvetica', leading=9.5)
+        )
 
         tc_rows.append([
             Paragraph(f'<font color="#64748b"><b>{tc.get("id","")}</b></font>',
-                      ParagraphStyle('IDC', fontSize=8.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(
-                f'<b><font color="#1e293b">{tc.get("name","")}</font></b><br/>'
-                f'<font color="#94a3b8" size="7.5">{desc_short}</font>'
-                f'{error_msg}',
-                ParagraphStyle('TCN', fontSize=9, fontName='Helvetica', leading=13)),
+                      ParagraphStyle('IDC', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            name_cell,
             Paragraph(
                 f'<font color="{type_color}"><b>{type_label}</b></font>',
-                ParagraphStyle('TYP', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+                ParagraphStyle('TYP', fontSize=7.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
             Paragraph(
-                f'<font color="#475569">{exp_short}</font>',
-                ParagraphStyle('EXP', fontSize=8, fontName='Helvetica', leading=12)),
+                f'<font color="#475569" size="7.5">{exp_short}</font>',
+                ParagraphStyle('EXP', fontSize=7.5, fontName='Helvetica', leading=10)),
+            reason_cell,
         ])
 
+        # ── Fond coloré pour la colonne Reason selon statut ──
+        row_idx = i + 1  # +1 pour le header
+        row_styles.append(('BACKGROUND', (4, row_idx), (4, row_idx), reason_bg))
+
     tc_tbl = Table(tc_rows, colWidths=col_w, repeatRows=1)
-    tc_tbl.setStyle(TableStyle([
+
+    base_style = [
         ('BACKGROUND',    (0,0), (-1,0), NAVY),
         ('TEXTCOLOR',     (0,0), (-1,0), WHITE),
         ('FONTNAME',      (0,0), (-1,0), 'Helvetica-Bold'),
         ('TOPPADDING',    (0,0), (-1,0), 9),
         ('BOTTOMPADDING', (0,0), (-1,0), 9),
         ('ROWBACKGROUNDS',(0,1), (-1,-1), [WHITE, LIGHT_BG]),
-        ('PADDING',       (0,1), (-1,-1), 8),
+        ('PADDING',       (0,1), (-1,-1), 7),
         ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
         ('BOX',           (0,0), (-1,-1), 0.8, BORDER_DARK),
-        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
+        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
         ('ALIGN',         (0,0), (0,-1), 'CENTER'),
         ('ALIGN',         (2,0), (2,-1), 'CENTER'),
-    ]))
+        # Bordure gauche colorée sur la colonne Reason
+        ('LINEBEFORE',    (4,1), (4,-1), 1.5, BORDER_DARK),
+    ]
+
+    tc_tbl.setStyle(TableStyle(base_style + row_styles))
     elements.append(tc_tbl)
 
 
@@ -243,7 +295,7 @@ def build_script_section(elements, script, framework_label):
     elements.append(section_header('📄', f'AI-Generated {framework_label} Script'))
     elements.append(Spacer(1, 4))
     elements.append(Paragraph(
-        "<font color='#94a3b8'><i>Ce script a été généré automatiquement par l'IA pour tester votre site.</i></font>",
+        "<font color='#94a3b8'><i>Ce script a ete genere automatiquement par l'IA pour tester votre site.</i></font>",
         ParagraphStyle('Info', fontSize=7.5, fontName='Helvetica')))
     elements.append(Spacer(1, 6))
 
@@ -276,11 +328,10 @@ def build_script_section(elements, script, framework_label):
     if len(script.split('\n')) > 60:
         elements.append(Spacer(1, 4))
         elements.append(Paragraph(
-            '<font color="#94a3b8"><i>… script truncated — download full version for complete output</i></font>',
+            '<font color="#94a3b8"><i>... script truncated — download full version for complete output</i></font>',
             ParagraphStyle('Trunc', fontSize=7.5, fontName='Helvetica', alignment=TA_CENTER)))
 
 
-# ── Main ───────────────────────────────────────────────────────
 def generate_pdf(generation_data: dict) -> bytes:
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
@@ -298,9 +349,7 @@ def generate_pdf(generation_data: dict) -> bytes:
     script              = generation_data.get('script', '')
     script_selenium     = generation_data.get('script_selenium', '')
     script_cypress      = generation_data.get('script_cypress', '')
-
-    # ✅ Récupérer les vrais résultats d'exécution
-    execution_results = generation_data.get('execution_results', [])
+    execution_results   = generation_data.get('execution_results', [])
 
     elements = []
 
@@ -362,46 +411,54 @@ def generate_pdf(generation_data: dict) -> bytes:
     elements.append(info_tbl)
     elements.append(Spacer(1, 20))
 
-    # ══════════════════════════════════════════════════════════
-    # CASE 1 : Both → deux sections séparées
-    # ══════════════════════════════════════════════════════════
-    if framework == 'Both':
+    # ── Légende priority/category ─────────────────────────────
+    legend_items = [
+        ('<b>Priority:</b>', ''),
+        ('HIGH', '#ef4444'), ('MEDIUM', '#f59e0b'), ('LOW', '#10b981'),
+        ('  |  <b>Category:</b>', ''),
+        ('FUNCTIONAL', '#3b82f6'), ('PERFORMANCE', '#8b5cf6'),
+        ('UI', '#ec4899'), ('NAVIGATION', '#10b981'),
+    ]
+    legend_parts = []
+    for label, color in legend_items:
+        if color:
+            legend_parts.append(f'<font color="{color}"><b>{label}</b></font>')
+        else:
+            legend_parts.append(f'<font color="#64748b">{label}</font>')
 
-        # ── SELENIUM ──────────────────────────────────────────
-        elements.append(framework_banner('🟢  SELENIUM', SELENIUM_COLOR, SELENIUM_BG))
+    elements.append(Paragraph(
+        '  '.join(legend_parts),
+        ParagraphStyle('Legend', fontSize=7, fontName='Helvetica', leading=10,
+                       textColor=HexColor('#64748b'))
+    ))
+    elements.append(Spacer(1, 10))
+
+    # ── Sections principale ───────────────────────────────────
+    if framework == 'Both':
+        elements.append(framework_banner('  SELENIUM', SELENIUM_COLOR, SELENIUM_BG))
         elements.append(Spacer(1, 10))
         elements.append(section_header('📊', 'Test Summary — Selenium'))
         elements.append(Spacer(1, 8))
-        # ✅ Passer execution_results pour Selenium
         build_stats_section(elements, test_cases_selenium, execution_results)
         elements.append(Spacer(1, 18))
         elements.append(section_header('🧪', 'Test Cases — Selenium'))
         elements.append(Spacer(1, 8))
         build_test_cases_table(elements, test_cases_selenium, execution_results)
         build_script_section(elements, script_selenium, 'Selenium')
-
         elements.append(Spacer(1, 30))
-
-        # ── CYPRESS ───────────────────────────────────────────
-        elements.append(framework_banner('🔵  CYPRESS', CYPRESS_COLOR, CYPRESS_BG))
+        elements.append(framework_banner('  CYPRESS', CYPRESS_COLOR, CYPRESS_BG))
         elements.append(Spacer(1, 10))
         elements.append(section_header('📊', 'Test Summary — Cypress'))
         elements.append(Spacer(1, 8))
-        # Cypress pas d'exécution réelle → fallback sur types
         build_stats_section(elements, test_cases_cypress, [])
         elements.append(Spacer(1, 18))
         elements.append(section_header('🧪', 'Test Cases — Cypress'))
         elements.append(Spacer(1, 8))
         build_test_cases_table(elements, test_cases_cypress, [])
         build_script_section(elements, script_cypress, 'Cypress')
-
-    # ══════════════════════════════════════════════════════════
-    # CASE 2 : Selenium ou Cypress seul
-    # ══════════════════════════════════════════════════════════
     else:
         elements.append(section_header('📊', 'Test Summary'))
         elements.append(Spacer(1, 8))
-        # ✅ Passer les vrais résultats
         build_stats_section(elements, test_cases, execution_results)
         elements.append(Spacer(1, 22))
         elements.append(section_header('🧪', 'Test Cases'))
