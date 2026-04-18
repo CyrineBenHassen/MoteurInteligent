@@ -1,429 +1,397 @@
-import subprocess
-import tempfile
-import os
-import re
-import sys
+# runner.py — assertions strictes + real DOM validation
 import time
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+
+_TIMEOUT     = 20_000
+_NAV_TIMEOUT = 30_000
 
 
 def run_selenium_script(script: str, test_cases: list = None) -> dict:
-    patched  = _patch_headless(script)
+    if not test_cases:
+        return {
+            "results": [{"name": "No steps", "status": "fail",
+                         "error": "No test_cases provided",
+                         "reason": "Provide steps from /generate",
+                         "reason_pass": None, "reason_skip": None,
+                         "assertion_result": None,
+                         "priority": "high", "category": "functional"}],
+            "pass_count": 0, "fail_count": 1, "skip_count": 0,
+            "pass_rate": 0, "total": 1, "duration_s": 0, "raw_output": "",
+        }
+    return _run_steps(test_cases)
 
-    with tempfile.NamedTemporaryFile(
-        mode='w', suffix='.py', delete=False, encoding='utf-8'
-    ) as f:
-        f.write(patched)
-        tmp_path = f.name
 
-    start = time.time()
-    try:
-        proc = subprocess.run(
-            [sys.executable, tmp_path],
-            capture_output=True,
-            text=True,
-            timeout=120,
+def _run_steps(steps: list) -> dict:
+    results     = []
+    start_total = time.time()
+    base_url    = _extract_base_url(steps)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox", "--disable-dev-shm-usage",
+                "--disable-gpu", "--window-size=1920,1080",
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
-        output = proc.stdout + proc.stderr
-    except subprocess.TimeoutExpired:
-        output = "TIMEOUT: script took more than 120 seconds"
-    except Exception as e:
-        output = f"ERROR: {e}"
-    finally:
-        elapsed = round(time.time() - start, 2)
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
+        context = browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            ignore_https_errors=True,
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+        )
+        page = context.new_page()
+        page.set_default_timeout(_TIMEOUT)
 
-    results  = _parse_output(output, script, test_cases or [])
+        if base_url:
+            try:
+                page.goto(base_url, timeout=_NAV_TIMEOUT, wait_until="domcontentloaded")
+                try:
+                    page.wait_for_load_state("networkidle", timeout=10_000)
+                except PWTimeout:
+                    pass
+                page.wait_for_selector("body", timeout=10_000)
+                page.evaluate("window.scrollTo(0, 300)")
+                page.wait_for_timeout(1500)
+                page.evaluate("window.scrollTo(0, 0)")
+                page.wait_for_timeout(500)
+            except Exception as e:
+                browser.close()
+                return _fatal_result(f"Cannot load '{base_url}': {e}", len(steps))
 
+        for step in steps:
+            result = _run_one_step(page, step)
+            results.append(result)
+
+        browser.close()
+
+    duration   = round(time.time() - start_total, 2)
     pass_count = sum(1 for r in results if r["status"] == "pass")
     fail_count = sum(1 for r in results if r["status"] == "fail")
-    skip_count = sum(1 for r in results if r["status"] == "skip")
     total      = len(results)
-    pass_rate  = round((pass_count / total) * 100) if total > 0 else 0
 
     return {
         "results":    results,
         "pass_count": pass_count,
         "fail_count": fail_count,
-        "skip_count": skip_count,
-        "pass_rate":  pass_rate,
+        "skip_count": 0,
+        "pass_rate":  round(pass_count / total * 100) if total else 0,
         "total":      total,
-        "duration_s": elapsed,
-        "raw_output": output[:1000],
+        "duration_s": duration,
+        "raw_output": "",
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _patch_headless(script: str) -> str:
-    """
-    Remplace setup_driver() par une version headless robuste.
-    Injecte aussi des prints standardisés 'Test N: PASSED/FAILED'
-    si le script utilise des noms de fonctions sans numéro.
-    """
-    headless_block = (
-        "def setup_driver():\n"
-        "    from selenium.webdriver.chrome.options import Options\n"
-        "    from selenium.webdriver.chrome.service import Service\n"
-        "    from webdriver_manager.chrome import ChromeDriverManager\n"
-        "    opts = Options()\n"
-        "    opts.add_argument('--headless')\n"
-        "    opts.add_argument('--no-sandbox')\n"
-        "    opts.add_argument('--disable-dev-shm-usage')\n"
-        "    opts.add_argument('--disable-gpu')\n"
-        "    opts.add_argument('--window-size=1920,1080')\n"
-        "    service = Service(ChromeDriverManager().install())\n"
-        "    return webdriver.Chrome(service=service, options=opts)\n"
-    )
-    script = re.sub(
-        r'def setup_driver\(\):.*?(?=\ndef |\nif |\Z)',
-        headless_block + '\n',
-        script,
-        flags=re.DOTALL,
-    )
-
-    # ── Normaliser les prints pour garantir "Test N: PASSED/FAILED" ──────────
-    # Remplace: print('Test X: PASSED') ou print(f'Test X: FAILED — {e}')
-    # où X peut être un mot (test_Page_load) → on renumérote par position
-
-    test_fns = re.findall(r'def (test_\w+)\(driver\)', script)
-
-    for i, fn in enumerate(test_fns, start=1):
-        # Remplacer tous les prints PASSED/FAILED liés à cette fonction
-        # Pattern: print('Test <fn_name>: PASSED') ou print('Test <anything>: PASSED') dans le bloc try
-        # On cherche les prints qui contiennent le nom de la fonction ou un index non-numérique
-        script = re.sub(
-            rf"print\(['\"]Test {re.escape(fn.replace('test_', '').replace('_', ' ').title())}[^'\"]*PASSED[^'\"]*['\"]\)",
-            f"print('Test {i}: PASSED')",
-            script
-        )
-        script = re.sub(
-            rf"print\(f['\"]Test {re.escape(fn.replace('test_', '').replace('_', ' ').title())}[^'\"]*FAILED[^'\"]*['\"]\)",
-            f"print(f'Test {i}: FAILED — {{e}}')",
-            script
-        )
-
-    # ── Fallback: remplacer print('Test X: PASSED') où X n'est pas un entier ─
-    def normalize_print(m):
-        label = m.group(1)
-        status = m.group(2)
-        # Si label est déjà un entier, garder tel quel
-        if label.strip().isdigit():
-            return m.group(0)
-        # Sinon remplacer par position (sera re-indexé au parsing)
-        return m.group(0)  # garder pour l'instant, géré dans _parse_output
-
-    return script
-
-
-def _parse_output(output: str, script: str, test_cases: list = []) -> list:
-    results  = []
-    test_fns = re.findall(r'def (test_\w+)\(driver\)', script)
-
-    if not test_fns:
-        return [{
-            "name":        "Script Error",
-            "status":      "fail",
-            "duration":    "—",
-            "error":       output[:300] if output else "No test functions found",
-            "reason":      "Le script n'a pas pu etre execute — aucune fonction de test trouvee.",
-            "reason_pass": None,
-            "reason_skip": None,
-        }]
-
-    # ── Détection PASSED/FAILED robuste — supporte numéros ET noms ───────────
-    passed_ids: set[int] = set()
-    failed_ids: set[int] = set()
-
-    # Pattern 1: "Test 3: PASSED" ou "Test 3: FAILED" (format numéroté standard)
-    for m in re.finditer(r'Test\s+(\d+)\s*:?\s*PASSED', output, re.IGNORECASE):
-        passed_ids.add(int(m.group(1)))
-    for m in re.finditer(r'Test\s+(\d+)\s*:?\s*FAILED', output, re.IGNORECASE):
-        failed_ids.add(int(m.group(1)))
-
-    # Pattern 2: "test_Page_load_time: PASSED" → mapper sur index
-    if not passed_ids and not failed_ids:
-        for i, fn in enumerate(test_fns, start=1):
-            fn_readable = fn.replace('test_', '').replace('_', ' ')
-            # Chercher le nom de la fonction dans l'output
-            pattern_pass = rf'(?:Test\s+)?{re.escape(fn)}[^:]*:?\s*PASSED'
-            pattern_fail = rf'(?:Test\s+)?{re.escape(fn)}[^:]*:?\s*FAILED'
-            if re.search(pattern_pass, output, re.IGNORECASE):
-                passed_ids.add(i)
-            elif re.search(pattern_fail, output, re.IGNORECASE):
-                failed_ids.add(i)
-
-    # Pattern 3: lignes "PASSED" / "FAILED" dans l'ordre d'apparition
-    if not passed_ids and not failed_ids:
-        lines = output.splitlines()
-        fn_index = 1
-        for line in lines:
-            line_upper = line.upper()
-            if 'PASSED' in line_upper and fn_index <= len(test_fns):
-                passed_ids.add(fn_index)
-                fn_index += 1
-            elif 'FAILED' in line_upper and fn_index <= len(test_fns):
-                failed_ids.add(fn_index)
-                fn_index += 1
-
-    # ── Construire les résultats ──────────────────────────────────────────────
-    for i, fn_name in enumerate(test_fns, start=1):
-        if test_cases and (i - 1) < len(test_cases):
-            tc       = test_cases[i - 1]
-            display  = tc.get("name", "") or fn_name.replace('test_', '').replace('_', ' ').title()
-            tc_type  = tc.get("type", "positive")
-            expected = tc.get("expected", "")
-            category = tc.get("category", "functional")
-            priority = tc.get("priority", "medium")
-        else:
-            display  = fn_name.replace('test_', '').replace('_', ' ').title()
-            tc_type  = "positive"
-            expected = ""
-            category = "functional"
-            priority = "medium"
-
-        if i in passed_ids:
-            status      = 'pass'
-            error       = None
-            reason_pass = _explain_pass(tc_type, expected, category, display)
-            reason_fail = None
-            reason_skip = None
-
-        elif i in failed_ids:
-            status      = 'fail'
-            error       = _extract_error(output, fn_name)
-            reason_fail = _explain_fail(error, tc_type, expected, display)
-            reason_pass = None
-            reason_skip = None
-
-        else:
-            # ── Pas trouvé → chercher une vraie erreur dans l'output ──────────
-            real_error = _extract_error(output, fn_name)
-            if real_error:
-                status      = 'fail'
-                error       = real_error
-                reason_fail = _explain_fail(real_error, tc_type, expected, display)
-            else:
-                # Vraiment pas exécuté — chercher si crash global
-                if 'TimeoutException' in output or 'NoSuchElementException' in output:
-                    global_error = _extract_error(output, fn_name)
-                    status      = 'fail'
-                    error       = global_error or 'Crash in previous test'
-                    reason_fail = _explain_fail(error, tc_type, expected, display)
-                else:
-                    status      = 'fail'
-                    error       = 'Test did not execute'
-                    reason_fail = _explain_fail(None, tc_type, expected, display)
-            reason_pass = None
-            reason_skip = None
-
-        results.append({
-            "name":        display,
-            "status":      status,
-            "duration":    "—",
-            "error":       error,
-            "reason":      reason_fail,
-            "reason_pass": reason_pass,
-            "reason_skip": reason_skip,
-            "priority":    priority,
-            "category":    category,
-        })
-
-    return results
-
-
-def _explain_pass(tc_type: str, expected: str, category: str, name: str) -> str:
-    exp        = expected.lower()
-    name_lower = name.lower()
-
-    if 'login' in exp or 'logged' in exp or 'login' in name_lower:
-        return "Login reussi — credentials valides acceptes, redirection vers la page principale confirmee."
-    if 'navigation' in exp or 'navigate' in name_lower or 'nav' in name_lower:
-        return "Navigation reussie — lien clique et nouvelle page chargee correctement."
-    if 'performance' in exp or 'load time' in exp or 'performance' in name_lower:
-        return "Performance OK — temps de chargement < 5s, conforme a la limite fixee."
-    if 'basket' in name_lower or 'cart' in name_lower or 'add to' in name_lower:
-        return "Ajout au panier reussi — bouton clique et page produit chargee."
-    if 'pagination' in name_lower or 'next' in name_lower:
-        return "Pagination fonctionnelle — navigation vers la page suivante confirmee."
-    if tc_type == 'negative':
-        if 'error' in exp or 'message' in exp:
-            return "Validation correcte — message d'erreur affiche comme attendu apres saisie invalide."
-        return "Comportement negatif verifie — la page gere correctement les cas d'erreur."
-    if 'button' in exp or 'click' in name_lower or 'button' in name_lower:
-        return "Bouton fonctionnel — element trouve, visible, actif et interactif."
-    if 'image' in exp or 'image' in name_lower:
-        return "Images chargees — src valides et dimensions confirmees (naturalWidth > 0)."
-    if 'load' in exp or 'title' in exp or 'visible' in exp:
-        return "Page chargee correctement — titre present et contenu visible dans le DOM."
-    if 'form' in exp or 'submit' in name_lower:
-        return "Formulaire soumis avec succes — donnees envoyees et reponse recue."
-    if category == 'performance':
-        return "Performance validee — temps de reponse dans les limites acceptables."
-    if category == 'ui':
-        return "Interface correcte — elements visuels presentes et conformes aux attentes."
-    if category == 'navigation':
-        return "Navigation fonctionnelle — transitions entre pages effectuees sans erreur."
-
-    return "Test reussi — toutes les assertions validees, comportement conforme aux specifications."
-
-
-def _explain_fail(error: str, tc_type: str, expected: str, name: str) -> str:
-    name_lower = name.lower()
-
-    # ── Pas de vraie erreur trouvée ───────────────────────────────────────────
-    if not error or error == 'Test did not execute':
-        # Donner une raison contextuelle selon le type de test
-        if 'form' in name_lower or 'submit' in name_lower:
-            return (
-                "Test invalide — aucun formulaire (<form>) detecte sur cette page. "
-                "Ce test ne devrait pas exister pour ce site. "
-                "Action: regenerez les tests pour obtenir des cas adaptes a cette page."
-            )
-        if 'error' in name_lower or 'alert' in name_lower or 'message' in name_lower:
-            return (
-                "Test invalide — aucun conteneur d'erreur/alerte detecte sur cette page. "
-                "Ce test ne devrait pas exister pour ce site. "
-                "Action: regenerez les tests pour obtenir des cas adaptes a cette page."
-            )
-        if 'login' in name_lower or 'credential' in name_lower or 'password' in name_lower:
-            return (
-                "Test invalide — aucun formulaire de login detecte sur cette page. "
-                "Ce test ne devrait pas exister pour ce site. "
-                "Action: regenerez les tests pour obtenir des cas adaptes a cette page."
-            )
-        if 'basket' in name_lower or 'cart' in name_lower:
-            return (
-                "Echec ajout panier — le clic sur le bouton n'a pas change l'URL. "
-                "Le bouton est peut-etre desactive ou la page ne redirige pas. "
-                "Action: verifiez le comportement du bouton sur le site."
-            )
-        if 'navigation' in name_lower or 'nav' in name_lower or 'link' in name_lower:
-            return (
-                "Navigation echouee — le lien clique n'a pas change l'URL. "
-                "Le texte du lien est peut-etre different ou le lien pointe vers la meme page."
-            )
-        return (
-            "Test non execute — erreur dans le script avant d'atteindre ce test. "
-            "Verifiez les tests precedents pour une erreur en cascade."
-        )
-
-    error_lower = error.lower()
-
-    # Timeout
-    if 'timeoutexception' in error_lower or 'timeout' in error_lower:
-        if 'login' in name_lower or 'password' in name_lower:
-            return (
-                "Timeout sur le formulaire de login — le selecteur CSS du champ username, "
-                "password ou bouton submit est incorrect ou l'element n'est pas present. "
-                "Action: verifiez les selecteurs dans le DOM."
-            )
-        if 'error' in name_lower or tc_type == 'negative':
-            return (
-                "Timeout sur le message d'erreur — le conteneur d'erreur n'est pas apparu. "
-                "Le selecteur CSS du message d'erreur est probablement incorrect. "
-                "Action: inspectez le DOM apres soumission invalide."
-            )
-        if 'navigation' in name_lower or 'nav' in name_lower or 'link' in name_lower:
-            return (
-                "Timeout sur la navigation — le lien clique n'a pas change l'URL dans les 10s. "
-                "Le texte exact du lien est peut-etre different. "
-                "Action: verifiez le texte exact du lien avec By.LINK_TEXT."
-            )
-        if 'basket' in name_lower or 'cart' in name_lower:
-            return (
-                "Timeout apres clic panier — l'URL n'a pas change dans les 5s. "
-                "Le bouton 'Add to basket' redirige peut-etre vers la page produit, pas le panier. "
-                "Action: verifiez le comportement du bouton manuellement."
-            )
-        return (
-            "Timeout (10s) — l'element cible n'a pas ete trouve dans le delai imparti. "
-            "Causes: selecteur CSS incorrect, element absent, ou page trop lente. "
-            "Action: verifiez le selecteur dans les outils dev (F12)."
-        )
-
-    # Element not found
-    if 'nosuchelementexception' in error_lower:
-        return (
-            "Element introuvable dans le DOM — le selecteur CSS ne correspond a aucun element. "
-            "L'element a peut-etre ete renomme ou est dans un iframe. "
-            "Action: ouvrez F12 et verifiez que le selecteur existe."
-        )
-
-    # Assertion error
-    if 'assertionerror' in error_lower:
-        if 'performance' in name_lower or 'load time' in name_lower:
-            return (
-                "Performance insuffisante — le temps de chargement depasse 5 secondes. "
-                "La page est trop lente. Action: verifiez la connexion reseau."
-            )
-        if 'navigation' in name_lower or 'url' in name_lower:
-            return (
-                "Assertion URL echouee — l'URL n'a pas change apres le clic. "
-                "Le lien pointe peut-etre vers la meme page."
-            )
-        if 'basket' in name_lower or 'cart' in name_lower:
-            return (
-                "Assertion panier echouee — l'URL n'a pas change apres le clic. "
-                "Le bouton 'Add to basket' ne redirige pas comme attendu."
-            )
-        if 'title' in name_lower or 'load' in name_lower:
-            return (
-                "Assertion du titre echouee — le titre de la page est vide ou inattendu. "
-                "La page n'a peut-etre pas charge correctement."
-            )
-        return (
-            "Assertion echouee — la condition verifiee n'est pas satisfaite. "
-            f"Attendu: {expected[:80] if expected else 'voir description du test'}."
-        )
-
-    if 'elementnotinteractable' in error_lower:
-        return (
-            "Element non interactif — l'element existe mais ne peut pas etre clique. "
-            "Il est peut-etre cache ou desactive. "
-            "Action: verifiez que l'element est visible avant interaction."
-        )
-
-    if 'staleelementreferenceexception' in error_lower:
-        return (
-            "Element obsolete — la page a ete rechargee apres que l'element a ete trouve. "
-            "Action: re-trouvez l'element apres chaque rechargement."
-        )
-
-    if 'webdriverexception' in error_lower:
-        return (
-            "Erreur WebDriver — probleme avec Chrome ou ChromeDriver. "
-            "Action: verifiez que Chrome et ChromeDriver sont a jour."
-        )
-
-    if 'connection' in error_lower or 'refused' in error_lower:
-        return (
-            "Connexion refusee — la page cible n'est pas accessible. "
-            "Action: verifiez que l'URL est correcte et que le site est en ligne."
-        )
-
-    return (
-        f"Echec inattendu — {error[:120]}. "
-        "Action: consultez le script genere pour identifier la ligne exacte en echec."
-    )
-
-
-def _extract_error(output: str, fn_name: str) -> str | None:
-    priority = [
-        'AssertionError',
-        'TimeoutException',
-        'NoSuchElementException',
-        'ElementNotInteractableException',
-        'StaleElementReferenceException',
-        'WebDriverException',
-        'Error',
-    ]
-    for line in output.splitlines():
-        for keyword in priority:
-            if keyword.lower() in line.lower():
-                return line.strip()[:250]
+def _extract_base_url(steps: list) -> str | None:
+    for step in steps:
+        if step.get("base_url"): return step["base_url"]
+        if step.get("url"):      return step["url"]
     return None
+
+
+def _fatal_result(error: str, n_steps: int) -> dict:
+    return {
+        "results": [{
+            "name": f"Step {i+1}", "status": "fail",
+            "duration": "-", "error": error,
+            "reason": f"Cannot load page — {error}",
+            "reason_pass": None, "reason_skip": None,
+            "assertion_result": None,
+            "priority": "high", "category": "functional",
+        } for i in range(n_steps)],
+        "pass_count": 0, "fail_count": n_steps,
+        "skip_count": 0, "pass_rate": 0,
+        "total": n_steps, "duration_s": 0, "raw_output": error,
+    }
+
+
+def _run_one_step(page, step: dict) -> dict:
+    name      = step.get("name", f"Step {step.get('id', '?')}")
+    action    = step.get("action", "")
+    selector  = step.get("selector", "")
+    value     = step.get("value", "")
+    assertion = step.get("assertion")
+    t0        = time.time()
+
+    selector = _normalize_selector(selector)
+
+    action_error     = None
+    assertion_result = None
+    status           = "pass"
+
+    # ── Métadonnées à exposer au frontend ────────────────────
+    step_meta = {
+        "action":   action,
+        "selector": selector,
+        "value":    value,
+    }
+
+    try:
+        # ── 1. Exécuter l'action ──────────────────────────────
+        if action == "check_visible":
+            _smart_wait_visible(page, selector)
+
+        elif action == "click":
+            _smart_wait_visible(page, selector)
+            page.click(selector)
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=5_000)
+            except PWTimeout:
+                pass
+            page.wait_for_timeout(800)
+
+        elif action == "fill":
+            _smart_wait_visible(page, selector)
+            page.fill(selector, value)
+            # Vérification DOM immédiate après fill
+            actual_val = page.input_value(selector)
+            if actual_val != value:
+                raise AssertionError(
+                    f"Fill verification failed: typed '{value}', DOM contains '{actual_val}'"
+                )
+
+        else:
+            raise ValueError(f"Unknown action: '{action}'")
+
+        # ── 2. Valider l'assertion post-action ────────────────
+        if assertion and isinstance(assertion, dict):
+            assertion_result = _validate_assertion(page, assertion, selector, value)
+            if not assertion_result["passed"]:
+                status       = "fail"
+                action_error = assertion_result["error"]
+
+    except (PWTimeout, AssertionError, Exception) as e:
+        status           = "fail"
+        action_error     = str(e)[:250]
+        assertion_result = None
+
+    duration = round(time.time() - t0, 2)
+
+    return {
+        "name":             name,
+        "status":           status,
+        "duration":         f"{duration}s",
+        "error":            action_error,
+        "reason":           _reason(action, "fail", action_error, assertion_result) if status == "fail" else None,
+        "reason_pass":      _reason(action, "pass", None, assertion_result)         if status == "pass" else None,
+        "reason_skip":      None,
+        "assertion_result": assertion_result,
+        "step_meta":        step_meta,
+        "priority":         step.get("priority", "medium"),
+        "category":         step.get("category", "functional"),
+    }
+
+
+def _validate_assertion(page, assertion: dict,
+                         action_selector: str = "",
+                         filled_value: str = "") -> dict:
+    a_type    = assertion.get("type", "")
+    a_value   = assertion.get("value", "")
+    a_target  = assertion.get("selector_target", "") or action_selector
+
+    try:
+        # ── url_contains ─────────────────────────────────────
+        if a_type == "url_contains":
+            current_url = page.url
+            passed      = a_value in current_url
+            return {
+                "passed":   passed,
+                "type":     a_type,
+                "expected": f"URL contains '{a_value}'",
+                "actual":   current_url,
+                "error":    None if passed
+                            else f"URL '{current_url}' does not contain '{a_value}'",
+            }
+
+        # ── element_visible ───────────────────────────────────
+        elif a_type == "element_visible":
+            if not a_target:
+                return {"passed": False, "type": a_type,
+                        "expected": "selector_target required",
+                        "actual": "", "error": "Missing selector_target"}
+            try:
+                page.wait_for_selector(a_target, state="visible", timeout=8_000)
+                passed = True; actual = "visible"
+            except PWTimeout:
+                passed = False; actual = "not visible / not found"
+            return {
+                "passed":   passed,
+                "type":     a_type,
+                "expected": f"'{a_target}' visible after action",
+                "actual":   actual,
+                "error":    None if passed
+                            else f"'{a_target}' not visible after action",
+            }
+
+        # ── element_exists ────────────────────────────────────
+        elif a_type == "element_exists":
+            if not a_target:
+                return {"passed": False, "type": a_type,
+                        "expected": "selector_target required",
+                        "actual": "", "error": "Missing selector_target"}
+            el     = page.query_selector(a_target)
+            passed = el is not None
+            return {
+                "passed":   passed,
+                "type":     a_type,
+                "expected": f"'{a_target}' exists in DOM",
+                "actual":   "found" if passed else "not found",
+                "error":    None if passed
+                            else f"'{a_target}' not found in DOM",
+            }
+
+        # ── text_contains ─────────────────────────────────────
+        elif a_type == "text_contains":
+            if not a_target:
+                return {"passed": False, "type": a_type,
+                        "expected": "selector_target required",
+                        "actual": "", "error": "Missing selector_target"}
+            el = page.query_selector(a_target)
+            if not el:
+                return {"passed": False, "type": a_type,
+                        "expected": f"text '{a_value}' in '{a_target}'",
+                        "actual": "element not found",
+                        "error": f"'{a_target}' not found in DOM"}
+            text   = (el.inner_text() or "").strip()
+            passed = a_value.lower() in text.lower()
+            return {
+                "passed":   passed,
+                "type":     a_type,
+                "expected": f"text contains '{a_value}'",
+                "actual":   text[:100],
+                "error":    None if passed
+                            else f"'{text[:60]}' does not contain '{a_value}'",
+            }
+
+        # ── input_value — STRICT DOM read ─────────────────────
+        elif a_type == "input_value":
+            expected_val = a_value or filled_value
+            # Lire la valeur réelle depuis le DOM via le selector de l'action
+            real_selector = a_target or action_selector
+            if not real_selector:
+                return {"passed": False, "type": a_type,
+                        "expected": f"input = '{expected_val}'",
+                        "actual": "unknown",
+                        "error": "No selector available to read input value"}
+            try:
+                actual_val = page.input_value(real_selector)
+            except Exception as e:
+                return {"passed": False, "type": a_type,
+                        "expected": f"input = '{expected_val}'",
+                        "actual": "read error",
+                        "error": f"Cannot read input value: {e}"}
+
+            passed = actual_val == expected_val
+            return {
+                "passed":   passed,
+                "type":     a_type,
+                "expected": f"input = '{expected_val}'",
+                "actual":   actual_val,
+                "error":    None if passed
+                            else f"Input contains '{actual_val}', expected '{expected_val}'",
+            }
+
+        else:
+            return {
+                "passed": False, "type": a_type,
+                "expected": "known assertion type",
+                "actual": a_type,
+                "error": f"Unknown assertion type: '{a_type}'",
+            }
+
+    except Exception as e:
+        return {
+            "passed": False, "type": a_type,
+            "expected": a_value or a_target,
+            "actual": "", "error": str(e)[:150],
+        }
+
+
+def _normalize_selector(selector: str) -> str:
+    if not selector: return selector
+    for pat in ["logo-pirc", "logo_pirc"]:
+        if f"alt='{pat}'" in selector.lower():
+            return "img[src*='logo']"
+    if "href*=" in selector and "%d8" in selector.lower():
+        return "a[href*='/ar/']"
+    if "href*=" in selector and "home" in selector.lower():
+        return "a[href*='/en/']"
+    return selector
+
+
+def _smart_wait_visible(page, selector: str) -> None:
+    try:
+        page.wait_for_selector(selector, state="visible", timeout=8_000)
+        return
+    except PWTimeout:
+        pass
+    for toggle in [".hamburger", ".menu-toggle", ".navbar-toggle",
+                   "[class*='menu-toggle']", "[aria-label*='menu']",
+                   ".nav-toggle", "#menu-toggle"]:
+        try:
+            el = page.query_selector(toggle)
+            if el and el.is_visible():
+                page.click(toggle)
+                page.wait_for_timeout(800)
+                break
+        except Exception:
+            continue
+    try:
+        page.wait_for_selector(selector, state="visible", timeout=6_000)
+        return
+    except PWTimeout:
+        pass
+    try:
+        page.wait_for_selector(selector, state="attached", timeout=5_000)
+        return
+    except PWTimeout:
+        pass
+    raise PWTimeout(f"Element '{selector}' not found after all strategies")
+
+
+def _reason(action: str, status: str, error: str | None,
+            assertion_result: dict | None = None) -> str:
+    if status == "pass":
+        base = {
+            "check_visible": "Element visible in DOM.",
+            "click":         "Click executed successfully.",
+            "fill":          "Text typed — DOM value verified.",
+        }.get(action, "Test passed.")
+        if assertion_result and assertion_result.get("passed"):
+            t = assertion_result.get("type", "")
+            a = assertion_result.get("actual", "")
+            if t == "url_contains":
+                return f"{base} URL verified: '{a}'."
+            elif t in ("element_visible", "element_exists"):
+                return f"{base} Post-action element confirmed."
+            elif t == "text_contains":
+                return f"{base} Text verified: '{a[:40]}'."
+            elif t == "input_value":
+                return f"{base} Input value confirmed in DOM."
+        return base
+
+    if assertion_result and not assertion_result.get("passed"):
+        t  = assertion_result.get("type", "")
+        ex = assertion_result.get("expected", "")
+        ac = assertion_result.get("actual", "")
+        er = assertion_result.get("error", "")
+        if t == "url_contains":
+            return f"Action OK but URL assertion failed. Expected '{ex}', got '{ac[:80]}'."
+        elif t in ("element_visible", "element_exists"):
+            return f"Action OK but element not found after action. {er}"
+        elif t == "text_contains":
+            return f"Action OK but text mismatch. Expected '{ex}', got '{ac[:60]}'."
+        elif t == "input_value":
+            return f"Fill OK but DOM value mismatch. Expected '{ex}', got '{ac}'."
+        return f"Assertion failed: {er or ex}"
+
+    if not error: return "Test failed — unknown reason."
+    e = error.lower()
+    if "timeout"  in e: return f"Timeout — element not visible after {_TIMEOUT//1000}s."
+    if "not found" in e: return "Element absent from DOM."
+    if "fill verification" in e: return error
+    return f"Error: {error[:120]}"

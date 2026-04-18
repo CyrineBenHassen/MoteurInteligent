@@ -67,14 +67,18 @@ def run_tests(data: dict):
     framework  = data.get("framework", "Selenium")
     test_cases = data.get("test_cases", [])
 
-    if not script:
-        return {"error": "script is required"}
+    # DEBUG — à supprimer après confirmation
+    print(f"[RUN] script len={len(script)} | test_cases count={len(test_cases)} | framework={framework}")
+    if test_cases:
+        print(f"[RUN] first step = {test_cases[0]}")
 
-    if framework.lower() != "selenium":
-        return {"error": "Only Selenium scripts can be executed server-side"}
+    if not script and not test_cases:
+        return {"error": "script or test_cases is required"}
+
+    if framework.lower() not in ("selenium", "playwright"):
+        return {"error": "Only Selenium/Playwright scripts supported"}
 
     return run_selenium_script(script, test_cases)
-
 
 @app.post("/analyze")
 def analyze(data: dict):

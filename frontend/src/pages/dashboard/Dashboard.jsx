@@ -7,23 +7,23 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell,
 } from 'recharts';
-import { useMemo } from "react";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Hooks & Micro-composants
+// ─────────────────────────────────────────────────────────────────────────────
 
 function useCountUp(target, duration = 1200) {
   const ref = useRef(null);
   useEffect(() => {
     const numeric = parseFloat(target);
-    const suffix = String(target).replace(/[\d.]/g, '');
+    const suffix  = String(target).replace(/[\d.]/g, '');
     if (!ref.current || isNaN(numeric)) return;
-    let start = null;
-    let raf;
+    let start = null; let raf;
     const step = (ts) => {
       if (!start) start = ts;
       const progress = Math.min((ts - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(eased * numeric);
-      if (ref.current) ref.current.textContent = current + suffix;
+      const eased    = 1 - Math.pow(1 - progress, 3);
+      if (ref.current) ref.current.textContent = Math.round(eased * numeric) + suffix;
       if (progress < 1) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
@@ -37,7 +37,7 @@ function AnimatedStat({ val }) {
   return <span ref={ref}>{val}</span>;
 }
 
-function NexLogo() {
+function NexLogo({ collapsed }) {
   return (
     <div className="s-logo">
       <div className="nav__gem">
@@ -47,10 +47,12 @@ function NexLogo() {
           <line x1="8" y1="30" x2="36" y2="30" stroke="rgba(6,14,30,0.5)" strokeWidth="2.5" strokeLinecap="round"/>
         </svg>
       </div>
-      <div className="logo-words">
-        <div className="nav__name">NexTest</div>
-        <div className="nav__sub">Test Automation</div>
-      </div>
+      {!collapsed && (
+        <div className="logo-words">
+          <div className="nav__name">NexTest</div>
+          <div className="nav__sub">Test Automation</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -76,10 +78,108 @@ function SItem({ id, label, badge, active, collapsed, onClick }) {
   );
 }
 
+function StatusIcon({ s }) {
+  if (s === 'pass') return <svg width="15" height="15" fill="none" stroke="#10b981" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>;
+  if (s === 'fail') return <svg width="15" height="15" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>;
+  return <svg width="15" height="15" fill="none" stroke="#f59e0b" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AssertionBadge — affiche expected vs actual par step
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AssertionBadge({ assertion_result, step_meta }) {
+  const [open, setOpen] = useState(false);
+  if (!assertion_result) return null;
+
+  const { passed, type, expected, actual, error } = assertion_result;
+  const color  = passed ? '#10b981' : '#ef4444';
+  const bg     = passed ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)';
+  const border = passed ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)';
+  const icon   = passed ? '✓' : '✗';
+
+  const TYPE_LABELS = {
+    url_contains:    '🔗 URL',
+    element_visible: '👁 Visible',
+    element_exists:  '🔍 Exists',
+    text_contains:   '📝 Text',
+    input_value:     '⌨ Input',
+  };
+
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '3px 10px', borderRadius: 20, cursor: 'pointer',
+          background: bg, border: `1px solid ${border}`,
+          fontSize: 10, fontWeight: 700, color, userSelect: 'none',
+          transition: 'all .15s',
+        }}
+      >
+        <span>{icon}</span>
+        <span>ASSERTION · {TYPE_LABELS[type] || type}</span>
+        <span style={{ opacity: .6, fontSize: 9 }}>{open ? '▲' : '▼'}</span>
+      </div>
+
+      {open && (
+        <div style={{
+          marginTop: 6, padding: '10px 12px', borderRadius: 8,
+          background: passed ? 'rgba(16,185,129,.04)' : 'rgba(239,68,68,.04)',
+          border: `1px solid ${border}`,
+          display: 'flex', flexDirection: 'column', gap: 6,
+        }}>
+          {step_meta && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+              <span style={{
+                padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700,
+                background: 'rgba(79,134,232,.1)', color: '#4f86e8',
+                border: '1px solid rgba(79,134,232,.2)',
+              }}>{step_meta.action}</span>
+              <span style={{
+                padding: '2px 8px', borderRadius: 10, fontSize: 10,
+                background: 'var(--bg)', color: 'var(--muted)',
+                border: '1px solid var(--border)', fontFamily: 'monospace',
+                maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{step_meta.selector}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 3 }}>Expected</div>
+              <div style={{ padding: '5px 8px', borderRadius: 6, fontSize: 10, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--navy)', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                {expected || '—'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: passed ? '#10b981' : '#ef4444', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 3 }}>Actual</div>
+              <div style={{ padding: '5px 8px', borderRadius: 6, fontSize: 10, background: passed ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)', border: `1px solid ${border}`, color: passed ? '#059669' : '#dc2626', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                {actual || '—'}
+              </div>
+            </div>
+          </div>
+
+          {!passed && error && (
+            <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.15)', fontSize: 10, color: '#dc2626' }}>
+              ⚠ {error}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard Panel
+// ─────────────────────────────────────────────────────────────────────────────
+
 const TOP_URLS = [
-  { url: 'https://github.com/login',       framework: 'Selenium', tests: 12, pass: 10, date: '2h ago' },
-  { url: 'https://trello.com/login',       framework: 'Cypress',  tests: 8,  pass: 8,  date: '1d ago' },
-  { url: 'https://app.slack.com/sign-in',  framework: 'Both',     tests: 15, pass: 12, date: '3d ago' },
+  { url: 'https://github.com/login',      framework: 'Selenium', tests: 12, pass: 10, date: '2h ago' },
+  { url: 'https://trello.com/login',      framework: 'Cypress',  tests: 8,  pass: 8,  date: '1d ago' },
+  { url: 'https://app.slack.com/sign-in', framework: 'Both',     tests: 15, pass: 12, date: '3d ago' },
 ];
 
 function TopURLsSection({ goTo }) {
@@ -88,30 +188,29 @@ function TopURLsSection({ goTo }) {
     <div className="section-box" style={{ marginBottom: 24 }}>
       <div className="sb-head">
         <span className="sb-title">🔗 {t('topUrls') || 'Top Tested URLs'}</span>
-        <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll') || 'View all'} </span>
+        <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll') || 'View all'}</span>
       </div>
       <div style={{ padding: '8px 0' }}>
         {TOP_URLS.map((item, i) => {
           const rate = Math.round((item.pass / item.tests) * 100);
           const statusColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
           return (
-            <div key={i} style={{ display:'flex', alignItems:'center', gap:16, padding:'12px 20px', borderBottom: i < TOP_URLS.length-1 ? '1px solid var(--border)' : 'none', transition:'background .15s' }}
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 20px', borderBottom: i < TOP_URLS.length - 1 ? '1px solid var(--border)' : 'none', transition: 'background .15s' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <div style={{ width:26, height:26, borderRadius:'50%', flexShrink:0, background:'var(--goldbg)', border:'1px solid rgba(201,162,39,.3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'var(--gold)' }}>{i + 1}</div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:600, color:'var(--navy)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.url}</div>
-                <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>{item.tests} tests · {item.date}</div>
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, background: 'var(--goldbg)', border: '1px solid rgba(201,162,39,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--gold)' }}>{i + 1}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--navy)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.url}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{item.tests} tests · {item.date}</div>
               </div>
-              <span style={{ fontSize:10, fontWeight:700, letterSpacing:'1px', padding:'3px 10px', borderRadius:20, background:'rgba(79,134,232,.1)', color:'#4f86e8', border:'1px solid rgba(79,134,232,.2)', flexShrink:0 }}>{item.framework}</span>
-              <div style={{ width:80, flexShrink:0 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                  <span style={{ fontSize:10, color:'var(--muted)' }}>pass rate</span>
-                  <span style={{ fontSize:11, fontWeight:700, color:statusColor }}>{rate}%</span>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', padding: '3px 10px', borderRadius: 20, background: 'rgba(79,134,232,.1)', color: '#4f86e8', border: '1px solid rgba(79,134,232,.2)', flexShrink: 0 }}>{item.framework}</span>
+              <div style={{ width: 80, flexShrink: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>pass rate</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{rate}%</span>
                 </div>
-                <div style={{ height:4, borderRadius:4, background:'var(--border)', overflow:'hidden' }}>
-                  <div style={{ height:'100%', borderRadius:4, width:`${rate}%`, background:statusColor, transition:'width 1s ease' }}/>
+                <div style={{ height: 4, borderRadius: 4, background: 'var(--border)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 4, width: `${rate}%`, background: statusColor, transition: 'width 1s ease' }} />
                 </div>
               </div>
             </div>
@@ -125,19 +224,19 @@ function TopURLsSection({ goTo }) {
 function DashboardPanel({ user, goTo }) {
   const { t } = useLang();
   const STATS = [
-    { icon:'🚀', val:'12',  lbl:t('scriptsGenerated'), accent:'linear-gradient(90deg,#4f86e8,#6fa3ff)' },
-    { icon:'🔬', val:'3',   lbl:t('appsAnalyzed'),     accent:'linear-gradient(90deg,#c9a227,#e8c84a)' },
-    { icon:'🎯', val:'82%', lbl:t('avgCoverage'),      accent:'linear-gradient(90deg,#10b981,#34d399)' },
-    { icon:'⚡', val:'2s',  lbl:t('avgGenTime'),       accent:'linear-gradient(90deg,#f97316,#fb923c)',},
+    { icon: '🚀', val: '12',  lbl: t('scriptsGenerated'), accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)' },
+    { icon: '🔬', val: '3',   lbl: t('appsAnalyzed'),     accent: 'linear-gradient(90deg,#c9a227,#e8c84a)' },
+    { icon: '🎯', val: '82%', lbl: t('avgCoverage'),      accent: 'linear-gradient(90deg,#10b981,#34d399)' },
+    { icon: '⚡', val: '2s',  lbl: t('avgGenTime'),       accent: 'linear-gradient(90deg,#f97316,#fb923c)' },
   ];
   const barData = [
-    { day:'Mon', count:3 }, { day:'Tue', count:7 }, { day:'Wed', count:2 },
-    { day:'Thu', count:9 }, { day:'Fri', count:5 }, { day:'Sat', count:1 }, { day:'Sun', count:4 },
+    { day: 'Mon', count: 3 }, { day: 'Tue', count: 7 }, { day: 'Wed', count: 2 },
+    { day: 'Thu', count: 9 }, { day: 'Fri', count: 5 }, { day: 'Sat', count: 1 }, { day: 'Sun', count: 4 },
   ];
   const donutData = [
-    { name:'Passed',  value:62, color:'#10b981' },
-    { name:'Failed',  value:23, color:'#ef4444' },
-    { name:'Skipped', value:15, color:'#f59e0b' },
+    { name: 'Passed',  value: 62, color: '#10b981' },
+    { name: 'Failed',  value: 23, color: '#ef4444' },
+    { name: 'Skipped', value: 15, color: '#f59e0b' },
   ];
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0);
 
@@ -145,7 +244,7 @@ function DashboardPanel({ user, goTo }) {
     <div className="panel">
       <div className="p-header">
         <div>
-          <h1 className="p-title">{t('welcome')}, <span className="g">{user?.name?.split(' ')[0] || 'User'}</span> </h1>
+          <h1 className="p-title">{t('welcome')}, <span className="g">{user?.name?.split(' ')[0] || 'User'}</span></h1>
           <p className="p-sub">{t('overview')}</p>
         </div>
         <button className="btn-primary" onClick={() => goTo('generate')}>
@@ -155,52 +254,51 @@ function DashboardPanel({ user, goTo }) {
       </div>
       <div className="stats-grid">
         {STATS.map((s, i) => (
-          <div className="stat-card" key={s.lbl} style={{'--i': i}}>
+          <div className="stat-card" key={s.lbl} style={{ '--i': i }}>
             <div className="stat-card-top">
               <div className="stat-icon-wrap">{s.icon}</div>
-              <span className="stat-trend">{s.trend}</span>
             </div>
             <span className="stat-val"><AnimatedStat val={s.val} /></span>
             <span className="stat-lbl">{s.lbl}</span>
-            <div className="stat-accent" style={{background: s.accent}} />
+            <div className="stat-accent" style={{ background: s.accent }} />
           </div>
         ))}
       </div>
-      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:24}}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
         <div className="section-box">
           <div className="sb-head"><span className="sb-title">{t('generationsPerWeek') || 'Generations this week'}</span></div>
-          <div style={{padding:'12px 8px 8px'}}>
+          <div style={{ padding: '12px 8px 8px' }}>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={barData} barSize={26}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
-                <XAxis dataKey="day" tick={{fill:'var(--muted)', fontSize:11}} axisLine={false} tickLine={false}/>
-                <YAxis tick={{fill:'var(--muted)', fontSize:11}} axisLine={false} tickLine={false} width={24}/>
-                <Tooltip contentStyle={{background:'var(--card)', border:'1px solid var(--border)', borderRadius:10, color:'var(--navy)', fontSize:12}} cursor={{fill:'rgba(201,162,39,0.07)'}} formatter={(val) => [val, 'Generations']}/>
-                <Bar dataKey="count" fill="#c9a227" radius={[6,6,0,0]}/>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="day" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={24} />
+                <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--navy)', fontSize: 12 }} cursor={{ fill: 'rgba(201,162,39,0.07)' }} formatter={(val) => [val, 'Generations']} />
+                <Bar dataKey="count" fill="#c9a227" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
         <div className="section-box">
           <div className="sb-head"><span className="sb-title">{t('testResults') || 'Test Results'}</span></div>
-          <div style={{padding:'12px 8px 8px', display:'flex', flexDirection:'column', alignItems:'center'}}>
+          <div style={{ padding: '12px 8px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie data={donutData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value" labelLine={false}>
-                  {donutData.map((entry, index) => (<Cell key={index} fill={entry.color} stroke="none"/>))}
+                  {donutData.map((entry, index) => (<Cell key={index} fill={entry.color} stroke="none" />))}
                 </Pie>
-                <Tooltip contentStyle={{background:'var(--card)', border:'1px solid var(--border)', borderRadius:10, color:'var(--navy)', fontSize:12}} formatter={(val, name) => [`${val}%`, name]}/>
+                <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--navy)', fontSize: 12 }} formatter={(val, name) => [`${val}%`, name]} />
                 <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
                   <tspan x="50%" dy="-8" fontSize="20" fontWeight="700" fill="#10b981">{Math.round((donutData[0].value / donutTotal) * 100)}%</tspan>
                   <tspan x="50%" dy="18" fontSize="10" fill="var(--muted)">pass rate</tspan>
                 </text>
               </PieChart>
             </ResponsiveContainer>
-            <div style={{display:'flex', gap:20, justifyContent:'center', marginTop:4}}>
+            <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginTop: 4 }}>
               {donutData.map(d => (
-                <div key={d.name} style={{display:'flex', alignItems:'center', gap:6}}>
-                  <div style={{width:10, height:10, borderRadius:'50%', background:d.color, flexShrink:0}}/>
-                  <span style={{fontSize:11, color:'var(--muted)', fontWeight:600}}>{d.name} <span style={{color:'var(--navy)'}}>{d.value}%</span></span>
+                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{d.name} <span style={{ color: 'var(--navy)' }}>{d.value}%</span></span>
                 </div>
               ))}
             </div>
@@ -208,10 +306,10 @@ function DashboardPanel({ user, goTo }) {
         </div>
       </div>
       <TopURLsSection goTo={goTo} />
-      <div className="section-box" style={{marginBottom:24}}>
+      <div className="section-box" style={{ marginBottom: 24 }}>
         <div className="sb-head">
           <span className="sb-title">{t('recentActivity')}</span>
-          <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')} </span>
+          <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')}</span>
         </div>
         <div className="empty-row">{t('noActivity')}</div>
       </div>
@@ -230,20 +328,30 @@ function DashboardPanel({ user, goTo }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Generate Panel — avec test_type + framework
+// ─────────────────────────────────────────────────────────────────────────────
+
 function GeneratePanel({ goTo, setGeneration }) {
   const { t } = useLang();
-  const [url,     setUrl]   = useState('');
-  const [fw,      setFw]    = useState('Selenium');
-  const [loading, setLoad]  = useState(false);
-  const [error,   setError] = useState('');
+  const [url,      setUrl]      = useState('');
+  const [fw,       setFw]       = useState('Selenium');
+  const [testType, setTestType] = useState('smoke');
+  const [loading,  setLoad]     = useState(false);
+  const [error,    setError]    = useState('');
+
+  const TEST_TYPES = [
+    { key: 'smoke',      label: 'Smoke Test',      icon: '💨', desc: 'Visibility checks — elements present in DOM' },
+    { key: 'functional', label: 'Functional Test',  icon: '⚡', desc: 'Interactions — click, fill, submit + assertions' },
+    { key: 'regression', label: 'Regression Test',  icon: '🔁', desc: 'End-to-end multi-step scenarios with full assertions' },
+  ];
 
   const submit = async (e) => {
     e.preventDefault();
     if (!url) return;
-    setLoad(true);
-    setError('');
+    setLoad(true); setError('');
     try {
-      const res = await api.post('/generate', { url, framework: fw });
+      const res = await api.post('/generate', { url, framework: fw, test_type: testType });
       setGeneration(res.data);
       goTo('execution');
     } catch (err) {
@@ -264,6 +372,8 @@ function GeneratePanel({ goTo, setGeneration }) {
       <div className="gen-layout">
         <div className="gen-card">
           <form className="gen-form" onSubmit={submit}>
+
+            {/* URL */}
             <div className="field">
               <label>{t('targetUrl')}</label>
               <div className="field-wrap">
@@ -273,21 +383,50 @@ function GeneratePanel({ goTo, setGeneration }) {
                 <input type="url" placeholder="https://myapp.com" value={url} onChange={e => setUrl(e.target.value)} required />
               </div>
             </div>
+
+            {/* Test Type */}
             <div className="field">
-              <label>{t('exportFramework')}</label>
-              <div className="fw-tabs">
-                {['Selenium','Cypress','Both'].map(f => (
-                  <button key={f} type="button" className={`fw-tab${fw===f?' on':''}`} onClick={() => setFw(f)}>{f}</button>
+              <label>Test Type</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {TEST_TYPES.map(tt => (
+                  <div key={tt.key} onClick={() => setTestType(tt.key)} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
+                    border: `2px solid ${testType === tt.key ? 'var(--gold)' : 'var(--border)'}`,
+                    background: testType === tt.key ? 'var(--goldbg)' : 'var(--bg)',
+                    transition: 'all .2s',
+                  }}>
+                    <span style={{ fontSize: 20 }}>{tt.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: testType === tt.key ? 'var(--gold)' : 'var(--navy)' }}>{tt.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{tt.desc}</div>
+                    </div>
+                    {testType === tt.key && (
+                      <svg width="16" height="16" fill="none" stroke="var(--gold)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
+
+            {/* Framework */}
+            <div className="field">
+              <label>{t('exportFramework')}</label>
+              <div className="fw-tabs">
+                {['Selenium', 'Cypress', 'Playwright'].map(f => (
+                  <button key={f} type="button" className={`fw-tab${fw === f ? ' on' : ''}`} onClick={() => setFw(f)}>{f}</button>
+                ))}
+              </div>
+            </div>
+
             <button type="submit" className="btn-gen" disabled={loading || !url}>
               {loading
-                ? <><span className="spinner"/>{t('analyzing')}</>
+                ? <><span className="spinner" />{t('analyzing')}</>
                 : <><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>{t('generateTests')}</>}
             </button>
           </form>
         </div>
+
         <div className="steps-card">
           <div className="steps-title">{t('howItWorks')}</div>
           {[
@@ -295,11 +434,11 @@ function GeneratePanel({ goTo, setGeneration }) {
             ['02', t('aiAnalysis'),     t('aiAnalysisDesc')],
             ['03', t('testGeneration'), t('testGenerationDesc')],
             ['04', t('scriptExport'),   t('scriptExportDesc')],
-          ].map(([n,title,desc], i, arr) => (
+          ].map(([n, title, desc], i, arr) => (
             <div className="i-step" key={n}>
               <div className="i-step-l">
                 <div className="i-step-num">{n}</div>
-                {i < arr.length - 1 && <div className="i-step-line"/>}
+                {i < arr.length - 1 && <div className="i-step-line" />}
               </div>
               <div className="i-step-body">
                 <div className="i-step-t">{title}</div>
@@ -307,76 +446,124 @@ function GeneratePanel({ goTo, setGeneration }) {
               </div>
             </div>
           ))}
+
+          {/* Mode sélectionné */}
+         
         </div>
       </div>
     </div>
   );
 }
 
-function StatusIcon({ s }) {
-  if (s==='pass') return <svg width="15" height="15" fill="none" stroke="#10b981" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>;
-  if (s==='fail') return <svg width="15" height="15" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>;
-  return <svg width="15" height="15" fill="none" stroke="#f59e0b" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Execution Panel — affichage riche avec assertions
+// ─────────────────────────────────────────────────────────────────────────────
 
 function ExecutionPanel({ generation }) {
   const { t } = useLang();
-  const [filter,    setFilter]    = useState('all');
-  const [activeTab, setActiveTab] = useState('selenium');
+  const [filter,     setFilter]     = useState('all');
+  const [activeTab,  setActiveTab]  = useState('selenium');
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [runResults, setRunResults] = useState(null);
+  const [running,    setRunning]    = useState(false);
 
-  const framework = generation?.framework || generation?.generation?.framework || 'Selenium';
+  const framework = generation?.generation?.framework || generation?.framework || 'Selenium';
+  const testType  = generation?.result?.test_type     || generation?.test_type  || 'smoke';
 
-  
-  
+  useEffect(() => {
+    if (!generation) return;
 
- 
+    const savedResults = generation?.result?.execution_results
+      || generation?.generation?.execution_results
+      || [];
 
-const buildTests = (test_cases, execution_results) => {
-  if (execution_results && execution_results.length > 0) {
-    return execution_results.map((r, i) => ({
-      id:       i + 1,
-      name:     r.name,
-      status:   r.status,
-      duration: r.duration || '—',
-      suite: r.error || (test_cases && test_cases[i]?.description?.slice(0, 40)) || 'Test',
+    if (savedResults.length > 0) {
+      setRunResults({ results: savedResults });
+      return;
+    }
+
+    if (!generation?.result?.test_cases?.length) return;
+
+    const currentFramework = generation?.generation?.framework || generation?.framework || 'Selenium';
+
+    const run = async () => {
+      setRunning(true); setRunResults(null);
+      try {
+        const res = await api.post('/run', {
+          script:     generation.result.script     || '',
+          framework:  currentFramework,
+          test_cases: generation.result.test_cases || [],
+        });
+        setRunResults(res.data);
+      } catch (err) {
+        console.error('[RUN ERROR]', err.response?.data || err.message);
+      } finally {
+        setRunning(false);
+      }
+    };
+    run();
+  }, [generation]);
+
+  const buildTests = (test_cases, execution_results) => {
+    if (execution_results && execution_results.length > 0) {
+      return execution_results.map((r, i) => ({
+        id:               i + 1,
+        name:             r.name,
+        status:           r.status,
+        duration:         r.duration || '—',
+        suite:            r.reason_pass || r.reason || r.error || 'Test',
+        assertion_result: r.assertion_result || null,
+        step_meta:        r.step_meta        || null,
+        category:         r.category         || 'smoke',
+        priority:         r.priority         || 'medium',
+      }));
+    }
+    return (test_cases || []).map((tc, i) => ({
+      id:               tc.id || i + 1,
+      name:             tc.name,
+      status:           'skip',
+      duration:         '—',
+      suite:            'Not executed',
+      assertion_result: null,
+      step_meta:        null,
+      category:         tc.category || 'smoke',
+      priority:         tc.priority || 'medium',
     }));
-  }
-  return (test_cases || []).map((tc, i) => ({
-    id:       tc.id || i + 1,
-    name:     tc.name,
-    status:   'skip',
-    duration: '—',
-    suite:    tc.description?.slice(0, 40) || 'Not executed',
-  }));
-};
+  };
 
-const executionResults = generation?.result?.execution_results || [];
+  const executionResults = runResults?.results || [];
+  const isBoth           = framework === 'Both';
+  const testsSelenium    = buildTests(generation?.result?.test_cases_selenium, executionResults);
+  const testsCypress     = buildTests(generation?.result?.test_cases_cypress,  []);
+  const testsSingle      = buildTests(generation?.result?.test_cases,          executionResults);
 
-const testsSelenium = buildTests(generation?.result?.test_cases_selenium, executionResults);
-const testsCypress  = buildTests(generation?.result?.test_cases_cypress, []);
-const testsSingle   = buildTests(generation?.result?.test_cases, executionResults);
-
-  const isBoth = framework === 'Both';
-  const tests  = isBoth
-    ? (activeTab === 'selenium' ? testsSelenium : testsCypress)
-    : testsSingle;
-
-  const pass = tests.filter(t => t.status === 'pass').length;
-  const fail = tests.filter(t => t.status === 'fail').length;
-  const skip = tests.filter(t => t.status === 'skip').length;
-  const rate = tests.length > 0 ? Math.round((pass / tests.length) * 100) : 0;
+  const tests = isBoth ? (activeTab === 'selenium' ? testsSelenium : testsCypress) : testsSingle;
+  const pass  = tests.filter(t => t.status === 'pass').length;
+  const fail  = tests.filter(t => t.status === 'fail').length;
+  const skip  = tests.filter(t => t.status === 'skip').length;
+  const rate  = tests.length > 0 ? Math.round((pass / tests.length) * 100) : 0;
   const shown = filter === 'all' ? tests : tests.filter(t => t.status === filter);
 
-  const url = generation?.url || generation?.generation?.url || '';
+  const url        = generation?.generation?.url || generation?.url || '';
+  const loadTimeMs = generation?.generation?.load_time_ms || generation?.scraped?.load_time_ms || 0;
 
-  const progressColor = rate >= 80
-    ? 'linear-gradient(90deg, #10b981, #34d399)'
-    : rate >= 50
-      ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-      : 'linear-gradient(90deg, #ef4444, #f87171)';
-
+  const progressColor     = rate >= 80 ? 'linear-gradient(90deg,#10b981,#34d399)' : rate >= 50 ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' : 'linear-gradient(90deg,#ef4444,#f87171)';
   const progressTextColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+
+  // Badge test type
+  const TEST_TYPE_BADGE = {
+    smoke:      { label: '💨 Smoke',      color: '#64748b', bg: 'rgba(148,163,184,.12)', border: 'rgba(148,163,184,.3)' },
+    functional: { label: '⚡ Functional', color: '#4f86e8', bg: 'rgba(79,134,232,.1)',  border: 'rgba(79,134,232,.25)' },
+    regression: { label: '🔁 Regression', color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',  border: 'rgba(139,92,246,.25)' },
+  };
+  const ttBadge = TEST_TYPE_BADGE[testType] || TEST_TYPE_BADGE.smoke;
+
+  // Category badge colors
+  const catStyle = (cat) => ({
+    smoke:      { color: '#64748b', bg: 'rgba(148,163,184,.12)', border: 'rgba(148,163,184,.25)' },
+    functional: { color: '#4f86e8', bg: 'rgba(79,134,232,.1)',   border: 'rgba(79,134,232,.2)'  },
+    regression: { color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',   border: 'rgba(139,92,246,.2)'  },
+  }[cat] || { color: '#64748b', bg: 'rgba(148,163,184,.12)', border: 'rgba(148,163,184,.25)' });
 
   const downloadScript = (type = 'selenium') => {
     let content, filename;
@@ -387,7 +574,7 @@ const testsSingle   = buildTests(generation?.result?.test_cases, executionResult
       content  = generation?.result?.script || '';
       filename = framework === 'Cypress' ? 'test_cypress.js' : 'test_selenium.py';
     }
-    const blob = new Blob([content], { type: 'text/plain' });
+    const blob = new Blob([content || ''], { type: 'text/plain' });
     const link = document.createElement('a');
     link.href  = URL.createObjectURL(blob);
     link.download = filename;
@@ -405,11 +592,8 @@ const testsSingle   = buildTests(generation?.result?.test_cases, executionResult
       link.href  = URL.createObjectURL(blob);
       link.download = `nextest_report_${id}.pdf`;
       link.click();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setPdfLoading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setPdfLoading(false); }
   };
 
   if (!generation) {
@@ -433,44 +617,43 @@ const testsSingle   = buildTests(generation?.result?.test_cases, executionResult
 
   return (
     <div className="panel">
+
       {/* Header */}
       <div className="p-header">
         <div>
           <h1 className="p-title">{t('test')} <span className="g">{t('execution')}</span></h1>
-          <p className="p-sub" style={{wordBreak:'break-all'}}>{url} · {framework}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+            <p className="p-sub" style={{ wordBreak: 'break-all', margin: 0 }}>{url} · {framework}</p>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 20, background: ttBadge.bg, color: ttBadge.color, border: `1px solid ${ttBadge.border}` }}>
+              {ttBadge.label}
+            </span>
+          </div>
         </div>
-        <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {isBoth ? (
             <>
-              <button className="btn-outline" style={{fontSize:11, padding:'9px 18px'}} onClick={() => downloadScript('selenium')}>
-                🐍 Selenium .py
-              </button>
-              <button className="btn-outline" style={{fontSize:11, padding:'9px 18px'}} onClick={() => downloadScript('cypress')}>
-                🌲 Cypress .js
-              </button>
+              <button className="btn-outline" style={{ fontSize: 11, padding: '9px 18px' }} onClick={() => downloadScript('selenium')}>🐍 Selenium .py</button>
+              <button className="btn-outline" style={{ fontSize: 11, padding: '9px 18px' }} onClick={() => downloadScript('cypress')}>🌲 Cypress .js</button>
             </>
           ) : (
-            <button className="btn-outline" style={{fontSize:11, padding:'9px 18px'}} onClick={() => downloadScript()}>
+            <button className="btn-outline" style={{ fontSize: 11, padding: '9px 18px' }} onClick={() => downloadScript()}>
               <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Download Script
             </button>
           )}
-          {/* ✅ Bouton PDF */}
-          <button className="btn-primary" style={{fontSize:11, padding:'9px 18px'}} onClick={downloadPdf} disabled={pdfLoading}>
-            {pdfLoading
-              ? <><span className="spinner"/>Generating...</>
-              : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>📄 Download PDF</>}
+          <button className="btn-primary" style={{ fontSize: 11, padding: '9px 18px' }} onClick={downloadPdf} disabled={pdfLoading}>
+            {pdfLoading ? <><span className="spinner" />Generating...</> : <>📄 Download PDF</>}
           </button>
         </div>
       </div>
 
-      {/* Tabs pour Both */}
+      {/* Tabs Both */}
       {isBoth && (
-        <div style={{display:'flex', gap:'8px', marginBottom:'20px'}}>
-          <button onClick={() => { setActiveTab('selenium'); setFilter('all'); }} style={{ padding:'8px 20px', borderRadius:'20px', fontWeight:700, fontSize:13, cursor:'pointer', border:'2px solid', borderColor: activeTab==='selenium' ? 'var(--gold)' : 'var(--border)', background: activeTab==='selenium' ? 'var(--goldbg)' : 'transparent', color: activeTab==='selenium' ? 'var(--gold)' : 'var(--muted)', transition:'all .2s' }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          <button onClick={() => { setActiveTab('selenium'); setFilter('all'); }} style={{ padding: '8px 20px', borderRadius: 20, fontWeight: 700, fontSize: 13, cursor: 'pointer', border: '2px solid', borderColor: activeTab === 'selenium' ? 'var(--gold)' : 'var(--border)', background: activeTab === 'selenium' ? 'var(--goldbg)' : 'transparent', color: activeTab === 'selenium' ? 'var(--gold)' : 'var(--muted)' }}>
             🐍 Selenium ({testsSelenium.length})
           </button>
-          <button onClick={() => { setActiveTab('cypress'); setFilter('all'); }} style={{ padding:'8px 20px', borderRadius:'20px', fontWeight:700, fontSize:13, cursor:'pointer', border:'2px solid', borderColor: activeTab==='cypress' ? 'var(--gold)' : 'var(--border)', background: activeTab==='cypress' ? 'var(--goldbg)' : 'transparent', color: activeTab==='cypress' ? 'var(--gold)' : 'var(--muted)', transition:'all .2s' }}>
+          <button onClick={() => { setActiveTab('cypress'); setFilter('all'); }} style={{ padding: '8px 20px', borderRadius: 20, fontWeight: 700, fontSize: 13, cursor: 'pointer', border: '2px solid', borderColor: activeTab === 'cypress' ? 'var(--gold)' : 'var(--border)', background: activeTab === 'cypress' ? 'var(--goldbg)' : 'transparent', color: activeTab === 'cypress' ? 'var(--gold)' : 'var(--muted)' }}>
             🌲 Cypress ({testsCypress.length})
           </button>
         </div>
@@ -484,48 +667,95 @@ const testsSingle   = buildTests(generation?.result?.test_cases, executionResult
         <div className="exec-sum-card exec-sum-rate"><div className="exec-sum-val">{rate}%</div><div className="exec-sum-lbl">{t('passRate')}</div></div>
       </div>
 
-      {/* ✅ Progress Bar colorée */}
-      <div className="exec-progress-wrap" style={{marginBottom:18}}>
+      {/* Progress bar */}
+      <div className="exec-progress-wrap" style={{ marginBottom: 18 }}>
         <div className="exec-progress-header">
           <span className="exec-progress-label">
-            ✓ {tests.length} tests generated · {generation?.generation?.load_time_ms || 0}ms load time
+            {running
+              ? <><span className="spinner" style={{ marginRight: 6 }} />Running tests...</>
+              : `✓ ${tests.length} tests · ${loadTimeMs}ms load time`}
           </span>
-          <span className="exec-progress-done" style={{color: progressTextColor}}>
-            {rate}% pass rate
-          </span>
+          <span className="exec-progress-done" style={{ color: progressTextColor }}>{rate}% pass rate</span>
         </div>
         <div className="exec-progress-bar">
-          <div className="exec-progress-fill" style={{ width:`${rate}%`, background: progressColor }}/>
+          <div className="exec-progress-fill" style={{ width: `${running ? 100 : rate}%`, background: running ? 'linear-gradient(90deg,#4f86e8,#6fa3ff)' : progressColor, transition: 'width 1s ease' }} />
         </div>
       </div>
 
       {/* Filtres */}
       <div className="exec-filters">
-        <button className={`exec-filter${filter==='all' ?' on':''}`} onClick={() => setFilter('all')}>{t('all')} ({tests.length})</button>
-        <button className={`exec-filter${filter==='pass'?' on':''}`} onClick={() => setFilter('pass')}>✓ {t('passed')} ({pass})</button>
-        <button className={`exec-filter${filter==='fail'?' on':''}`} onClick={() => setFilter('fail')}>✗ {t('failed')} ({fail})</button>
-        <button className={`exec-filter${filter==='skip'?' on':''}`} onClick={() => setFilter('skip')}>⚠ {t('skipped')} ({skip})</button>
+        <button className={`exec-filter${filter === 'all'  ? ' on' : ''}`} onClick={() => setFilter('all')}>{t('all')} ({tests.length})</button>
+        <button className={`exec-filter${filter === 'pass' ? ' on' : ''}`} onClick={() => setFilter('pass')}>✓ {t('passed')} ({pass})</button>
+        <button className={`exec-filter${filter === 'fail' ? ' on' : ''}`} onClick={() => setFilter('fail')}>✗ {t('failed')} ({fail})</button>
+        <button className={`exec-filter${filter === 'skip' ? ' on' : ''}`} onClick={() => setFilter('skip')}>⚠ {t('skipped')} ({skip})</button>
       </div>
 
       {/* Liste des tests */}
       <div className="exec-list">
-        {shown.map((test, i) => (
-          <div key={test.id} className={`exec-row exec-row--${test.status}`} style={{animationDelay:`${i*0.045}s`}}>
-            <div className="exec-row-status"><StatusIcon s={test.status}/></div>
-            <div className="exec-row-info">
-              <div className="exec-row-name">{test.name}</div>
-              <div className="exec-row-suite">{test.suite}</div>
-            </div>
-            <div className="exec-row-meta">
-              <span className={`exec-badge exec-badge--${test.status}`}>{test.status}</span>
-              <span className="exec-duration">{test.duration}</span>
-            </div>
-          </div>
-        ))}
+        {running
+          ? Array.from({ length: tests.length || 3 }).map((_, i) => (
+              <div key={i} className="exec-row" style={{ animationDelay: `${i * 0.045}s`, opacity: .5 }}>
+                <div className="exec-row-status">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4f86e8" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                </div>
+                <div className="exec-row-info">
+                  <div className="exec-row-name" style={{ background: 'var(--border)', borderRadius: 4, height: 14, width: '60%' }} />
+                  <div className="exec-row-suite" style={{ background: 'var(--border)', borderRadius: 4, height: 10, width: '40%', marginTop: 6 }} />
+                </div>
+                <div className="exec-row-meta">
+                  <span className="exec-badge exec-badge--skip">running...</span>
+                </div>
+              </div>
+            ))
+          : shown.map((test, i) => {
+              const cs = catStyle(test.category);
+              return (
+                <div key={test.id}
+                     className={`exec-row exec-row--${test.status}`}
+                     style={{ animationDelay: `${i * 0.045}s`, flexDirection: 'column', alignItems: 'stretch', padding: '12px 16px' }}>
+
+                  {/* Ligne principale */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div className="exec-row-status" style={{ flexShrink: 0 }}>
+                      <StatusIcon s={test.status} />
+                    </div>
+
+                    <div className="exec-row-info" style={{ flex: 1, minWidth: 0 }}>
+                      <div className="exec-row-name">{test.name}</div>
+                      <div className="exec-row-suite" style={{ marginTop: 2 }}>{test.suite}</div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {/* Category badge */}
+                      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1px', padding: '2px 8px', borderRadius: 10, background: cs.bg, color: cs.color, border: `1px solid ${cs.border}` }}>
+                        {test.category?.toUpperCase()}
+                      </span>
+                      <span className={`exec-badge exec-badge--${test.status}`}>{test.status}</span>
+                      <span className="exec-duration">{test.duration}</span>
+                    </div>
+                  </div>
+
+                  {/* Assertion detail */}
+                  {test.assertion_result && (
+                    <div style={{ marginLeft: 25, marginTop: 4 }}>
+                      <AssertionBadge
+                        assertion_result={test.assertion_result}
+                        step_meta={test.step_meta}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })
+        }
       </div>
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// History Panel
+// ─────────────────────────────────────────────────────────────────────────────
 
 function HistoryPanel({ goTo, setGeneration }) {
   const { t } = useLang();
@@ -536,18 +766,13 @@ function HistoryPanel({ goTo, setGeneration }) {
   const [filterFw,  setFilterFw]  = useState('all');
 
   useEffect(() => {
-    api.get('/generations')
-      .then(res => setHistories(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    api.get('/generations').then(res => setHistories(res.data)).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const handleDelete = async (id) => {
     setDeleting(id);
-    try {
-      await api.delete(`/generations/${id}`);
-      setHistories(prev => prev.filter(h => h.id !== id));
-    } catch (e) { console.error(e); }
+    try { await api.delete(`/generations/${id}`); setHistories(prev => prev.filter(h => h.id !== id)); }
+    catch (e) { console.error(e); }
     setDeleting(null);
   };
 
@@ -562,7 +787,8 @@ function HistoryPanel({ goTo, setGeneration }) {
         script:              item.script              || '',
         script_selenium:     item.script_selenium     || '',
         script_cypress:      item.script_cypress      || '',
-      }
+        execution_results:   item.execution_results   || [],
+      },
     });
     goTo('execution');
   };
@@ -570,26 +796,22 @@ function HistoryPanel({ goTo, setGeneration }) {
   const timeAgo = (dateStr) => {
     const diff = (Date.now() - new Date(dateStr)) / 1000;
     if (diff < 60)    return `${Math.floor(diff)}s ago`;
-    if (diff < 3600)  return `${Math.floor(diff/60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
-    return `${Math.floor(diff/86400)}d ago`;
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
   };
 
   const fwConfig = {
-    Selenium: { color:'#4f86e8', bg:'rgba(79,134,232,.1)',  border:'rgba(79,134,232,.2)',  emoji:'🐍' },
-    Cypress:  { color:'#10b981', bg:'rgba(16,185,129,.1)',  border:'rgba(16,185,129,.2)',  emoji:'🌲' },
-    Both:     { color:'#c9a227', bg:'rgba(201,162,39,.1)',  border:'rgba(201,162,39,.2)',  emoji:'⚡' },
+    Selenium:   { color: '#4f86e8', bg: 'rgba(79,134,232,.1)',  border: 'rgba(79,134,232,.2)',  emoji: '🐍' },
+    Cypress:    { color: '#10b981', bg: 'rgba(16,185,129,.1)',  border: 'rgba(16,185,129,.2)',  emoji: '🌲' },
+    Playwright: { color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',  border: 'rgba(139,92,246,.2)',  emoji: '🎭' },
+    Both:       { color: '#c9a227', bg: 'rgba(201,162,39,.1)',  border: 'rgba(201,162,39,.2)',  emoji: '⚡' },
   };
 
-  const filtered = histories.filter(h => {
-    const matchSearch = h.url.toLowerCase().includes(search.toLowerCase());
-    const matchFw     = filterFw === 'all' || h.framework === filterFw;
-    return matchSearch && matchFw;
-  });
-
-  const totalTests = histories.reduce((s, h) => s + (h.pass_count||0) + (h.fail_count||0) + (h.skip_count||0), 0);
-  const totalPass  = histories.reduce((s, h) => s + (h.pass_count||0), 0);
-  const avgRate    = histories.length > 0 ? Math.round(histories.reduce((s,h) => s + (h.pass_rate||0), 0) / histories.length) : 0;
+  const filtered   = histories.filter(h => h.url.toLowerCase().includes(search.toLowerCase()) && (filterFw === 'all' || h.framework === filterFw));
+  const totalTests = histories.reduce((s, h) => s + (h.pass_count || 0) + (h.fail_count || 0) + (h.skip_count || 0), 0);
+  const totalPass  = histories.reduce((s, h) => s + (h.pass_count || 0), 0);
+  const avgRate    = histories.length > 0 ? Math.round(histories.reduce((s, h) => s + (h.pass_rate || 0), 0) / histories.length) : 0;
 
   return (
     <div className="panel">
@@ -605,18 +827,18 @@ function HistoryPanel({ goTo, setGeneration }) {
       </div>
 
       {histories.length > 0 && (
-        <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24}}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
           {[
-            { label:'Total Generations', val: histories.length, color:'var(--gold)', icon:'🚀' },
-            { label:'Total Tests',       val: totalTests,       color:'#4f86e8',     icon:'🔬' },
-            { label:'Tests Passed',      val: totalPass,        color:'#10b981',     icon:'✅' },
-            { label:'Avg Pass Rate',     val: `${avgRate}%`,    color:'#f59e0b',     icon:'🎯' },
+            { label: 'Total Generations', val: histories.length, color: 'var(--gold)', icon: '🚀' },
+            { label: 'Total Tests',       val: totalTests,       color: '#4f86e8',     icon: '🔬' },
+            { label: 'Tests Passed',      val: totalPass,        color: '#10b981',     icon: '✅' },
+            { label: 'Avg Pass Rate',     val: `${avgRate}%`,    color: '#f59e0b',     icon: '🎯' },
           ].map((s, i) => (
-            <div key={i} style={{ background:'var(--card)', border:'1.5px solid var(--border)', borderRadius:14, padding:'18px 20px', boxShadow:'var(--shadow)', display:'flex', alignItems:'center', gap:14 }}>
-              <div style={{ width:44, height:44, borderRadius:12, background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>{s.icon}</div>
+            <div key={i} style={{ background: 'var(--card)', border: '1.5px solid var(--border)', borderRadius: 14, padding: '18px 20px', boxShadow: 'var(--shadow)', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{s.icon}</div>
               <div>
-                <div style={{fontFamily:'var(--C)', fontSize:28, fontWeight:700, color:s.color, lineHeight:1}}>{s.val}</div>
-                <div style={{fontSize:10, fontWeight:700, letterSpacing:'1.5px', textTransform:'uppercase', color:'var(--muted)', marginTop:4}}>{s.label}</div>
+                <div style={{ fontFamily: 'var(--C)', fontSize: 28, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.val}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 4 }}>{s.label}</div>
               </div>
             </div>
           ))}
@@ -624,93 +846,85 @@ function HistoryPanel({ goTo, setGeneration }) {
       )}
 
       {histories.length > 0 && (
-        <div style={{display:'flex', gap:12, marginBottom:20, alignItems:'center'}}>
-          <div style={{ flex:1, display:'flex', alignItems:'center', gap:10, background:'var(--card)', border:'1.5px solid var(--border)', borderRadius:10, padding:'10px 14px' }}>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
             <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input type="text" placeholder="Search by URL..." value={search} onChange={e => setSearch(e.target.value)} style={{background:'none', border:'none', color:'var(--text)', fontSize:13, width:'100%'}}/>
+            <input type="text" placeholder="Search by URL..." value={search} onChange={e => setSearch(e.target.value)} style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: 13, width: '100%' }} />
           </div>
-          <div style={{display:'flex', gap:6}}>
-            {['all','Selenium','Cypress','Both'].map(fw => (
-              <button key={fw} onClick={() => setFilterFw(fw)} style={{ padding:'8px 16px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1.5px solid', borderColor: filterFw===fw ? 'var(--navy)' : 'var(--border)', background: filterFw===fw ? 'var(--navy)' : 'var(--card)', color: filterFw===fw ? '#fff' : 'var(--muted)', transition:'all .2s' }}>
-                {fw === 'all' ? 'All' : `${fwConfig[fw]?.emoji} ${fw}`}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {['all', 'Selenium', 'Cypress', 'Playwright', 'Both'].map(fw => (
+              <button key={fw} onClick={() => setFilterFw(fw)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1.5px solid', borderColor: filterFw === fw ? 'var(--navy)' : 'var(--border)', background: filterFw === fw ? 'var(--navy)' : 'var(--card)', color: filterFw === fw ? '#fff' : 'var(--muted)', transition: 'all .2s' }}>
+                {fw === 'all' ? 'All' : `${fwConfig[fw]?.emoji || ''} ${fw}`}
               </button>
             ))}
           </div>
-          <div style={{fontSize:12, color:'var(--muted)', fontWeight:600, flexShrink:0}}>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, flexShrink: 0 }}>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</div>
         </div>
       )}
 
       {loading ? (
-        <div style={{textAlign:'center', padding:'60px 0', color:'var(--muted)'}}><span className="spinner" style={{marginRight:8}}/>Loading...</div>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--muted)' }}><span className="spinner" style={{ marginRight: 8 }} />Loading...</div>
       ) : histories.length === 0 ? (
         <div className="hist-empty">
           <div className="he-ring"><svg width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-          <h3>{t('noHistoryYet')}</h3>
-          <p>{t('noHistoryDesc')}</p>
+          <h3>{t('noHistoryYet')}</h3><p>{t('noHistoryDesc')}</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="hist-empty">
-          <div className="he-ring">🔍</div>
-          <h3>No results found</h3>
-          <p>Try a different search or filter</p>
-        </div>
+        <div className="hist-empty"><div className="he-ring">🔍</div><h3>No results found</h3><p>Try a different search or filter</p></div>
       ) : (
-        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(480px, 1fr))', gap:16}}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: 16 }}>
           {filtered.map((item, i) => {
             const rate        = item.pass_rate || 0;
-            const total       = (item.pass_count||0) + (item.fail_count||0) + (item.skip_count||0);
+            const total       = (item.pass_count || 0) + (item.fail_count || 0) + (item.skip_count || 0);
             const statusColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
             const fw          = fwConfig[item.framework] || fwConfig['Selenium'];
             return (
-              <div key={item.id} style={{ background:'var(--card)', border:'1.5px solid var(--border)', borderRadius:16, overflow:'hidden', boxShadow:'var(--shadow)', transition:'all .25s', animation:`dFadeUp .4s cubic-bezier(.22,1,.36,1) ${i*.05}s both` }}
-                onMouseEnter={e => { e.currentTarget.style.transform='translateY(-3px)'; e.currentTarget.style.boxShadow='var(--shadow2)'; e.currentTarget.style.borderColor=fw.border; }}
-                onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='var(--shadow)'; e.currentTarget.style.borderColor='var(--border)'; }}
-              >
-                <div style={{height:4, background:`linear-gradient(90deg, ${fw.color}, ${statusColor})`}}/>
-                <div style={{padding:'20px'}}>
-                  <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:16}}>
-                    <div style={{flex:1, minWidth:0}}>
-                      <div style={{fontSize:13, fontWeight:700, color:'var(--navy)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:6}}>🔗 {item.url}</div>
-                      <div style={{display:'flex', alignItems:'center', gap:10, flexWrap:'wrap'}}>
-                        <span style={{fontSize:10, fontWeight:700, letterSpacing:'1px', padding:'3px 10px', borderRadius:20, background:fw.bg, color:fw.color, border:`1px solid ${fw.border}`}}>{fw.emoji} {item.framework}</span>
-                        <span style={{fontSize:11, color:'var(--muted)'}}>🕐 {timeAgo(item.created_at)}</span>
-                        <span style={{fontSize:11, color:'var(--muted)'}}>📋 {total} tests</span>
+              <div key={item.id} style={{ background: 'var(--card)', border: '1.5px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow)', transition: 'all .25s' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = 'var(--shadow2)'; e.currentTarget.style.borderColor = fw.border; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow)'; e.currentTarget.style.borderColor = 'var(--border)'; }}>
+                <div style={{ height: 4, background: `linear-gradient(90deg, ${fw.color}, ${statusColor})` }} />
+                <div style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--navy)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 6 }}>🔗 {item.url}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', padding: '3px 10px', borderRadius: 20, background: fw.bg, color: fw.color, border: `1px solid ${fw.border}` }}>{fw.emoji} {item.framework}</span>
+                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>🕐 {timeAgo(item.created_at)}</span>
+                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>📋 {total} tests</span>
                       </div>
                     </div>
                   </div>
-                  <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom:16}}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 16 }}>
                     {[
-                      { label:'Passed',  val:item.pass_count||0, color:'#10b981', bg:'rgba(16,185,129,.08)', border:'rgba(16,185,129,.15)' },
-                      { label:'Failed',  val:item.fail_count||0, color:'#ef4444', bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.15)'  },
-                      { label:'Skipped', val:item.skip_count||0, color:'#f59e0b', bg:'rgba(245,158,11,.08)', border:'rgba(245,158,11,.15)' },
+                      { label: 'Passed',  val: item.pass_count || 0, color: '#10b981', bg: 'rgba(16,185,129,.08)', border: 'rgba(16,185,129,.15)' },
+                      { label: 'Failed',  val: item.fail_count || 0, color: '#ef4444', bg: 'rgba(239,68,68,.08)',  border: 'rgba(239,68,68,.15)'  },
+                      { label: 'Skipped', val: item.skip_count || 0, color: '#f59e0b', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.15)' },
                     ].map(s => (
-                      <div key={s.label} style={{background:s.bg, border:`1px solid ${s.border}`, borderRadius:10, padding:'10px', textAlign:'center'}}>
-                        <div style={{fontFamily:'var(--C)', fontSize:24, fontWeight:700, color:s.color, lineHeight:1}}>{s.val}</div>
-                        <div style={{fontSize:10, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:s.color, opacity:.8, marginTop:4}}>{s.label}</div>
+                      <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: '10px', textAlign: 'center' }}>
+                        <div style={{ fontFamily: 'var(--C)', fontSize: 24, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.val}</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: s.color, opacity: .8, marginTop: 4 }}>{s.label}</div>
                       </div>
                     ))}
                   </div>
-                  <div style={{marginBottom:16}}>
-                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
-                      <span style={{fontSize:11, fontWeight:600, color:'var(--muted)'}}>Pass Rate</span>
-                      <span style={{fontSize:13, fontWeight:700, color:statusColor}}>{rate}%</span>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>Pass Rate</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: statusColor }}>{rate}%</span>
                     </div>
-                    <div style={{height:6, borderRadius:6, background:'var(--border)', overflow:'hidden'}}>
-                      <div style={{height:'100%', borderRadius:6, width:`${rate}%`, background:`linear-gradient(90deg, ${fw.color}, ${statusColor})`, transition:'width 1s ease'}}/>
+                    <div style={{ height: 6, borderRadius: 6, background: 'var(--border)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 6, width: `${rate}%`, background: `linear-gradient(90deg, ${fw.color}, ${statusColor})`, transition: 'width 1s ease' }} />
                     </div>
                   </div>
-                  <div style={{display:'flex', gap:8}}>
-                    <button onClick={() => handleReview(item)} style={{ flex:1, padding:'9px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border:'1.5px solid var(--border)', background:'var(--bg)', color:'var(--navy)', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all .2s' }}
-                      onMouseEnter={e => { e.currentTarget.style.background='var(--navy)'; e.currentTarget.style.color='#fff'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background='var(--bg)'; e.currentTarget.style.color='var(--navy)'; }}
-                    >
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => handleReview(item)} style={{ flex: 1, padding: '9px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1.5px solid var(--border)', background: 'var(--bg)', color: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all .2s' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--navy)'; e.currentTarget.style.color = '#fff'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg)'; e.currentTarget.style.color = 'var(--navy)'; }}>
                       <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       View Results
                     </button>
-                    <button onClick={() => handleDelete(item.id)} disabled={deleting === item.id} style={{ padding:'9px 14px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border:'1.5px solid rgba(239,68,68,.3)', background:'rgba(239,68,68,.05)', color:'#ef4444', transition:'all .2s' }}
-                      onMouseEnter={e => { e.currentTarget.style.background='#ef4444'; e.currentTarget.style.color='#fff'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background='rgba(239,68,68,.05)'; e.currentTarget.style.color='#ef4444'; }}
-                    >
+                    <button onClick={() => handleDelete(item.id)} disabled={deleting === item.id} style={{ padding: '9px 14px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1.5px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.05)', color: '#ef4444', transition: 'all .2s' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = '#fff'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,.05)'; e.currentTarget.style.color = '#ef4444'; }}>
                       {deleting === item.id ? '...' : '🗑'}
                     </button>
                   </div>
@@ -723,6 +937,10 @@ function HistoryPanel({ goTo, setGeneration }) {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Account Panel
+// ─────────────────────────────────────────────────────────────────────────────
 
 function AccountPanel({ user }) {
   const { setUser } = useAuth();
@@ -738,116 +956,75 @@ function AccountPanel({ user }) {
 
   const saveProfile = async () => {
     setLoading(true); setMsg(''); setError('');
-    try {
-      const res = await api.put('/profile/update', { name, email });
-      setUser(res.data.user);
-      setMsg(t('profileUpdated'));
-    } catch (err) { setError(err.response?.data?.message || t('errorOccurred')); }
+    try { const res = await api.put('/profile/update', { name, email }); setUser(res.data.user); setMsg(t('profileUpdated')); }
+    catch (err) { setError(err.response?.data?.message || t('errorOccurred')); }
     setLoading(false);
   };
 
   const changePassword = async () => {
     if (newPwd !== confirmPwd) { setError(t('passwordMismatch')); return; }
     setLoading(true); setMsg(''); setError('');
-    try {
-      await api.put('/profile/password', { current_password:currPwd, new_password:newPwd, new_password_confirmation:confirmPwd });
-      setMsg(t('passwordChanged'));
-      setCurrPwd(''); setNewPwd(''); setConfirmPwd('');
-    } catch (err) { setError(err.response?.data?.errors?.current_password?.[0] || t('errorOccurred')); }
+    try { await api.put('/profile/password', { current_password: currPwd, new_password: newPwd, new_password_confirmation: confirmPwd }); setMsg(t('passwordChanged')); setCurrPwd(''); setNewPwd(''); setConfirmPwd(''); }
+    catch (err) { setError(err.response?.data?.errors?.current_password?.[0] || t('errorOccurred')); }
     setLoading(false);
   };
 
   return (
     <div className="panel">
       <div className="p-header">
-        <div>
-          <h1 className="p-title">{t('my')} <span className="g">{t('account')}</span></h1>
-          <p className="p-sub">{t('accountDesc')}</p>
-        </div>
+        <div><h1 className="p-title">{t('my')} <span className="g">{t('account')}</span></h1><p className="p-sub">{t('accountDesc')}</p></div>
       </div>
       {msg   && <div className="success-msg">✓ {msg}</div>}
       {error && <div className="error-msg">✗ {error}</div>}
-      <div style={{background:'linear-gradient(135deg,#060e1e 0%,#0f2744 50%,#0b1829 100%)',borderRadius:20,padding:'32px 36px',marginBottom:28,position:'relative',overflow:'hidden',border:'1px solid rgba(201,162,39,.15)',boxShadow:'0 8px 32px rgba(6,14,30,.2)'}}>
-        <div style={{position:'absolute',top:-60,right:-60,width:220,height:220,borderRadius:'50%',background:'radial-gradient(circle,rgba(201,162,39,.12) 0%,transparent 70%)'}}/>
-        <div style={{position:'absolute',bottom:-40,left:'40%',width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(201,162,39,.06) 0%,transparent 70%)'}}/>
-        <div style={{display:'flex',alignItems:'center',gap:28,position:'relative'}}>
-          <div style={{position:'relative',flexShrink:0}}>
-            <div style={{width:88,height:88,borderRadius:'50%',background:'linear-gradient(135deg,#c9a227,#e8c84a)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:36,fontFamily:'Cormorant Garamond,serif',fontWeight:700,color:'#060e1e',border:'3px solid rgba(255,255,255,.15)',boxShadow:'0 4px 20px rgba(201,162,39,.35)',overflow:'hidden'}}>
-              {user?.avatar?<img src={user.avatar} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span>{user?.name?.[0]?.toUpperCase()||'U'}</span>}
+      <div style={{ background: 'linear-gradient(135deg,#060e1e 0%,#0f2744 50%,#0b1829 100%)', borderRadius: 20, padding: '32px 36px', marginBottom: 28, position: 'relative', overflow: 'hidden', border: '1px solid rgba(201,162,39,.15)', boxShadow: '0 8px 32px rgba(6,14,30,.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 28, position: 'relative' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div style={{ width: 88, height: 88, borderRadius: '50%', background: 'linear-gradient(135deg,#c9a227,#e8c84a)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, fontFamily: 'Cormorant Garamond,serif', fontWeight: 700, color: '#060e1e', border: '3px solid rgba(255,255,255,.15)', overflow: 'hidden' }}>
+              {user?.avatar ? <img src={user.avatar} alt="av" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span>{user?.name?.[0]?.toUpperCase() || 'U'}</span>}
             </div>
-            <input type="file" id="avatar-upload" accept="image/*" style={{display:'none'}} onChange={async(e)=>{const file=e.target.files[0];if(!file)return;const fd=new FormData();fd.append('avatar',file);try{const res=await api.post('/profile/avatar',fd,{headers:{'Content-Type':'multipart/form-data'}});setUser(prev=>({...prev,avatar:res.data.avatar}));}catch(err){console.error(err);}}}/>
-            <button style={{position:'absolute',bottom:0,right:0,width:28,height:28,borderRadius:'50%',background:'linear-gradient(135deg,#c9a227,#e8c84a)',border:'2px solid #060e1e',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,.3)',transition:'transform .2s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.15)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'} onClick={()=>document.getElementById('avatar-upload').click()} title={t('changePhoto')}>
+            <input type="file" id="avatar-upload" accept="image/*" style={{ display: 'none' }} onChange={async (e) => { const file = e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append('avatar', file); try { const res = await api.post('/profile/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } }); setUser(prev => ({ ...prev, avatar: res.data.avatar })); } catch (err) { console.error(err); } }} />
+            <button style={{ position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#c9a227,#e8c84a)', border: '2px solid #060e1e', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} onClick={() => document.getElementById('avatar-upload').click()}>
               <svg width="13" height="13" fill="none" stroke="#060e1e" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
             </button>
           </div>
-          <div style={{flex:1}}>
-            <div style={{fontFamily:'Cormorant Garamond,serif',fontSize:28,fontWeight:700,color:'#fff',marginBottom:4,lineHeight:1}}>{user?.name||'User'}</div>
-            <div style={{fontSize:13,color:'rgba(255,255,255,.5)',marginBottom:12}}>{user?.email||'—'}</div>
-            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-              <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11,fontWeight:600,color:'rgba(255,255,255,.6)',background:'rgba(255,255,255,.07)',border:'1px solid rgba(255,255,255,.1)',padding:'4px 12px',borderRadius:20}}>
-                <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                {t('qaEngineer')}
-              </span>
-              {user?.google_id&&(<span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11,fontWeight:600,color:'rgba(255,255,255,.6)',background:'rgba(255,255,255,.07)',border:'1px solid rgba(255,255,255,.1)',padding:'4px 12px',borderRadius:20}}>✓ {t('connectedGoogle')}</span>)}
-            </div>
-          </div>
-          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:8,flexShrink:0}}>
-            <div style={{background:'rgba(201,162,39,.1)',border:'1px solid rgba(201,162,39,.25)',borderRadius:12,padding:'12px 20px',textAlign:'center'}}>
-              <div style={{fontFamily:'Cormorant Garamond,serif',fontSize:28,fontWeight:700,color:'#c9a227',lineHeight:1}}>0</div>
-              <div style={{fontSize:10,fontWeight:700,letterSpacing:'1.5px',textTransform:'uppercase',color:'rgba(201,162,39,.7)',marginTop:4}}>{t('testsGenerated')}</div>
-            </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: 'Cormorant Garamond,serif', fontSize: 28, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{user?.name || 'User'}</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>{user?.email || '—'}</div>
           </div>
         </div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <div className="set-group">
           <div className="set-group-title">{t('profileInformation')}</div>
-          <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:16}}>
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="field">
-              <label style={{fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:6,display:'block'}}>{t('fullName')}</label>
-              <div className="field-wrap">
-                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-                <input type="text" value={name} placeholder={t('yourFullName')} onChange={e=>setName(e.target.value)}/>
-              </div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>{t('fullName')}</label>
+              <div className="field-wrap"><svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: 'var(--muted)', flexShrink: 0 }}><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><input type="text" value={name} placeholder={t('yourFullName')} onChange={e => setName(e.target.value)} /></div>
             </div>
             <div className="field">
-              <label style={{fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:6,display:'block'}}>{t('emailAddress')}</label>
-              <div className="field-wrap">
-                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                <input type="email" value={email} placeholder={t('yourEmail')} onChange={e=>setEmail(e.target.value)}/>
-              </div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>{t('emailAddress')}</label>
+              <div className="field-wrap"><svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: 'var(--muted)', flexShrink: 0 }}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><input type="email" value={email} placeholder={t('yourEmail')} onChange={e => setEmail(e.target.value)} /></div>
             </div>
-            <button className="btn-primary" style={{width:'100%',justifyContent:'center',marginTop:4}} onClick={saveProfile} disabled={loading}>
-              {loading?<><span className="spinner"/>{t('saving')}</>:<><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>{t('saveChanges')}</>}
+            <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }} onClick={saveProfile} disabled={loading}>
+              {loading ? <><span className="spinner" />{t('saving')}</> : <>{t('saveChanges')}</>}
             </button>
           </div>
         </div>
         <div className="set-group">
           <div className="set-group-title">{t('changePassword')}</div>
-          <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:16}}>
-            <div className="field">
-              <label style={{fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:6,display:'block'}}>{t('currentPassword')}</label>
-              <div className="field-wrap">
-                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <input type="password" value={currPwd} placeholder={t('enterCurrentPassword')} onChange={e=>setCurrPwd(e.target.value)}/>
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {[
+              { label: t('currentPassword'), val: currPwd, set: setCurrPwd, ph: t('enterCurrentPassword') },
+              { label: t('newPassword'),     val: newPwd,  set: setNewPwd,  ph: t('minChars') },
+              { label: t('confirmNewPassword'), val: confirmPwd, set: setConfirmPwd, ph: t('confirmNewPassword') },
+            ].map(f => (
+              <div key={f.label} className="field">
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>{f.label}</label>
+                <div className="field-wrap"><svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: 'var(--muted)', flexShrink: 0 }}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input type="password" value={f.val} placeholder={f.ph} onChange={e => f.set(e.target.value)} /></div>
               </div>
-            </div>
-            <div className="field">
-              <label style={{fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:6,display:'block'}}>{t('newPassword')}</label>
-              <div className="field-wrap">
-                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <input type="password" value={newPwd} placeholder={t('minChars')} onChange={e=>setNewPwd(e.target.value)}/>
-              </div>
-            </div>
-            <div className="field">
-              <label style={{fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:6,display:'block'}}>{t('confirmNewPassword')}</label>
-              <div className="field-wrap">
-                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'var(--muted)',flexShrink:0}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <input type="password" value={confirmPwd} placeholder={t('confirmNewPassword')} onChange={e=>setConfirmPwd(e.target.value)}/>
-              </div>
-            </div>
-            <button className="btn-primary" style={{width:'100%',justifyContent:'center',marginTop:4}} onClick={changePassword} disabled={loading}>
-              {loading?<><span className="spinner"/>{t('updating')}</>:<><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{t('updatePassword')}</>}
+            ))}
+            <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }} onClick={changePassword} disabled={loading}>
+              {loading ? <><span className="spinner" />{t('updating')}</> : <>{t('updatePassword')}</>}
             </button>
           </div>
         </div>
@@ -855,6 +1032,10 @@ function AccountPanel({ user }) {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Settings Panel
+// ─────────────────────────────────────────────────────────────────────────────
 
 function SettingsPanel({ theme, setTheme }) {
   const { t, setLanguage: applyLang } = useLang();
@@ -878,7 +1059,7 @@ function SettingsPanel({ theme, setTheme }) {
   const saveSettings = async () => {
     setLoading(true); setMsg('');
     try {
-      await api.put('/settings/update', { email_notifications:notifs, weekly_report:weekly, default_framework:framework, theme, language });
+      await api.put('/settings/update', { email_notifications: notifs, weekly_report: weekly, default_framework: framework, theme, language });
       applyLang(language);
       setMsg(t('settingsSaved'));
       setTimeout(() => setMsg(''), 3000);
@@ -887,57 +1068,47 @@ function SettingsPanel({ theme, setTheme }) {
   };
 
   const LANGS = [
-    { code:'en', label:'English',  flag:'🇬🇧' },
-    { code:'fr', label:'Français', flag:'🇫🇷' },
-    { code:'ar', label:'العربية',  flag:'🇹🇳' },
+    { code: 'en', label: 'English',  flag: '🇬🇧' },
+    { code: 'fr', label: 'Français', flag: '🇫🇷' },
+    { code: 'ar', label: 'العربية',  flag: '🇹🇳' },
   ];
 
   return (
     <div className="panel">
       <div className="p-header">
-        <div>
-          <h1 className="p-title">{t('appSettings')} <span className="g">{t('settings')}</span></h1>
-          <p className="p-sub">{t('customize')}</p>
-        </div>
+        <div><h1 className="p-title">{t('appSettings')} <span className="g">{t('settings')}</span></h1><p className="p-sub">{t('customize')}</p></div>
         <button className="btn-primary" onClick={saveSettings} disabled={loading}>
-          {loading?<><span className="spinner"/>{t('saving')}</>:<><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>{t('saveSettings')}</>}
+          {loading ? <><span className="spinner" />{t('saving')}</> : <>{t('saveSettings')}</>}
         </button>
       </div>
       {msg && <div className="success-msg">✓ {msg}</div>}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
         <div className="set-group">
           <div className="set-group-title">{t('notifications')}</div>
-          <div className="set-row">
-            <div><div className="set-name">{t('emailNotif')}</div><div className="set-desc">{t('emailNotifDesc')}</div></div>
-            <div className={`toggle${notifs?' on':''}`} onClick={()=>setNotifs(p=>!p)}><span className="toggle-knob"/></div>
-          </div>
-          <div className="set-row">
-            <div><div className="set-name">{t('weeklyReport')}</div><div className="set-desc">{t('weeklyReportDesc')}</div></div>
-            <div className={`toggle${weekly?' on':''}`} onClick={()=>setWeekly(p=>!p)}><span className="toggle-knob"/></div>
-          </div>
+          <div className="set-row"><div><div className="set-name">{t('emailNotif')}</div><div className="set-desc">{t('emailNotifDesc')}</div></div><div className={`toggle${notifs ? ' on' : ''}`} onClick={() => setNotifs(p => !p)}><span className="toggle-knob" /></div></div>
+          <div className="set-row"><div><div className="set-name">{t('weeklyReport')}</div><div className="set-desc">{t('weeklyReportDesc')}</div></div><div className={`toggle${weekly ? ' on' : ''}`} onClick={() => setWeekly(p => !p)}><span className="toggle-knob" /></div></div>
         </div>
         <div className="set-group">
           <div className="set-group-title">{t('exportDefaults')}</div>
-          <div className="set-row">
-            <div><div className="set-name">{t('defaultFramework')}</div><div className="set-desc">{t('defaultFrameworkDesc')}</div></div>
-            <select className="set-select" value={framework} onChange={e=>setFramework(e.target.value)}>
-              <option>Selenium</option><option>Cypress</option><option>Both</option>
+          <div className="set-row"><div><div className="set-name">{t('defaultFramework')}</div><div className="set-desc">{t('defaultFrameworkDesc')}</div></div>
+            <select className="set-select" value={framework} onChange={e => setFramework(e.target.value)}>
+              <option>Selenium</option><option>Cypress</option><option>Playwright</option><option>Both</option>
             </select>
           </div>
         </div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <div className="set-group">
           <div className="set-group-title">{t('appearance')}</div>
-          <div style={{padding:'16px 20px'}}>
-            <div className="set-name" style={{marginBottom:4}}>{t('theme')}</div>
-            <div className="set-desc" style={{marginBottom:14}}>{t('themeDesc')}</div>
-            <div style={{display:'flex',gap:12}}>
-              {[{key:'light',emoji:'☀️',label:'Light'},{key:'dark',emoji:'🌙',label:'Dark'},{key:'system',emoji:'💻',label:'System'}].map(th=>(
-                <div key={th.key} onClick={()=>{ setTheme(th.key); api.put('/settings/update',{theme:th.key}); }} style={{flex:1,padding:'14px 12px',borderRadius:12,cursor:'pointer',border:theme===th.key?'2px solid var(--gold)':'1.5px solid var(--border)',background:theme===th.key?'var(--goldbg)':'var(--bg)',transition:'all .2s',textAlign:'center'}}>
-                  <div style={{fontSize:24,marginBottom:6}}>{th.emoji}</div>
-                  <div style={{fontSize:12,fontWeight:700,color:theme===th.key?'var(--gold)':'var(--muted)'}}>{th.label}</div>
-                  {theme===th.key&&<div style={{width:8,height:8,borderRadius:'50%',background:'var(--gold)',margin:'6px auto 0'}}/>}
+          <div style={{ padding: '16px 20px' }}>
+            <div className="set-name" style={{ marginBottom: 4 }}>{t('theme')}</div>
+            <div className="set-desc" style={{ marginBottom: 14 }}>{t('themeDesc')}</div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              {[{ key: 'light', emoji: '☀️', label: 'Light' }, { key: 'dark', emoji: '🌙', label: 'Dark' }, { key: 'system', emoji: '💻', label: 'System' }].map(th => (
+                <div key={th.key} onClick={() => { setTheme(th.key); api.put('/settings/update', { theme: th.key }); }} style={{ flex: 1, padding: '14px 12px', borderRadius: 12, cursor: 'pointer', border: theme === th.key ? '2px solid var(--gold)' : '1.5px solid var(--border)', background: theme === th.key ? 'var(--goldbg)' : 'var(--bg)', transition: 'all .2s', textAlign: 'center' }}>
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>{th.emoji}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: theme === th.key ? 'var(--gold)' : 'var(--muted)' }}>{th.label}</div>
+                  {theme === th.key && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)', margin: '6px auto 0' }} />}
                 </div>
               ))}
             </div>
@@ -945,15 +1116,15 @@ function SettingsPanel({ theme, setTheme }) {
         </div>
         <div className="set-group">
           <div className="set-group-title">{t('language')}</div>
-          <div style={{padding:'16px 20px'}}>
-            <div className="set-name" style={{marginBottom:4}}>{t('interfaceLang')}</div>
-            <div className="set-desc" style={{marginBottom:14}}>{t('langDesc')}</div>
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              {LANGS.map(l=>(
-                <div key={l.code} onClick={()=>setLanguage(l.code)} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',borderRadius:10,cursor:'pointer',border:language===l.code?'2px solid var(--gold)':'1.5px solid var(--border)',background:language===l.code?'var(--goldbg)':'var(--bg)',transition:'all .2s'}}>
-                  <span style={{fontSize:20}}>{l.flag}</span>
-                  <span style={{fontSize:13,fontWeight:600,color:language===l.code?'var(--gold)':'var(--muted)',flex:1}}>{l.label}</span>
-                  {language===l.code&&(<svg width="16" height="16" fill="none" stroke="var(--gold)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>)}
+          <div style={{ padding: '16px 20px' }}>
+            <div className="set-name" style={{ marginBottom: 4 }}>{t('interfaceLang')}</div>
+            <div className="set-desc" style={{ marginBottom: 14 }}>{t('langDesc')}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {LANGS.map(l => (
+                <div key={l.code} onClick={() => setLanguage(l.code)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, cursor: 'pointer', border: language === l.code ? '2px solid var(--gold)' : '1.5px solid var(--border)', background: language === l.code ? 'var(--goldbg)' : 'var(--bg)', transition: 'all .2s' }}>
+                  <span style={{ fontSize: 20 }}>{l.flag}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: language === l.code ? 'var(--gold)' : 'var(--muted)', flex: 1 }}>{l.label}</span>
+                  {language === l.code && <svg width="16" height="16" fill="none" stroke="var(--gold)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>}
                 </div>
               ))}
             </div>
@@ -963,6 +1134,10 @@ function SettingsPanel({ theme, setTheme }) {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Root Dashboard
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [page,       setPage]      = useState('dashboard');
@@ -977,45 +1152,45 @@ export default function Dashboard() {
   }, [theme]);
 
   const NAV_MAIN = [
-    { id:'dashboard', label:t('dashboard'),     badge:null      },
-    { id:'generate',  label:t('newGeneration'), badge:t('new')  },
-    { id:'execution', label:t('testExecution'), badge:null      },
-    { id:'history',   label:t('history'),       badge:null      },
+    { id: 'dashboard', label: t('dashboard'),     badge: null     },
+    { id: 'generate',  label: t('newGeneration'), badge: t('new') },
+    { id: 'execution', label: t('testExecution'), badge: null     },
+    { id: 'history',   label: t('history'),       badge: null     },
   ];
   const NAV_USER = [
-    { id:'account',  label:t('account')  },
-    { id:'settings', label:t('settings') },
+    { id: 'account',  label: t('account')  },
+    { id: 'settings', label: t('settings') },
   ];
   const LABELS = {
-    dashboard:t('dashboard'), generate:t('newGeneration'),
-    execution:t('testExecution'), history:t('history'),
-    account:t('account'), settings:t('settings'),
+    dashboard: t('dashboard'), generate: t('newGeneration'),
+    execution: t('testExecution'), history: t('history'),
+    account: t('account'), settings: t('settings'),
   };
 
   return (
-    <div className="dash-root" style={{position:"fixed",top:0,left:0,right:0,bottom:0,width:"100vw",height:"100vh",display:"flex",flexDirection:"row",overflow:"hidden"}}>
-      <aside className={`sidebar${collapsed?' collapsed':''}`}>
-        <NexLogo collapsed={collapsed}/>
-        <button className="s-toggle" onClick={()=>setCollapse(p=>!p)}>
+    <div className="dash-root" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+      <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+        <NexLogo collapsed={collapsed} />
+        <button className="s-toggle" onClick={() => setCollapse(p => !p)}>
           <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            {collapsed?<path d="M9 18l6-6-6-6"/>:<path d="M15 18l-6-6 6-6"/>}
+            {collapsed ? <path d="M9 18l6-6-6-6" /> : <path d="M15 18l-6-6 6-6" />}
           </svg>
         </button>
         <nav className="s-nav">
           <div className="s-group">
-            {!collapsed&&<div className="s-label">{t('main')}</div>}
-            {NAV_MAIN.map(it=>(<SItem key={it.id} {...it} active={page===it.id} collapsed={collapsed} onClick={setPage}/>))}
+            {!collapsed && <div className="s-label">{t('main')}</div>}
+            {NAV_MAIN.map(it => (<SItem key={it.id} {...it} active={page === it.id} collapsed={collapsed} onClick={setPage} />))}
           </div>
-          <div className="s-divider"/>
+          <div className="s-divider" />
           <div className="s-group">
-            {!collapsed&&<div className="s-label">{t('user')}</div>}
-            {NAV_USER.map(it=>(<SItem key={it.id} {...it} active={page===it.id} collapsed={collapsed} onClick={setPage}/>))}
+            {!collapsed && <div className="s-label">{t('user')}</div>}
+            {NAV_USER.map(it => (<SItem key={it.id} {...it} active={page === it.id} collapsed={collapsed} onClick={setPage} />))}
           </div>
         </nav>
         <div className="s-footer">
           <button className="s-item s-logout" onClick={logout} title={t('logout')}>
             <span className="s-icon">{IC.logout}</span>
-            {!collapsed&&<span className="s-label-txt">{t('logout')}</span>}
+            {!collapsed && <span className="s-label-txt">{t('logout')}</span>}
           </button>
         </div>
       </aside>
@@ -1025,37 +1200,37 @@ export default function Dashboard() {
           <div className="h-left">
             <div className="h-breadcrumb">
               <span className="h-bc-root">NexTest</span>
-              <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'#e5e7f0'}}><path d="M9 18l6-6-6-6"/></svg>
+              <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: '#e5e7f0' }}><path d="M9 18l6-6-6-6" /></svg>
               <span className="h-bc-page">{LABELS[page]}</span>
             </div>
           </div>
           <div className="h-search">
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:'#9ca3af',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input type="text" placeholder={t('searchPlaceholder')}/>
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: '#9ca3af', flexShrink: 0 }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" placeholder={t('searchPlaceholder')} />
           </div>
           <div className="h-right">
             <button className="h-icon-btn">
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              <span className="notif-dot"/>
+              <span className="notif-dot" />
             </button>
-            <div className="h-sep"/>
+            <div className="h-sep" />
             <div className="h-avatar">
-              {user?.avatar?<img src={user.avatar} alt="av" style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover'}}/>:<span>{user?.name?.[0]?.toUpperCase()||'U'}</span>}
+              {user?.avatar ? <img src={user.avatar} alt="av" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <span>{user?.name?.[0]?.toUpperCase() || 'U'}</span>}
             </div>
             <div>
-              <div className="h-user-name">{user?.name?.split(' ')[0]||'User'}</div>
+              <div className="h-user-name">{user?.name?.split(' ')[0] || 'User'}</div>
               <div className="h-user-role">{t('qaEngineer')}</div>
             </div>
           </div>
         </header>
 
         <div className="content">
-          {page==='dashboard'&&<DashboardPanel user={user} goTo={setPage}/>}
-          {page==='generate' &&<GeneratePanel  goTo={setPage} setGeneration={setGeneration}/>}
-          {page==='execution'&&<ExecutionPanel generation={generation}/>}
-          {page==='history'  &&<HistoryPanel   goTo={setPage} setGeneration={setGeneration}/>}
-          {page==='account'  &&<AccountPanel   user={user}/>}
-          {page==='settings' &&<SettingsPanel  theme={theme} setTheme={setTheme}/>}
+          {page === 'dashboard' && <DashboardPanel user={user} goTo={setPage} />}
+          {page === 'generate'  && <GeneratePanel  goTo={setPage} setGeneration={setGeneration} />}
+          {page === 'execution' && <ExecutionPanel generation={generation} />}
+          {page === 'history'   && <HistoryPanel   goTo={setPage} setGeneration={setGeneration} />}
+          {page === 'account'   && <AccountPanel   user={user} />}
+          {page === 'settings'  && <SettingsPanel  theme={theme} setTheme={setTheme} />}
         </div>
       </div>
     </div>

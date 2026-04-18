@@ -6,6 +6,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.platypus import Flowable
 from io import BytesIO
+import re
 from datetime import datetime
 
 # ── Color Palette ──────────────────────────────────────────────
@@ -332,6 +333,213 @@ def build_script_section(elements, script, framework_label):
             ParagraphStyle('Trunc', fontSize=7.5, fontName='Helvetica', alignment=TA_CENTER)))
 
 
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section 1 : Page Analysis — ce qui a été détecté
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_page_analysis(elements, scraped: dict, page_type: str):
+    """Affiche ce que le scraper a détecté sur la page."""
+    elements.append(section_header('🔍', 'Page Analysis'))
+    elements.append(Spacer(1, 8))
+
+    # ── Éléments détectés ────────────────────────────────────
+    detected = []
+    if scraped.get("inputs"):
+        types = list(set(i.get("type","text") for i in scraped["inputs"]))
+        detected.append(("Inputs", f"{len(scraped['inputs'])} champ(s) — types: {', '.join(types)}", "#3b82f6"))
+    if scraped.get("buttons"):
+        texts = [b.get("text","") for b in scraped["buttons"][:3] if b.get("text")]
+        detected.append(("Buttons", f"{len(scraped['buttons'])} bouton(s) — ex: {', '.join(texts)}", "#8b5cf6"))
+    if scraped.get("nav_links"):
+        detected.append(("Navigation", f"{len(scraped['nav_links'])} lien(s) de navigation", "#10b981"))
+    if scraped.get("forms"):
+        detected.append(("Forms", f"{len(scraped['forms'])} formulaire(s) detecte(s)", "#f59e0b"))
+    if scraped.get("images"):
+        loaded = sum(1 for i in scraped["images"] if i.get("loaded"))
+        detected.append(("Images", f"{len(scraped['images'])} image(s) — {loaded} chargee(s)", "#ec4899"))
+    if scraped.get("alerts"):
+        detected.append(("Alerts", f"{len(scraped['alerts'])} conteneur(s) d'erreur/alerte", "#ef4444"))
+    if scraped.get("pagination"):
+        detected.append(("Pagination", f"{len(scraped['pagination'])} element(s) de pagination", "#06b6d4"))
+    if scraped.get("add_to_cart"):
+        detected.append(("Add to Cart", f"{len(scraped['add_to_cart'])} bouton(s) panier detecte(s)", "#f97316"))
+    if scraped.get("modals"):
+        detected.append(("Modals", f"{len(scraped['modals'])} modal(s) detecte(e)(s)", "#6366f1"))
+
+    # Risques
+    risks = []
+    load_time = scraped.get("load_time_ms", 0)
+    if load_time > 3000:
+        risks.append(f"⚠ Page lente ({load_time}ms) — test de performance inclus")
+    if scraped.get("is_spa"):
+        risks.append("⚠ SPA detecte (React/Vue/Angular) — waits explicites requis")
+    if not scraped.get("inputs") and not scraped.get("buttons"):
+        risks.append("⚠ Peu d'elements interactifs — tests generiques generes")
+    if not scraped.get("alerts"):
+        risks.append("ℹ Aucun conteneur d'erreur — tests negatifs limites")
+
+    # Tableau détection
+    if detected:
+        det_rows = [[
+            Paragraph('<font color="#ffffff"><b>Element</b></font>',
+                      ParagraphStyle('DH', fontSize=8, fontName='Helvetica-Bold')),
+            Paragraph('<font color="#ffffff"><b>Details</b></font>',
+                      ParagraphStyle('DH2', fontSize=8, fontName='Helvetica-Bold')),
+        ]]
+        for name, detail, color in detected:
+            det_rows.append([
+                Paragraph(f'<font color="{color}"><b>{name}</b></font>',
+                          ParagraphStyle('DN', fontSize=8, fontName='Helvetica-Bold', leading=11)),
+                Paragraph(f'<font color="#475569">{detail}</font>',
+                          ParagraphStyle('DD', fontSize=8, fontName='Helvetica', leading=11)),
+            ])
+        det_tbl = Table(det_rows, colWidths=[35*mm, 133*mm])
+        det_tbl.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0), (-1,0), NAVY),
+            ('ROWBACKGROUNDS',(0,1), (-1,-1), [WHITE, LIGHT_BG]),
+            ('PADDING',       (0,0), (-1,-1), 7),
+            ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
+            ('BOX',           (0,0), (-1,-1), 0.8, BORDER_DARK),
+            ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
+        ]))
+        elements.append(det_tbl)
+    else:
+        elements.append(Paragraph(
+            '<font color="#94a3b8">Aucun element interactif detecte sur cette page.</font>',
+            ParagraphStyle('NoEl', fontSize=8, fontName='Helvetica')))
+
+    # Risques
+    if risks:
+        elements.append(Spacer(1, 8))
+        for risk in risks:
+            elements.append(Paragraph(
+                f'<font color="#f59e0b" size="7.5">{risk}</font>',
+                ParagraphStyle('Risk', fontSize=7.5, fontName='Helvetica', leading=11)))
+
+    elements.append(Spacer(1, 16))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section 2 : Test Plan — stratégie avant exécution
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_test_plan(elements, test_cases: list, page_type: str, framework: str, scraped: dict):
+    """Affiche le plan de test — scénarios prévus avant exécution."""
+    elements.append(section_header('📋', 'Test Plan'))
+    elements.append(Spacer(1, 8))
+
+    # ── Résumé stratégie ─────────────────────────────────────
+    page_type_labels = {
+        "login":     "Page de connexion — tests d'authentification",
+        "ecommerce": "Page e-commerce — tests panier et navigation",
+        "form":      "Page formulaire — tests de soumission et validation",
+        "dashboard": "Dashboard — tests de navigation et affichage",
+        "general":   "Page generale — tests de chargement et navigation",
+    }
+    strategy = page_type_labels.get(page_type, "Page generale")
+
+    summary_data = [
+        [Paragraph('<font color="#ffffff"><b>Critere</b></font>',
+                   ParagraphStyle('PH', fontSize=8, fontName='Helvetica-Bold')),
+         Paragraph('<font color="#ffffff"><b>Valeur</b></font>',
+                   ParagraphStyle('PH2', fontSize=8, fontName='Helvetica-Bold'))],
+        [Paragraph('<font color="#64748b">Type de page detecte</font>',
+                   ParagraphStyle('PL', fontSize=8, fontName='Helvetica-Bold')),
+         Paragraph(f'<font color="#1e293b">{page_type.upper()} — {strategy}</font>',
+                   ParagraphStyle('PV', fontSize=8, fontName='Helvetica'))],
+        [Paragraph('<font color="#64748b">Framework</font>',
+                   ParagraphStyle('PL2', fontSize=8, fontName='Helvetica-Bold')),
+         Paragraph(f'<font color="#1e293b">{framework}</font>',
+                   ParagraphStyle('PV2', fontSize=8, fontName='Helvetica'))],
+        [Paragraph('<font color="#64748b">Nombre de tests</font>',
+                   ParagraphStyle('PL3', fontSize=8, fontName='Helvetica-Bold')),
+         Paragraph(f'<font color="#1e293b">{len(test_cases)} tests planifies</font>',
+                   ParagraphStyle('PV3', fontSize=8, fontName='Helvetica'))],
+        [Paragraph('<font color="#64748b">Couverture</font>',
+                   ParagraphStyle('PL4', fontSize=8, fontName='Helvetica-Bold')),
+         Paragraph(
+             f'<font color="#10b981">{sum(1 for t in test_cases if t.get("type")=="positive")} positifs</font>'
+             f'  <font color="#94a3b8">|</font>  '
+             f'<font color="#ef4444">{sum(1 for t in test_cases if t.get("type")=="negative")} negatifs</font>',
+             ParagraphStyle('PV4', fontSize=8, fontName='Helvetica'))],
+    ]
+
+    plan_tbl = Table(summary_data, colWidths=[45*mm, 123*mm])
+    plan_tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,0), NAVY),
+        ('ROWBACKGROUNDS',(0,1), (-1,-1), [WHITE, LIGHT_BG]),
+        ('PADDING',       (0,0), (-1,-1), 7),
+        ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
+        ('BOX',           (0,0), (-1,-1), 0.8, BORDER_DARK),
+        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
+        ('LEFTPADDING',   (0,0), (0,-1), 10),
+    ]))
+    elements.append(plan_tbl)
+    elements.append(Spacer(1, 12))
+
+    # ── Scénarios planifiés ───────────────────────────────────
+    elements.append(Paragraph(
+        '<font color="#1e293b" size="9"><b>Scenarios planifies</b></font>',
+        ParagraphStyle('ScH', fontSize=9, fontName='Helvetica-Bold', leading=12)))
+    elements.append(Spacer(1, 6))
+
+    sc_rows = [[
+        Paragraph('<font color="#ffffff"><b>#</b></font>',
+                  ParagraphStyle('SCH1', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Scenario</b></font>',
+                  ParagraphStyle('SCH2', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Objectif</b></font>',
+                  ParagraphStyle('SCH3', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Priorite</b></font>',
+                  ParagraphStyle('SCH4', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Categorie</b></font>',
+                  ParagraphStyle('SCH5', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+    ]]
+
+    for i, tc in enumerate(test_cases):
+        priority = tc.get("priority", "medium")
+        category = tc.get("category", "functional")
+        pri_color = PRIORITY_COLORS.get(priority, '#94a3b8')
+        cat_color = CATEGORY_COLORS.get(category, '#3b82f6')
+
+        precond = tc.get("preconditions", "Page accessible")
+        precond = precond[:50] + '…' if len(precond) > 50 else precond
+
+        sc_rows.append([
+            Paragraph(f'<font color="#64748b"><b>{tc.get("id","")}</b></font>',
+                      ParagraphStyle('SCID', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(
+                f'<b><font color="#1e293b" size="8">{tc.get("name","")}</font></b><br/>'
+                f'<font color="#94a3b8" size="6.5">Pre: {precond}</font>',
+                ParagraphStyle('SCN', fontSize=8, fontName='Helvetica', leading=10)),
+            Paragraph(
+                f'<font color="#475569" size="7.5">{tc.get("description","")[:60]}</font>',
+                ParagraphStyle('SCO', fontSize=7.5, fontName='Helvetica', leading=10)),
+            Paragraph(
+                f'<font color="{pri_color}"><b>{priority.upper()}</b></font>',
+                ParagraphStyle('SCP', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(
+                f'<font color="{cat_color}"><b>{category.upper()}</b></font>',
+                ParagraphStyle('SCC', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        ])
+
+    sc_tbl = Table(sc_rows, colWidths=[8*mm, 52*mm, 62*mm, 22*mm, 24*mm])
+    sc_tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,0), NAVY),
+        ('ROWBACKGROUNDS',(0,1), (-1,-1), [WHITE, LIGHT_BG]),
+        ('PADDING',       (0,0), (-1,-1), 7),
+        ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
+        ('BOX',           (0,0), (-1,-1), 0.8, BORDER_DARK),
+        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
+        ('ALIGN',         (0,0), (0,-1), 'CENTER'),
+        ('ALIGN',         (3,0), (3,-1), 'CENTER'),
+        ('ALIGN',         (4,0), (4,-1), 'CENTER'),
+    ]))
+    elements.append(sc_tbl)
+    elements.append(Spacer(1, 20))
+
 def generate_pdf(generation_data: dict) -> bytes:
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
@@ -342,13 +550,22 @@ def generate_pdf(generation_data: dict) -> bytes:
     framework = generation_data.get('framework', 'Selenium')
     load_time = generation_data.get('load_time_ms', 0)
     is_spa    = generation_data.get('is_spa', False)
+    scraped   = generation_data.get('scraped', {
+        'inputs': [], 'buttons': [], 'nav_links': [], 'forms': [],
+        'images': [], 'alerts': [], 'pagination': [], 'add_to_cart': [],
+        'modals': [], 'is_spa': is_spa, 'load_time_ms': load_time,
+    })
+    page_type = generation_data.get('page_type', 'general')
 
-    test_cases          = generation_data.get('test_cases', [])
-    test_cases_selenium = generation_data.get('test_cases_selenium', [])
-    test_cases_cypress  = generation_data.get('test_cases_cypress', [])
-    script              = generation_data.get('script', '')
-    script_selenium     = generation_data.get('script_selenium', '')
-    script_cypress      = generation_data.get('script_cypress', '')
+
+    result = generation_data.get('result', generation_data)
+    test_cases = result.get('test_cases', generation_data.get('test_cases', []))
+    test_cases_selenium = result.get('test_cases_selenium', generation_data.get('test_cases_selenium', []))
+    test_cases_cypress  = result.get('test_cases_cypress',  generation_data.get('test_cases_cypress', []))
+    script              = result.get('script',          generation_data.get('script', ''))
+    script_selenium     = result.get('script_selenium', generation_data.get('script_selenium', ''))
+    script_cypress      = result.get('script_cypress',  generation_data.get('script_cypress', ''))
+    page_type           = result.get('page_type',       generation_data.get('page_type', 'general'))
     execution_results   = generation_data.get('execution_results', [])
 
     elements = []
@@ -432,6 +649,11 @@ def generate_pdf(generation_data: dict) -> bytes:
                        textColor=HexColor('#64748b'))
     ))
     elements.append(Spacer(1, 10))
+
+    # ── Page Analysis + Test Plan ─────────────────────────────
+    active_tcs = test_cases_selenium if framework == 'Both' else test_cases
+    build_page_analysis(elements, scraped, page_type)
+    build_test_plan(elements, active_tcs, page_type, framework, scraped)
 
     # ── Sections principale ───────────────────────────────────
     if framework == 'Both':

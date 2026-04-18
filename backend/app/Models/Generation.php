@@ -10,27 +10,32 @@ class Generation extends Model
         'user_id',
         'url',
         'framework',
+        'test_type',
         'status',
         'test_cases',
+        'test_cases_selenium',
+        'test_cases_cypress',
         'script',
-        'script_selenium',      // 🆕
-        'script_cypress',       // 🆕
-         'execution_results', // 🆕
-        'test_cases_selenium',  // 🆕
-        'test_cases_cypress',   // 🆕
+        'script_selenium',
+        'script_playwright',
+        'script_cypress',
+        'execution_results',
         'load_time_ms',
         'is_spa',
-        'pass_count',           // 🆕
-        'fail_count',           // 🆕
-        'skip_count',           // 🆕
-        'pass_rate',            // 🆕
+        'pass_count',
+        'fail_count',
+        'skip_count',
+        'pass_rate',
+        'page_type',
+        'scraped',
     ];
 
     protected $casts = [
         'test_cases'          => 'array',
-        'test_cases_selenium' => 'array', // 🆕
-        'test_cases_cypress'  => 'array', // 🆕
+        'test_cases_selenium' => 'array',
+        'test_cases_cypress'  => 'array',
         'execution_results'   => 'array',
+        'scraped'             => 'array',
         'is_spa'              => 'boolean',
     ];
 

@@ -1,102 +1,90 @@
 from playwright.sync_api import sync_playwright
+import re
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper JS : sélecteur CSS stable (filtre classes dynamiques avec hash)
+# ─────────────────────────────────────────────────────────────────────────────
+_STABLE_CSS_JS = """
+function stableCSS(el, fallback) {
+    if (el.id && !/^\\d/.test(el.id)) return '#' + el.id;
+    const tag = el.tagName.toLowerCase();
+    if (el.name) return tag + "[name='" + el.name + "']";
+    const classes = (el.className || '').toString().trim().split(/\\s+/)
+        .filter(c => c.length > 2
+            && !/[0-9a-f]{5,}/i.test(c)
+            && !/^\\d+$/.test(c)
+            && !/^(css|sc|wp)-/.test(c)
+            && !/--/.test(c)
+        );
+    if (classes.length) return tag + '.' + classes[0];
+    if (el.type && el.type !== 'text') return tag + "[type='" + el.type + "']";
+    return fallback || tag;
+}
+"""
 
 
 def scrape_page(url: str, wait_time: int = 2000) -> dict:
     with sync_playwright() as p:
-
-        # ── Launch avec options anti-détection ──────────────────────────────
         browser = p.chromium.launch(
             headless=True,
             args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
+                '--no-sandbox', '--disable-setuid-sandbox',
                 '--disable-blink-features=AutomationControlled',
-                '--disable-infobars',
-                '--ignore-certificate-errors',        # ✅ SSL invalide
+                '--disable-infobars', '--ignore-certificate-errors',
                 '--ignore-certificate-errors-spki-list',
-                '--disable-web-security',
-                '--allow-running-insecure-content',
+                '--disable-web-security', '--allow-running-insecure-content',
             ]
         )
-
-        # ── Context anti-détection avancé ────────────────────────────────────
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             extra_http_headers={
-                "Accept-Language":  "en-US,en;q=0.9",
-                "Accept":           "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                "Accept-Encoding":  "gzip, deflate, br",
-                "Cache-Control":    "no-cache",
-                "Pragma":           "no-cache",
-                "Sec-Fetch-Dest":   "document",
-                "Sec-Fetch-Mode":   "navigate",
-                "Sec-Fetch-Site":   "none",
-                "Upgrade-Insecure-Requests": "1",
+                "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Cache-Control": "no-cache", "Pragma": "no-cache",
+                "Sec-Fetch-Dest": "document", "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none", "Upgrade-Insecure-Requests": "1",
             },
             viewport={"width": 1920, "height": 1080},
-            locale="en-US",
-            timezone_id="America/New_York",
-            ignore_https_errors=True,               # ✅ ignorer erreurs SSL
+            locale="fr-FR", timezone_id="Africa/Tunis", ignore_https_errors=True,
         )
-
-        # ── Masquer Playwright complètement ──────────────────────────────────
         page = context.new_page()
         page.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
             Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-            Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+            Object.defineProperty(navigator, 'languages', {get: () => ['fr-FR', 'fr', 'en']});
             window.chrome = { runtime: {} };
-            Object.defineProperty(navigator, 'permissions', {
-                get: () => ({ query: () => Promise.resolve({ state: 'granted' }) })
-            });
         """)
 
-        # ── Stratégie de chargement multi-niveaux ────────────────────────────
+        # ── Chargement robuste avec fallback ─────────────────────────────────
         loaded = False
-
-        # Niveau 1 : networkidle (idéal)
-        if not loaded:
+        for wait_until, extra_wait in [
+            ("networkidle", 0),
+            ("load", 3000),
+            ("domcontentloaded", 5000),
+            ("commit", 8000),
+        ]:
+            if loaded:
+                break
             try:
-                page.goto(url, timeout=30000, wait_until="networkidle")
+                page.goto(url, timeout=30000, wait_until=wait_until)
+                if extra_wait:
+                    page.wait_for_timeout(extra_wait)
                 loaded = True
             except Exception:
                 pass
 
-        # Niveau 2 : load event
         if not loaded:
-            try:
-                page.goto(url, timeout=30000, wait_until="load")
-                page.wait_for_timeout(3000)
-                loaded = True
-            except Exception:
-                pass
+            browser.close()
+            return {"error": "Could not load page", "url": url}
 
-        # Niveau 3 : domcontentloaded (minimal)
-        if not loaded:
-            try:
-                page.goto(url, timeout=30000, wait_until="domcontentloaded")
-                page.wait_for_timeout(5000)
-                loaded = True
-            except Exception:
-                pass
-
-        # Niveau 4 : commit (juste la navigation)
-        if not loaded:
-            try:
-                page.goto(url, timeout=30000, wait_until="commit")
-                page.wait_for_timeout(8000)
-                loaded = True
-            except Exception as e:
-                browser.close()
-                return {"error": str(e), "url": url}
-
-        # ── Attendre que le body soit présent ────────────────────────────────
+        # ── Attendre le body + scroll pour déclencher lazy-load ──────────────
         try:
             page.wait_for_selector("body", timeout=10000)
         except Exception:
             pass
-
-        # ── Scroll pour charger le lazy content ──────────────────────────────
         try:
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             page.wait_for_timeout(wait_time)
@@ -105,145 +93,340 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
         except Exception:
             pass
 
-        # ── Vérifier que la page a du contenu ────────────────────────────────
         title = page.title()
-        body_text = ""
-        try:
-            body_text = page.inner_text("body")
-        except Exception:
-            pass
 
-        # ── Scrape tous les éléments ─────────────────────────────────────────
-
-        def safe_eval(selector, script, default=None):
-            """Eval sécurisé — retourne default si échec."""
+        def safe_eval(selector, script):
             try:
                 return page.eval_on_selector_all(selector, script)
             except Exception:
-                return default or []
+                return []
 
-        # Inputs
-        inputs = safe_eval(
-            "input:not([type='hidden'])",
-            """els => els.map(el => {
-                const id = el.id || ''; const name = el.name || '';
-                const type = el.type || 'text'; const className = el.className || '';
-                let css = id ? '#'+id : name ? "[name='"+name+"']" :
-                          className ? '.'+className.trim().split(/\\s+/)[0] : "input[type='"+type+"']";
-                return { type, name, id, placeholder: el.placeholder||'', required: el.required, css_selector: css };
-            })"""
-        )
+        # ── INPUTS ────────────────────────────────────────────────────────────
+        inputs = safe_eval("input:not([type='hidden'])", _STABLE_CSS_JS + """
+        els => els.map(el => {
+            const css = stableCSS(el, "input[type='" + (el.type||'text') + "']");
+            return {
+                type: el.type||'text',
+                name: el.name||'',
+                id: el.id||'',
+                placeholder: el.placeholder||'',
+                required: el.required,
+                css_selector: css
+            };
+        })""")
 
-        # Buttons
+        # ── BUTTONS ───────────────────────────────────────────────────────────
         buttons = safe_eval(
-            "button, input[type='submit'], input[type='button'], [role='button'], [type='button']",
-            """els => els.map(el => {
-                const id = el.id || ''; const text = (el.innerText||el.value||'').trim();
-                const className = el.className || '';
-                let css = id ? '#'+id : className ? '.'+className.trim().split(/\\s+/)[0] : 'button';
-                return { type: el.type||'button', text, id, name: el.name||'', css_selector: css, text_content: text };
-            })"""
-        )
+            "button, input[type='submit'], input[type='button'], [role='button']",
+            _STABLE_CSS_JS + """
+        els => els.map(el => {
+            const text = (el.innerText||el.value||'').trim();
+            const css = stableCSS(el, 'button');
+            return {
+                type: el.type||'button',
+                text: text,
+                id: el.id||'',
+                name: el.name||'',
+                css_selector: css
+            };
+        }).filter(b => b.text || b.id)
+        """)
 
-        # Links
+        # ── LINKS ─────────────────────────────────────────────────────────────
         links = safe_eval(
             "a[href]",
-            "els => els.slice(0,15).map(el => ({ text: el.innerText.trim()||'', href: el.href||'' }))"
+            "els => els.slice(0,15).map(el => ({text:(el.innerText||'').trim(), href:el.href||''}))"
         )
 
-        # Forms
-        forms = safe_eval(
-            "form",
-            """els => els.map(el => {
-                const id = el.id||''; const className = el.className||'';
-                let css = id ? '#'+id : className ? '.'+className.trim().split(/\\s+/)[0] : 'form';
-                return { id, action: el.action||'', method: el.method||'get', css_selector: css };
-            })"""
-        )
+        # ── FORMS ─────────────────────────────────────────────────────────────
+        forms = safe_eval("form", _STABLE_CSS_JS + """
+        els => els.map(el => {
+            const css = stableCSS(el, 'form');
+            return {
+                id: el.id||'',
+                action: el.action||'',
+                method: el.method||'get',
+                css_selector: css
+            };
+        })""")
 
-        # Selects
-        selects = safe_eval(
-            "select",
-            """els => els.map(el => {
-                const id=el.id||''; const name=el.name||'';
-                let css = id?'#'+id:name?"select[name='"+name+"']":'select';
-                return { name, id, options: Array.from(el.options).map(o=>o.value).slice(0,5), css_selector: css };
-            })"""
-        )
+        # ── SELECTS ───────────────────────────────────────────────────────────
+        selects = safe_eval("select", _STABLE_CSS_JS + """
+        els => els.map(el => {
+            const css = stableCSS(el, 'select');
+            return {
+                name: el.name||'',
+                id: el.id||'',
+                options: Array.from(el.options).map(o => o.value).slice(0,5),
+                css_selector: css
+            };
+        })""")
 
-        # Textareas
-        textareas = safe_eval(
-            "textarea",
-            """els => els.map(el => {
-                const id=el.id||''; const name=el.name||'';
-                let css = id?'#'+id:name?"textarea[name='"+name+"']":'textarea';
-                return { name, id, placeholder: el.placeholder||'', css_selector: css };
-            })"""
-        )
+        # ── TEXTAREAS ─────────────────────────────────────────────────────────
+        textareas = safe_eval("textarea", _STABLE_CSS_JS + """
+        els => els.map(el => {
+            const css = stableCSS(el, 'textarea');
+            return {name: el.name||'', id: el.id||'', placeholder: el.placeholder||'', css_selector: css};
+        })""")
 
-        # Checkboxes
+        # ── CHECKBOXES ────────────────────────────────────────────────────────
         checkboxes = safe_eval(
             "input[type='checkbox'], input[type='radio']",
-            """els => els.map(el => {
-                const id=el.id||''; const name=el.name||'';
-                let css = id?'#'+id:name?"[name='"+name+"']":"input[type='"+el.type+"']";
-                return { type: el.type, name, id, value: el.value||'', css_selector: css };
-            })"""
-        )
+            _STABLE_CSS_JS + """
+        els => els.map(el => {
+            const css = stableCSS(el, "input[type='" + el.type + "']");
+            return {type: el.type, name: el.name||'', id: el.id||'', value: el.value||'', css_selector: css};
+        })""")
 
-        # Add to cart
+        # ── ADD TO CART ───────────────────────────────────────────────────────
         add_to_cart = safe_eval(
-            "[class*='cart'], [id*='cart'], [class*='add-to'], [id*='add-to'], [class*='addtocart']",
-            """els => els.slice(0,10).map(el => {
-                const id=el.id||''; const className=el.className||'';
-                let css = id?'#'+id:className?'.'+className.trim().split(/\\s+/)[0]:'[class*="cart"]';
-                return { text: (el.innerText||'').trim(), id, class: className, css_selector: css };
-            })"""
-        )
+            "[class*='cart'],[id*='cart'],[class*='add-to'],[id*='add-to']",
+            _STABLE_CSS_JS + """
+        els => els.slice(0,10).map(el => {
+            const css = stableCSS(el, '[class*=cart]');
+            return {text:(el.innerText||'').trim(), id:el.id||'', css_selector:css};
+        })""")
 
-        # Pagination
+        # ── PAGINATION ────────────────────────────────────────────────────────
         pagination = safe_eval(
-            ".pagination a, [class*='pagination'] a, [aria-label*='page'], [class*='page-item'] a",
-            """els => els.slice(0,10).map(el => ({
-                text: (el.innerText||'').trim(), href: el.href||'', aria_label: el.getAttribute('aria-label')||''
-            }))"""
+            ".pagination a, [class*='pagination'] a, [class*='page-item'] a",
+            "els => els.slice(0,10).map(el => ({text:(el.innerText||'').trim(), href:el.href||'', aria_label:el.getAttribute('aria-label')||''}))"
         )
 
-        # Nav links
-        nav_links = safe_eval(
+        # ── NAV LINKS ─────────────────────────────────────────────────────────
+        raw_nav = safe_eval(
             "nav a, [class*='nav'] a, [class*='menu'] a, header a, [class*='navbar'] a",
-            "els => els.slice(0,15).map(el => ({ text: (el.innerText||'').trim(), href: el.href||'' }))"
+            "els => els.slice(0,20).map(el => ({text:(el.innerText||'').trim(), href:el.href||''}))"
         )
+        seen_nav = set()
+        nav_links = []
+        base = url.rstrip("/")
+        for n in raw_nav:
+            href = n.get("href", "").rstrip("/")
+            text = n.get("text", "").strip()
+            if (not href or not text or href == base
+                    or href.endswith("#") or href in seen_nav
+                    or href.startswith("javascript")):
+                continue
+            seen_nav.add(href)
+            nav_links.append(n)
 
-        # Modals
+        # ── MODALS ────────────────────────────────────────────────────────────
         modals = safe_eval(
-            "[class*='modal'], [class*='popup'], [role='dialog'], [class*='overlay']",
-            """els => els.slice(0,5).map(el => {
-                const id=el.id||''; const className=el.className||'';
-                let css = id?'#'+id:className?'.'+className.trim().split(/\\s+/)[0]:'[role="dialog"]';
-                return { id, class: className, visible: el.offsetParent!==null, css_selector: css };
-            })"""
-        )
+            "[class*='modal'],[class*='popup'],[role='dialog']",
+            _STABLE_CSS_JS + """
+        els => els.slice(0,5).map(el => {
+            const css = stableCSS(el, '[role=dialog]');
+            return {id:el.id||'', visible:el.offsetParent!==null, css_selector:css};
+        })""")
 
-        # Images
+        # ── IMAGES (existing) ─────────────────────────────────────────────────
         images = safe_eval(
             "img",
-            "els => els.slice(0,10).map(el => ({ src: el.src||'', alt: el.alt||'', loaded: el.complete&&el.naturalWidth>0 }))"
+            "els => els.slice(0,10).map(el => ({src:el.src||'', alt:el.alt||'', loaded:el.complete&&el.naturalWidth>0}))"
         )
 
-        # Alerts — détection maximale
+        # ── ALERTS ────────────────────────────────────────────────────────────
         alerts = safe_eval(
-            "[class*='alert'], [class*='error'], [id*='error'], [class*='success'], "
-            "[class*='warning'], [role='alert'], [id*='alert'], [id*='message'], "
-            "[class*='message'], [class*='flash'], [class*='notification'], [class*='toast']",
-            """els => els.slice(0,10).map(el => {
-                const id=el.id||''; const className=el.className||'';
-                let css = id?'#'+id:className?'.'+className.trim().split(/\\s+/)[0]:'';
-                return { text: (el.innerText||'').trim(), class: className, id: id, css_selector: css };
-            })"""
+            "[class*='alert'],[class*='error'],[id*='error'],[class*='success'],"
+            "[class*='warning'],[role='alert'],[id*='alert'],[id*='message'],"
+            "[class*='message'],[class*='flash'],[class*='notification'],[class*='toast']",
+            _STABLE_CSS_JS + """
+        els => els.slice(0,10).map(el => {
+            const css = stableCSS(el, '');
+            return {text:(el.innerText||'').trim(), class:el.className||'', id:el.id||'', css_selector:css};
+        })""")
+
+        # ── SEARCH INPUTS (existing) ──────────────────────────────────────────
+        search_inputs = safe_eval(
+            "input[type='search'], input[name='s'], "
+            "input[placeholder*='search' i], input[placeholder*='recherche' i], "
+            "input[placeholder*='chercher' i], input[placeholder*='بحث' i], "
+            "input[name*='search' i], input[name*='query' i], "
+            "[class*='search'] input, [id*='search'] input",
+            _STABLE_CSS_JS + """
+        els => {
+            const seen = new Set();
+            return els.map(el => {
+                const css = stableCSS(el, "input[name='s']");
+                if (seen.has(css)) return null;
+                seen.add(css);
+                return {
+                    type: el.type||'text',
+                    name: el.name||'',
+                    id: el.id||'',
+                    placeholder: el.placeholder||'',
+                    css_selector: css
+                };
+            }).filter(Boolean);
+        }""")
+
+        # ── FILTERS ───────────────────────────────────────────────────────────
+        filters = safe_eval(
+            "[class*='filter'] select, [id*='filter'] select, "
+            "[class*='filtre'] select, select[name*='filter' i], "
+            "select[name*='sort' i], select[name*='category' i], "
+            "[class*='sort'] select",
+            _STABLE_CSS_JS + """
+        els => els.slice(0,10).map(el => {
+            const css = stableCSS(el, '[class*=filter]');
+            return {tag:el.tagName.toLowerCase(), id:el.id||'', css_selector:css, text:(el.innerText||el.value||'').trim().slice(0,50)};
+        })""")
+
+        # ── NEW: LANGUAGE SWITCHER ────────────────────────────────────────────
+        lang_switcher = safe_eval(
+            ".pll-parent-menu-item, .wpml-ls-item, [class*='lang-switch'], "
+            "[class*='language-switch'], [class*='lang-selector'], "
+            "a[hreflang], "
+            "a[href*='/fr/'], a[href*='/en/'], a[href*='/ar/'], a[href*='/de/'], "
+            "a[href*='lang=fr'], a[href*='lang=en'], a[href*='lang=ar']",
+            _STABLE_CSS_JS + r"""
+        els => {
+            const seen = new Set();
+            return els.slice(0, 10).map(el => {
+                const css  = stableCSS(el, 'a[hreflang]');
+                const text = (el.innerText || el.getAttribute('hreflang') || '').trim().toUpperCase();
+                const href = el.href || '';
+                if (seen.has(css)) return null;
+                seen.add(css);
+                return { css_selector: css, text, href, hreflang: el.getAttribute('hreflang') || '' };
+            }).filter(Boolean);
+        }"""
+        )
+        # Deduplicate by (text, hreflang, href-prefix)
+        _seen_lang = set()
+        _lang_clean = []
+        for _l in lang_switcher:
+            _key = (_l.get("text", ""), _l.get("hreflang", ""), _l.get("href", "")[:60])
+            if _key not in _seen_lang:
+                _seen_lang.add(_key)
+                _lang_clean.append(_l)
+        lang_switcher = _lang_clean[:6]
+
+        # ── NEW: SEARCH BAR (form-level) ──────────────────────────────────────
+        search_bar = safe_eval(
+            "form[role='search'], form[action*='search'], "
+            "[class*='search-form'], [class*='search-bar'], [class*='search-box'], "
+            "[id*='search-form'], [id*='searchform']",
+            _STABLE_CSS_JS + """
+        els => els.slice(0, 5).map(el => {
+            const css   = stableCSS(el, 'form[role=search]');
+            const input = el.querySelector("input[type='search'], input[name='s'], input[type='text']");
+            return {
+                css_selector:      css,
+                has_input:         !!input,
+                input_placeholder: input ? (input.placeholder || '') : '',
+                visible:           el.offsetParent !== null,
+            };
+        })"""
         )
 
-        # Performance
+        # ── NEW: IMAGES AUDIT (visibility + alt) ─────────────────────────────
+        images_audit = safe_eval(
+            "img",
+            """els => els.slice(0, 20).map(el => {
+            const rect   = el.getBoundingClientRect();
+            const inView = rect.width > 0 && rect.height > 0;
+            const loaded = el.complete && el.naturalWidth > 0;
+            const alt    = el.alt || '';
+            const src    = el.src || el.getAttribute('data-src') || '';
+            let css = '';
+            if (el.id)                       css = '#' + el.id;
+            else if (alt && alt.length < 60) css = "img[alt='" + alt.replace(/'/g,"") + "']";
+            else if (src) {
+                const frag = src.split('/').pop().split('?')[0].slice(0, 30);
+                if (frag)                    css = "img[src*='" + frag + "']";
+            }
+            if (!css) css = 'img';
+            return {
+                css_selector: css,
+                src:          src.slice(0, 120),
+                alt:          alt,
+                has_alt:      alt.trim().length > 0,
+                is_decorative: alt === '',
+                loaded:       loaded,
+                in_viewport:  inView,
+                width:        Math.round(rect.width),
+                height:       Math.round(rect.height),
+            };
+        }).filter(img => img.loaded && img.width > 10)
+        """
+        )
+
+        # ── NEW: ICON DETECTION (SVG + font icons) ────────────────────────────
+        icons = safe_eval(
+            "svg, "
+            "[class*='fa-'], [class*='icon-'], [class*='bi-'], [class*='ri-'], "
+            "[class*='mdi-'], [class*='feather-'], [class*='heroicon-'], "
+            "[class*='icon']:not(section):not(div):not(article), "
+            "i[class*='fa'], i[class*='icon'], i[class*='bi']",
+            _STABLE_CSS_JS + """
+        els => {
+            const seen = new Set();
+            return els.slice(0, 15).map(el => {
+                const tag = el.tagName.toLowerCase();
+                const cls = (el.className && el.className.toString) ? el.className.toString() : '';
+                const css = stableCSS(el, tag);
+                if (seen.has(css)) return null;
+                seen.add(css);
+                const kind = tag === 'svg' ? 'svg'
+                           : cls.match(/fa[- ]/)  ? 'font-awesome'
+                           : cls.match(/bi-/)      ? 'bootstrap-icon'
+                           : cls.match(/mdi-/)     ? 'material-icon'
+                           : cls.match(/icon/)     ? 'generic-icon'
+                           : 'unknown';
+                const visible = el.offsetParent !== null || tag === 'svg';
+                return { css_selector: css, kind, visible, class: cls.trim().slice(0, 60) };
+            }).filter(Boolean).filter(ic => ic.visible);
+        }"""
+        )
+
+        # ── NEW: INPUT FIELDS (semantic, form-context aware) ──────────────────
+        input_fields = safe_eval(
+            "input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']), "
+            "textarea, select",
+            _STABLE_CSS_JS + """
+        els => {
+            const labelFor = id => {
+                if (!id) return '';
+                const lbl = document.querySelector("label[for='" + id + "']");
+                return lbl ? lbl.innerText.trim() : '';
+            };
+            return els.slice(0, 20).map(el => {
+                const tag   = el.tagName.toLowerCase();
+                const type  = el.type || tag;
+                const css   = stableCSS(el, tag + "[type='" + type + "']");
+                const label = labelFor(el.id) || el.getAttribute('aria-label') || el.placeholder || '';
+                const hint  = (el.name + ' ' + el.id + ' ' + el.placeholder + ' ' + label).toLowerCase();
+                const role  = type === 'email'                        ? 'email'
+                            : type === 'tel'                          ? 'phone'
+                            : type === 'password'                     ? 'password'
+                            : /message|comment|body|content/i.test(hint) ? 'message'
+                            : /subject|objet|sujet/i.test(hint)       ? 'subject'
+                            : /name|nom|prenom|firstname/i.test(hint) ? 'name'
+                            : /search|query|recherche/i.test(hint)    ? 'search'
+                            : tag === 'textarea'                      ? 'textarea'
+                            : tag === 'select'                        ? 'select'
+                            : 'text';
+                const form    = el.closest('form');
+                const formCss = form
+                    ? (form.id ? '#'+form.id
+                        : (form.className ? '.'+form.className.trim().split(' ')[0] : 'form'))
+                    : '';
+                return {
+                    css_selector: css,
+                    type, role, label,
+                    name:     el.name || '',
+                    id:       el.id   || '',
+                    required: el.required,
+                    form_css: formCss,
+                    visible:  el.offsetParent !== null,
+                };
+            }).filter(f => f.visible);
+        }"""
+        )
+
+        # ── PERFORMANCE & SPA DETECTION ───────────────────────────────────────
         load_time = 0
         try:
             load_time = page.evaluate("""() => {
@@ -254,14 +437,12 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
         except Exception:
             pass
 
-        # SPA Detection élargie
         is_spa = False
         try:
             is_spa = page.evaluate("""() => {
                 return !!(window.React || window.angular || window.Vue ||
-                          window.__NEXT_DATA__ || window.nuxt ||
-                          window.__NUXT__ || window.Ember ||
-                          document.querySelector('[ng-app]') ||
+                          window.__NEXT_DATA__ || window.nuxt || window.__NUXT__ ||
+                          window.Ember || document.querySelector('[ng-app]') ||
                           document.querySelector('[data-reactroot]') ||
                           document.querySelector('#__next') ||
                           document.querySelector('#app[data-v-app]'));
@@ -272,9 +453,30 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
         browser.close()
 
         return {
-            "url": url, "title": title, "is_spa": is_spa, "load_time_ms": load_time,
-            "inputs": inputs, "buttons": buttons, "links": links, "forms": forms,
-            "selects": selects, "textareas": textareas, "checkboxes": checkboxes,
-            "add_to_cart": add_to_cart, "pagination": pagination, "nav_links": nav_links,
-            "modals": modals, "images": images, "alerts": alerts,
+            # ── Existing keys (unchanged) ──────────────────────────────────
+            "url":            url,
+            "title":          title,
+            "is_spa":         is_spa,
+            "load_time_ms":   load_time,
+            "inputs":         inputs,
+            "buttons":        buttons,
+            "links":          links,
+            "forms":          forms,
+            "selects":        selects,
+            "textareas":      textareas,
+            "checkboxes":     checkboxes,
+            "add_to_cart":    add_to_cart,
+            "pagination":     pagination,
+            "nav_links":      nav_links,
+            "modals":         modals,
+            "images":         images,
+            "alerts":         alerts,
+            "search_inputs":  search_inputs,
+            "filters":        filters,
+            # ── NEW keys ───────────────────────────────────────────────────
+            "lang_switcher":  lang_switcher,   # i18n routing detection
+            "search_bar":     search_bar,       # form-level search container
+            "images_audit":   images_audit,     # visibility + alt audit
+            "icons":          icons,             # SVG / font icon detection
+            "input_fields":   input_fields,     # semantic form field detection
         }
