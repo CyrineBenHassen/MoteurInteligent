@@ -446,9 +446,6 @@ function GeneratePanel({ goTo, setGeneration }) {
               </div>
             </div>
           ))}
-
-          {/* Mode sélectionné */}
-         
         </div>
       </div>
     </div>
@@ -550,7 +547,6 @@ function ExecutionPanel({ generation }) {
   const progressColor     = rate >= 80 ? 'linear-gradient(90deg,#10b981,#34d399)' : rate >= 50 ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' : 'linear-gradient(90deg,#ef4444,#f87171)';
   const progressTextColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
 
-  // Badge test type
   const TEST_TYPE_BADGE = {
     smoke:      { label: '💨 Smoke',      color: '#64748b', bg: 'rgba(148,163,184,.12)', border: 'rgba(148,163,184,.3)' },
     functional: { label: '⚡ Functional', color: '#4f86e8', bg: 'rgba(79,134,232,.1)',  border: 'rgba(79,134,232,.25)' },
@@ -558,25 +554,36 @@ function ExecutionPanel({ generation }) {
   };
   const ttBadge = TEST_TYPE_BADGE[testType] || TEST_TYPE_BADGE.smoke;
 
-  // Category badge colors
   const catStyle = (cat) => ({
     smoke:      { color: '#64748b', bg: 'rgba(148,163,184,.12)', border: 'rgba(148,163,184,.25)' },
     functional: { color: '#4f86e8', bg: 'rgba(79,134,232,.1)',   border: 'rgba(79,134,232,.2)'  },
     regression: { color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',   border: 'rgba(139,92,246,.2)'  },
   }[cat] || { color: '#64748b', bg: 'rgba(148,163,184,.12)', border: 'rgba(148,163,184,.25)' });
 
+  // ── FIX 3: downloadScript now handles Playwright correctly ────────────────
   const downloadScript = (type = 'selenium') => {
     let content, filename;
+
     if (isBoth) {
-      content  = type === 'selenium' ? generation?.result?.script_selenium : generation?.result?.script_cypress;
-      filename = type === 'selenium' ? 'test_selenium.py' : 'test_cypress.js';
+      content  = type === 'selenium'   ? generation?.result?.script_selenium
+               : type === 'playwright' ? generation?.result?.script_playwright
+               :                         generation?.result?.script_cypress;
+      filename = type === 'selenium'   ? 'test_selenium.py'
+               : type === 'playwright' ? 'test_playwright.py'
+               :                         'test_cypress.js';
     } else {
-      content  = generation?.result?.script || '';
-      filename = framework === 'Cypress' ? 'test_cypress.js' : 'test_selenium.py';
+      const fw = framework?.toLowerCase();
+      content  = fw === 'playwright' ? (generation?.result?.script_playwright || generation?.result?.script || '')
+               : fw === 'cypress'    ? (generation?.result?.script_cypress    || generation?.result?.script || '')
+               :                       (generation?.result?.script_selenium   || generation?.result?.script || '');
+      filename = fw === 'playwright' ? 'test_playwright.py'
+               : fw === 'cypress'    ? 'test_cypress.js'
+               :                       'test_selenium.py';
     }
+
     const blob = new Blob([content || ''], { type: 'text/plain' });
     const link = document.createElement('a');
-    link.href  = URL.createObjectURL(blob);
+    link.href     = URL.createObjectURL(blob);
     link.download = filename;
     link.click();
   };
@@ -629,19 +636,39 @@ function ExecutionPanel({ generation }) {
             </span>
           </div>
         </div>
+
+        {/* ── FIX 3: Download buttons — Playwright button added for isBoth,
+                     single-framework button shows correct emoji/extension     ── */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {isBoth ? (
             <>
-              <button className="btn-outline" style={{ fontSize: 11, padding: '9px 18px' }} onClick={() => downloadScript('selenium')}>🐍 Selenium .py</button>
-              <button className="btn-outline" style={{ fontSize: 11, padding: '9px 18px' }} onClick={() => downloadScript('cypress')}>🌲 Cypress .js</button>
+              <button className="btn-outline" style={{ fontSize: 11, padding: '9px 18px' }}
+                      onClick={() => downloadScript('selenium')}>
+                🐍 Selenium .py
+              </button>
+              <button className="btn-outline" style={{ fontSize: 11, padding: '9px 18px' }}
+                      onClick={() => downloadScript('playwright')}>
+                🎭 Playwright .py
+              </button>
+              <button className="btn-outline" style={{ fontSize: 11, padding: '9px 18px' }}
+                      onClick={() => downloadScript('cypress')}>
+                🌲 Cypress .js
+              </button>
             </>
           ) : (
-            <button className="btn-outline" style={{ fontSize: 11, padding: '9px 18px' }} onClick={() => downloadScript()}>
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download Script
+            <button className="btn-outline" style={{ fontSize: 11, padding: '9px 18px' }}
+                    onClick={() => downloadScript()}>
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"
+                   viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Download {framework === 'Playwright' ? '🎭 .py' : framework === 'Cypress' ? '🌲 .js' : '🐍 .py'}
             </button>
           )}
-          <button className="btn-primary" style={{ fontSize: 11, padding: '9px 18px' }} onClick={downloadPdf} disabled={pdfLoading}>
+          <button className="btn-primary" style={{ fontSize: 11, padding: '9px 18px' }}
+                  onClick={downloadPdf} disabled={pdfLoading}>
             {pdfLoading ? <><span className="spinner" />Generating...</> : <>📄 Download PDF</>}
           </button>
         </div>
@@ -726,7 +753,6 @@ function ExecutionPanel({ generation }) {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                      {/* Category badge */}
                       <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1px', padding: '2px 8px', borderRadius: 10, background: cs.bg, color: cs.color, border: `1px solid ${cs.border}` }}>
                         {test.category?.toUpperCase()}
                       </span>
@@ -786,6 +812,7 @@ function HistoryPanel({ goTo, setGeneration }) {
         test_cases_cypress:  item.test_cases_cypress  || [],
         script:              item.script              || '',
         script_selenium:     item.script_selenium     || '',
+        script_playwright:   item.script_playwright   || '',  // FIX 2: added for history review
         script_cypress:      item.script_cypress      || '',
         execution_results:   item.execution_results   || [],
       },

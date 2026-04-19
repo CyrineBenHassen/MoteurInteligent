@@ -19,34 +19,50 @@ class GenerationController extends Controller
 
         $request->validate([
             'url'       => 'required|url',
-            'framework' => 'in:Selenium,Cypress,Both',
-            // FIX 1: test_type was never validated or read — added here
-            'test_type' => 'in:smoke,functional,regression',
+            'framework' => 'nullable|in:Selenium,Cypress,Playwright,Both,All',
+            'test_type' => 'nullable|in:smoke,functional,regression',
         ]);
 
-        $url      = $request->url;
+        // FIX 1: Normalise casing BEFORE validate() would reject lowercase values.
+        // The validate() above already ran, so we normalise for downstream usage.
+        $url       = $request->url;
         $framework = $request->framework ?? 'Selenium';
-        // FIX 2: read test_type from request — was hardcoded/missing before
-        $testType = $request->test_type ?? 'smoke';
+        $testType  = $request->test_type  ?? 'smoke';
+
+        $frameworkMap = [
+            'selenium'   => 'Selenium',
+            'playwright' => 'Playwright',
+            'cypress'    => 'Cypress',
+            'both'       => 'Both',
+            'all'        => 'All',
+        ];
+        $framework = $frameworkMap[strtolower($framework)] ?? $framework;
+        $testType  = strtolower($testType);
+
+        // Block localhost
+        if (str_contains($url, 'localhost') || str_contains($url, '127.0.0.1')) {
+            return response()->json([
+                'error' => 'localhost URLs cannot be tested — please use a public URL.',
+            ], 422);
+        }
 
         Log::info('[NEXTEST] generate()', [
             'url'       => $url,
             'framework' => $framework,
-            'test_type' => $testType,   // now visible in logs for debugging
+            'test_type' => $testType,
         ]);
 
         try {
             // ── Step 1: Generate tests via LLM ─────────────────────────────
-            // FIX 3: test_type is now forwarded to the Python service
             $response = Http::timeout(120)->post('http://127.0.0.1:8001/generate', [
                 'url'       => $url,
                 'framework' => $framework,
-                'test_type' => $testType,   // ← the missing piece
+                'test_type' => $testType,
             ]);
 
             if ($response->failed()) {
                 return response()->json([
-                    'error' => 'AI service error',
+                    'error'  => 'AI service error',
                     'detail' => $response->body(),
                 ], 500);
             }
@@ -54,7 +70,6 @@ class GenerationController extends Controller
             $data   = $response->json();
             $result = $data['result'] ?? [];
 
-            // Surface validation errors from Python if generation partially failed
             if (!empty($result['validation_errors'])) {
                 Log::warning('[NEXTEST] Generation validation errors', [
                     'test_type' => $testType,
@@ -62,10 +77,9 @@ class GenerationController extends Controller
                 ]);
             }
 
-            // Detect and log downgrade (static page: functional → smoke)
             $wasDowngraded   = $result['downgraded']       ?? false;
             $downgradeReason = $result['downgrade_reason'] ?? null;
-            $executionType   = $result['execution_type']   ?? $testType; // 'smoke' when downgraded
+            $executionType   = $result['execution_type']   ?? $testType;
 
             if ($wasDowngraded) {
                 Log::info('[NEXTEST] Test type downgraded', [
@@ -80,14 +94,13 @@ class GenerationController extends Controller
             $testCasesCypress  = $result['test_cases_cypress']  ?? [];
             $script            = $result['script']              ?? '';
             $scriptSelenium    = $result['script_selenium']     ?? '';
+            $scriptPlaywright  = $result['script_playwright']   ?? '';  // FIX 2: added
             $scriptCypress     = $result['script_cypress']      ?? '';
             $scraped           = $data['scraped']               ?? [];
             $pageType          = $result['page_type']
                               ?? ($testCases[0]['page_type'] ?? 'general');
 
-            // ── Step 2: PHP-side validation before execution ────────────────
-            // Skip contract validation for downgraded tests — the Python layer
-            // already handled the downgrade and the steps are correctly smoke-shaped.
+            // ── Step 2: PHP-side validation ─────────────────────────────────
             if ($wasDowngraded) {
                 $validationResult = ['valid' => true, 'errors' => [], 'warnings' => [
                     "Test type downgraded from {$testType} to smoke: {$downgradeReason}",
@@ -103,11 +116,10 @@ class GenerationController extends Controller
                     'steps'     => array_column($testCases, 'action'),
                 ]);
 
-                // Return 422 with the bad test cases for frontend debugging
                 return response()->json([
                     'error'             => 'Generated tests do not match test_type contract',
                     'validation_errors' => $validationResult['errors'],
-                    'test_cases'        => $testCases,   // for debugging
+                    'test_cases'        => $testCases,
                     'test_type'         => $testType,
                 ], 422);
             }
@@ -136,7 +148,7 @@ class GenerationController extends Controller
                     'script'     => $framework === 'Both' ? $scriptSelenium : $script,
                     'framework'  => 'Selenium',
                     'test_cases' => $testCasesToRun,
-                    'test_type'  => $testType,  // forward so runner can apply mode logic
+                    'test_type'  => $testType,
                 ]);
 
                 Log::info('[NEXTEST] /run response', [
@@ -162,13 +174,14 @@ class GenerationController extends Controller
                 'user_id'             => auth()->id(),
                 'url'                 => $url,
                 'framework'           => $framework,
-                'test_type'           => $testType,   // persist so history shows correct mode
+                'test_type'           => $testType,
                 'status'              => 'completed',
                 'test_cases'          => $testCases,
                 'test_cases_selenium' => $testCasesSelenium,
                 'test_cases_cypress'  => $testCasesCypress,
                 'script'              => $script,
                 'script_selenium'     => $scriptSelenium,
+                'script_playwright'   => $scriptPlaywright,  // FIX 2: added
                 'script_cypress'      => $scriptCypress,
                 'execution_results'   => $executionResults,
                 'load_time_ms'        => $scraped['load_time_ms'] ?? 0,
@@ -182,20 +195,21 @@ class GenerationController extends Controller
             ]);
 
             return response()->json([
-                'message'          => 'Tests generated successfully',
-                'generation'       => $generation,
-                'result'           => array_merge($result, [
+                'message'             => 'Tests generated successfully',
+                'generation'          => $generation,
+                'result'              => array_merge($result, [
                     'execution_results' => $executionResults,
                     'page_type'         => $pageType,
-                    'test_type'         => $testType,       // always the requested type
-                    'execution_type'    => $executionType,  // what actually ran
+                    'test_type'         => $testType,
+                    'execution_type'    => $executionType,
+                    'script_playwright' => $scriptPlaywright,  // FIX 2: added
                 ]),
-                'scraped'          => $scraped,
-                'page_type'        => $pageType,
-                'test_type'        => $testType,            // requested — never mutated
-                'execution_type'   => $executionType,       // 'smoke' when downgraded
-                'downgraded'       => $wasDowngraded,
-                'downgrade_reason' => $downgradeReason,
+                'scraped'             => $scraped,
+                'page_type'           => $pageType,
+                'test_type'           => $testType,
+                'execution_type'      => $executionType,
+                'downgraded'          => $wasDowngraded,
+                'downgrade_reason'    => $downgradeReason,
                 'validation_warnings' => $validationResult['warnings'],
             ]);
 
@@ -207,7 +221,6 @@ class GenerationController extends Controller
 
     /**
      * PHP-side contract validation — mirrors Python's _validate_steps().
-     * Runs after generation, before execution, so bad tests never reach the runner.
      */
     private function validateTestCases(array $testCases, string $testType): array
     {
@@ -231,7 +244,6 @@ class GenerationController extends Controller
             }
 
         } elseif (in_array($testType, ['functional', 'regression'])) {
-            // Must have at least one interaction
             $interactions = array_filter($actions, fn($a) => in_array($a, $interactionActions));
             if (empty($interactions)) {
                 $errors[] = "{$testType} test has no interactions (click/fill) — "
@@ -239,7 +251,6 @@ class GenerationController extends Controller
                           . "Actions found: " . implode(', ', array_unique($actions));
             }
 
-            // Every interaction must have an assertion
             foreach ($testCases as $i => $step) {
                 if (!in_array($step['action'] ?? '', $interactionActions)) continue;
 
@@ -278,7 +289,7 @@ class GenerationController extends Controller
         ];
     }
 
-    // ── Unchanged methods below ─────────────────────────────────────────────
+    // ── Unchanged methods ───────────────────────────────────────────────────
 
     public function index()
     {
@@ -345,6 +356,7 @@ class GenerationController extends Controller
                 'test_cases_cypress'  => $generation->test_cases_cypress  ?? [],
                 'script'              => $generation->script              ?? '',
                 'script_selenium'     => $generation->script_selenium     ?? '',
+                'script_playwright'   => $generation->script_playwright   ?? '',  // FIX 2: added
                 'script_cypress'      => $generation->script_cypress      ?? '',
                 'execution_results'   => $generation->execution_results   ?? [],
                 'load_time_ms'        => $generation->load_time_ms,

@@ -1,9 +1,14 @@
-# runner.py — assertions strictes + real DOM validation
+# runner.py — assertions strictes + real DOM validation + optional smoke support
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
 _TIMEOUT     = 20_000
 _NAV_TIMEOUT = 30_000
+
+# Types optionnels — absent = SKIP, jamais FAIL
+OPTIONAL_TYPES = frozenset({
+    "lang_switch", "search_bar", "image_visible", "icon_present", "input_field"
+})
 
 
 def run_selenium_script(script: str, test_cases: list = None) -> dict:
@@ -72,14 +77,19 @@ def _run_steps(steps: list) -> dict:
     duration   = round(time.time() - start_total, 2)
     pass_count = sum(1 for r in results if r["status"] == "pass")
     fail_count = sum(1 for r in results if r["status"] == "fail")
+    skip_count = sum(1 for r in results if r["status"] == "skip")
     total      = len(results)
+
+    # Pass rate calculé sur les tests exécutés (skip exclus)
+    executed = pass_count + fail_count
+    pass_rate = round(pass_count / executed * 100) if executed else 0
 
     return {
         "results":    results,
         "pass_count": pass_count,
         "fail_count": fail_count,
-        "skip_count": 0,
-        "pass_rate":  round(pass_count / total * 100) if total else 0,
+        "skip_count": skip_count,
+        "pass_rate":  pass_rate,
         "total":      total,
         "duration_s": duration,
         "raw_output": "",
@@ -96,17 +106,27 @@ def _extract_base_url(steps: list) -> str | None:
 def _fatal_result(error: str, n_steps: int) -> dict:
     return {
         "results": [{
-            "name": f"Step {i+1}", "status": "fail",
-            "duration": "-", "error": error,
-            "reason": f"Cannot load page — {error}",
-            "reason_pass": None, "reason_skip": None,
+            "name":             f"Step {i+1}",
+            "status":           "fail",
+            "duration":         "-",
+            "error":            error,
+            "reason":           f"Cannot load page — {error}",
+            "reason_pass":      None,
+            "reason_skip":      None,
             "assertion_result": None,
-            "priority": "high", "category": "functional",
+            "step_meta":        None,
+            "priority":         "high",
+            "category":         "functional",
         } for i in range(n_steps)],
         "pass_count": 0, "fail_count": n_steps,
         "skip_count": 0, "pass_rate": 0,
         "total": n_steps, "duration_s": 0, "raw_output": error,
     }
+
+
+def _is_optional(step: dict) -> bool:
+    """Retourne True si l'élément est optionnel — absent = SKIP, jamais FAIL."""
+    return step.get("optional", False) or step.get("type") in OPTIONAL_TYPES
 
 
 def _run_one_step(page, step: dict) -> dict:
@@ -115,6 +135,7 @@ def _run_one_step(page, step: dict) -> dict:
     selector  = step.get("selector", "")
     value     = step.get("value", "")
     assertion = step.get("assertion")
+    optional  = _is_optional(step)
     t0        = time.time()
 
     selector = _normalize_selector(selector)
@@ -123,7 +144,6 @@ def _run_one_step(page, step: dict) -> dict:
     assertion_result = None
     status           = "pass"
 
-    # ── Métadonnées à exposer au frontend ────────────────────
     step_meta = {
         "action":   action,
         "selector": selector,
@@ -131,9 +151,29 @@ def _run_one_step(page, step: dict) -> dict:
     }
 
     try:
-        # ── 1. Exécuter l'action ──────────────────────────────
+        # ── 1. Exécuter l'action ──────────────────────────────────────────────
         if action == "check_visible":
-            _smart_wait_visible(page, selector)
+            try:
+                _smart_wait_visible(page, selector)
+            except PWTimeout:
+                if optional:
+                    # Élément optionnel absent → SKIP propre, jamais FAIL
+                    duration = round(time.time() - t0, 2)
+                    return {
+                        "name":             name,
+                        "status":           "skip",
+                        "duration":         f"{duration}s",
+                        "error":            None,
+                        "reason":           None,
+                        "reason_pass":      None,
+                        "reason_skip":      f"Optional element absent — not a failure: {selector}",
+                        "assertion_result": None,
+                        "step_meta":        step_meta,
+                        "priority":         step.get("priority", "medium"),
+                        "category":         step.get("category", "smoke"),
+                    }
+                # Élément obligatoire → propagate → FAIL
+                raise
 
         elif action == "click":
             _smart_wait_visible(page, selector)
@@ -147,7 +187,6 @@ def _run_one_step(page, step: dict) -> dict:
         elif action == "fill":
             _smart_wait_visible(page, selector)
             page.fill(selector, value)
-            # Vérification DOM immédiate après fill
             actual_val = page.input_value(selector)
             if actual_val != value:
                 raise AssertionError(
@@ -157,7 +196,7 @@ def _run_one_step(page, step: dict) -> dict:
         else:
             raise ValueError(f"Unknown action: '{action}'")
 
-        # ── 2. Valider l'assertion post-action ────────────────
+        # ── 2. Valider l'assertion post-action ────────────────────────────────
         if assertion and isinstance(assertion, dict):
             assertion_result = _validate_assertion(page, assertion, selector, value)
             if not assertion_result["passed"]:
@@ -182,19 +221,19 @@ def _run_one_step(page, step: dict) -> dict:
         "assertion_result": assertion_result,
         "step_meta":        step_meta,
         "priority":         step.get("priority", "medium"),
-        "category":         step.get("category", "functional"),
+        "category":         step.get("category", step.get("type", "smoke")),
     }
 
 
 def _validate_assertion(page, assertion: dict,
                          action_selector: str = "",
                          filled_value: str = "") -> dict:
-    a_type    = assertion.get("type", "")
-    a_value   = assertion.get("value", "")
-    a_target  = assertion.get("selector_target", "") or action_selector
+    a_type   = assertion.get("type", "")
+    a_value  = assertion.get("value", "")
+    a_target = assertion.get("selector_target", "") or action_selector
 
     try:
-        # ── url_contains ─────────────────────────────────────
+        # ── url_contains ─────────────────────────────────────────────────────
         if a_type == "url_contains":
             current_url = page.url
             passed      = a_value in current_url
@@ -203,11 +242,10 @@ def _validate_assertion(page, assertion: dict,
                 "type":     a_type,
                 "expected": f"URL contains '{a_value}'",
                 "actual":   current_url,
-                "error":    None if passed
-                            else f"URL '{current_url}' does not contain '{a_value}'",
+                "error":    None if passed else f"URL '{current_url}' does not contain '{a_value}'",
             }
 
-        # ── element_visible ───────────────────────────────────
+        # ── element_visible ───────────────────────────────────────────────────
         elif a_type == "element_visible":
             if not a_target:
                 return {"passed": False, "type": a_type,
@@ -223,11 +261,10 @@ def _validate_assertion(page, assertion: dict,
                 "type":     a_type,
                 "expected": f"'{a_target}' visible after action",
                 "actual":   actual,
-                "error":    None if passed
-                            else f"'{a_target}' not visible after action",
+                "error":    None if passed else f"'{a_target}' not visible after action",
             }
 
-        # ── element_exists ────────────────────────────────────
+        # ── element_exists ────────────────────────────────────────────────────
         elif a_type == "element_exists":
             if not a_target:
                 return {"passed": False, "type": a_type,
@@ -240,11 +277,10 @@ def _validate_assertion(page, assertion: dict,
                 "type":     a_type,
                 "expected": f"'{a_target}' exists in DOM",
                 "actual":   "found" if passed else "not found",
-                "error":    None if passed
-                            else f"'{a_target}' not found in DOM",
+                "error":    None if passed else f"'{a_target}' not found in DOM",
             }
 
-        # ── text_contains ─────────────────────────────────────
+        # ── text_contains ─────────────────────────────────────────────────────
         elif a_type == "text_contains":
             if not a_target:
                 return {"passed": False, "type": a_type,
@@ -263,14 +299,12 @@ def _validate_assertion(page, assertion: dict,
                 "type":     a_type,
                 "expected": f"text contains '{a_value}'",
                 "actual":   text[:100],
-                "error":    None if passed
-                            else f"'{text[:60]}' does not contain '{a_value}'",
+                "error":    None if passed else f"'{text[:60]}' does not contain '{a_value}'",
             }
 
-        # ── input_value — STRICT DOM read ─────────────────────
+        # ── input_value — STRICT DOM read ─────────────────────────────────────
         elif a_type == "input_value":
-            expected_val = a_value or filled_value
-            # Lire la valeur réelle depuis le DOM via le selector de l'action
+            expected_val  = a_value or filled_value
             real_selector = a_target or action_selector
             if not real_selector:
                 return {"passed": False, "type": a_type,
@@ -284,15 +318,13 @@ def _validate_assertion(page, assertion: dict,
                         "expected": f"input = '{expected_val}'",
                         "actual": "read error",
                         "error": f"Cannot read input value: {e}"}
-
             passed = actual_val == expected_val
             return {
                 "passed":   passed,
                 "type":     a_type,
                 "expected": f"input = '{expected_val}'",
                 "actual":   actual_val,
-                "error":    None if passed
-                            else f"Input contains '{actual_val}', expected '{expected_val}'",
+                "error":    None if passed else f"Input contains '{actual_val}', expected '{expected_val}'",
             }
 
         else:
@@ -324,14 +356,26 @@ def _normalize_selector(selector: str) -> str:
 
 
 def _smart_wait_visible(page, selector: str) -> None:
+    """
+    Stratégie en cascade :
+    1. wait_for_selector visible (8s)
+    2. essai ouverture menu hamburger
+    3. retry visible (6s)
+    4. fallback attached (5s)
+    5. raise PWTimeout si toujours absent
+    """
     try:
         page.wait_for_selector(selector, state="visible", timeout=8_000)
         return
     except PWTimeout:
         pass
-    for toggle in [".hamburger", ".menu-toggle", ".navbar-toggle",
-                   "[class*='menu-toggle']", "[aria-label*='menu']",
-                   ".nav-toggle", "#menu-toggle"]:
+
+    # Tentative ouverture menu mobile
+    for toggle in [
+        ".hamburger", ".menu-toggle", ".navbar-toggle",
+        "[class*='menu-toggle']", "[aria-label*='menu']",
+        ".nav-toggle", "#menu-toggle",
+    ]:
         try:
             el = page.query_selector(toggle)
             if el and el.is_visible():
@@ -340,16 +384,20 @@ def _smart_wait_visible(page, selector: str) -> None:
                 break
         except Exception:
             continue
+
     try:
         page.wait_for_selector(selector, state="visible", timeout=6_000)
         return
     except PWTimeout:
         pass
+
+    # Fallback : présent dans le DOM mais pas forcément visible
     try:
         page.wait_for_selector(selector, state="attached", timeout=5_000)
         return
     except PWTimeout:
         pass
+
     raise PWTimeout(f"Element '{selector}' not found after all strategies")
 
 
