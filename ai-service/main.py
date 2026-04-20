@@ -30,13 +30,22 @@ def generate(data: dict):
     username  = data.get("username")
     password  = data.get("password")
     wait_time = data.get("wait_time", 2000)
+    test_type = data.get("test_type", "smoke")   # ✅ FIX 1: was missing — defaulting to smoke
 
     if not url:
         return {"error": "URL is required"}
 
+    # ✅ FIX 2: Normalise test_type casing to match generator expectations
+    valid_test_types = {"smoke", "functional", "regression"}
+    test_type = test_type.lower() if test_type else "smoke"
+    if test_type not in valid_test_types:
+        test_type = "smoke"
+
+    print(f"[GENERATE] url={url} | framework={framework} | test_type={test_type}")
+
     scraped = scrape_page(url, wait_time=wait_time)
 
-    # Vérifier si scraping a échoué avec une vraie erreur
+    # ✅ FIX 3: Propagate scraping error cleanly
     if "error" in scraped:
         return {
             "error": f"Cannot scrape this page: {scraped['error']}",
@@ -45,17 +54,19 @@ def generate(data: dict):
                 "inputs": [], "buttons": [], "forms": [], "selects": [],
                 "textareas": [], "checkboxes": [], "nav_links": [],
                 "add_to_cart": [], "pagination": [], "modals": [],
-                "images": [], "alerts": [], "links": []
+                "images": [], "alerts": [], "links": [],
+                "lang_switcher": [], "search_bar": [], "images_audit": [],
+                "icons": [], "input_fields": [],
             }
         }
 
-    # ✅ Ne plus bloquer si peu d'éléments — générer quand même
-    # Le generator a un fallback pour les pages sans éléments
-    result = generate_tests(scraped, framework, username, password)
+    # ✅ FIX 4: Pass test_type to generate_tests
+    result = generate_tests(scraped, framework, username, password, test_type=test_type)
 
     return {
         "url":       url,
         "framework": framework,
+        "test_type": test_type,
         "scraped":   scraped,
         "result":    result,
     }
@@ -66,9 +77,9 @@ def run_tests(data: dict):
     script     = data.get("script", "")
     framework  = data.get("framework", "Selenium")
     test_cases = data.get("test_cases", [])
+    test_type  = data.get("test_type", "smoke")   # ✅ FIX 5: accept test_type for logging
 
-    # DEBUG — à supprimer après confirmation
-    print(f"[RUN] script len={len(script)} | test_cases count={len(test_cases)} | framework={framework}")
+    print(f"[RUN] script len={len(script)} | test_cases count={len(test_cases)} | framework={framework} | test_type={test_type}")
     if test_cases:
         print(f"[RUN] first step = {test_cases[0]}")
 
@@ -79,6 +90,7 @@ def run_tests(data: dict):
         return {"error": "Only Selenium/Playwright scripts supported"}
 
     return run_selenium_script(script, test_cases)
+
 
 @app.post("/analyze")
 def analyze(data: dict):
