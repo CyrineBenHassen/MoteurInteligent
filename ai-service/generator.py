@@ -1,6 +1,6 @@
-# generator.py — v7
-# Key change: smoke tests are now DETERMINISTIC (no LLM).
-# The builder directly returns validated steps from scraped data + CSS fallbacks.
+# generator.py — v8
+# Key change: smoke tests now use REAL scraped data (nav_links, images_audit, buttons, icons, pagination)
+# instead of only generic hardcoded selectors.
 # LLM is still used for functional/regression only.
 import os, json, re
 from openai import OpenAI
@@ -17,38 +17,32 @@ groq_client = OpenAI(
 # Criticality tiers
 # ─────────────────────────────────────────────────────────────────────────────
 SMOKE_CRITICALITY = {
-    # Tier 1 — Application alive & identity confirmed
     "auth_trigger":  {"score": 100, "label": "Auth entry point",   "tier": 1},
     "primary_cta":   {"score": 95,  "label": "Primary CTA",        "tier": 1},
     "main_nav":      {"score": 90,  "label": "Main navigation",    "tier": 1},
     "core_content":  {"score": 85,  "label": "Core content area",  "tier": 1},
     "page_identity": {"score": 80,  "label": "Page identity (h1)", "tier": 1},
-    # Tier 2 — Core usability signals
     "input_field":   {"score": 72,  "label": "Form input field",   "tier": 2},
     "search_bar":    {"score": 68,  "label": "Search bar",         "tier": 2},
     "lang_switch":   {"score": 66,  "label": "Language switcher",  "tier": 2},
     "hero":          {"score": 65,  "label": "Hero / banner",      "tier": 2},
     "logo":          {"score": 60,  "label": "Brand identity",     "tier": 2},
     "image_visible": {"score": 45,  "label": "Image visible",      "tier": 2},
-    # Tier 3 — Fallback only
     "icon_present":  {"score": 35,  "label": "Icon/SVG rendered",  "tier": 3},
     "footer":        {"score": 30,  "label": "Footer",             "tier": 3},
     "generic_nav":   {"score": 25,  "label": "Generic nav",        "tier": 3},
 }
 
-SMOKE_MAX_STEPS = 8
+SMOKE_MAX_STEPS = 15   # v9: increased from 12 to 15 to cover more real page elements
 SMOKE_MIN_STEPS = 3
 SMOKE_MAX_TIER  = 2
 
-# These types never hard-fail — runner marks them WARN/SKIP if absent
 OPTIONAL_TYPES = frozenset({
     "lang_switch", "search_bar", "image_visible", "icon_present", "input_field"
 })
 
-
 # ─────────────────────────────────────────────────────────────────────────────
-# CSS fallback selectors — robust multi-pattern, ordered specific→generic
-# These fire even when the scraper returned empty lists for new keys
+# CSS fallback selectors
 # ─────────────────────────────────────────────────────────────────────────────
 CSS = {
     "lang_switch": (
@@ -109,8 +103,8 @@ def _classify_page_profile(scraped: dict) -> str:
 
 
 def _extract_clickable_nav(scraped: dict, max_links: int = 6) -> list:
-    results    = []
-    seen_slugs = set()
+    results     = []
+    seen_slugs  = set()
     base_domain = ""
     if "//" in scraped.get("url", ""):
         base_domain = scraped["url"].split("/")[2]
@@ -134,11 +128,8 @@ def _extract_clickable_nav(scraped: dict, max_links: int = 6) -> list:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Individual detectors
-# Each returns at most 1 element dict, or [].
-# Priority: scraped data with selector > scraped data without > CSS fallback
+# Individual detectors (existing)
 # ─────────────────────────────────────────────────────────────────────────────
-
 def _pick_selector(scraped_items: list, fallback_css: str) -> str:
     for item in scraped_items:
         sel = (item.get("css_selector") or "").strip()
@@ -187,7 +178,6 @@ def _detect_primary_cta(scraped: dict) -> list:
 
 
 def _detect_lang_switch(scraped: dict) -> list:
-    # 1. New scraper key
     items = scraped.get("lang_switcher", [])
     if items:
         sel  = _pick_selector(items, CSS["lang_switch"])
@@ -195,7 +185,6 @@ def _detect_lang_switch(scraped: dict) -> list:
         return [{"name": f"Language switcher ({lang})", "selector": sel,
                  "type": "lang_switch", "tier": 2, "optional": True,
                  "reason": "Lang switcher present — i18n routing is operational"}]
-    # 2. Nav links that look like locale links
     locale_texts = {"fr", "en", "ar", "de", "es", "it", "nl", "pt"}
     locale_hrefs = ["/fr", "/en", "/ar", "/de", "lang=fr", "lang=en", "lang=ar"]
     for nav in scraped.get("nav_links", []):
@@ -207,35 +196,30 @@ def _detect_lang_switch(scraped: dict) -> list:
             return [{"name": f"Language switcher ({nav['text'].upper()})", "selector": sel,
                      "type": "lang_switch", "tier": 2, "optional": True,
                      "reason": "Lang switcher present — i18n routing is operational"}]
-    # 3. CSS fallback — runner WARNs if absent, never FAILs
     return [{"name": "Language switcher (if present)", "selector": CSS["lang_switch"],
              "type": "lang_switch", "tier": 2, "optional": True,
              "reason": "Lang switcher — i18n routing health check"}]
 
 
 def _detect_search_bar(scraped: dict) -> list:
-    # 1. New scraper key (form-level)
     bars = scraped.get("search_bar", [])
     if bars:
         sel = _pick_selector(bars, CSS["search_bar"])
         return [{"name": "Search bar", "selector": sel,
                  "type": "search_bar", "tier": 2, "optional": True,
                  "reason": "Search form present — content discovery is rendered"}]
-    # 2. Existing search_inputs key
     inputs = scraped.get("search_inputs", [])
     if inputs:
         sel = _pick_selector(inputs, "input[type='search']")
         return [{"name": "Search input", "selector": sel,
                  "type": "search_bar", "tier": 2, "optional": True,
                  "reason": "Search input present — content discovery is available"}]
-    # 3. CSS fallback
     return [{"name": "Search bar (if present)", "selector": CSS["search_bar"],
              "type": "search_bar", "tier": 2, "optional": True,
              "reason": "Search bar — content discovery health check"}]
 
 
 def _detect_images(scraped: dict) -> list:
-    # 1. New scraper key (with loaded/size info)
     audit = scraped.get("images_audit", [])
     best  = next(
         (img for img in audit
@@ -248,8 +232,7 @@ def _detect_images(scraped: dict) -> list:
         return [{"name": f"Content image visible ({note})", "selector": best["css_selector"],
                  "type": "image_visible", "tier": 2, "optional": True,
                  "reason": "Image rendered — CDN and media pipeline are operational"}]
-    # 2. Existing images key
-    raw = scraped.get("images", [])
+    raw    = scraped.get("images", [])
     loaded = [img for img in raw if img.get("loaded") and img.get("src")]
     if loaded:
         alt  = loaded[0].get("alt", "")
@@ -264,14 +247,12 @@ def _detect_images(scraped: dict) -> list:
         return [{"name": "Content image visible", "selector": sel,
                  "type": "image_visible", "tier": 2, "optional": True,
                  "reason": "Image rendered — CDN and media pipeline are operational"}]
-    # 3. CSS fallback
     return [{"name": "Content images (if present)", "selector": CSS["image_visible"],
              "type": "image_visible", "tier": 2, "optional": True,
              "reason": "Image visibility — media pipeline health check"}]
 
 
 def _detect_icons(scraped: dict) -> list:
-    # 1. New scraper key
     icons = scraped.get("icons", [])
     if icons:
         svg_first = sorted(icons, key=lambda ic: 0 if ic.get("kind") == "svg" else 1)
@@ -280,7 +261,6 @@ def _detect_icons(scraped: dict) -> list:
         return [{"name": f"Icon rendered ({kind})", "selector": sel,
                  "type": "icon_present", "tier": 3, "optional": True,
                  "reason": f"{kind} icon visible — icon sprite/font loaded"}]
-    # 2. CSS fallback (SVG preferred)
     return [{"name": "SVG/font icon (if present)",
              "selector": "svg, " + CSS["icon_font"],
              "type": "icon_present", "tier": 3, "optional": True,
@@ -288,8 +268,7 @@ def _detect_icons(scraped: dict) -> list:
 
 
 def _detect_input_fields(scraped: dict) -> list:
-    # 1. New scraper key (semantic roles)
-    fields = scraped.get("input_fields", [])
+    fields         = scraped.get("input_fields", [])
     priority_roles = ["email", "name", "message", "subject", "phone", "textarea", "text"]
     best = next(
         (f for role in priority_roles
@@ -303,7 +282,6 @@ def _detect_input_fields(scraped: dict) -> list:
         return [{"name": f"Form field visible ({role}{req})", "selector": sel,
                  "type": "input_field", "tier": 2, "optional": True,
                  "reason": f"Form input '{role}' present — form rendered correctly"}]
-    # 2. Existing inputs key
     skip = {"hidden", "submit", "button", "reset"}
     raw  = [i for i in scraped.get("inputs", [])
             if i.get("css_selector") and i.get("type") not in skip]
@@ -312,7 +290,6 @@ def _detect_input_fields(scraped: dict) -> list:
                  "selector": raw[0]["css_selector"],
                  "type": "input_field", "tier": 2, "optional": True,
                  "reason": "Form input present — form rendering confirmed"}]
-    # 3. CSS fallback — only if the page has forms
     if scraped.get("forms"):
         return [{"name": "Form input field", "selector": CSS["input_field"],
                  "type": "input_field", "tier": 2, "optional": True,
@@ -321,12 +298,152 @@ def _detect_input_fields(scraped: dict) -> list:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DETERMINISTIC smoke builder — no LLM, no randomness
+# v8 NEW: Real page element detectors
+# ─────────────────────────────────────────────────────────────────────────────
+def _detect_real_nav_links(scraped: dict, max_links: int = 4) -> list:
+    """v8: One smoke check per real nav link found by the scraper."""
+    results     = []
+    seen_slugs  = set()
+    base_domain = ""
+    if "//" in scraped.get("url", ""):
+        base_domain = scraped["url"].split("/")[2]
+    for nav in scraped.get("nav_links", []):
+        href = nav.get("href", "").strip()
+        text = nav.get("text", "").strip()
+        if not href or not text:
+            continue
+        slug = href.rstrip("/").split("/")[-1]
+        if not slug or slug in ("#", "pll_switcher", ""):
+            continue
+        if href.startswith("http") and base_domain and base_domain not in href:
+            continue
+        if slug in seen_slugs:
+            continue
+        seen_slugs.add(slug)
+        results.append({
+            "name":     f"Nav link visible: {text[:40]}",
+            "selector": f"a[href*='{slug}']",
+            "type":     "main_nav",
+            "tier":     1,
+            "optional": False,
+            "score":    78,
+            "reason":   f"Nav link '{text}' present — page routing confirmed",
+        })
+        if len(results) >= max_links:
+            break
+    return results
+
+
+def _detect_real_buttons(scraped: dict, max_buttons: int = 3) -> list:
+    """v8: One smoke check per real button found by the scraper."""
+    results = []
+    for btn in scraped.get("buttons", []):
+        css  = btn.get("css_selector", "")
+        text = btn.get("text", "").strip()
+        if not css or not text or len(text) < 2:
+            continue
+        results.append({
+            "name":     f"Button visible: {text[:40]}",
+            "selector": css,
+            "type":     "primary_cta",
+            "tier":     1,
+            "optional": True,
+            "score":    70,
+            "reason":   f"Button '{text}' present and rendered correctly",
+        })
+        if len(results) >= max_buttons:
+            break
+    return results
+
+
+def _detect_real_images(scraped: dict, max_images: int = 3) -> list:
+    """v8: One smoke check per real loaded image found by the scraper."""
+    results         = []
+    seen_selectors  = set()
+    for img in scraped.get("images_audit", []):
+        if not img.get("loaded") or not img.get("css_selector"):
+            continue
+        if img.get("width", 0) < 20:
+            continue
+        sel = img["css_selector"]
+        if sel in seen_selectors:
+            continue
+        seen_selectors.add(sel)
+        alt_text = img.get("alt", "").strip()
+        note     = f"alt='{alt_text[:20]}'" if alt_text else "no alt"
+        src_hint = img.get("src", "").split("/")[-1][:30]
+        label    = alt_text[:30] if alt_text else src_hint
+        results.append({
+            "name":     f"Image visible ({note}): {label}",
+            "selector": sel,
+            "type":     "image_visible",
+            "tier":     2,
+            "optional": True,
+            "score":    45,
+            "reason":   "Image rendered — CDN and media pipeline operational",
+        })
+        if len(results) >= max_images:
+            break
+    return results
+
+
+def _detect_real_icons(scraped: dict, max_icons: int = 2) -> list:
+    """v8: One smoke check per real SVG/font icon found by the scraper."""
+    results = []
+    for icon in scraped.get("icons", []):
+        css  = icon.get("css_selector", "")
+        kind = icon.get("kind", "svg")
+        if not css:
+            continue
+        results.append({
+            "name":     f"Icon rendered ({kind})",
+            "selector": css,
+            "type":     "icon_present",
+            "tier":     3,
+            "optional": True,
+            "score":    35,
+            "reason":   f"{kind} icon visible — icon sprite/font loaded correctly",
+        })
+        if len(results) >= max_icons:
+            break
+    return results
+
+
+def _detect_pagination(scraped: dict) -> list:
+    """v8: Check pagination if scraper detected it."""
+    if scraped.get("pagination"):
+        return [{
+            "name":     "Pagination present",
+            "selector": ".pagination a, [class*='pagination'] a, [class*='page-item'] a",
+            "type":     "core_content",
+            "tier":     2,
+            "optional": True,
+            "score":    50,
+            "reason":   "Pagination rendered — content listing operational",
+        }]
+    return []
+
+
+def _detect_footer(scraped: dict) -> list:
+    """v8: Check footer presence."""
+    return [{
+        "name":     "Footer present",
+        "selector": "footer, [class*='footer'], #footer",
+        "type":     "footer",
+        "tier":     3,
+        "optional": True,
+        "score":    30,
+        "reason":   "Footer rendered — page structure is complete",
+    }]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DETERMINISTIC smoke builder — v8: uses real scraped data
 # ─────────────────────────────────────────────────────────────────────────────
 def _build_smoke_steps(scraped: dict) -> list:
     candidates = []
 
-    # ── Tier 1: always present ────────────────────────────────────────────────
+    # ── Tier 1: structural baseline (always present) ──────────────────────────
     candidates += [
         {"name": "Main navigation present",
          "selector": "nav, [class*='navbar'], [class*='nav-bar'], header nav",
@@ -345,11 +462,19 @@ def _build_smoke_steps(scraped: dict) -> list:
          "reason": "Content container confirms page rendering succeeded"},
     ]
 
-    # ── Tier 1: page-specific ─────────────────────────────────────────────────
+    # ── Tier 1: auth + primary CTA ────────────────────────────────────────────
     for el in _detect_auth(scraped):
         candidates.append({**el, "score": SMOKE_CRITICALITY["auth_trigger"]["score"]})
     for el in _detect_primary_cta(scraped):
         candidates.append({**el, "score": SMOKE_CRITICALITY["primary_cta"]["score"]})
+
+    # ── v9: Real nav links from scraper — increased to 6 ─────────────────────
+    for el in _detect_real_nav_links(scraped, max_links=6):
+        candidates.append(el)
+
+    # ── v9: Real buttons from scraper ────────────────────────────────────────
+    for el in _detect_real_buttons(scraped, max_buttons=4):
+        candidates.append(el)
 
     # ── Tier 2: optional usability checks ────────────────────────────────────
     for el in _detect_input_fields(scraped):
@@ -376,12 +501,20 @@ def _build_smoke_steps(scraped: dict) -> list:
          "reason": "Logo confirms correct site identity"},
     ]
 
-    for el in _detect_images(scraped):
-        candidates.append({**el, "score": SMOKE_CRITICALITY["image_visible"]["score"]})
+    # ── v9: Real images from images_audit — increased to 4 ───────────────────
+    for el in _detect_real_images(scraped, max_images=4):
+        candidates.append(el)
 
-    # ── Tier 3: fallback ──────────────────────────────────────────────────────
-    for el in _detect_icons(scraped):
-        candidates.append({**el, "score": SMOKE_CRITICALITY["icon_present"]["score"]})
+    # ── v9: Pagination + Footer (moved to tier 2) ────────────────────────────
+    for el in _detect_pagination(scraped):
+        candidates.append(el)
+    for el in _detect_footer(scraped):
+        el["tier"] = 2   # v9: promoted from tier 3 → tier 2 to ensure inclusion
+        candidates.append(el)
+
+    # ── Tier 3: icons ─────────────────────────────────────────────────────────
+    for el in _detect_real_icons(scraped, max_icons=2):
+        candidates.append(el)
 
     # ── Sort, deduplicate, enforce cap ────────────────────────────────────────
     candidates.sort(key=lambda x: x.get("score", 0), reverse=True)
@@ -472,8 +605,8 @@ def _validate_steps(steps: list, test_type: str, downgraded: bool = False) -> tu
         bad = [s["action"] for s in steps if s.get("action") in INTERACTION_ACTIONS]
         if bad:
             errors.append(f"Smoke test contains forbidden actions: {bad}")
-        if len(steps) > 8:
-            errors.append(f"Smoke test has too many steps ({len(steps)}) — max 8.")
+        if len(steps) > SMOKE_MAX_STEPS:
+            errors.append(f"Smoke test has too many steps ({len(steps)}) — max {SMOKE_MAX_STEPS}.")
     elif test_type in ("functional", "regression"):
         interactions = [s for s in steps if s.get("action") in INTERACTION_ACTIONS]
         if not interactions:
@@ -632,7 +765,7 @@ For click/fill steps replace null with:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Script builders — graceful wrappers for optional steps
+# Script builders
 # ─────────────────────────────────────────────────────────────────────────────
 def _is_optional(step: dict) -> bool:
     return step.get("optional", False) or step.get("type") in OPTIONAL_TYPES
@@ -777,7 +910,7 @@ def _build_playwright_script(steps: list, url: str) -> str:
 
 def _build_cypress_script(steps: list, url: str) -> str:
     lines = [
-        "// Cypress smoke suite — auto-generated by NexTest v7",
+        "// Cypress smoke suite — auto-generated by NexTest v8",
         f"const BASE_URL = '{url}';",
         "",
         "describe('NexTest Smoke Suite', () => {",

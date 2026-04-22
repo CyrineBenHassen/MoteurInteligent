@@ -341,9 +341,9 @@ function GeneratePanel({ goTo, setGeneration }) {
   const [error,    setError]    = useState('');
 
   const TEST_TYPES = [
-    { key: 'smoke',      label: 'Smoke Test',      icon: '💨', desc: 'Visibility checks — elements present in DOM' },
-    { key: 'functional', label: 'Functional Test',  icon: '⚡', desc: 'Interactions — click, fill, submit + assertions' },
-    { key: 'regression', label: 'Regression Test',  icon: '🔁', desc: 'End-to-end multi-step scenarios with full assertions' },
+    { key: 'smoke',      label: 'Smoke Test',  desc: 'Visibility checks — elements present in DOM' },
+    { key: 'functional', label: 'Functional Test', desc: 'Interactions — click, fill, submit + assertions' },
+    { key: 'regression', label: 'Regression Test', desc: 'End-to-end multi-step scenarios with full assertions' },
   ];
 
   const submit = async (e) => {
