@@ -2,6 +2,124 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import './Home.css';
 
+// ─── Translations ───────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  en: {
+    features:    'Features',
+    howItWorks:  'How it Works',
+    stats:       'Stats',
+    signIn:      'Sign In',
+    getStarted:  'Get Started',
+    heroLead:    <>Provide your web application's URL — the engine analyzes your interface,
+                    generates functional test cases, and exports ready-to-use
+                    <strong> multi-framework</strong> scripts (Selenium, Cypress, Playwright). In seconds.</>,
+    startFree:   'Start for free',
+    seeHow:      'See how it works',
+    trust:       ['No credit card', 'Open-source AI', 'Results in 60s'],
+    ctaFree:     'Create a free account',
+    ctaSignIn:   'Already have an account? Sign in →',
+  },
+  fr: {
+    features:    'Fonctionnalités',
+    howItWorks:  'Comment ça marche',
+    stats:       'Statistiques',
+    signIn:      'Connexion',
+    getStarted:  'Commencer',
+    heroLead:    <>Fournissez l'URL de votre application web — le moteur analyse votre interface,
+                    génère des cas de test fonctionnels et exporte des scripts
+                    <strong> multi-framework</strong> prêts à l'emploi (Selenium, Cypress, Playwright). En quelques secondes.</>,
+    startFree:   'Commencer gratuitement',
+    seeHow:      'Voir comment ça marche',
+    trust:       ['Sans carte bancaire', 'IA open-source', 'Résultats en 60s'],
+    ctaFree:     'Créer un compte gratuit',
+    ctaSignIn:   'Déjà un compte ? Se connecter →',
+  },
+  ar: {
+    features:    'الميزات',
+    howItWorks:  'كيف يعمل',
+    stats:       'الإحصائيات',
+    signIn:      'تسجيل الدخول',
+    getStarted:  'ابدأ الآن',
+    heroLead:    <>أدخل رابط تطبيقك — يقوم المحرك بتحليل الواجهة،
+                    وتوليد حالات الاختبار، وتصدير سكريبتات
+                    <strong> متعددة الأطر</strong> (Selenium, Cypress, Playwright). في ثوانٍ.</>,
+    startFree:   'ابدأ مجاناً',
+    seeHow:      'اكتشف كيف يعمل',
+    trust:       ['بدون بطاقة بنكية', 'ذكاء اصطناعي مفتوح', 'نتائج في 60 ثانية'],
+    ctaFree:     'إنشاء حساب مجاني',
+    ctaSignIn:   'لديك حساب؟ تسجيل الدخول ←',
+  },
+};
+
+// ─── Language Switcher (Dropdown) ────────────────────────────────────────────
+const LANGS = [
+  { code: 'en', flag: '🇬🇧', label: 'EN', full: 'English'  },
+  { code: 'fr', flag: '🇫🇷', label: 'FR', full: 'Français' },
+  { code: 'ar', flag: '🇹🇳', label: 'AR', full: 'العربية'  },
+];
+
+function LangSwitcher({ lang, setLang }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const current = LANGS.find(l => l.code === lang);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="lang-dropdown" ref={ref}>
+      {/* Trigger button */}
+      <button
+        className={`lang-trigger ${open ? 'lang-trigger--open' : ''}`}
+        onClick={() => setOpen(v => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="lang-trigger__flag">{current.flag}</span>
+        <span className="lang-trigger__label">{current.label}</span>
+        <svg
+          className={`lang-trigger__chevron ${open ? 'lang-trigger__chevron--up' : ''}`}
+          width="10" height="10" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" strokeWidth="2.5"
+        >
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div className="lang-panel" role="listbox">
+          {LANGS.map(l => (
+            <button
+              key={l.code}
+              className={`lang-option ${lang === l.code ? 'lang-option--active' : ''}`}
+              role="option"
+              aria-selected={lang === l.code}
+              onClick={() => { setLang(l.code); setOpen(false); }}
+            >
+              <span className="lang-option__flag">{l.flag}</span>
+              <span className="lang-option__full">{l.full}</span>
+              <span className="lang-option__code">{l.label}</span>
+              {lang === l.code && (
+                <svg className="lang-option__check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <path d="M20 6L9 17l-5-5"/>
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Hooks ───────────────────────────────────────────────────────────────────
 function useCounter(target, duration = 2200, started = false) {
   const [val, setVal] = useState(0);
   useEffect(() => {
@@ -31,6 +149,7 @@ function useVisible(threshold = 0.15) {
   return [ref, visible];
 }
 
+// ─── Data ────────────────────────────────────────────────────────────────────
 const FEATURES = [
   {
     icon: '🧠',
@@ -47,8 +166,8 @@ const FEATURES = [
   {
     icon: '🎯',
     tag: 'Export',
-    title: 'Selenium & Cypress Scripts',
-    desc: 'Clean, readable, production-ready scripts. Drop them directly into your CI/CD pipeline with zero post-processing required.',
+    title: 'Multi-Framework Scripts',
+    desc: 'Clean, production-ready scripts for Selenium, Cypress, and Playwright. Drop them directly into your CI/CD pipeline with zero post-processing.',
   },
   {
     icon: '🛡️',
@@ -74,11 +193,13 @@ const STEPS = [
   { n: '01', icon: '🔗', title: 'Provide a URL',         desc: 'Paste any web application URL — production, staging, or localhost via tunnel. The engine handles everything else.' },
   { n: '02', icon: '🤖', title: 'AI Maps the Interface', desc: 'Every interactive element, flow, and application state is scanned and modeled by the AI engine within seconds.' },
   { n: '03', icon: '📋', title: 'Review Test Scenarios',  desc: 'Read generated test cases written in plain language. Edit or approve them with a single click.' },
-  { n: '04', icon: '🚀', title: 'Export & Integrate',     desc: 'Download your Selenium or Cypress scripts. Plug them into GitHub Actions, GitLab CI, or Jenkins seamlessly.' },
+  { n: '04', icon: '🚀', title: 'Export & Integrate',     desc: 'Download your Selenium, Cypress or Playwright scripts. Plug them into GitHub Actions, GitLab CI, or Jenkins seamlessly.' },
 ];
 
+// ─── Component ───────────────────────────────────────────────────────────────
 export default function HomePage() {
   const [navSolid, setNavSolid] = useState(false);
+  const [lang,     setLang]     = useState('en');
   const [statsRef, statsOn] = useVisible(0.3);
   const [featRef,  featOn]  = useVisible(0.1);
   const [howRef,   howOn]   = useVisible(0.1);
@@ -89,21 +210,35 @@ export default function HomePage() {
   const c4 = useCounter(80,     1500, statsOn);
   const fmt = v => v >= 1000 ? `${Math.floor(v/1000)}K` : v;
 
+  const t = TRANSLATIONS[lang];
+  const isRtl = lang === 'ar';
+
   useEffect(() => {
     const h = () => setNavSolid(window.scrollY > 40);
     window.addEventListener('scroll', h, { passive: true });
     return () => window.removeEventListener('scroll', h);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+    return () => { document.documentElement.dir = 'ltr'; };
+  }, [isRtl]);
+
+  const NAV_ITEMS = [
+    { label: t.features,   id: 'features'   },
+    { label: t.howItWorks, id: 'howitworks' },
+    { label: t.stats,      id: 'stats'      },
+  ];
+
   return (
-    <div className="hp">
+    <div className="hp" dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* ══ NAV ══ */}
       <nav className={`nav ${navSolid ? 'nav--solid' : ''}`}>
         <div className="nav__inner">
           <Link to="/" className="nav__brand">
             <div className="nav__gem">
-              <svg width="22" height="22" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
                 <rect width="44" height="44" rx="11" fill="none"/>
                 <polyline points="8,14 22,30 36,14" stroke="#060e1e" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
                 <line x1="8" y1="30" x2="36" y2="30" stroke="rgba(6,14,30,0.5)" strokeWidth="2.5" strokeLinecap="round"/>
@@ -114,20 +249,26 @@ export default function HomePage() {
               <div className="nav__sub">Test Automation</div>
             </div>
           </Link>
+
           <ul className="nav__links">
-            {['Features', 'How it Works', 'Stats'].map((l, idx) => {
-              const ids = ['features', 'howitworks', 'stats'];
-              return <li key={l}><a href={`#${ids[idx]}`}>{l}</a></li>;
-            })}
+            {NAV_ITEMS.map(item => (
+              <li key={item.id}>
+                <a href={`#${item.id}`}>{item.label}</a>
+              </li>
+            ))}
           </ul>
+
           <div className="nav__actions">
-            <Link to="/login"    className="nav__ghost">Sign In</Link>
-            <Link to="/register" className="nav__cta"><span>Get Started</span></Link>
+            {/* ── Dropdown Language Switcher ── */}
+            <LangSwitcher lang={lang} setLang={setLang} />
+
+            <Link to="/login"    className="nav__ghost">{t.signIn}</Link>
+            <Link to="/register" className="nav__cta"><span>{t.getStarted}</span></Link>
           </div>
         </div>
       </nav>
 
-      
+      {/* ══ HERO ══ */}
       <section className="hero">
         <div className="hero__bg" aria-hidden="true">
           <div className="blob b1"/><div className="blob b2"/><div className="blob b3"/>
@@ -142,36 +283,30 @@ export default function HomePage() {
 
         <div className="hero__body">
           <div className="hero__copy">
-           
-
             <h1 className="hero__h1">
               <span className="h1--plain">Generate</span>
               <span className="h1--italic">Web Tests</span>
               <span className="h1--gold">Automatically</span>
             </h1>
 
-            <p className="hero__lead">
-              Provide your web application's URL — the engine analyzes your interface,
-              generates functional test cases, and exports ready-to-use
-              <strong> Selenium</strong> &amp; <strong>Cypress</strong> scripts. In seconds.
-            </p>
+            <p className="hero__lead">{t.heroLead}</p>
 
             <div className="hero__actions">
               <Link to="/register" className="btn btn--fill">
-                Start for free
+                {t.startFree}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </Link>
               <a href="#howitworks" className="btn btn--ring">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M10 8l6 4-6 4V8z" fill="currentColor"/></svg>
-                See how it works
+                {t.seeHow}
               </a>
             </div>
 
             <div className="hero__trust">
-              {['No credit card', 'Open-source AI', 'Results in 60s'].map(t => (
-                <span key={t} className="trust__item">
+              {t.trust.map(item => (
+                <span key={item} className="trust__item">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#c9a227" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
-                  {t}
+                  {item}
                 </span>
               ))}
             </div>
@@ -215,14 +350,14 @@ export default function HomePage() {
                 <p className="tl dim"><span className="ico">◆</span> Running generative AI pipeline…</p>
                 <div className="gap"/>
                 <p className="tl ok"><span className="ico">✓</span> 42 test cases generated <span className="badge-time">2.1s</span></p>
-                <p className="tl ok"><span className="ico">✓</span> Selenium scripts exported</p>
-                <p className="tl ok"><span className="ico">✓</span> Cypress scripts exported</p>
+                <p className="tl ok"><span className="ico">✓</span> Selenium · Cypress · Playwright exported</p>
                 <div className="gap"/>
                 <p className="tl"><span className="cur">▋</span></p>
               </div>
               <div className="term__foot">
                 <span className="pill">Selenium</span>
                 <span className="pill">Cypress</span>
+                <span className="pill">Playwright</span>
                 <span className="pill pill--gold">42 tests ready</span>
               </div>
             </div>
@@ -235,17 +370,17 @@ export default function HomePage() {
         </div>
       </section>
 
-    
+      {/* ══ BAND ══ */}
       <div className="band">
         <div className="band__inner">
           <span className="band__label">Built with</span>
-          {['React', 'Laravel', 'FastAPI', 'StarCoder2', 'PostgreSQL', 'Selenium', 'Cypress'].map(t => (
-            <span key={t} className="band__item">{t}</span>
+          {['React', 'Laravel', 'FastAPI', 'StarCoder2', 'PostgreSQL', 'Selenium', 'Cypress', 'Playwright'].map(item => (
+            <span key={item} className="band__item">{item}</span>
           ))}
         </div>
       </div>
 
-     
+      {/* ══ FEATURES ══ */}
       <section className="sec features" id="features" ref={featRef}>
         <div className="sec__wrap">
           <div className="sec__head">
@@ -272,7 +407,7 @@ export default function HomePage() {
         </div>
       </section>
 
-    
+      {/* ══ HOW IT WORKS ══ */}
       <section className="sec how" id="howitworks" ref={howRef}>
         <div className="how__decor" aria-hidden="true">
           <div className="how__orb how__orb--1"/><div className="how__orb how__orb--2"/>
@@ -299,7 +434,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      
+      {/* ══ STATS ══ */}
       <section className="sec stats" id="stats" ref={statsRef}>
         <div className="sec__wrap">
           <span className="eyebrow eyebrow--c">By the numbers</span>
@@ -324,7 +459,7 @@ export default function HomePage() {
         </div>
       </section>
 
-     
+      {/* ══ CTA ══ */}
       <section className="cta-sec">
         <div className="cta__bg" aria-hidden="true">
           <div className="cta__blob cta__blob--1"/><div className="cta__blob cta__blob--2"/>
@@ -340,18 +475,18 @@ export default function HomePage() {
           </p>
           <div className="cta__actions">
             <Link to="/register" className="btn btn--fill btn--lg">
-              Create a free account
+              {t.ctaFree}
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </Link>
-            <Link to="/login" className="cta__link">Already have an account? Sign in →</Link>
+            <Link to="/login" className="cta__link">{t.ctaSignIn}</Link>
           </div>
           <div className="cta__trust">
             {[
-              {icon:'🔒', t:'Secured user data'},
-              {icon:'⚡', t:'99.9% uptime SLA'},
-              {icon:'🤖', t:'Open-source AI (StarCoder2)'},
+              {icon:'🔒', text:'Secured user data'},
+              {icon:'⚡', text:'99.9% uptime SLA'},
+              {icon:'🤖', text:'Open-source AI (StarCoder2)'},
             ].map(x => (
-              <span key={x.t} className="ctrust">{x.icon} {x.t}</span>
+              <span key={x.text} className="ctrust">{x.icon} {x.text}</span>
             ))}
           </div>
         </div>
@@ -362,7 +497,7 @@ export default function HomePage() {
         <div className="footer__inner">
           <div className="footer__brand">
             <div className="nav__gem">
-              <svg width="22" height="22" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
                 <rect width="44" height="44" rx="11" fill="none"/>
                 <polyline points="8,14 22,30 36,14" stroke="#060e1e" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
                 <line x1="8" y1="30" x2="36" y2="30" stroke="rgba(6,14,30,0.5)" strokeWidth="2.5" strokeLinecap="round"/>

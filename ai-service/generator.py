@@ -1,8 +1,16 @@
-# generator.py — v8
-# Key change: smoke tests now use REAL scraped data (nav_links, images_audit, buttons, icons, pagination)
-# instead of only generic hardcoded selectors.
-# LLM is still used for functional/regression only.
-import os, json, re
+# generator.py — v13 (FULL PAGE COVERAGE — section-based generation)
+#
+# ARCHITECTURE v13:
+#   - Page is divided into SECTIONS: header, hero, forms, content, footer, search, lang
+#   - Each section is independently analysed and tested
+#   - LLaMA3 generates tests PER SECTION (not one big prompt)
+#   - Negative tests for forms (empty submit, invalid email, etc.)
+#   - Workflow tests (search flow, lang switch, nav→back, form→error)
+#   - Real coverage metric: tested_elements / detected_elements
+#   - No artificial step limit — generates as many as needed
+#   - Smoke test: unchanged (deterministic, no LLM)
+
+import os, json, re, time
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -14,100 +22,96 @@ groq_client = OpenAI(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Criticality tiers
+# Constants
 # ─────────────────────────────────────────────────────────────────────────────
-SMOKE_CRITICALITY = {
-    "auth_trigger":  {"score": 100, "label": "Auth entry point",   "tier": 1},
-    "primary_cta":   {"score": 95,  "label": "Primary CTA",        "tier": 1},
-    "main_nav":      {"score": 90,  "label": "Main navigation",    "tier": 1},
-    "core_content":  {"score": 85,  "label": "Core content area",  "tier": 1},
-    "page_identity": {"score": 80,  "label": "Page identity (h1)", "tier": 1},
-    "input_field":   {"score": 72,  "label": "Form input field",   "tier": 2},
-    "search_bar":    {"score": 68,  "label": "Search bar",         "tier": 2},
-    "lang_switch":   {"score": 66,  "label": "Language switcher",  "tier": 2},
-    "hero":          {"score": 65,  "label": "Hero / banner",      "tier": 2},
-    "logo":          {"score": 60,  "label": "Brand identity",     "tier": 2},
-    "image_visible": {"score": 45,  "label": "Image visible",      "tier": 2},
-    "icon_present":  {"score": 35,  "label": "Icon/SVG rendered",  "tier": 3},
-    "footer":        {"score": 30,  "label": "Footer",             "tier": 3},
-    "generic_nav":   {"score": 25,  "label": "Generic nav",        "tier": 3},
-}
 
-SMOKE_MAX_STEPS = 15   # v9: increased from 12 to 15 to cover more real page elements
+SMOKE_MAX_STEPS = 20
 SMOKE_MIN_STEPS = 3
-SMOKE_MAX_TIER  = 2
+
+INTERACTION_ACTIONS = {"click", "fill", "submit"}
+ASSERTION_TYPES = {
+    "url_contains", "element_visible", "element_exists",
+    "text_contains", "input_value", "element_not_visible",
+}
 
 OPTIONAL_TYPES = frozenset({
-    "lang_switch", "search_bar", "image_visible", "icon_present", "input_field"
+    "footer", "search", "hero", "logo", "image", "pagination",
+    "section", "input_field", "cta", "icon", "lang_switch", "nav_link",
 })
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CSS fallback selectors
-# ─────────────────────────────────────────────────────────────────────────────
-CSS = {
-    "lang_switch": (
-        ".pll-parent-menu-item, .wpml-ls-item, "
-        "[class*='lang-switch'], [class*='language-switch'], [class*='lang-selector'], "
-        "[class*='language-selector'], [id*='lang-switch'], "
-        "a[hreflang], "
-        "a[href*='/fr'], a[href*='/en'], a[href*='/ar'], a[href*='/de'], "
-        "a[href*='lang=fr'], a[href*='lang=en'], a[href*='lang=ar'], "
-        "select[name*='lang' i], select[id*='lang' i]"
-    ),
-    "search_bar": (
-        "form[role='search'], form[action*='search'], "
-        "[class*='search-form'], [class*='searchform'], "
-        "[id*='search-form'], [id*='searchform'], "
-        "[class*='search-bar'], [class*='search-box'], "
-        "input[type='search'], input[name='s'], "
-        "input[placeholder*='search' i], input[placeholder*='recherche' i], "
-        "input[placeholder*='chercher' i], input[placeholder*='بحث' i]"
-    ),
-    "image_visible": (
-        "main img, article img, .content img, "
-        "[class*='hero'] img, [class*='banner'] img, "
-        "img[src]:not([src='']):not([width='1']):not([height='1'])"
-    ),
-    "icon_font": (
-        "i[class*='fa'], i[class*='icon'], i[class*='bi'], i[class*='ri'], "
-        "[class*='fa-'], [class*='icon-'], [class*='bi-'], [class*='material-icon']"
-    ),
-    "input_field": (
-        "form input[type='email'], form input[type='text'], "
-        "form textarea, form select, "
-        "input[type='email'], input[type='text'], textarea"
-    ),
+TEST_TYPE_PROFILES = {
+    "smoke":      {"category": "smoke",      "priority": "medium"},
+    "functional": {"category": "functional", "priority": "high"},
+    "regression": {"category": "regression", "priority": "high"},
+}
+
+# Section priority order
+SECTION_PRIORITY = [
+    "header",   # navbar, logo, lang switch
+    "hero",     # hero buttons, CTAs
+    "search",   # search bar
+    "forms",    # all forms + negative tests
+    "content",  # content sections, cards, internal CTAs
+    "footer",   # footer links, contact info
+    "workflow", # multi-step user journeys
+]
+
+FLEX = {
+    "navigation": ["nav", "[role='navigation']", ".navbar", ".nav", "header ul", ".menu"],
+    "footer":     ["footer", "[role='contentinfo']", ".footer", "#footer"],
+    "search":     ["input[type='search']", "input[name='s']", "form[role='search']"],
+    "hero":       ["[class*='hero']", "[class*='banner']", "[class*='jumbotron']"],
+    "main_content": ["main", "[role='main']", "#content", ".content", "article"],
+}
+
+CRITICALITY = {
+    "body":        {"score": 100, "tier": 1, "optional": False},
+    "heading":     {"score": 90,  "tier": 1, "optional": False},
+    "main_content":{"score": 85,  "tier": 1, "optional": False},
+    "auth":        {"score": 95,  "tier": 1, "optional": False},
+    "cta":         {"score": 88,  "tier": 1, "optional": True},
+    "navigation":  {"score": 78,  "tier": 1, "optional": True},
+    "nav_link":    {"score": 72,  "tier": 1, "optional": True},
+    "input_field": {"score": 68,  "tier": 2, "optional": True},
+    "search":      {"score": 65,  "tier": 2, "optional": True},
+    "footer":      {"score": 60,  "tier": 2, "optional": True},
+    "hero":        {"score": 62,  "tier": 2, "optional": True},
+    "logo":        {"score": 58,  "tier": 2, "optional": True},
+    "pagination":  {"score": 50,  "tier": 2, "optional": True},
+    "section":     {"score": 52,  "tier": 2, "optional": True},
+    "image":       {"score": 45,  "tier": 2, "optional": True},
+    "lang_switch": {"score": 55,  "tier": 2, "optional": True},
+    "icon":        {"score": 30,  "tier": 3, "optional": True},
 }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Page profile classifier
-# ─────────────────────────────────────────────────────────────────────────────
-def _classify_page_profile(scraped: dict) -> str:
-    has_inputs = any(
-        i.get("css_selector") and i.get("type") not in {"hidden", "submit", "button", "reset"}
-        for i in scraped.get("inputs", [])
-    )
-    has_forms   = bool(scraped.get("forms"))
-    has_nav     = any(
-        n.get("href") and n.get("text", "").strip()
-        and n["href"].rstrip("/").split("/")[-1] not in ("", "#", "pll_switcher")
-        for n in scraped.get("nav_links", [])
-    )
-    has_buttons = bool(scraped.get("buttons"))
-    if has_inputs or has_forms:
-        return "rich"
-    if has_nav or has_buttons:
-        return "nav_only"
-    return "static"
+def _joined(key: str) -> str:
+    return ", ".join(FLEX.get(key, [key]))
 
 
-def _extract_clickable_nav(scraped: dict, max_links: int = 6) -> list:
-    results     = []
-    seen_slugs  = set()
-    base_domain = ""
-    if "//" in scraped.get("url", ""):
-        base_domain = scraped["url"].split("/")[2]
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION EXTRACTOR — divides the page into testable sections
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _extract_sections(scraped: dict) -> dict:
+    """
+    Divides all detected elements into named sections.
+    Returns a dict: section_name → list of detected elements.
+    Each element has: css, text, type, role, required, etc.
+    """
+    url         = scraped.get("url", "")
+    base_domain = url.split("/")[2] if "//" in url else ""
+    sections    = {s: [] for s in SECTION_PRIORITY}
+    seen_css    = set()
+
+    def _add(section: str, elem: dict):
+        css = elem.get("css", "")
+        if css and css not in seen_css:
+            seen_css.add(css)
+            sections[section].append(elem)
+
+    # ── HEADER: nav links + logo + lang switch ────────────────────────────────
+    seen_slugs = set()
     for n in scraped.get("nav_links", []):
         href = n.get("href", "").strip()
         text = n.get("text", "").strip()
@@ -121,514 +125,331 @@ def _extract_clickable_nav(scraped: dict, max_links: int = 6) -> list:
         if slug in seen_slugs:
             continue
         seen_slugs.add(slug)
-        results.append({"css": f"a[href*='{slug}']", "text": text, "slug": slug, "href": href})
-        if len(results) >= max_links:
+        _add("header", {
+            "css":      f"a[href*='{slug}']",
+            "text":     text,
+            "slug":     slug,
+            "href":     href,
+            "type":     "nav_link",
+            "section":  "header",
+            "priority": "high",
+        })
+
+    # Logo
+    for img in scraped.get("images_audit", []):
+        alt = img.get("alt", "").lower()
+        src = img.get("src", "").lower()
+        if "logo" in alt or "logo" in src:
+            _add("header", {
+                "css":     img.get("css_selector", "img[src*='logo']"),
+                "text":    "logo",
+                "type":    "logo",
+                "section": "header",
+                "priority":"medium",
+            })
             break
-    return results
 
+    # Lang switch
+    for ls in scraped.get("lang_switcher", []):
+        css = ls.get("css_selector", "").strip()
+        if css:
+            _add("header", {
+                "css":     css,
+                "text":    ls.get("text", ls.get("hreflang", "lang")),
+                "type":    "lang_switch",
+                "section": "header",
+                "priority":"medium",
+            })
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Individual detectors (existing)
-# ─────────────────────────────────────────────────────────────────────────────
-def _pick_selector(scraped_items: list, fallback_css: str) -> str:
-    for item in scraped_items:
-        sel = (item.get("css_selector") or "").strip()
-        if sel:
-            return sel
-    return fallback_css
+    # ── HERO: hero/banner buttons and CTAs ───────────────────────────────────
+    hero_kw = {"hero", "banner", "jumbotron", "slider", "carousel", "intro"}
+    cta_kw  = {"get started", "start", "try", "demo", "buy", "shop", "book",
+                "order", "subscribe", "download", "contact", "learn more", "explore",
+                "en savoir", "découvrir", "voir", "commencer"}
 
+    for sec in scraped.get("content_sections", []):
+        css = sec.get("css_selector", "")
+        if any(k in css.lower() for k in hero_kw):
+            _add("hero", {
+                "css": css, "text": sec.get("title", "hero section"),
+                "type": "hero_section", "section": "hero", "priority": "high",
+            })
 
-def _detect_auth(scraped: dict) -> list:
-    auth_kw = {"login", "signin", "sign-in", "register", "signup", "sign-up",
-               "account", "connexion", "inscription", "تسجيل", "دخول", "حساب"}
     for btn in scraped.get("buttons", []):
-        text = btn.get("text", "").lower().strip()
-        if any(k in text for k in auth_kw) and btn.get("css_selector"):
-            return [{"name": f"Auth entry: {btn['text'][:40]}", "selector": btn["css_selector"],
-                     "type": "auth_trigger", "tier": 1, "optional": False,
-                     "reason": "Auth entry point — users cannot log in if missing"}]
-    for nav in scraped.get("nav_links", []):
-        text = nav.get("text", "").lower()
-        href = nav.get("href", "").lower()
-        if any(k in text or k in href for k in auth_kw):
-            slug = nav["href"].rstrip("/").split("/")[-1]
-            if slug:
-                return [{"name": f"Auth link: {nav['text'][:40]}",
-                         "selector": f"a[href*='{slug}']",
-                         "type": "auth_trigger", "tier": 1, "optional": False,
-                         "reason": "Auth navigation — critical for user access"}]
-    return []
-
-
-def _detect_primary_cta(scraped: dict) -> list:
-    cta_kw = {"get started", "start", "try", "demo", "buy", "shop", "book",
-              "order", "subscribe", "download", "contact", "learn more", "explore"}
-    for btn in scraped.get("buttons", []):
-        text = btn.get("text", "").lower().strip()
         css  = btn.get("css_selector", "")
+        text = btn.get("text", "").lower().strip()
         if not css or not text:
             continue
-        is_primary  = any(k in css.lower() for k in ["primary", "cta", "btn-main", "hero", "action"])
-        is_cta_text = any(k in text for k in cta_kw)
-        if is_primary or is_cta_text:
-            return [{"name": f"Primary CTA: {btn['text'][:40]}", "selector": css,
-                     "type": "primary_cta", "tier": 1, "optional": False,
-                     "reason": "Primary CTA — signals core feature is reachable"}]
-    return []
+        is_cta = any(k in text for k in cta_kw) or any(
+            k in css.lower() for k in ("primary", "cta", "hero", "action", "btn-main")
+        )
+        if is_cta:
+            _add("hero", {
+                "css": css, "text": btn.get("text", ""),
+                "type": "cta_button", "section": "hero", "priority": "high",
+            })
 
+    # ── SEARCH ────────────────────────────────────────────────────────────────
+    for bar in scraped.get("search_bar", []) + scraped.get("search_inputs", []):
+        css = bar.get("css_selector", "").strip()
+        if css:
+            _add("search", {
+                "css": css, "text": "search input",
+                "type": "search_input", "section": "search", "priority": "high",
+            })
 
-def _detect_lang_switch(scraped: dict) -> list:
-    items = scraped.get("lang_switcher", [])
-    if items:
-        sel  = _pick_selector(items, CSS["lang_switch"])
-        lang = (items[0].get("text") or items[0].get("hreflang") or "LANG").upper()
-        return [{"name": f"Language switcher ({lang})", "selector": sel,
-                 "type": "lang_switch", "tier": 2, "optional": True,
-                 "reason": "Lang switcher present — i18n routing is operational"}]
-    locale_texts = {"fr", "en", "ar", "de", "es", "it", "nl", "pt"}
-    locale_hrefs = ["/fr", "/en", "/ar", "/de", "lang=fr", "lang=en", "lang=ar"]
-    for nav in scraped.get("nav_links", []):
-        text = nav.get("text", "").strip().lower()
-        href = nav.get("href", "").lower()
-        if text in locale_texts or any(p in href for p in locale_hrefs):
-            slug = nav["href"].rstrip("/").split("/")[-1]
-            sel  = f"a[href*='{slug}']" if slug else CSS["lang_switch"]
-            return [{"name": f"Language switcher ({nav['text'].upper()})", "selector": sel,
-                     "type": "lang_switch", "tier": 2, "optional": True,
-                     "reason": "Lang switcher present — i18n routing is operational"}]
-    return [{"name": "Language switcher (if present)", "selector": CSS["lang_switch"],
-             "type": "lang_switch", "tier": 2, "optional": True,
-             "reason": "Lang switcher — i18n routing health check"}]
+    for inp in scraped.get("inputs", []):
+        if inp.get("type") == "search":
+            css = inp.get("css_selector", "")
+            if css:
+                _add("search", {
+                    "css": css, "text": "search",
+                    "type": "search_input", "section": "search", "priority": "high",
+                })
 
+    # ── FORMS: all inputs + forms + submit buttons ────────────────────────────
+    skip_types = {"hidden", "submit", "button", "reset"}
 
-def _detect_search_bar(scraped: dict) -> list:
-    bars = scraped.get("search_bar", [])
-    if bars:
-        sel = _pick_selector(bars, CSS["search_bar"])
-        return [{"name": "Search bar", "selector": sel,
-                 "type": "search_bar", "tier": 2, "optional": True,
-                 "reason": "Search form present — content discovery is rendered"}]
-    inputs = scraped.get("search_inputs", [])
-    if inputs:
-        sel = _pick_selector(inputs, "input[type='search']")
-        return [{"name": "Search input", "selector": sel,
-                 "type": "search_bar", "tier": 2, "optional": True,
-                 "reason": "Search input present — content discovery is available"}]
-    return [{"name": "Search bar (if present)", "selector": CSS["search_bar"],
-             "type": "search_bar", "tier": 2, "optional": True,
-             "reason": "Search bar — content discovery health check"}]
-
-
-def _detect_images(scraped: dict) -> list:
-    audit = scraped.get("images_audit", [])
-    best  = next(
-        (img for img in audit
-         if img.get("loaded") and img.get("css_selector") and img.get("src")
-         and img.get("width", 0) > 20),
-        None
-    )
-    if best:
-        note = "has alt" if best.get("has_alt") else "no alt"
-        return [{"name": f"Content image visible ({note})", "selector": best["css_selector"],
-                 "type": "image_visible", "tier": 2, "optional": True,
-                 "reason": "Image rendered — CDN and media pipeline are operational"}]
-    raw    = scraped.get("images", [])
-    loaded = [img for img in raw if img.get("loaded") and img.get("src")]
-    if loaded:
-        alt  = loaded[0].get("alt", "")
-        src  = loaded[0].get("src", "")
-        if alt and len(alt) < 60:
-            sel = "img[alt='{}']".format(alt.replace("'", ""))
-        elif src:
-            frag = src.split("/")[-1].split("?")[0][:30]
-            sel  = f"img[src*='{frag}']" if frag else "img"
-        else:
-            sel = "img"
-        return [{"name": "Content image visible", "selector": sel,
-                 "type": "image_visible", "tier": 2, "optional": True,
-                 "reason": "Image rendered — CDN and media pipeline are operational"}]
-    return [{"name": "Content images (if present)", "selector": CSS["image_visible"],
-             "type": "image_visible", "tier": 2, "optional": True,
-             "reason": "Image visibility — media pipeline health check"}]
-
-
-def _detect_icons(scraped: dict) -> list:
-    icons = scraped.get("icons", [])
-    if icons:
-        svg_first = sorted(icons, key=lambda ic: 0 if ic.get("kind") == "svg" else 1)
-        sel  = svg_first[0].get("css_selector", "svg")
-        kind = svg_first[0].get("kind", "svg")
-        return [{"name": f"Icon rendered ({kind})", "selector": sel,
-                 "type": "icon_present", "tier": 3, "optional": True,
-                 "reason": f"{kind} icon visible — icon sprite/font loaded"}]
-    return [{"name": "SVG/font icon (if present)",
-             "selector": "svg, " + CSS["icon_font"],
-             "type": "icon_present", "tier": 3, "optional": True,
-             "reason": "Icon presence — icon font/SVG sprite loaded"}]
-
-
-def _detect_input_fields(scraped: dict) -> list:
-    fields         = scraped.get("input_fields", [])
-    priority_roles = ["email", "name", "message", "subject", "phone", "textarea", "text"]
-    best = next(
-        (f for role in priority_roles
-         for f in fields if f.get("role") == role and f.get("visible") and f.get("css_selector")),
-        fields[0] if fields else None
-    )
-    if best:
-        sel  = best["css_selector"]
-        role = best.get("role", "input")
-        req  = " (required)" if best.get("required") else ""
-        return [{"name": f"Form field visible ({role}{req})", "selector": sel,
-                 "type": "input_field", "tier": 2, "optional": True,
-                 "reason": f"Form input '{role}' present — form rendered correctly"}]
-    skip = {"hidden", "submit", "button", "reset"}
-    raw  = [i for i in scraped.get("inputs", [])
-            if i.get("css_selector") and i.get("type") not in skip]
-    if raw:
-        return [{"name": f"Form input visible ({raw[0].get('type','text')})",
-                 "selector": raw[0]["css_selector"],
-                 "type": "input_field", "tier": 2, "optional": True,
-                 "reason": "Form input present — form rendering confirmed"}]
-    if scraped.get("forms"):
-        return [{"name": "Form input field", "selector": CSS["input_field"],
-                 "type": "input_field", "tier": 2, "optional": True,
-                 "reason": "Form input visible — form rendering confirmed"}]
-    return []
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# v8 NEW: Real page element detectors
-# ─────────────────────────────────────────────────────────────────────────────
-def _detect_real_nav_links(scraped: dict, max_links: int = 4) -> list:
-    """v8: One smoke check per real nav link found by the scraper."""
-    results     = []
-    seen_slugs  = set()
-    base_domain = ""
-    if "//" in scraped.get("url", ""):
-        base_domain = scraped["url"].split("/")[2]
-    for nav in scraped.get("nav_links", []):
-        href = nav.get("href", "").strip()
-        text = nav.get("text", "").strip()
-        if not href or not text:
+    for f in scraped.get("input_fields", []):
+        if not f.get("css_selector") or not f.get("visible"):
             continue
-        slug = href.rstrip("/").split("/")[-1]
-        if not slug or slug in ("#", "pll_switcher", ""):
+        if f.get("type") in skip_types:
             continue
-        if href.startswith("http") and base_domain and base_domain not in href:
-            continue
-        if slug in seen_slugs:
-            continue
-        seen_slugs.add(slug)
-        results.append({
-            "name":     f"Nav link visible: {text[:40]}",
-            "selector": f"a[href*='{slug}']",
-            "type":     "main_nav",
-            "tier":     1,
-            "optional": False,
-            "score":    78,
-            "reason":   f"Nav link '{text}' present — page routing confirmed",
+        _add("forms", {
+            "css":      f["css_selector"],
+            "text":     f.get("label", f.get("placeholder", f.get("role", "input"))),
+            "type":     "input",
+            "role":     f.get("role", f.get("type", "text")),
+            "required": f.get("required", False),
+            "section":  "forms",
+            "priority": "high",
         })
-        if len(results) >= max_links:
-            break
-    return results
 
+    if not sections["forms"]:
+        for inp in scraped.get("inputs", []):
+            if not inp.get("css_selector") or inp.get("type") in skip_types:
+                continue
+            _add("forms", {
+                "css":      inp["css_selector"],
+                "text":     inp.get("placeholder", inp.get("type", "input")),
+                "type":     "input",
+                "role":     inp.get("type", "text"),
+                "required": inp.get("required", False),
+                "section":  "forms",
+                "priority": "high",
+            })
 
-def _detect_real_buttons(scraped: dict, max_buttons: int = 3) -> list:
-    """v8: One smoke check per real button found by the scraper."""
-    results = []
+    for form in scraped.get("forms", []):
+        css = form.get("css_selector", "")
+        if css:
+            _add("forms", {
+                "css": css, "text": "form",
+                "type": "form", "action": form.get("action", ""),
+                "section": "forms", "priority": "high",
+            })
+
+    # Submit buttons
     for btn in scraped.get("buttons", []):
         css  = btn.get("css_selector", "")
-        text = btn.get("text", "").strip()
-        if not css or not text or len(text) < 2:
+        text = btn.get("text", "").lower()
+        if css and any(k in text for k in ("submit", "send", "envoyer", "soumettre", "save", "ok")):
+            _add("forms", {
+                "css": css, "text": btn.get("text", "submit"),
+                "type": "submit_button", "section": "forms", "priority": "high",
+            })
+
+    # ── CONTENT: headings, sections, cards, internal links ───────────────────
+    for h in scraped.get("headings", []):
+        css  = h.get("css_selector", "").strip()
+        text = h.get("text", "").strip()
+        if css and text:
+            _add("content", {
+                "css": css, "text": text[:60],
+                "type": "heading", "section": "content", "priority": "medium",
+            })
+
+    for card in scraped.get("cards", []):
+        css   = card.get("css_selector", "")
+        title = card.get("title", card.get("text", "card"))
+        if css:
+            _add("content", {
+                "css": css, "text": title[:60],
+                "type": "card", "section": "content", "priority": "medium",
+            })
+
+    for sec in scraped.get("content_sections", []):
+        css   = sec.get("css_selector", "")
+        title = sec.get("title", sec.get("text", "section"))
+        if css and not any(k in css.lower() for k in hero_kw):
+            _add("content", {
+                "css": css, "text": title[:60],
+                "type": "content_section", "section": "content", "priority": "medium",
+            })
+
+    # Non-CTA buttons in content
+    for btn in scraped.get("buttons", []):
+        css  = btn.get("css_selector", "")
+        text = btn.get("text", "").lower().strip()
+        if not css or not text:
             continue
-        results.append({
-            "name":     f"Button visible: {text[:40]}",
-            "selector": css,
-            "type":     "primary_cta",
-            "tier":     1,
-            "optional": True,
-            "score":    70,
-            "reason":   f"Button '{text}' present and rendered correctly",
+        is_cta = any(k in text for k in cta_kw)
+        is_submit = any(k in text for k in ("submit", "send", "envoyer"))
+        if not is_cta and not is_submit:
+            _add("content", {
+                "css": css, "text": btn.get("text", "button"),
+                "type": "button", "section": "content", "priority": "medium",
+            })
+
+    # ── FOOTER: footer links + contact info ──────────────────────────────────
+    for f in scraped.get("footer_data", []):
+        if not f.get("visible"):
+            continue
+        css = f.get("css_selector", "footer")
+        _add("footer", {
+            "css": css, "text": "footer",
+            "type": "footer_container", "section": "footer", "priority": "low",
+            "phones": f.get("phones", []),
+            "emails": f.get("emails", []),
         })
-        if len(results) >= max_buttons:
-            break
-    return results
+        for link in f.get("links", [])[:6]:
+            lhref = link.get("href", "").strip()
+            ltext = link.get("text", "").strip()
+            if lhref and ltext:
+                slug = lhref.rstrip("/").split("/")[-1]
+                if slug and slug not in seen_slugs:
+                    seen_slugs.add(slug)
+                    _add("footer", {
+                        "css": f"footer a[href*='{slug}']",
+                        "text": ltext, "slug": slug,
+                        "type": "footer_link", "section": "footer", "priority": "low",
+                    })
+
+    # ── WORKFLOW: automatic multi-step journeys ───────────────────────────────
+    # These are defined by combining detected elements, not from scraper directly
+    # (populated later in _define_workflows)
+
+    return sections
 
 
-def _detect_real_images(scraped: dict, max_images: int = 3) -> list:
-    """v8: One smoke check per real loaded image found by the scraper."""
-    results         = []
-    seen_selectors  = set()
-    for img in scraped.get("images_audit", []):
-        if not img.get("loaded") or not img.get("css_selector"):
-            continue
-        if img.get("width", 0) < 20:
-            continue
-        sel = img["css_selector"]
-        if sel in seen_selectors:
-            continue
-        seen_selectors.add(sel)
-        alt_text = img.get("alt", "").strip()
-        note     = f"alt='{alt_text[:20]}'" if alt_text else "no alt"
-        src_hint = img.get("src", "").split("/")[-1][:30]
-        label    = alt_text[:30] if alt_text else src_hint
-        results.append({
-            "name":     f"Image visible ({note}): {label}",
-            "selector": sel,
-            "type":     "image_visible",
-            "tier":     2,
-            "optional": True,
-            "score":    45,
-            "reason":   "Image rendered — CDN and media pipeline operational",
+def _define_workflows(sections: dict, scraped: dict) -> list:
+    """
+    Defines multi-step user journeys based on what was detected.
+    Returns a list of workflow definitions.
+    """
+    workflows = []
+
+    # Workflow 1: Search flow
+    if sections.get("search"):
+        search_elem = sections["search"][0]
+        workflows.append({
+            "name":   "Search workflow",
+            "type":   "search_flow",
+            "steps": [
+                {"action": "check_visible", "css": search_elem["css"], "desc": "Search bar is visible"},
+                {"action": "fill",          "css": search_elem["css"], "value": "test", "desc": "Type search query"},
+                {"action": "submit_search", "css": search_elem["css"], "desc": "Submit search"},
+            ],
         })
-        if len(results) >= max_images:
-            break
-    return results
 
-
-def _detect_real_icons(scraped: dict, max_icons: int = 2) -> list:
-    """v8: One smoke check per real SVG/font icon found by the scraper."""
-    results = []
-    for icon in scraped.get("icons", []):
-        css  = icon.get("css_selector", "")
-        kind = icon.get("kind", "svg")
-        if not css:
-            continue
-        results.append({
-            "name":     f"Icon rendered ({kind})",
-            "selector": css,
-            "type":     "icon_present",
-            "tier":     3,
-            "optional": True,
-            "score":    35,
-            "reason":   f"{kind} icon visible — icon sprite/font loaded correctly",
+    # Workflow 2: Navigation → back to homepage
+    nav_links = sections.get("header", [])
+    nav_links = [n for n in nav_links if n.get("type") == "nav_link"]
+    if nav_links:
+        first_nav = nav_links[0]
+        base_url  = scraped.get("url", "")
+        base_slug = base_url.rstrip("/").split("/")[-1] or "/"
+        workflows.append({
+            "name": f"Navigate to {first_nav['text']} then back",
+            "type": "nav_back_flow",
+            "steps": [
+                {"action": "click",         "css": first_nav["css"], "desc": f"Click {first_nav['text']}"},
+                {"action": "check_url",     "value": first_nav["slug"], "desc": "Verify destination URL"},
+                {"action": "navigate_back", "value": base_url,          "desc": "Return to homepage"},
+            ],
         })
-        if len(results) >= max_icons:
-            break
-    return results
 
+    # Workflow 3: Form empty submit (negative test)
+    form_inputs = [e for e in sections.get("forms", []) if e.get("type") == "input"]
+    submit_btn  = next((e for e in sections.get("forms", []) if e.get("type") == "submit_button"), None)
+    if form_inputs and submit_btn:
+        workflows.append({
+            "name": "Form empty submit — validation errors expected",
+            "type": "form_negative",
+            "steps": [
+                {"action": "click", "css": submit_btn["css"],
+                 "desc": "Submit empty form — expect validation error"},
+            ],
+        })
 
-def _detect_pagination(scraped: dict) -> list:
-    """v8: Check pagination if scraper detected it."""
-    if scraped.get("pagination"):
-        return [{
-            "name":     "Pagination present",
-            "selector": ".pagination a, [class*='pagination'] a, [class*='page-item'] a",
-            "type":     "core_content",
-            "tier":     2,
-            "optional": True,
-            "score":    50,
-            "reason":   "Pagination rendered — content listing operational",
-        }]
-    return []
+    # Workflow 4: Language switch
+    lang_elems = [e for e in sections.get("header", []) if e.get("type") == "lang_switch"]
+    if lang_elems:
+        workflows.append({
+            "name": "Language switch workflow",
+            "type": "lang_flow",
+            "steps": [
+                {"action": "click",     "css": lang_elems[0]["css"], "desc": "Click language switcher"},
+                {"action": "check_url", "value": "",                  "desc": "Verify URL changed"},
+            ],
+        })
 
-
-def _detect_footer(scraped: dict) -> list:
-    """v8: Check footer presence."""
-    return [{
-        "name":     "Footer present",
-        "selector": "footer, [class*='footer'], #footer",
-        "type":     "footer",
-        "tier":     3,
-        "optional": True,
-        "score":    30,
-        "reason":   "Footer rendered — page structure is complete",
-    }]
+    return workflows
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DETERMINISTIC smoke builder — v8: uses real scraped data
+# COVERAGE TRACKER
 # ─────────────────────────────────────────────────────────────────────────────
-def _build_smoke_steps(scraped: dict) -> list:
-    candidates = []
 
-    # ── Tier 1: structural baseline (always present) ──────────────────────────
-    candidates += [
-        {"name": "Main navigation present",
-         "selector": "nav, [class*='navbar'], [class*='nav-bar'], header nav",
-         "type": "main_nav", "tier": 1, "optional": False,
-         "score": SMOKE_CRITICALITY["main_nav"]["score"],
-         "reason": "Navigation confirms routing system is operational"},
-        {"name": "Page title (H1) present",
-         "selector": "h1",
-         "type": "page_identity", "tier": 1, "optional": False,
-         "score": SMOKE_CRITICALITY["page_identity"]["score"],
-         "reason": "H1 confirms correct page loaded with content"},
-        {"name": "Main content area present",
-         "selector": "main, [role='main'], #main, #content, .main-content",
-         "type": "core_content", "tier": 1, "optional": False,
-         "score": SMOKE_CRITICALITY["core_content"]["score"],
-         "reason": "Content container confirms page rendering succeeded"},
-    ]
+class CoverageTracker:
+    def __init__(self, sections: dict):
+        self.detected: dict[str, list] = {}   # section → elements
+        self.tested:   dict[str, list] = {}   # section → tested css selectors
 
-    # ── Tier 1: auth + primary CTA ────────────────────────────────────────────
-    for el in _detect_auth(scraped):
-        candidates.append({**el, "score": SMOKE_CRITICALITY["auth_trigger"]["score"]})
-    for el in _detect_primary_cta(scraped):
-        candidates.append({**el, "score": SMOKE_CRITICALITY["primary_cta"]["score"]})
+        for sec, elems in sections.items():
+            if elems:
+                self.detected[sec] = elems
+                self.tested[sec]   = []
 
-    # ── v9: Real nav links from scraper — increased to 6 ─────────────────────
-    for el in _detect_real_nav_links(scraped, max_links=6):
-        candidates.append(el)
+    def mark_tested(self, section: str, css: str):
+        if section in self.tested and css not in self.tested[section]:
+            self.tested[section].append(css)
 
-    # ── v9: Real buttons from scraper ────────────────────────────────────────
-    for el in _detect_real_buttons(scraped, max_buttons=4):
-        candidates.append(el)
+    def total_detected(self) -> int:
+        return sum(len(v) for v in self.detected.values())
 
-    # ── Tier 2: optional usability checks ────────────────────────────────────
-    for el in _detect_input_fields(scraped):
-        candidates.append({**el, "score": SMOKE_CRITICALITY["input_field"]["score"]})
-    for el in _detect_search_bar(scraped):
-        candidates.append({**el, "score": SMOKE_CRITICALITY["search_bar"]["score"]})
-    for el in _detect_lang_switch(scraped):
-        candidates.append({**el, "score": SMOKE_CRITICALITY["lang_switch"]["score"]})
+    def total_tested(self) -> int:
+        return sum(len(v) for v in self.tested.values())
 
-    candidates += [
-        {"name": "Hero section present",
-         "selector": "[class*='hero'], [class*='banner'], [class*='jumbotron'], [class*='slider']",
-         "type": "hero", "tier": 2, "optional": True,
-         "score": SMOKE_CRITICALITY["hero"]["score"],
-         "reason": "Hero section confirms above-the-fold content rendered"},
-        {"name": "Brand logo present",
-         "selector": (
-             "img[alt*='logo' i], img[src*='logo' i], "
-             "[class*='logo'] img, .logo img, .navbar-brand img, "
-             "[class*='logo'] svg, header [class*='brand']"
-         ),
-         "type": "logo", "tier": 2, "optional": True,
-         "score": SMOKE_CRITICALITY["logo"]["score"],
-         "reason": "Logo confirms correct site identity"},
-    ]
+    def coverage_pct(self) -> float:
+        total = self.total_detected()
+        return round(self.total_tested() / total * 100, 1) if total else 0.0
 
-    # ── v9: Real images from images_audit — increased to 4 ───────────────────
-    for el in _detect_real_images(scraped, max_images=4):
-        candidates.append(el)
+    def per_section(self) -> dict:
+        result = {}
+        for sec in self.detected:
+            det  = len(self.detected[sec])
+            test = len(self.tested.get(sec, []))
+            result[sec] = {
+                "detected": det,
+                "tested":   test,
+                "coverage": round(test / det * 100, 1) if det else 0.0,
+            }
+        return result
 
-    # ── v9: Pagination + Footer (moved to tier 2) ────────────────────────────
-    for el in _detect_pagination(scraped):
-        candidates.append(el)
-    for el in _detect_footer(scraped):
-        el["tier"] = 2   # v9: promoted from tier 3 → tier 2 to ensure inclusion
-        candidates.append(el)
-
-    # ── Tier 3: icons ─────────────────────────────────────────────────────────
-    for el in _detect_real_icons(scraped, max_icons=2):
-        candidates.append(el)
-
-    # ── Sort, deduplicate, enforce cap ────────────────────────────────────────
-    candidates.sort(key=lambda x: x.get("score", 0), reverse=True)
-    seen, unique = set(), []
-    for c in candidates:
-        key = c["selector"][:80]
-        if key not in seen:
-            seen.add(key)
-            unique.append(c)
-
-    tier_1_2 = [c for c in unique if c.get("tier", 3) <= SMOKE_MAX_TIER]
-    tier_3   = [c for c in unique if c.get("tier", 3)  > SMOKE_MAX_TIER]
-    final    = tier_1_2[:SMOKE_MAX_STEPS]
-    if len(final) < SMOKE_MIN_STEPS:
-        final.extend(tier_3[:SMOKE_MIN_STEPS - len(final)])
-
-    # Stamp runner-required fields
-    for i, step in enumerate(final, 1):
-        step.setdefault("id",          i)
-        step.setdefault("action",      "check_visible")
-        step.setdefault("value",       "")
-        step.setdefault("assertion",   None)
-        step.setdefault("category",    "smoke")
-        step.setdefault("priority",    "medium")
-        step.setdefault("expected",    step.get("reason", "Element should be present"))
-        step.setdefault("description", step["expected"])
-
-    return final
+    def report(self) -> dict:
+        return {
+            "total_detected_elements": self.total_detected(),
+            "total_tested_elements":   self.total_tested(),
+            "coverage_percentage":     self.coverage_pct(),
+            "per_section":             self.per_section(),
+        }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LLM path — functional / regression only
+# LLM CALL
 # ─────────────────────────────────────────────────────────────────────────────
-def _build_system_prompt(test_type: str, page_profile: str) -> str:
-    if test_type == "functional":
-        if page_profile == "nav_only":
-            return (
-                "You are a QA engineer generating FUNCTIONAL navigation tests.\n"
-                "This page has NO forms or inputs. Nav links are your ONLY interaction targets.\n\n"
-                "STRICT RULES:\n"
-                "1. Respond ONLY with valid JSON — no markdown, no backticks\n"
-                "2. Use ONLY selectors from CLICK TARGETS\n"
-                "3. REQUIRED: at least 2 click steps with url_contains assertions\n"
-                "4. FORBIDDEN: only check_visible steps — will be REJECTED\n"
-                "5. Pattern: check_visible(link) → click(link) + assertion(url_contains)\n"
-                "6. Generate 4-8 steps"
-            )
-        return (
-            "You are a QA engineer generating FUNCTIONAL tests.\n"
-            "STRICT RULES:\n"
-            "1. Respond ONLY with valid JSON — no markdown, no backticks\n"
-            "2. Use ONLY selectors from PAGE ELEMENTS\n"
-            "3. REQUIRED: at least 1 click or fill with an assertion\n"
-            "4. EVERY click/fill MUST have an assertion field\n"
-            "5. Assertion: { type, value, selector_target }\n"
-            "6. Generate 5-10 steps"
-        )
-    return (
-        "You are a QA engineer generating REGRESSION tests.\n"
-        "STRICT RULES:\n"
-        "1. Respond ONLY with valid JSON — no markdown, no backticks\n"
-        "2. Use ONLY selectors from PAGE ELEMENTS\n"
-        "3. REQUIRED: minimum 6 steps, at least 3 assertions\n"
-        "4. EVERY click/fill MUST have assertion\n"
-        "5. Build complete user journey flows\n"
-        "6. Generate 6-10 steps"
-    )
 
-
-TEST_TYPE_PROFILES = {
-    "smoke":      {"category": "smoke",      "priority": "medium", "has_assertion": False},
-    "functional": {"category": "functional", "priority": "high",   "has_assertion": True},
-    "regression": {"category": "regression", "priority": "high",   "has_assertion": True},
-}
-
-INTERACTION_ACTIONS = {"click", "fill", "submit"}
-ASSERTION_TYPES     = {"url_contains", "element_visible", "element_exists",
-                       "text_contains", "input_value"}
-
-
-def _validate_steps(steps: list, test_type: str, downgraded: bool = False) -> tuple:
-    errors = []
-    if not steps:
-        return False, ["No steps generated"]
-    if downgraded:
-        test_type = "smoke"
-    if test_type == "smoke":
-        bad = [s["action"] for s in steps if s.get("action") in INTERACTION_ACTIONS]
-        if bad:
-            errors.append(f"Smoke test contains forbidden actions: {bad}")
-        if len(steps) > SMOKE_MAX_STEPS:
-            errors.append(f"Smoke test has too many steps ({len(steps)}) — max {SMOKE_MAX_STEPS}.")
-    elif test_type in ("functional", "regression"):
-        interactions = [s for s in steps if s.get("action") in INTERACTION_ACTIONS]
-        if not interactions:
-            errors.append(f"{test_type} test has zero interactions")
-        for i, step in enumerate(steps):
-            if step.get("action") not in INTERACTION_ACTIONS:
-                continue
-            assertion = step.get("assertion")
-            if not assertion or not isinstance(assertion, dict):
-                errors.append(f"Step {i+1} ({step.get('action')}) missing assertion")
-            elif assertion.get("type") not in ASSERTION_TYPES:
-                errors.append(f"Step {i+1} invalid assertion type '{assertion.get('type')}'")
-        if test_type == "regression":
-            n_assert = sum(1 for s in steps if s.get("assertion"))
-            if n_assert < 3:
-                errors.append(f"Regression needs >=3 assertions, got {n_assert}")
-            if len(steps) < 6:
-                errors.append(f"Regression needs >=6 steps, got {len(steps)}")
-    return len(errors) == 0, errors
-
-
-def _call_llm(system_prompt: str, user_prompt: str) -> str:
+def _call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> str:
     for model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
         try:
             resp = groq_client.chat.completions.create(
@@ -637,7 +458,7 @@ def _call_llm(system_prompt: str, user_prompt: str) -> str:
                     {"role": "system", "content": system_prompt},
                     {"role": "user",   "content": user_prompt},
                 ],
-                temperature=0.0, max_tokens=2000, seed=42,
+                temperature=0.0, max_tokens=max_tokens, seed=42,
             )
             content = resp.choices[0].message.content.strip()
             if resp.choices[0].finish_reason != "length":
@@ -645,6 +466,7 @@ def _call_llm(system_prompt: str, user_prompt: str) -> str:
         except Exception as e:
             if "429" not in str(e):
                 raise
+            time.sleep(2)
     raise ValueError("All LLM models unavailable")
 
 
@@ -672,104 +494,394 @@ def _safe_parse(content: str) -> dict:
         raise ValueError(f"Cannot parse JSON: {content[:200]}")
 
 
-def _build_elements_block(scraped: dict, test_type: str,
-                           page_profile: str, clickable_nav: list) -> str:
-    lines = []
-    if page_profile == "nav_only" and clickable_nav:
-        lines.append("CLICK TARGETS — use at least 2 with click + assertion:")
-        for n in clickable_nav:
-            lines.append(f"  css='{n['css']}' text='{n['text']}' → assert url_contains='{n['slug']}'")
-        lines.append("")
-    skip_types = {"hidden", "submit", "button", "reset"}
-    inputs = [i for i in scraped.get("inputs", [])[:10]
-              if i.get("css_selector") and i.get("type") not in skip_types]
-    if inputs:
-        lines.append("Inputs (fill + assertion):")
-        for inp in inputs:
-            lines.append(f"  css='{inp['css_selector']}' type={inp['type']} placeholder='{inp.get('placeholder','')}'")
-    buttons = [b for b in scraped.get("buttons", [])[:8]
-               if b.get("css_selector") and b.get("text")]
-    if buttons:
-        lines.append("Buttons (click + assertion):")
-        for b in buttons:
-            lines.append(f"  css='{b['css_selector']}' text='{b['text']}'")
-    forms = scraped.get("forms", [])[:3]
-    if forms:
-        lines.append("Forms:")
-        for f in forms:
-            lines.append(f"  css='{f.get('css_selector','')}' action='{f.get('action','')}'")
-    else:
-        lines.append("Forms: NONE")
-    if page_profile == "rich":
-        nav_lines = []
-        for n in scraped.get("nav_links", [])[:6]:
-            href = n.get("href", ""); text = n.get("text", "").strip()
-            if not href or not text: continue
-            slug = href.rstrip("/").split("/")[-1]
-            if slug and slug not in ("", "#", "pll_switcher"):
-                nav_lines.append(f"  css='a[href*=\"{slug}\"]' text='{text}'")
-        if nav_lines:
-            lines.append("Nav links (click → assert url_contains):")
-            lines.extend(nav_lines)
-    return "\n".join(lines) if lines else "No elements found."
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION PROMPTS — one LLM call per section
+# ─────────────────────────────────────────────────────────────────────────────
+
+_SYSTEM_BASE = (
+    "You are an expert QA automation engineer generating functional test steps.\n"
+    "ABSOLUTE RULES:\n"
+    "1. Respond ONLY with valid JSON — no markdown, no explanation\n"
+    "2. Use ONLY the CSS selectors listed — never invent selectors\n"
+    "3. Every click/fill step MUST have a non-null assertion\n"
+    "4. check_visible steps may have assertion: null\n"
+    "5. Assertion types: url_contains, element_visible, text_contains, input_value, element_not_visible\n"
+    "6. Generate a step for EVERY element listed — do not skip any\n"
+    "7. Add section and priority fields to every step\n"
+)
+
+_STEP_SCHEMA = """{
+  "id": <int>,
+  "name": "<descriptive name>",
+  "action": "check_visible|click|fill",
+  "selector": "<exact CSS selector>",
+  "value": "<text if fill, else empty>",
+  "expected": "<what should happen>",
+  "category": "functional",
+  "priority": "high|medium|low",
+  "section": "<section name>",
+  "assertion": {
+    "type": "url_contains|element_visible|text_contains|input_value|element_not_visible",
+    "value": "<expected value>",
+    "selector_target": "<CSS selector to check>"
+  }
+}"""
 
 
-def _build_user_prompt(scraped: dict, test_type: str, page_profile: str,
-                        clickable_nav: list, retry_errors: list = None) -> str:
-    url      = scraped.get("url", "")
-    title    = scraped.get("title", "")
-    profile  = TEST_TYPE_PROFILES[test_type]
-    elements = _build_elements_block(scraped, test_type, page_profile, clickable_nav)
-    strategy_block = ""
-    if page_profile == "nav_only" and clickable_nav:
-        nav_examples = "\n".join(
-            f"  Step A: check_visible selector='{n['css']}'\n"
-            f"  Step B: click selector='{n['css']}' + assertion url_contains='{n['slug']}'"
-            for n in clickable_nav[:2]
-        )
-        strategy_block = "MANDATORY STRATEGY:\n" + nav_examples + "\nDo NOT generate only check_visible."
-    elif page_profile == "rich":
-        strategy_block = "STRATEGY: fill inputs + assert_input_value, click submit + assert_url."
-    retry_block = ""
-    if retry_errors:
-        retry_block = "\nPREVIOUS ATTEMPT REJECTED:\n" + "\n".join(f"  x {e}" for e in retry_errors)
-    return f"""Generate {profile['category']} test steps for this page.
+def _generate_section_steps(
+    section_name:  str,
+    elements:      list,
+    scraped:       dict,
+    start_id:      int = 1,
+    extra_context: str = "",
+) -> list:
+    if not elements:
+        return []
+
+    url   = scraped.get("url", "")
+    title = scraped.get("title", "")
+
+    # Build element list for the prompt
+    elem_lines = []
+    for e in elements:
+        line = f"  selector: '{e['css']}'  type: {e.get('type','')}  text: '{e.get('text','')[:50]}'"
+        if e.get("role"):
+            line += f"  role: {e['role']}"
+        if e.get("required"):
+            line += "  required: true"
+        if e.get("slug"):
+            line += f"  slug: '{e['slug']}'"
+        elem_lines.append(line)
+
+    # Section-specific strategy instructions
+    strategies = {
+        "header": (
+            "SECTION: HEADER / NAVBAR\n"
+            "For EACH nav link:\n"
+            "  - Step A: check_visible (assertion: null)\n"
+            "  - Step B: click → assert url_contains the slug\n"
+            "For logo: check_visible (assertion: null)\n"
+            "For lang_switch: click → assert url_contains a lang code\n"
+        ),
+        "hero": (
+            "SECTION: HERO / BANNER\n"
+            "For hero sections: check_visible (assertion: null)\n"
+            "For CTA buttons: check_visible → then click → assert element_visible or url_contains\n"
+        ),
+        "search": (
+            "SECTION: SEARCH\n"
+            "Generate a COMPLETE search workflow:\n"
+            "  1. check_visible on search input\n"
+            "  2. fill search input with 'test' → assert input_value\n"
+            "  3. click submit or press Enter equivalent (click the search input's form or button)\n"
+            "     → assert element_visible on results or url_contains 'search' or '?s='\n"
+        ),
+        "forms": (
+            "SECTION: FORMS\n"
+            "For EACH input field:\n"
+            "  - check_visible → assertion: null\n"
+            "  - fill with realistic test data → assert input_value\n"
+            "For submit button:\n"
+            "  - Generate POSITIVE test: fill all fields then click submit → assert element_visible (success)\n"
+            "  - Generate NEGATIVE test: click submit WITHOUT filling → assert element_visible (error message)\n"
+            "    Use selector_target like '.error, .alert, [class*=error], [class*=invalid]' for negative\n"
+        ),
+        "content": (
+            "SECTION: CONTENT\n"
+            "For headings: check_visible with text_contains assertion\n"
+            "For cards/sections: check_visible (assertion: null)\n"
+            "For buttons: click → assert url_contains or element_visible\n"
+        ),
+        "footer": (
+            "SECTION: FOOTER\n"
+            "For footer container: check_visible (assertion: null)\n"
+            "For footer links: check_visible → click → assert url_contains slug\n"
+        ),
+    }
+
+    strategy = strategies.get(section_name, f"SECTION: {section_name.upper()}\nTest all listed elements.\n")
+
+    system_prompt = _SYSTEM_BASE + f"\n{strategy}"
+
+    user_prompt = f"""Generate functional test steps for the {section_name.upper()} section.
 URL: {url}
-Title: {title}
-Page profile: {page_profile}
+PAGE TITLE: {title}
+IDs start at: {start_id}
+{extra_context}
 
-{elements}
-
-{strategy_block}
-{retry_block}
+=== ELEMENTS TO TEST (test ALL of them) ===
+{chr(10).join(elem_lines)}
 
 Return ONLY this JSON:
 {{
   "steps": [
-    {{
-      "id": 1,
-      "name": "descriptive name",
-      "action": "check_visible | click | fill",
-      "selector": "exact selector from elements above",
-      "value": "text to type (fill only, else empty string)",
-      "expected": "what should happen",
-      "category": "{profile['category']}",
-      "priority": "high",
-      "assertion": null
-    }}
+    {_STEP_SCHEMA}
   ]
 }}
 
-For click/fill steps replace null with:
-  {{"type": "url_contains|element_visible|text_contains|input_value", "value": "...", "selector_target": "..."}}"""
+CRITICAL:
+- Test EVERY element listed above — do not skip any
+- For click/fill: assertion must be non-null
+- Include section: "{section_name}" in every step
+"""
+
+    for attempt in range(3):
+        try:
+            raw    = _call_llm(system_prompt, user_prompt)
+            parsed = _safe_parse(raw)
+            steps  = parsed.get("steps", [])
+            if steps:
+                # Ensure section field is set
+                for s in steps:
+                    s.setdefault("section", section_name)
+                return steps
+        except Exception as e:
+            print(f"[GEN] Section '{section_name}' attempt {attempt+1} failed: {e}")
+            time.sleep(1)
+
+    return []
+
+
+def _generate_workflow_steps(
+    workflows:  list,
+    scraped:    dict,
+    start_id:   int = 1,
+) -> list:
+    if not workflows:
+        return []
+
+    url = scraped.get("url", "")
+
+    workflow_lines = []
+    for wf in workflows:
+        workflow_lines.append(f"WORKFLOW: {wf['name']} (type: {wf['type']})")
+        for st in wf["steps"]:
+            workflow_lines.append(f"  action: {st['action']}  css: {st.get('css', 'N/A')}  desc: {st['desc']}")
+        workflow_lines.append("")
+
+    system_prompt = (
+        _SYSTEM_BASE
+        + "\nSECTION: WORKFLOWS\n"
+        "Generate multi-step user journey tests.\n"
+        "For search_flow: fill input → click/submit → assert results visible\n"
+        "For nav_back_flow: click nav link → assert URL → navigate to original URL → assert homepage loaded\n"
+        "For form_negative: click submit without filling → assert error element visible\n"
+        "For lang_flow: click lang switch → assert URL contains lang code or page content changed\n"
+    )
+
+    user_prompt = f"""Generate workflow test steps.
+URL: {url}
+IDs start at: {start_id}
+
+=== WORKFLOWS TO IMPLEMENT ===
+{chr(10).join(workflow_lines)}
+
+Return ONLY this JSON:
+{{
+  "steps": [
+    {_STEP_SCHEMA}
+  ]
+}}
+
+CRITICAL:
+- Each workflow must have multiple steps that chain together
+- Include section: "workflow" in every step
+- For navigate_back: use action "click" on a home link or logo selector
+- For error assertions: use selector_target '.error, .alert, [class*=error], [class*=invalid], [aria-invalid]'
+"""
+
+    for attempt in range(3):
+        try:
+            raw    = _call_llm(system_prompt, user_prompt)
+            parsed = _safe_parse(raw)
+            steps  = parsed.get("steps", [])
+            if steps:
+                for s in steps:
+                    s.setdefault("section", "workflow")
+                return steps
+        except Exception as e:
+            print(f"[GEN] Workflow attempt {attempt+1} failed: {e}")
+            time.sleep(1)
+
+    return []
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Script builders
+# SMOKE HELPERS (unchanged from v12)
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _scraper_best_heading(scraped):
+    for h in scraped.get("headings", []):
+        sel  = h.get("css_selector", "").strip()
+        text = h.get("text", "").strip()
+        if sel and text:
+            return sel
+    return "h1, h2, h3"
+
+def _scraper_best_main_content(scraped):
+    for sec in scraped.get("content_sections", []):
+        css = sec.get("css_selector", "").strip()
+        if css and sec.get("has_size"):
+            if any(tok in css for tok in ("main","content","container","wrapper","article","section")):
+                return css
+    return "main, [role='main'], #content, .content, article"
+
+def _scraper_has_nav(scraped):
+    for nav in scraped.get("nav_links", []):
+        href = nav.get("href","").strip()
+        text = nav.get("text","").strip()
+        slug = href.rstrip("/").split("/")[-1] if href else ""
+        if text and slug and slug not in ("","#","pll_switcher"):
+            return True, f"a[href*='{slug}']"
+    return False, "nav, [role='navigation']"
+
+def _scraper_has_search(scraped):
+    for bar in scraped.get("search_bar", []):
+        sel = bar.get("css_selector","").strip()
+        if sel: return True, sel
+    return False, "input[type='search']"
+
+def _scraper_has_footer(scraped):
+    for f in scraped.get("footer_data",[]):
+        if f.get("visible"):
+            sel = f.get("css_selector","").strip()
+            return True, sel or "footer"
+    return False, "footer"
+
+def _scraper_has_auth(scraped):
+    auth_kw = {"login","signin","register","signup","account","connexion"}
+    for btn in scraped.get("buttons",[]):
+        text = btn.get("text","").lower()
+        css  = btn.get("css_selector","")
+        if css and any(k in text for k in auth_kw): return True, css
+    for nav in scraped.get("nav_links",[]):
+        text = nav.get("text","").lower()
+        href = nav.get("href","").lower()
+        if any(k in text or k in href for k in auth_kw):
+            slug = nav["href"].rstrip("/").split("/")[-1]
+            if slug: return True, f"a[href*='{slug}']"
+    return False, ""
+
+def _scraper_has_logo(scraped):
+    for img in scraped.get("images_audit",[]):
+        alt = img.get("alt","").lower(); src = img.get("src","").lower()
+        if "logo" in alt or "logo" in src:
+            return True, img.get("css_selector","img[src*='logo']")
+    return False, "img[src*='logo']"
+
+def _scraper_real_nav_links(scraped, max_links=4):
+    results, seen = [], set()
+    base_domain = scraped.get("url","").split("/")[2] if "//" in scraped.get("url","") else ""
+    for nav in scraped.get("nav_links",[]):
+        href = nav.get("href","").strip(); text = nav.get("text","").strip()
+        if not href or not text: continue
+        slug = href.rstrip("/").split("/")[-1]
+        if not slug or slug in ("#","pll_switcher",""): continue
+        if href.startswith("http") and base_domain and base_domain not in href: continue
+        if slug in seen: continue
+        seen.add(slug)
+        results.append({"css": f"a[href*='{slug}']", "text": text, "slug": slug})
+        if len(results) >= max_links: break
+    return results
+
+def _make_smoke_step(name, selector, check_type, reason, optional=None):
+    meta = CRITICALITY.get(check_type, {"score": 40, "tier": 3, "optional": True})
+    return {
+        "name": name, "selector": selector, "type": check_type,
+        "tier": meta.get("tier",3), "score": meta.get("score",40),
+        "optional": meta.get("optional",True) if optional is None else optional,
+        "reason": reason, "action": "check_visible", "value": "",
+        "assertion": None, "category": "smoke",
+        "priority": "high" if meta.get("tier",3)==1 else "medium",
+        "expected": reason, "description": reason, "section": "smoke",
+    }
+
+def _build_smoke_steps(scraped: dict) -> list:
+    candidates = []
+    url = scraped.get("url","")
+
+    candidates.append(_make_smoke_step("Page body rendered","body","body","body element present",False))
+
+    heading_sel = _scraper_best_heading(scraped)
+    candidates.append(_make_smoke_step("Page heading visible", heading_sel, "heading",
+        "Heading present — correct page loaded", False))
+
+    content_sel = _scraper_best_main_content(scraped)
+    candidates.append(_make_smoke_step("Main content area present", content_sel, "main_content",
+        "Content container present", False))
+
+    auth_found, auth_sel = _scraper_has_auth(scraped)
+    if auth_found:
+        candidates.append(_make_smoke_step("Auth entry point present", auth_sel, "auth",
+            "Auth element detected", False))
+
+    nav_found, nav_sel = _scraper_has_nav(scraped)
+    if nav_found:
+        candidates.append(_make_smoke_step("Navigation present", nav_sel, "navigation",
+            "Navigation detected"))
+        for link in _scraper_real_nav_links(scraped, max_links=4):
+            candidates.append(_make_smoke_step(
+                f"Nav link: {link['text'][:40]}", link["css"], "nav_link",
+                f"Nav link '{link['text']}' present"))
+
+    search_found, search_sel = _scraper_has_search(scraped)
+    if search_found:
+        candidates.append(_make_smoke_step("Search bar present", search_sel, "search",
+            "Search component detected"))
+
+    logo_found, logo_sel = _scraper_has_logo(scraped)
+    if logo_found:
+        candidates.append(_make_smoke_step("Brand logo visible", logo_sel, "logo",
+            "Logo detected"))
+
+    footer_found, footer_sel = _scraper_has_footer(scraped)
+    if footer_found:
+        candidates.append(_make_smoke_step("Footer present", footer_sel, "footer",
+            "Footer detected"))
+
+    candidates.sort(key=lambda x: x.get("score",0), reverse=True)
+    seen, unique = set(), []
+    for c in candidates:
+        key = c["selector"][:120]
+        if key not in seen:
+            seen.add(key); unique.append(c)
+
+    final = unique[:SMOKE_MAX_STEPS]
+    if len(final) < SMOKE_MIN_STEPS:
+        final = unique[:SMOKE_MIN_STEPS]
+
+    for i, step in enumerate(final, 1):
+        step["id"] = i; step["base_url"] = url
+    return final
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PAGE PROFILE CLASSIFIER
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _classify_page_profile(scraped: dict) -> str:
+    has_inputs = any(
+        i.get("css_selector") and i.get("type") not in {"hidden","submit","button","reset"}
+        for i in scraped.get("inputs",[])
+    )
+    has_forms   = bool(scraped.get("forms"))
+    has_nav     = any(
+        n.get("href") and n.get("text","").strip()
+        and n["href"].rstrip("/").split("/")[-1] not in ("","#","pll_switcher")
+        for n in scraped.get("nav_links",[])
+    )
+    has_buttons = bool(scraped.get("buttons"))
+    if has_inputs or has_forms: return "rich"
+    if has_nav or has_buttons:  return "nav_only"
+    return "static"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SCRIPT BUILDERS (Selenium / Playwright / Cypress)
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _is_optional(step: dict) -> bool:
     return step.get("optional", False) or step.get("type") in OPTIONAL_TYPES
-
 
 def _build_selenium_script(steps: list, url: str) -> str:
     lines = [
@@ -778,8 +890,7 @@ def _build_selenium_script(steps: list, url: str) -> str:
         "from selenium.webdriver.support.ui import WebDriverWait",
         "from selenium.webdriver.support import expected_conditions as EC",
         "from selenium.webdriver.chrome.options import Options",
-        "import time",
-        "",
+        "import time", "",
         "def setup_driver():",
         "    opts = Options()",
         "    opts.add_argument('--headless')",
@@ -789,214 +900,213 @@ def _build_selenium_script(steps: list, url: str) -> str:
         "    driver = webdriver.Chrome(options=opts)",
         "    driver.set_page_load_timeout(30)",
         "    driver.implicitly_wait(10)",
-        "    return driver",
-        "",
+        "    return driver", "",
     ]
     for i, step in enumerate(steps, 1):
-        action    = step.get("action", "check_visible")
-        selector  = step.get("selector", "")
-        value     = step.get("value", "")
-        name      = step.get("name", f"step_{i}")
-        fn_name   = f"test_{i}_" + re.sub(r"[^a-z0-9]", "_", name.lower())[:30]
+        action    = step.get("action","check_visible")
+        selector  = step.get("selector","")
+        value     = step.get("value","")
+        name      = step.get("name",f"step_{i}")
+        fn_name   = f"test_{i}_" + re.sub(r"[^a-z0-9]","_",name.lower())[:30]
         assertion = step.get("assertion")
         optional  = _is_optional(step)
         lines.append(f"def {fn_name}(driver):")
         lines.append(f"    driver.get('{url}')")
         if action == "check_visible":
             if optional:
-                lines.append(f"    try:")
-                lines.append(f"        el = WebDriverWait(driver, 10).until(")
-                lines.append(f"            EC.presence_of_element_located((By.CSS_SELECTOR, '{selector}')))")
-                lines.append(f"        assert el is not None")
-                lines.append(f"    except Exception:")
-                lines.append(f"        print('[WARN] Optional element not found: {selector}')")
+                lines += [f"    try:",
+                          f"        el = WebDriverWait(driver,10).until(EC.presence_of_element_located((By.CSS_SELECTOR,'{selector}')))",
+                          f"        assert el is not None",
+                          f"    except Exception: print('[WARN] Optional: {selector}')"]
             else:
-                lines.append(f"    el = WebDriverWait(driver, 15).until(")
-                lines.append(f"        EC.presence_of_element_located((By.CSS_SELECTOR, '{selector}')))")
-                lines.append(f"    assert el is not None, 'Element not found: {selector}'")
+                lines += [f"    el = WebDriverWait(driver,15).until(EC.presence_of_element_located((By.CSS_SELECTOR,'{selector}')))",
+                          f"    assert el is not None, 'Not found: {selector}'"]
         elif action == "click":
-            lines.append(f"    el = WebDriverWait(driver, 15).until(")
-            lines.append(f"        EC.element_to_be_clickable((By.CSS_SELECTOR, '{selector}')))")
-            lines.append(f"    el.click()")
-            lines.append(f"    time.sleep(1)")
+            lines += [f"    el = WebDriverWait(driver,15).until(EC.element_to_be_clickable((By.CSS_SELECTOR,'{selector}')))",
+                      f"    el.click()", f"    time.sleep(1)"]
             if assertion:
                 if assertion.get("type") == "url_contains":
                     lines.append(f"    assert '{assertion['value']}' in driver.current_url")
-                elif assertion.get("type") in ("element_visible", "element_exists"):
-                    t = assertion.get("selector_target", "")
-                    lines.append(f"    WebDriverWait(driver, 10).until(")
-                    lines.append(f"        EC.presence_of_element_located((By.CSS_SELECTOR, '{t}')))")
+                elif assertion.get("type") in ("element_visible","element_exists"):
+                    t = assertion.get("selector_target","")
+                    lines.append(f"    WebDriverWait(driver,10).until(EC.presence_of_element_located((By.CSS_SELECTOR,'{t}')))")
+                elif assertion.get("type") == "text_contains":
+                    t = assertion.get("selector_target",""); v = assertion.get("value","")
+                    lines += [f"    el2 = driver.find_element(By.CSS_SELECTOR,'{t}')",
+                              f"    assert '{v}' in el2.text"]
+                elif assertion.get("type") == "element_not_visible":
+                    t = assertion.get("selector_target","")
+                    lines.append(f"    assert len(driver.find_elements(By.CSS_SELECTOR,'{t}')) == 0")
         elif action == "fill":
-            lines.append(f"    el = WebDriverWait(driver, 15).until(")
-            lines.append(f"        EC.presence_of_element_located((By.CSS_SELECTOR, '{selector}')))")
-            lines.append(f"    el.clear()")
-            lines.append(f"    el.send_keys('{value}')")
-            lines.append(f"    assert el.get_attribute('value') == '{value}', 'Fill failed'")
+            lines += [f"    el = WebDriverWait(driver,15).until(EC.presence_of_element_located((By.CSS_SELECTOR,'{selector}')))",
+                      f"    el.clear()", f"    el.send_keys('{value}')"]
+            if assertion and assertion.get("type") == "input_value":
+                lines.append(f"    assert el.get_attribute('value') == '{value}'")
         lines.append("")
-    fn_names = [f"test_{i}_" + re.sub(r"[^a-z0-9]", "_", s.get("name","step").lower())[:30]
-                for i, s in enumerate(steps, 1)]
-    lines += [
-        "if __name__ == '__main__':",
-        "    driver = setup_driver()",
-        "    tests = [" + ", ".join(fn_names) + "]",
-        "    passed = failed = 0",
-        "    try:",
-        "        for i, t in enumerate(tests, 1):",
-        "            try:",
-        "                t(driver)",
-        "                print(f'Test {i}: PASSED')",
-        "                passed += 1",
-        "            except Exception as e:",
-        "                print(f'Test {i}: FAILED — {e}')",
-        "                failed += 1",
-        "    finally:",
-        "        driver.quit()",
-        "        print(f'\\n{passed} passed / {failed} failed')",
-    ]
-    return "\n".join(lines)
 
+    fn_names = [f"test_{i}_"+re.sub(r"[^a-z0-9]","_",s.get("name","step").lower())[:30]
+                for i,s in enumerate(steps,1)]
+    lines += ["if __name__ == '__main__':",
+              "    driver = setup_driver()",
+              "    tests = ["+", ".join(fn_names)+"]",
+              "    passed = failed = 0",
+              "    try:",
+              "        for i,t in enumerate(tests,1):",
+              "            try: t(driver); print(f'Test {i}: PASSED'); passed+=1",
+              "            except Exception as e: print(f'Test {i}: FAILED — {e}'); failed+=1",
+              "    finally:",
+              "        driver.quit()",
+              "        print(f'\\n{passed} passed / {failed} failed')"]
+    return "\n".join(lines)
 
 def _build_playwright_script(steps: list, url: str) -> str:
     lines = [
         "from playwright.sync_api import sync_playwright, expect",
-        "import pytest, re",
-        "",
-        f"BASE_URL = '{url}'",
-        "",
+        "import pytest, re", "",
+        f"BASE_URL = '{url}'", "",
         "@pytest.fixture(scope='module')",
         "def page():",
         "    with sync_playwright() as p:",
         "        browser = p.chromium.launch(headless=True)",
-        "        ctx = browser.new_context(viewport={'width': 1920, 'height': 1080})",
-        "        pg  = ctx.new_page()",
+        "        ctx = browser.new_context(viewport={'width':1920,'height':1080})",
+        "        pg = ctx.new_page()",
         "        pg.goto(BASE_URL, wait_until='domcontentloaded')",
         "        yield pg",
-        "        browser.close()",
-        "",
+        "        browser.close()", "",
     ]
     for i, step in enumerate(steps, 1):
-        action    = step.get("action", "check_visible")
-        selector  = step.get("selector", "")
-        value     = step.get("value", "")
-        name      = step.get("name", f"step_{i}")
-        fn_name   = "test_" + re.sub(r"[^a-z0-9]", "_", name.lower())[:40]
+        action    = step.get("action","check_visible")
+        selector  = step.get("selector","")
+        value     = step.get("value","")
+        name      = step.get("name",f"step_{i}")
+        fn_name   = "test_"+re.sub(r"[^a-z0-9]","_",name.lower())[:40]
         assertion = step.get("assertion")
         optional  = _is_optional(step)
         lines.append(f"def {fn_name}(page):")
         if action == "check_visible":
             if optional:
-                lines.append(f"    try:")
-                lines.append(f"        expect(page.locator('{selector}').first).to_be_visible(timeout=10000)")
-                lines.append(f"    except Exception:")
-                lines.append(f"        pytest.skip('Optional element not found: {selector}')")
+                lines += [f"    try: expect(page.locator('{selector}').first).to_be_visible(timeout=10000)",
+                          f"    except Exception: pytest.skip('Optional: {selector}')"]
             else:
                 lines.append(f"    expect(page.locator('{selector}').first).to_be_visible(timeout=15000)")
         elif action == "click":
-            lines.append(f"    page.locator('{selector}').first.click()")
-            lines.append(f"    page.wait_for_load_state('domcontentloaded')")
+            lines += [f"    page.locator('{selector}').first.click()",
+                      f"    page.wait_for_load_state('domcontentloaded')"]
             if assertion:
                 if assertion.get("type") == "url_contains":
-                    _av = re.escape(assertion.get("value", ""))
-                    lines.append(f"    expect(page).to_have_url(re.compile(r'{_av}'))")
-                elif assertion.get("type") in ("element_visible", "element_exists"):
-                    _at = assertion.get("selector_target", "")
-                    lines.append(f"    expect(page.locator('{_at}').first).to_be_visible(timeout=10000)")
+                    av = re.escape(assertion.get("value",""))
+                    lines.append(f"    expect(page).to_have_url(re.compile(r'{av}'))")
+                elif assertion.get("type") in ("element_visible","element_exists"):
+                    at = assertion.get("selector_target","")
+                    lines.append(f"    expect(page.locator('{at}').first).to_be_visible(timeout=15000)")
+                elif assertion.get("type") == "text_contains":
+                    at = assertion.get("selector_target",""); av = assertion.get("value","")
+                    lines.append(f"    expect(page.locator('{at}').first).to_contain_text('{av}')")
+                elif assertion.get("type") == "element_not_visible":
+                    at = assertion.get("selector_target","")
+                    lines.append(f"    expect(page.locator('{at}')).to_have_count(0)")
         elif action == "fill":
-            lines.append(f"    page.fill('{selector}', '{value}')")
-            lines.append(f"    expect(page.locator('{selector}')).to_have_value('{value}')")
+            lines.append(f"    page.fill('{selector}','{value}')")
+            if assertion and assertion.get("type") == "input_value":
+                lines.append(f"    expect(page.locator('{selector}')).to_have_value('{value}')")
         lines.append("")
     return "\n".join(lines)
 
-
 def _build_cypress_script(steps: list, url: str) -> str:
     lines = [
-        "// Cypress smoke suite — auto-generated by NexTest v8",
-        f"const BASE_URL = '{url}';",
-        "",
-        "describe('NexTest Smoke Suite', () => {",
-        "  beforeEach(() => { cy.visit(BASE_URL); });",
-        "",
+        "// Cypress functional suite — NexTest v13",
+        f"const BASE_URL = '{url}';", "",
+        "describe('NexTest Full Coverage Suite', () => {",
+        "  beforeEach(() => { cy.visit(BASE_URL); });", "",
     ]
     for i, step in enumerate(steps, 1):
-        action    = step.get("action", "check_visible")
-        selector  = step.get("selector", "")
-        value     = step.get("value", "")
-        name      = step.get("name", f"step {i}")
+        action    = step.get("action","check_visible")
+        selector  = step.get("selector","")
+        value     = step.get("value","")
+        name      = step.get("name",f"step {i}")
         assertion = step.get("assertion")
         optional  = _is_optional(step)
+        section   = step.get("section","general")
+        lines.append(f"  // [{section.upper()}]")
         lines.append(f"  it('{name}', () => {{")
         if action == "check_visible":
             if optional:
-                lines.append(f"    cy.get('body').then($body => {{")
-                lines.append(f"      if ($body.find('{selector}').length > 0) {{")
-                lines.append(f"        cy.get('{selector}').first().should('exist');")
-                lines.append(f"      }} else {{")
-                lines.append(f"        cy.log('WARN: optional element not found — {selector}');")
-                lines.append(f"      }}")
-                lines.append(f"    }});")
+                lines += [f"    cy.get('body').then($b => {{",
+                          f"      if ($b.find('{selector}').length > 0) cy.get('{selector}').first().should('exist');",
+                          f"      else cy.log('WARN: optional — {selector}');",
+                          f"    }});"]
             else:
                 lines.append(f"    cy.get('{selector}').first().should('exist');")
         elif action == "click":
             lines.append(f"    cy.get('{selector}').first().click();")
             if assertion:
                 if assertion.get("type") == "url_contains":
-                    _cv = assertion.get("value", "")
-                    lines.append(f"    cy.url().should('include', '{_cv}');")
-                elif assertion.get("type") in ("element_visible", "element_exists"):
-                    _ct = assertion.get("selector_target", "")
-                    lines.append(f"    cy.get('{_ct}').should('be.visible');")
+                    lines.append(f"    cy.url().should('include', '{assertion['value']}');")
+                elif assertion.get("type") in ("element_visible","element_exists"):
+                    ct = assertion.get("selector_target","")
+                    lines.append(f"    cy.get('{ct}').should('be.visible');")
+                elif assertion.get("type") == "text_contains":
+                    ct = assertion.get("selector_target",""); cv = assertion.get("value","")
+                    lines.append(f"    cy.get('{ct}').should('contain', '{cv}');")
+                elif assertion.get("type") == "element_not_visible":
+                    ct = assertion.get("selector_target","")
+                    lines.append(f"    cy.get('{ct}').should('not.exist');")
         elif action == "fill":
             lines.append(f"    cy.get('{selector}').clear().type('{value}');")
-            lines.append(f"    cy.get('{selector}').should('have.value', '{value}');")
-        lines.append("  });")
-        lines.append("")
+            if assertion and assertion.get("type") == "input_value":
+                lines.append(f"    cy.get('{selector}').should('have.value', '{value}');")
+        lines += ["  });", ""]
     lines.append("});")
     return "\n".join(lines)
 
-
 def _build_scripts(steps: list, url: str, framework: str) -> dict:
     fw = framework.lower()
-    scripts = {"script": "", "script_selenium": "", "script_playwright": "", "script_cypress": ""}
+    s  = {"script":"","script_selenium":"","script_playwright":"","script_cypress":""}
     if fw == "selenium":
-        scripts["script_selenium"] = _build_selenium_script(steps, url)
-        scripts["script"]          = scripts["script_selenium"]
+        s["script_selenium"] = _build_selenium_script(steps, url)
+        s["script"]          = s["script_selenium"]
     elif fw == "playwright":
-        scripts["script_playwright"] = _build_playwright_script(steps, url)
-        scripts["script"]            = scripts["script_playwright"]
+        s["script_playwright"] = _build_playwright_script(steps, url)
+        s["script"]            = s["script_playwright"]
     elif fw == "cypress":
-        scripts["script_cypress"] = _build_cypress_script(steps, url)
-        scripts["script"]         = scripts["script_cypress"]
-    elif fw in ("both", "all"):
-        scripts["script_selenium"]   = _build_selenium_script(steps, url)
-        scripts["script_playwright"] = _build_playwright_script(steps, url)
-        scripts["script_cypress"]    = _build_cypress_script(steps, url)
-        scripts["script"]            = scripts["script_selenium"]
-    return scripts
+        s["script_cypress"] = _build_cypress_script(steps, url)
+        s["script"]         = s["script_cypress"]
+    elif fw in ("both","all"):
+        s["script_selenium"]   = _build_selenium_script(steps, url)
+        s["script_playwright"] = _build_playwright_script(steps, url)
+        s["script_cypress"]    = _build_cypress_script(steps, url)
+        s["script"]            = s["script_selenium"]
+    return s
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Main entry point
+# MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
-def generate_tests(scraped: dict, framework: str,
-                   username: str = None, password: str = None,
-                   test_type: str = "smoke") -> dict:
+
+def generate_tests(
+    scraped:       dict,
+    framework:     str,
+    username:      str = None,
+    password:      str = None,
+    test_type:     str = "smoke",
+    user_scenario: str = None,
+) -> dict:
 
     if test_type not in TEST_TYPE_PROFILES:
         test_type = "smoke"
 
-    profile      = TEST_TYPE_PROFILES[test_type]
-    url          = scraped.get("url", "")
+    url          = scraped.get("url","")
     page_profile = _classify_page_profile(scraped)
 
-    print(f"[GEN] {test_type} | page_profile={page_profile} | url={url}")
+    print(f"[GEN v13] {test_type} | profile={page_profile} | url={url}")
 
-    # ── SMOKE: deterministic — skip LLM entirely ──────────────────────────────
+    # ── SMOKE : deterministic, no LLM ────────────────────────────────────────
     if test_type == "smoke":
         steps = _build_smoke_steps(scraped)
         for step in steps:
             step["base_url"] = url
         scripts = _build_scripts(steps, url, framework)
-        print(f"[GEN] OK smoke | {len(steps)} steps | deterministic (no LLM)")
+        print(f"[GEN v13] smoke OK | {len(steps)} steps")
         return {
             "test_cases":          steps,
             "test_cases_selenium": steps,
@@ -1008,78 +1118,103 @@ def generate_tests(scraped: dict, framework: str,
             "page_type":           "general",
             "test_type":           "smoke",
             "page_profile":        page_profile,
+            "coverage_report":     None,
         }
 
-    # ── FUNCTIONAL / REGRESSION: LLM path ────────────────────────────────────
-    clickable_nav = _extract_clickable_nav(scraped)
+    # ── FUNCTIONAL / REGRESSION : section-based full coverage ────────────────
 
-    if page_profile == "static":
-        print(f"[GEN] DOWNGRADE {test_type} → smoke (no interactable elements)")
+    if page_profile == "static" and not user_scenario:
+        print(f"[GEN v13] DOWNGRADE {test_type} → smoke (static page)")
         result = generate_tests(scraped, framework, username, password, test_type="smoke")
-        for step in result.get("test_cases", []):
-            step["downgraded"]         = True
-            step["original_test_type"] = test_type
-        result.update({
-            "test_type":        test_type,
-            "execution_type":   "smoke",
-            "downgraded":       True,
-            "downgrade_reason": (
-                f"No interactable elements found. {test_type.capitalize()} "
-                "requires clickable/fillable targets. Executed as smoke instead."
-            ),
-        })
+        result.update({"test_type": test_type, "downgraded": True,
+                       "downgrade_reason": "No interactable elements found."})
         return result
 
-    system_prompt = _build_system_prompt(test_type, page_profile)
-    last_errors   = []
+    # 1. Extract sections
+    sections  = _extract_sections(scraped)
+    workflows = _define_workflows(sections, scraped)
+    tracker   = CoverageTracker(sections)
 
-    for attempt in range(3):
-        try:
-            user_prompt = _build_user_prompt(
-                scraped, test_type, page_profile, clickable_nav,
-                retry_errors=last_errors if attempt > 0 else None,
+    print(f"[GEN v13] Sections detected: "
+          + ", ".join(f"{s}:{len(e)}" for s,e in sections.items() if e))
+
+    # 2. Generate steps per section
+    all_steps  = []
+    current_id = 1
+
+    for sec_name in SECTION_PRIORITY:
+        elems = sections.get(sec_name, [])
+        if not elems and sec_name != "workflow":
+            continue
+
+        if sec_name == "workflow":
+            sec_steps = _generate_workflow_steps(workflows, scraped, start_id=current_id)
+        else:
+            sec_steps = _generate_section_steps(
+                section_name=sec_name,
+                elements=elems,
+                scraped=scraped,
+                start_id=current_id,
             )
-            raw    = _call_llm(system_prompt, user_prompt)
-            parsed = _safe_parse(raw)
-            steps  = parsed.get("steps", [])
-            if not steps:
-                last_errors = ["No steps returned"]; continue
-            valid, errors = _validate_steps(steps, test_type)
-            if not valid:
-                print(f"[GEN] Attempt {attempt+1} failed: {errors}")
-                last_errors = errors; continue
-            for step in steps:
-                step["base_url"]    = url
-                step["category"]    = step.get("category", profile["category"])
-                step["priority"]    = step.get("priority", "high")
-                step["description"] = step.get("expected", "")
-                step.setdefault("assertion", None)
-            scripts = _build_scripts(steps, url, framework)
-            print(f"[GEN] OK {test_type} | {len(steps)} steps | attempt {attempt+1}")
-            return {
-                "test_cases":          steps,
-                "test_cases_selenium": steps,
-                "test_cases_cypress":  steps,
-                "script":              scripts["script"],
-                "script_selenium":     scripts["script_selenium"],
-                "script_playwright":   scripts["script_playwright"],
-                "script_cypress":      scripts["script_cypress"],
-                "page_type":           "general",
-                "test_type":           test_type,
-                "page_profile":        page_profile,
-            }
-        except Exception as e:
-            print(f"[GEN] Attempt {attempt+1} exception: {e}")
-            last_errors = [str(e)]
+
+        if sec_steps:
+            print(f"[GEN v13] Section '{sec_name}': {len(sec_steps)} steps")
+            all_steps.extend(sec_steps)
+            current_id += len(sec_steps)
+
+            # Track coverage
+            for step in sec_steps:
+                sel = step.get("selector","")
+                if sel:
+                    tracker.mark_tested(sec_name, sel)
+
+    # 3. Deduplicate by action+selector
+    seen_keys     = set()
+    unique_steps  = []
+    for step in all_steps:
+        key = f"{step.get('action')}:{step.get('selector','')}"
+        if key not in seen_keys:
+            seen_keys.add(key)
+            unique_steps.append(step)
+
+    # 4. Renumber + enrich
+    profile = TEST_TYPE_PROFILES[test_type]
+    for i, step in enumerate(unique_steps, 1):
+        step["id"]          = i
+        step["base_url"]    = url
+        step["category"]    = step.get("category", profile["category"])
+        step["priority"]    = step.get("priority", profile["priority"])
+        step["description"] = step.get("expected","")
+        step["section"]     = step.get("section","general")
+        step.setdefault("assertion", None)
+        step.setdefault("optional",  False)
+
+    # 5. Coverage report
+    coverage_report = tracker.report()
+    coverage_report["note"] = (
+        "coverage_percentage reflects tested/detected interactive elements. "
+        "It does NOT mean 100% of page behaviour is validated."
+    )
+
+    print(f"[GEN v13] DONE | {len(unique_steps)} steps | "
+          f"coverage={coverage_report['coverage_percentage']}% "
+          f"({coverage_report['total_tested_elements']}/{coverage_report['total_detected_elements']})")
+
+    # 6. Build scripts
+    scripts = _build_scripts(unique_steps, url, framework)
 
     return {
-        "error":             f"Generation failed: {last_errors}",
-        "validation_errors": last_errors,
-        "test_cases":        [],
-        "script":            "",
-        "script_selenium":   "",
-        "script_playwright": "",
-        "script_cypress":    "",
-        "test_type":         test_type,
-        "page_profile":      page_profile,
+        "test_cases":          unique_steps,
+        "test_cases_selenium": unique_steps,
+        "test_cases_cypress":  unique_steps,
+        "script":              scripts["script"],
+        "script_selenium":     scripts["script_selenium"],
+        "script_playwright":   scripts["script_playwright"],
+        "script_cypress":      scripts["script_cypress"],
+        "page_type":           "general",
+        "test_type":           test_type,
+        "page_profile":        page_profile,
+        "user_scenario":       user_scenario or "",
+        "total_steps":         len(unique_steps),
+        "coverage_report":     coverage_report,
     }

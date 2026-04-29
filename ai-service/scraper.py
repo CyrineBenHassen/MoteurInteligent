@@ -101,6 +101,12 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
             except Exception:
                 return []
 
+        def safe_eval_js(script):
+            try:
+                return page.evaluate(script)
+            except Exception:
+                return []
+
         # ── INPUTS ────────────────────────────────────────────────────────────
         inputs = safe_eval("input:not([type='hidden'])", _STABLE_CSS_JS + """
         els => els.map(el => {
@@ -273,7 +279,7 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
             return {tag:el.tagName.toLowerCase(), id:el.id||'', css_selector:css, text:(el.innerText||el.value||'').trim().slice(0,50)};
         })""")
 
-        # ── NEW: LANGUAGE SWITCHER ────────────────────────────────────────────
+        # ── LANGUAGE SWITCHER ────────────────────────────────────────────────
         lang_switcher = safe_eval(
             ".pll-parent-menu-item, .wpml-ls-item, [class*='lang-switch'], "
             "[class*='language-switch'], [class*='lang-selector'], "
@@ -293,7 +299,6 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
             }).filter(Boolean);
         }"""
         )
-        # Deduplicate by (text, hreflang, href-prefix)
         _seen_lang = set()
         _lang_clean = []
         for _l in lang_switcher:
@@ -303,7 +308,7 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
                 _lang_clean.append(_l)
         lang_switcher = _lang_clean[:6]
 
-        # ── NEW: SEARCH BAR (form-level) ──────────────────────────────────────
+        # ── SEARCH BAR (form-level) ───────────────────────────────────────────
         search_bar = safe_eval(
             "form[role='search'], form[action*='search'], "
             "[class*='search-form'], [class*='search-bar'], [class*='search-box'], "
@@ -321,7 +326,7 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
         })"""
         )
 
-        # ── NEW: IMAGES AUDIT (visibility + alt) ─────────────────────────────
+        # ── IMAGES AUDIT (visibility + alt) ──────────────────────────────────
         images_audit = safe_eval(
             "img",
             """els => els.slice(0, 20).map(el => {
@@ -353,7 +358,7 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
         """
         )
 
-        # ── NEW: ICON DETECTION (SVG + font icons) ────────────────────────────
+        # ── ICON DETECTION (SVG + font icons) ─────────────────────────────────
         icons = safe_eval(
             "svg, "
             "[class*='fa-'], [class*='icon-'], [class*='bi-'], [class*='ri-'], "
@@ -381,7 +386,7 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
         }"""
         )
 
-        # ── NEW: INPUT FIELDS (semantic, form-context aware) ──────────────────
+        # ── INPUT FIELDS (semantic, form-context aware) ───────────────────────
         input_fields = safe_eval(
             "input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']), "
             "textarea, select",
@@ -423,6 +428,98 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
                     visible:  el.offsetParent !== null,
                 };
             }).filter(f => f.visible);
+        }"""
+        )
+
+        # ── NEW: FOOTER DETECTION ─────────────────────────────────────────────
+        footer_data = safe_eval(
+            "footer, [class*='footer'], #footer, [id*='footer']",
+            _STABLE_CSS_JS + """
+        els => els.slice(0, 3).map(el => {
+            const css     = stableCSS(el, 'footer');
+            const text    = (el.innerText || '').trim().slice(0, 200);
+            const links   = Array.from(el.querySelectorAll('a')).slice(0, 8).map(a => ({
+                text: (a.innerText || '').trim(),
+                href: a.href || ''
+            })).filter(a => a.text);
+            const phones  = (text.match(/\\+?[\\d\\s\\-\\.]{7,}/g) || []).slice(0, 3);
+            const emails  = (text.match(/[\\w.-]+@[\\w.-]+\\.[a-z]{2,}/gi) || []).slice(0, 3);
+            const visible = el.offsetParent !== null;
+            return { css_selector: css, text, links, phones, emails, visible };
+        }).filter(f => f.visible)
+        """
+        )
+
+        # ── NEW: CONTENT SECTIONS (Piliers, Cards, Articles) ─────────────────
+        content_sections = safe_eval(
+            "section, article, [class*='pilier'], [class*='pillar'], "
+            "[class*='card'], [class*='bloc'], [class*='block'], "
+            "[class*='feature'], [class*='service'], [class*='item'], "
+            "[class*='post'], [class*='entry'], [class*='widget']",
+            _STABLE_CSS_JS + """
+        els => {
+            const seen = new Set();
+            return els.slice(0, 20).map(el => {
+                const css     = stableCSS(el, el.tagName.toLowerCase());
+                if (seen.has(css)) return null;
+                seen.add(css);
+                const heading = el.querySelector('h1,h2,h3,h4');
+                const title   = heading ? (heading.innerText || '').trim().slice(0, 80) : '';
+                const text    = (el.innerText || '').trim().slice(0, 100);
+                const visible = el.offsetParent !== null;
+                const rect    = el.getBoundingClientRect();
+                const hasSize = rect.width > 50 && rect.height > 50;
+                return { css_selector: css, title, text, visible, has_size: hasSize };
+            }).filter(Boolean).filter(s => s.visible && s.has_size && (s.title || s.text));
+        }"""
+        )
+
+        # ── NEW: HEADINGS (H2, H3) — vrais titres de sections ────────────────
+        headings = safe_eval(
+            "h2, h3",
+            _STABLE_CSS_JS + """
+        els => {
+            const seen = new Set();
+            return els.slice(0, 15).map(el => {
+                const css  = stableCSS(el, el.tagName.toLowerCase());
+                const text = (el.innerText || '').trim();
+                if (!text || seen.has(text)) return null;
+                seen.add(text);
+                const visible = el.offsetParent !== null;
+                return {
+                    css_selector: css,
+                    tag:  el.tagName.toLowerCase(),
+                    text: text.slice(0, 100),
+                    visible
+                };
+            }).filter(Boolean).filter(h => h.visible && h.text.length > 2);
+        }"""
+        )
+
+        # ── NEW: CARDS / ITEMS avec liens ─────────────────────────────────────
+        cards = safe_eval(
+            "[class*='card'], [class*='item'], [class*='post'], "
+            "[class*='bloc'], [class*='tile'], [class*='box']",
+            _STABLE_CSS_JS + """
+        els => {
+            const seen = new Set();
+            return els.slice(0, 10).map(el => {
+                const css     = stableCSS(el, '[class*=card]');
+                if (seen.has(css)) return null;
+                seen.add(css);
+                const heading = el.querySelector('h1,h2,h3,h4,h5');
+                const link    = el.querySelector('a');
+                const title   = heading ? (heading.innerText || '').trim().slice(0, 60) : '';
+                const href    = link ? (link.href || '') : '';
+                const visible = el.offsetParent !== null;
+                const rect    = el.getBoundingClientRect();
+                return {
+                    css_selector: css,
+                    title, href,
+                    visible,
+                    has_size: rect.width > 30 && rect.height > 30
+                };
+            }).filter(Boolean).filter(c => c.visible && c.has_size);
         }"""
         )
 
@@ -473,10 +570,15 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
             "alerts":         alerts,
             "search_inputs":  search_inputs,
             "filters":        filters,
-            # ── NEW keys ───────────────────────────────────────────────────
-            "lang_switcher":  lang_switcher,   # i18n routing detection
-            "search_bar":     search_bar,       # form-level search container
-            "images_audit":   images_audit,     # visibility + alt audit
-            "icons":          icons,             # SVG / font icon detection
-            "input_fields":   input_fields,     # semantic form field detection
+            # ── Existing NEW keys ──────────────────────────────────────────
+            "lang_switcher":  lang_switcher,
+            "search_bar":     search_bar,
+            "images_audit":   images_audit,
+            "icons":          icons,
+            "input_fields":   input_fields,
+            # ── NEW v2 keys ────────────────────────────────────────────────
+            "footer_data":        footer_data,        # footer + contact + emails + phones
+            "content_sections":   content_sections,   # sections/piliers/cards/articles
+            "headings":           headings,            # H2, H3 titres réels
+            "cards":              cards,               # cards/items avec liens
         }

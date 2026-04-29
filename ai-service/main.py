@@ -11,7 +11,7 @@ app = FastAPI(title="NexTest AI Service")
 
 @app.get("/")
 def root():
-    return {"message": "NexTest AI Service is running"}
+    return {"message": "NexTest AI Service is running — v11"}
 
 
 @app.post("/scrape")
@@ -25,27 +25,27 @@ def scrape(data: dict):
 
 @app.post("/generate")
 def generate(data: dict):
-    url       = data.get("url")
-    framework = data.get("framework", "Selenium")
-    username  = data.get("username")
-    password  = data.get("password")
-    wait_time = data.get("wait_time", 2000)
-    test_type = data.get("test_type", "smoke")   # ✅ FIX 1: was missing — defaulting to smoke
+    url           = data.get("url")
+    framework     = data.get("framework", "Selenium")
+    username      = data.get("username")
+    password      = data.get("password")
+    wait_time     = data.get("wait_time", 2000)
+    test_type     = data.get("test_type", "smoke")
+    user_scenario = data.get("user_scenario", None)   # ← NOUVEAU : scénario utilisateur
 
     if not url:
         return {"error": "URL is required"}
 
-    # ✅ FIX 2: Normalise test_type casing to match generator expectations
+    # Normalise test_type
     valid_test_types = {"smoke", "functional", "regression"}
     test_type = test_type.lower() if test_type else "smoke"
     if test_type not in valid_test_types:
         test_type = "smoke"
 
-    print(f"[GENERATE] url={url} | framework={framework} | test_type={test_type}")
+    print(f"[GENERATE] url={url} | framework={framework} | test_type={test_type} | scenario={bool(user_scenario)}")
 
     scraped = scrape_page(url, wait_time=wait_time)
 
-    # ✅ FIX 3: Propagate scraping error cleanly
     if "error" in scraped:
         return {
             "error": f"Cannot scrape this page: {scraped['error']}",
@@ -60,15 +60,22 @@ def generate(data: dict):
             }
         }
 
-    # ✅ FIX 4: Pass test_type to generate_tests
-    result = generate_tests(scraped, framework, username, password, test_type=test_type)
+    result = generate_tests(
+        scraped,
+        framework,
+        username,
+        password,
+        test_type=test_type,
+        user_scenario=user_scenario,   # ← NOUVEAU
+    )
 
     return {
-        "url":       url,
-        "framework": framework,
-        "test_type": test_type,
-        "scraped":   scraped,
-        "result":    result,
+        "url":           url,
+        "framework":     framework,
+        "test_type":     test_type,
+        "user_scenario": user_scenario or "",
+        "scraped":       scraped,
+        "result":        result,
     }
 
 
@@ -77,7 +84,7 @@ def run_tests(data: dict):
     script     = data.get("script", "")
     framework  = data.get("framework", "Selenium")
     test_cases = data.get("test_cases", [])
-    test_type  = data.get("test_type", "smoke")   # ✅ FIX 5: accept test_type for logging
+    test_type  = data.get("test_type", "smoke")
 
     print(f"[RUN] script len={len(script)} | test_cases count={len(test_cases)} | framework={framework} | test_type={test_type}")
     if test_cases:
