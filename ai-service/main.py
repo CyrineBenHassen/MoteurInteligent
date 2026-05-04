@@ -117,6 +117,88 @@ def analyze(data: dict):
         "original_error": error,
         "analysis":       result,
     }
+    
+    
+@app.post("/chat")
+def chat(data: dict):
+    message  = data.get("message", "")
+    lang     = data.get("lang", "fr")
+    history  = data.get("history", [])
+    
+    if not message:
+        return {"error": "message is required"}
+
+    system_prompt = (
+        "Tu es l'assistant IA de NexTest, un outil de génération automatique de tests web.\n"
+        "NexTest utilise LLaMA 3 via Groq pour analyser les pages web et générer des scripts de test.\n\n"
+        "FONCTIONNALITÉS DE NEXTEST :\n"
+        "- Scraping automatique du DOM (inputs, boutons, nav, forms, footer, hero...)\n"
+        "- Génération par sections : header, hero, search, forms, content, footer, workflow\n"
+        "- Frameworks : Selenium (.py), Playwright (.py), Cypress (.js), Both (les 3)\n"
+        "- Types de tests : smoke (~30s), functional (~1min), regression (~3min), unit, security (~5min)\n"
+        "- Projets Public (web apps) ou Internal (APIs, microservices)\n"
+        "- Assertions : url_contains, element_visible, text_contains, input_value, element_not_visible\n"
+        "- Export rapports : CSV, HTML, PDF\n"
+        "- Historique des générations avec pass rate\n\n"
+        "WORKFLOW NEXTEST :\n"
+        "1. Projects → créer un projet (Public ou Internal)\n"
+        "2. Ajouter une page (URL cible)\n"
+        "3. Cliquer Generate → choisir test type + framework\n"
+        "4. Voir les résultats dans Test Execution\n"
+        "5. Télécharger le rapport ou le script\n\n"
+        f"Réponds {'en français' if lang == 'fr' else 'in English'}, "
+        "de manière concise. Utilise **gras** pour les termes importants. "
+        "Max 5 phrases sauf si besoin de plus."
+    ) if lang == 'fr' else (
+        "You are the AI assistant for NexTest, an automated web test generation tool.\n"
+        "NexTest uses LLaMA 3 via Groq to analyze web pages and generate test scripts.\n\n"
+        "NEXTEST FEATURES:\n"
+        "- Automatic DOM scraping (inputs, buttons, nav, forms, footer, hero...)\n"
+        "- Section-based generation: header, hero, search, forms, content, footer, workflow\n"
+        "- Frameworks: Selenium (.py), Playwright (.py), Cypress (.js), Both (all 3)\n"
+        "- Test types: smoke (~30s), functional (~1min), regression (~3min), unit, security (~5min)\n"
+        "- Public projects (web apps) or Internal (APIs, microservices)\n"
+        "- Assertions: url_contains, element_visible, text_contains, input_value, element_not_visible\n"
+        "- Export reports: CSV, HTML, PDF\n"
+        "- Generation history with pass rate\n\n"
+        "NEXTEST WORKFLOW:\n"
+        "1. Projects → create a project (Public or Internal)\n"
+        "2. Add a page (target URL)\n"
+        "3. Click Generate → choose test type + framework\n"
+        "4. See results in Test Execution\n"
+        "5. Download report or script\n\n"
+        "Respond in English, concisely. Use **bold** for important terms. "
+        "Max 5 sentences unless more is needed."
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        *history[-6:],
+        {"role": "user", "content": message},
+    ]
+
+    try:
+        from openai import OpenAI
+        from dotenv import load_dotenv
+        import os
+        load_dotenv()
+        
+        groq_client = OpenAI(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=os.getenv("GROQ_API_KEY"),
+        )
+        
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1000,
+        )
+        
+        return {"reply": resp.choices[0].message.content.strip()}
+    
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.post("/generate-pdf")

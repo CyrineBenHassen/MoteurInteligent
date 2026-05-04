@@ -3,6 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useLang } from '../../context/LanguageContext';
 import api from '../../api/axios';
 import './Dashboard.css';
+import NextestChatbot from '../../pages/Chatboot/Nextestchatbot';
+
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell,
@@ -40,16 +42,34 @@ function AnimatedStat({ val }) {
 function NexLogo({ collapsed }) {
   return (
     <div className="s-logo">
-      <div className="nav__gem">
+      <div
+        className="nav__gem nex-icon"
+        style={{
+          background: 'linear-gradient(135deg, #8a6a00, #C9A227, #E8C84A)',
+          boxShadow: '0 4px 16px rgba(201,162,39,0.5)'
+        }}
+      >
         <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
-          <rect width="44" height="44" rx="11" fill="none"/>
-          <polyline points="8,14 22,30 36,14" stroke="#060e1e" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-          <line x1="8" y1="30" x2="36" y2="30" stroke="rgba(6,14,30,0.5)" strokeWidth="2.5" strokeLinecap="round"/>
+          <circle
+            cx="22" cy="22" r="17"
+            stroke="#060e1e"
+            strokeWidth="2"
+            fill="none"
+            opacity="0.6"
+          />
+          <polyline
+            points="13,22 20,30 32,14"
+            stroke="#060e1e"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
         </svg>
       </div>
       {!collapsed && (
         <div className="logo-words">
-          <div className="nav__name">NexTest</div>
+          <div className="nav__name nex-name">NexTest</div>
           <div className="nav__sub">Test Automation</div>
         </div>
       )}
@@ -57,9 +77,54 @@ function NexLogo({ collapsed }) {
   );
 }
 
+function ThemeToggle({ theme, setTheme }) {
+  const isDark = theme !== 'light';
+ 
+  const toggle = () => {
+    const next = isDark ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem('nextest-theme', next);
+    document.documentElement.setAttribute('data-theme', next);
+  };
+ 
+  return (
+    <button
+      onClick={toggle}
+      className={`tt-btn${isDark ? '' : ' tt-btn--light'}`}
+      title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+      aria-label="Toggle theme"
+    >
+      <span className="tt-track">
+        <span className="tt-knob">
+          {isDark ? (
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          ) : (
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1"  x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22"  x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1"  y1="12" x2="3"  y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64"  x2="19.78" y2="4.22"/>
+            </svg>
+          )}
+        </span>
+        <span className="tt-hint tt-hint--sun">☀</span>
+        <span className="tt-hint tt-hint--moon">☽</span>
+      </span>
+    </button>
+  );
+}
+
 const IC = {
   dashboard: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
-  generate:  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
+  generate: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
   execution: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
   history:   <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
   account:   <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
@@ -328,72 +393,1148 @@ function DashboardPanel({ user, goTo }) {
   );
 }
 
+export function ProjectsListPanel({ onNewProject, onSelectProject }) {
+  const [projects,  setProjects]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [deleting,  setDeleting]  = useState(null);
+  const [search,    setSearch]    = useState('');
+  const [filterType, setFilterType] = useState('all');
+ 
+  useEffect(() => {
+    api.get('/projects')
+      .then(res => setProjects(res.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+ 
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    setDeleting(id);
+    try {
+      await api.delete(`/projects/${id}`);
+      setProjects(prev => prev.filter(p => p.id !== id));
+    } catch (err) { console.error(err); }
+    setDeleting(null);
+  };
+ 
+  const filtered = projects.filter(p => {
+    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
+    const matchType   = filterType === 'all' || p.type === filterType;
+    return matchSearch && matchType;
+  });
+ 
+  const totalPublic   = projects.filter(p => p.type === 'public').length;
+  const totalInternal = projects.filter(p => p.type === 'internal').length;
+ 
+  const timeAgo = (dateStr) => {
+    // eslint-disable-next-line react-hooks/purity
+    const diff = (Date.now() - new Date(dateStr)) / 1000;
+    if (diff < 60)    return `${Math.floor(diff)}s ago`;
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
+ 
+  return (
+    <div className="panel">
+ 
+      {/* ── HEADER ── */}
+      <div className="p-header" style={{ marginBottom: 32 }}>
+        <div>
+          <h1 className="p-title">
+            My <span className="g">Projects</span>
+          </h1>
+          <p className="p-sub">
+            Select a project to generate tests, or create a new one.
+          </p>
+        </div>
+        <button className="btn-primary" onClick={onNewProject}>
+          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          New Project
+        </button>
+      </div>
+ 
+      {/* ── STAT CARDS ── */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 16, marginBottom: 28,
+      }}>
+        {[
+          {
+            icon: '📁', val: projects.length, lbl: 'Total Projects',
+            accent: 'linear-gradient(90deg,#6366f1,#818cf8)',
+          },
+          {
+            icon: '🌐', val: totalPublic, lbl: 'Public Projects',
+            accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)',
+          },
+          {
+            icon: '🔒', val: totalInternal, lbl: 'Internal Projects',
+            accent: 'linear-gradient(90deg,#8b5cf6,#a78bfa)',
+          },
+        ].map((s, i) => (
+          <div key={s.lbl} className="stat-card" style={{ '--i': i, minHeight: 120 }}>
+            <div className="stat-card-top">
+              <div className="stat-icon-wrap">{s.icon}</div>
+            </div>
+            <span className="stat-val" style={{ fontSize: 40 }}>{s.val}</span>
+            <span className="stat-lbl">{s.lbl}</span>
+            <div className="stat-accent" style={{ background: s.accent }} />
+          </div>
+        ))}
+      </div>
+ 
+      {/* ── TOOLBAR ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+ 
+        {/* Search */}
+        <div style={{
+          flex: 1, minWidth: 220,
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'var(--card)', border: '1.5px solid var(--border)',
+          borderRadius: 10, padding: '10px 14px',
+        }}>
+          <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input
+            style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit', width: '100%' }}
+            placeholder="Search projects…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}>
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          )}
+        </div>
+ 
+        {/* Filters */}
+        {['all', 'public', 'internal'].map(f => (
+          <button
+            key={f}
+            onClick={() => setFilterType(f)}
+            style={{
+              padding: '9px 16px', borderRadius: 8,
+              fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'inherit', letterSpacing: '.5px',
+              border: filterType === f ? 'none' : '1.5px solid var(--border)',
+              background: filterType === f
+                ? f === 'public'   ? '#4f86e8'
+                : f === 'internal' ? '#8b5cf6'
+                :                   'var(--indigo)'
+                : 'var(--card)',
+              color: filterType === f ? '#fff' : 'var(--muted)',
+              boxShadow: filterType === f ? '0 2px 10px rgba(99,102,241,.3)' : 'none',
+              transition: 'all .18s',
+              textTransform: 'capitalize',
+            }}
+          >
+            {f === 'all' ? 'All' : f === 'public' ? '🌐 Public' : '🔒 Internal'}
+          </button>
+        ))}
+ 
+        <span style={{
+          marginLeft: 'auto', fontSize: 11, fontWeight: 600,
+          color: 'var(--muted)', padding: '6px 12px',
+          background: 'var(--card)', border: '1px solid var(--border)',
+          borderRadius: 8,
+        }}>
+          {filtered.length} project{filtered.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+ 
+      {/* ── PROJECT LIST ── */}
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={{
+              background: 'var(--card)', border: '1px solid var(--border)',
+              borderRadius: 16, padding: '24px', opacity: .5,
+            }}>
+              <div style={{ height: 14, borderRadius: 4, background: 'var(--border)', width: '40%', marginBottom: 10 }} />
+              <div style={{ height: 11, borderRadius: 4, background: 'var(--border)', width: '60%' }} />
+            </div>
+          ))}
+        </div>
+ 
+      ) : filtered.length === 0 ? (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', padding: '80px 32px',
+          background: 'var(--card)', border: '1px solid var(--border)',
+          borderRadius: 16, textAlign: 'center',
+        }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: '50%',
+            background: 'var(--indigo-bg)', border: '1px solid var(--indigo-border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 32, marginBottom: 20,
+          }}>📁</div>
+          <h3 style={{ fontFamily: 'var(--C)', fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+            {search || filterType !== 'all' ? 'No results found' : 'No projects yet'}
+          </h3>
+          <p style={{ fontSize: 13, color: 'var(--sub)', lineHeight: 1.7, maxWidth: 300, marginBottom: 24 }}>
+            {search || filterType !== 'all'
+              ? 'Try adjusting your search or filters'
+              : 'Create your first project to start generating tests'
+            }
+          </p>
+          {!search && filterType === 'all' && (
+            <button className="btn-primary" onClick={onNewProject}>
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              Create First Project
+            </button>
+          )}
+        </div>
+ 
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+          {filtered.map((project, i) => {
+            const isPublic = project.type === 'public';
+            const color    = isPublic ? '#4f86e8' : '#8b5cf6';
+            const colorBg  = isPublic ? 'rgba(79,134,232,.08)'  : 'rgba(139,92,246,.08)';
+            const colorBd  = isPublic ? 'rgba(79,134,232,.2)'   : 'rgba(139,92,246,.2)';
+ 
+            return (
+              <div
+                key={project.id}
+                onClick={() => onSelectProject(project)}
+                style={{
+                  background: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 16, padding: '24px',
+                  cursor: 'pointer', position: 'relative', overflow: 'hidden',
+                  transition: 'all .25s',
+                  animation: `dFadeUp .35s var(--ease) ${i * 0.05}s both`,
+                  boxShadow: 'var(--shadow)',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.borderColor = color;
+                  e.currentTarget.style.boxShadow = `0 12px 32px rgba(0,0,0,.3), 0 0 0 1px ${color}`;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                  e.currentTarget.style.boxShadow = 'var(--shadow)';
+                }}
+              >
+                {/* Top accent line */}
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                  background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
+                }} />
+ 
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                      background: colorBg, border: `1px solid ${colorBd}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 22,
+                    }}>
+                      {isPublic ? '🌐' : '🔒'}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>
+                        {project.name}
+                      </div>
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                        textTransform: 'uppercase', padding: '2px 8px',
+                        borderRadius: 20, color, background: colorBg,
+                        border: `1px solid ${colorBd}`,
+                      }}>
+                        {isPublic ? 'Public' : 'Internal'}
+                      </span>
+                    </div>
+                  </div>
+ 
+                  {/* Delete button */}
+                  <button
+                    onClick={(e) => handleDelete(e, project.id)}
+                    disabled={deleting === project.id}
+                    style={{
+                      width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                      background: 'var(--bg2)', border: '1px solid var(--border)',
+                      color: 'var(--muted)', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all .18s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'var(--red-bg)';
+                      e.currentTarget.style.borderColor = 'var(--red-border)';
+                      e.currentTarget.style.color = 'var(--red)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'var(--bg2)';
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                      e.currentTarget.style.color = 'var(--muted)';
+                    }}
+                  >
+                    {deleting === project.id ? '...' : (
+                      <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6l-1 14H6L5 6"/>
+                        <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+ 
+                {/* Description */}
+                {project.description ? (
+                  <p style={{
+                    fontSize: 12, color: 'var(--sub)', lineHeight: 1.6,
+                    marginBottom: 16,
+                    display: '-webkit-box', WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                  }}>
+                    {project.description}
+                  </p>
+                ) : (
+                  <p style={{ fontSize: 12, color: 'var(--dimmed)', fontStyle: 'italic', marginBottom: 16 }}>
+                    No description
+                  </p>
+                )}
+ 
+                {/* Footer */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  paddingTop: 14, borderTop: '1px solid var(--border3)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
+                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                    </svg>
+                    {project.generations_count || 0} generation{project.generations_count !== 1 ? 's' : ''}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
+                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    {timeAgo(project.created_at)}
+                  </div>
+ 
+                  {/* Open button */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    fontSize: 11, fontWeight: 700, color,
+                    letterSpacing: '.5px', textTransform: 'uppercase',
+                  }}>
+                    Open
+                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGeneration, goTo }) {
+  const [generations, setGenerations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(null);
+
+  const isPublic = project?.type === 'public';
+  const color    = isPublic ? '#4f86e8' : '#8b5cf6';
+  const colorBg  = isPublic ? 'rgba(79,134,232,.08)' : 'rgba(139,92,246,.08)';
+  const colorBd  = isPublic ? 'rgba(79,134,232,.2)'  : 'rgba(139,92,246,.2)';
+
+  useEffect(() => {
+    api.get(`/projects/${project.id}/generations`)
+      .then(res => setGenerations(res.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [project.id]);
+
+  const handleDelete = async (id) => {
+    setDeleting(id);
+    try {
+      await api.delete(`/generations/${id}`);
+      setGenerations(prev => prev.filter(g => g.id !== id));
+    } catch (e) { console.error(e); }
+    setDeleting(null);
+  };
+
+  const handleView = (item) => {
+    setGeneration({
+      url: item.url, framework: item.framework,
+      generation: { id: item.id, url: item.url, framework: item.framework, load_time_ms: item.load_time_ms },
+      result: {
+        test_cases:          item.test_cases          || [],
+        test_cases_selenium: item.test_cases_selenium || [],
+        test_cases_cypress:  item.test_cases_cypress  || [],
+        script:              item.script              || '',
+        script_selenium:     item.script_selenium     || '',
+        script_playwright:   item.script_playwright   || '',
+        script_cypress:      item.script_cypress      || '',
+        execution_results:   item.execution_results   || [],
+      },
+    });
+    goTo('execution');
+  };
+
+  // Stats
+  const totalGen   = generations.length;
+  const avgRate    = totalGen
+    ? Math.round(generations.reduce((s, g) => s + (g.pass_rate || 0), 0) / totalGen)
+    : 0;
+  const totalPass  = generations.reduce((s, g) => s + (g.pass_count || 0), 0);
+  const totalFail  = generations.reduce((s, g) => s + (g.fail_count || 0), 0);
+
+  // Grouper par URL — dernière génération par URL
+  const byUrl = {};
+  generations.forEach(g => {
+    if (!byUrl[g.url] || new Date(g.created_at) > new Date(byUrl[g.url].created_at)) {
+      byUrl[g.url] = g;
+    }
+  });
+  const urlCards = Object.values(byUrl);
+
+  const rateColor = (r) => r >= 80 ? '#10b981' : r >= 50 ? '#f59e0b' : '#ef4444';
+
+  const timeAgo = (dateStr) => {
+    const diff = (Date.now() - new Date(dateStr)) / 1000;
+    if (diff < 60)    return `${Math.floor(diff)}s ago`;
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
+
+  const FW_CONFIG = {
+    Selenium:   { color: '#43B02A', letters: 'Se' },
+    Cypress:    { color: '#00BFA5', letters: 'Cy' },
+    Playwright: { color: '#E2574C', letters: 'Pl' },
+    Both:       { color: '#C9A227', letters: '∞'  },
+  };
+
+  return (
+    <div className="panel">
+
+      {/* ── BACK ── */}
+      <button
+        onClick={onBack}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontSize: 11, fontWeight: 700, color: 'var(--muted)',
+          background: 'none', border: 'none', cursor: 'pointer',
+          padding: '0 0 20px', transition: 'color .18s',
+          letterSpacing: '.5px', textTransform: 'uppercase',
+        }}
+        onMouseEnter={e => e.currentTarget.style.color = 'var(--indigo2)'}
+        onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+      >
+        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+          <path d="M19 12H5M12 5l-7 7 7 7"/>
+        </svg>
+        Back to projects
+      </button>
+
+      {/* ── HEADER ── */}
+      <div className="p-header" style={{ marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+            background: colorBg, border: `1px solid ${colorBd}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 26,
+          }}>
+            {isPublic ? '🌐' : '🔒'}
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <h1 className="p-title" style={{ marginBottom: 0 }}>{project?.name}</h1>
+              <span style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                textTransform: 'uppercase', padding: '3px 10px',
+                borderRadius: 20, color, background: colorBg,
+                border: `1px solid ${colorBd}`,
+              }}>
+                {isPublic ? 'Public' : 'Internal'}
+              </span>
+            </div>
+            <p className="p-sub" style={{ marginBottom: 0 }}>
+              {project?.description || 'No description'}
+            </p>
+          </div>
+        </div>
+        <button className="btn-primary" onClick={onNewGeneration}>
+          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+          New Generation
+        </button>
+      </div>
+
+      {/* ── STATS ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
+        {[
+          { icon: '🚀', val: totalGen,      lbl: 'Generations', accent: `linear-gradient(90deg,${color},${color}88)` },
+          { icon: '🔗', val: urlCards.length, lbl: 'URLs Tested', accent: 'linear-gradient(90deg,#6366f1,#818cf8)' },
+          { icon: '✅', val: totalPass,     lbl: 'Total Passed', accent: 'linear-gradient(90deg,#10b981,#34d399)' },
+          { icon: '🎯', val: `${avgRate}%`, lbl: 'Avg Pass Rate', accent: avgRate >= 80 ? 'linear-gradient(90deg,#10b981,#34d399)' : avgRate >= 50 ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' : 'linear-gradient(90deg,#ef4444,#f87171)' },
+        ].map((s, i) => (
+          <div key={s.lbl} className="stat-card" style={{ '--i': i, minHeight: 110 }}>
+            <div className="stat-card-top">
+              <div className="stat-icon-wrap">{s.icon}</div>
+            </div>
+            <span className="stat-val" style={{ fontSize: 36 }}>{s.val}</span>
+            <span className="stat-lbl">{s.lbl}</span>
+            <div className="stat-accent" style={{ background: s.accent }} />
+          </div>
+        ))}
+      </div>
+
+      {/* ── URLs TESTÉES ── */}
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} style={{
+              background: 'var(--card)', border: '1px solid var(--border)',
+              borderRadius: 16, padding: 24, opacity: .5,
+            }}>
+              <div style={{ height: 14, borderRadius: 4, background: 'var(--border)', width: '40%', marginBottom: 10 }} />
+              <div style={{ height: 10, borderRadius: 4, background: 'var(--border)', width: '60%' }} />
+            </div>
+          ))}
+        </div>
+
+      ) : urlCards.length === 0 ? (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', padding: '80px 32px',
+          background: 'var(--card)', border: '1px solid var(--border)',
+          borderRadius: 16, textAlign: 'center',
+        }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: '50%',
+            background: colorBg, border: `1px solid ${colorBd}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 32, marginBottom: 20,
+          }}>⚡</div>
+          <h3 style={{ fontFamily: 'var(--C)', fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+            No generations yet
+          </h3>
+          <p style={{ fontSize: 13, color: 'var(--sub)', lineHeight: 1.7, maxWidth: 300, marginBottom: 24 }}>
+            Start generating tests for this project
+          </p>
+          <button className="btn-primary" onClick={onNewGeneration}>
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+            New Generation
+          </button>
+        </div>
+
+      ) : (
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 14 }}>
+            🔗 URLs Tested — {urlCards.length} unique
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {urlCards.map((item, i) => {
+              const fw = FW_CONFIG[item.framework] || FW_CONFIG.Selenium;
+              const rc = rateColor(item.pass_rate || 0);
+              const total = (item.pass_count || 0) + (item.fail_count || 0) + (item.skip_count || 0);
+
+              return (
+                <div key={item.url} style={{
+                  background: 'var(--card)', border: '1px solid var(--border)',
+                  borderRadius: 16, padding: '20px 24px',
+                  transition: 'all .25s', position: 'relative', overflow: 'hidden',
+                  animation: `dFadeUp .3s var(--ease) ${i * 0.05}s both`,
+                }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = color;
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,.2), 0 0 0 1px ${color}`;
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  {/* Top accent */}
+                  <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                    background: `linear-gradient(90deg, transparent, ${rc}, transparent)`,
+                  }} />
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+
+                    {/* Rate circle */}
+                    <div style={{
+                      width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
+                      background: `${rc}15`, border: `2px solid ${rc}44`,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: rc, lineHeight: 1 }}>
+                        {item.pass_rate || 0}%
+                      </span>
+                      <span style={{ fontSize: 8, color: 'var(--muted)', letterSpacing: .5 }}>PASS</span>
+                    </div>
+
+                    {/* URL + info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 14, fontWeight: 700, color: 'var(--text)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        marginBottom: 6,
+                      }}>
+                        {item.url}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                          color: fw.color, background: `${fw.color}15`, border: `1px solid ${fw.color}30`,
+                        }}>
+                          {fw.letters} · {item.framework}
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                          {total} tests
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                          · {timeAgo(item.created_at)}
+                        </span>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div style={{ display: 'flex', height: 4, borderRadius: 4, overflow: 'hidden', marginTop: 10, background: 'var(--border)' }}>
+                        <div style={{ width: `${total ? (item.pass_count || 0) / total * 100 : 0}%`, background: '#10b981' }} />
+                        <div style={{ width: `${total ? (item.fail_count || 0) / total * 100 : 0}%`, background: '#ef4444' }} />
+                        <div style={{ width: `${total ? (item.skip_count || 0) / total * 100 : 0}%`, background: '#f59e0b' }} />
+                      </div>
+
+                      {/* Pass/Fail/Skip */}
+                      <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+                        {[
+                          { val: item.pass_count || 0, color: '#10b981', lbl: 'pass' },
+                          { val: item.fail_count || 0, color: '#ef4444', lbl: 'fail' },
+                          { val: item.skip_count || 0, color: '#f59e0b', lbl: 'skip' },
+                        ].map(s => (
+                          <span key={s.lbl} style={{ fontSize: 11, color: s.color, fontWeight: 700 }}>
+                            {s.val} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>{s.lbl}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+                      <button
+                        onClick={() => handleView(item)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '8px 16px', borderRadius: 8,
+                          background: `linear-gradient(135deg, ${color}, ${color}cc)`,
+                          border: 'none', color: '#fff',
+                          fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                          fontFamily: 'inherit', letterSpacing: '.5px',
+                          boxShadow: `0 3px 10px ${color}44`,
+                          transition: 'all .2s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                      >
+                        <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                          <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        View
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        disabled={deleting === item.id}
+                        style={{
+                          width: '100%', padding: '7px', borderRadius: 8,
+                          background: 'var(--bg2)', border: '1px solid var(--border)',
+                          color: 'var(--muted)', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all .18s',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = 'var(--red-bg)';
+                          e.currentTarget.style.borderColor = 'var(--red-border)';
+                          e.currentTarget.style.color = 'var(--red)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = 'var(--bg2)';
+                          e.currentTarget.style.borderColor = 'var(--border)';
+                          e.currentTarget.style.color = 'var(--muted)';
+                        }}
+                      >
+                        {deleting === item.id ? '...' : (
+                          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6l-1 14H6L5 6"/>
+                            <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CreateProjectPanel — Étape avant New Generation
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function CreateProjectPanel({ onProjectCreated }) {
+  const [projectType, setProjectType] = useState(null);
+  const [name,        setName]        = useState('');
+  const [description, setDescription] = useState('');
+  const [submitting,  setSubmitting]  = useState(false);
+  const [nameError,   setNameError]   = useState('');
+  const inputRef = useRef(null);
+ 
+  const isReady = projectType !== null && name.trim().length > 0;
+ 
+  const SUGGESTIONS = {
+    public:   ['Login Flow QA', 'Homepage E2E', 'Checkout Suite', 'Auth Regression'],
+    internal: ['API Auth Tests', 'Internal Gateway', 'Microservice Suite', 'CI Security Scan'],
+  };
+ 
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!name.trim()) { setNameError('Project name is required'); inputRef.current?.focus(); return; }
+  if (!projectType) return;
+  setSubmitting(true);
+  try {
+    const res = await api.post('/projects', {
+      name:        name.trim(),
+      type:        projectType,
+      description: description.trim(),
+    });
+    onProjectCreated(res.data);  // ← passe le projet retourné par l'API
+  } catch (err) {
+    console.error(err);
+    setNameError('Error creating project, try again.');
+  }
+  setSubmitting(false);
+};
+  const fwConf = projectType === 'public'
+    ? { bc: '#4f86e8', bshadow: 'rgba(79,134,232,.35)' }
+    : projectType === 'internal'
+    ? { bc: '#8b5cf6', bshadow: 'rgba(139,92,246,.35)' }
+    : {};
+ 
+  const CheckIcon = (
+    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+      <path d="M20 6L9 17l-5-5"/>
+    </svg>
+  );
+ 
+  // Steps state for the sidebar
+  const steps = [
+    {
+      n: 1, label: 'Project Type',
+      val: projectType ? (projectType === 'public' ? '🌐 Public Test' : '🔒 Internal Test') : 'Not selected yet',
+      done: !!projectType,
+      active: !projectType,
+    },
+    {
+      n: 2, label: 'Project Name',
+      val: name.trim() || 'Enter a name…',
+      done: name.trim().length > 0,
+      active: !!projectType && !name.trim(),
+    },
+    {
+      n: 3, label: 'Description',
+      val: description.trim() ? description.trim().slice(0, 30) + (description.length > 30 ? '…' : '') : 'Optional — skip if not needed',
+      done: description.trim().length > 0,
+      active: !!projectType && name.trim().length > 0,
+    },
+    {
+      n: 4, label: 'Launch Project',
+      val: isReady ? 'Ready to launch →' : 'Complete fields above',
+      done: false,
+      active: isReady,
+    },
+  ];
+ 
+  return (
+    <div className="cpv5-root">
+ 
+      {/* ── PAGE HEADER (same as GeneratePanel) ── */}
+      <div className="p-header" style={{ marginBottom: 32 }}>
+        <div>
+          <h1 className="p-title">
+            New <span className="g">Project</span>
+          </h1>
+          <p className="p-sub">
+            Configure your project — your test options will adapt to the type you choose.
+          </p>
+        </div>
+        {isReady && (
+          <div className="gp-ready-badge">
+            <span className="gp-ready-dot" />
+            Ready to launch
+          </div>
+        )}
+      </div>
+ 
+      <form onSubmit={handleSubmit}>
+        <div style={{
+  display: 'grid',
+   gridTemplateColumns: '1fr 280px',
+  gap: 20,
+  alignItems: 'start',
+}}>
+ 
+          {/* ════ LEFT COLUMN ════ */}
+          <div className="cpv5-left">
+ 
+            {/* ── STEP 1: Project Type ── */}
+            <div className="cpv5-section">
+              <div className="cpv5-section-header">
+                <span className="cpv5-sec-num">01</span>
+                <div>
+                  <div className="cpv5-sec-title">Project Type</div>
+                  <div className="cpv5-sec-sub">Choose the kind of application you want to test</div>
+                </div>
+              </div>
+ 
+              <div className="cpv5-type-grid">
+                {/* PUBLIC */}
+                <div
+                  className={`cpv5-type-card${projectType === 'public' ? ' selected' : ''}`}
+                  style={{ '--tc': '#4f86e8', '--tg': 'rgba(79,134,232,.1)', '--tb': 'rgba(79,134,232,.25)' }}
+                  onClick={() => setProjectType('public')}
+                >
+                  <div className="cpv5-type-top">
+                    <div className="cpv5-type-icon">🌐</div>
+                    {projectType === 'public' && <div className="cpv5-type-check">{CheckIcon}</div>}
+                  </div>
+                  <div className="cpv5-type-name">Public Test</div>
+                  <div className="cpv5-type-desc">Web apps, landing pages & user-facing interfaces</div>
+                  <div className="cpv5-type-tags">
+                    <span>Smoke</span><span>Functional</span><span>Performance</span>
+                  </div>
+                  <div className="cpv5-type-fws">
+                    <span style={{ color: '#43B02A' }}>Selenium</span>
+                    <span style={{ color: '#00BFA5' }}>Cypress</span>
+                    <span style={{ color: '#E2574C' }}>Playwright</span>
+                  </div>
+                  <div className="cpv5-type-edge" />
+                </div>
+ 
+                {/* INTERNAL */}
+                <div
+                  className={`cpv5-type-card${projectType === 'internal' ? ' selected' : ''}`}
+                  style={{ '--tc': '#8b5cf6', '--tg': 'rgba(139,92,246,.1)', '--tb': 'rgba(139,92,246,.25)' }}
+                  onClick={() => setProjectType('internal')}
+                >
+                  <div className="cpv5-type-top">
+                    <div className="cpv5-type-icon">🔒</div>
+                    {projectType === 'internal' && <div className="cpv5-type-check">{CheckIcon}</div>}
+                  </div>
+                  <div className="cpv5-type-name">Internal Test</div>
+                  <div className="cpv5-type-desc">APIs, microservices & private infrastructure</div>
+                  <div className="cpv5-type-tags">
+                    <span>Unit</span><span>Regression</span><span>Security</span>
+                  </div>
+                  <div className="cpv5-type-fws">
+                    <span style={{ color: '#E2574C' }}>Playwright</span>
+                    <span style={{ color: '#43B02A' }}>Selenium</span>
+                  </div>
+                  <div className="cpv5-type-edge" />
+                </div>
+              </div>
+            </div>
+ 
+            {/* ── STEP 2: Project Name ── */}
+            <div className="cpv5-section">
+              <div className="cpv5-section-header">
+                <span className="cpv5-sec-num">02</span>
+                <div>
+                  <div className="cpv5-sec-title">Project Name</div>
+                  <div className="cpv5-sec-sub">Give your project a clear, descriptive name</div>
+                </div>
+              </div>
+ 
+              <div className={`cpv5-input-wrap${nameError ? ' error' : ''}${name ? ' filled' : ''}`}>
+                <svg className="cpv5-input-ico" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <input
+                  ref={inputRef}
+                  className="cpv5-input"
+                  type="text"
+                  placeholder="e.g. Login Flow QA"
+                  value={name}
+                  maxLength={60}
+                  onChange={e => { setName(e.target.value); setNameError(''); }}
+                  onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
+                  autoComplete="off"
+                />
+                {name.length > 0 && <span className="cpv5-input-count">{name.length}/60</span>}
+              </div>
+ 
+              {nameError && (
+                <div className="cpv5-error">
+                  <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+                  </svg>
+                  {nameError}
+                </div>
+              )}
+ 
+              {projectType && (
+                <div className="cpv5-suggestions">
+                  {SUGGESTIONS[projectType].map(s => (
+                    <button
+                      key={s} type="button" className="cpv5-sug"
+                      style={projectType === 'public'
+                        ? { '--sc': '#4f86e8', '--sb': 'rgba(79,134,232,.08)', '--sbo': 'rgba(79,134,232,.2)' }
+                        : { '--sc': '#8b5cf6', '--sb': 'rgba(139,92,246,.08)', '--sbo': 'rgba(139,92,246,.2)' }
+                      }
+                      onClick={() => { setName(s); setNameError(''); }}
+                    >{s}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+ 
+            {/* ── STEP 3: Description ── */}
+            <div className="cpv5-section">
+              <div className="cpv5-section-header">
+                <span className="cpv5-sec-num">03</span>
+                <div>
+                  <div className="cpv5-sec-title">
+                    Description
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase',
+                      color: 'var(--muted)', background: 'var(--bg2)', border: '1px solid var(--border)',
+                      borderRadius: 10, padding: '2px 8px', marginLeft: 8,
+                    }}>optional</span>
+                  </div>
+                  <div className="cpv5-sec-sub">Briefly describe what this project tests</div>
+                </div>
+              </div>
+ 
+              <div className="cpv5-textarea-wrap">
+                <textarea
+                  className="cpv5-textarea"
+                  placeholder="e.g. End-to-end tests for the login flow including OAuth and 2FA…"
+                  value={description}
+                  maxLength={280}
+                  rows={4}
+                  onChange={e => setDescription(e.target.value)}
+                />
+                {description.length > 0 && (
+                  <span className="cpv5-textarea-count">{description.length}/280</span>
+                )}
+              </div>
+              <div className="cpv5-optional-hint">
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+                </svg>
+                You can always add or edit the description later from project settings.
+              </div>
+            </div>
+ 
+            {/* ── SUBMIT ── */}
+            <button
+              type="submit"
+              className={`cpv5-submit${isReady ? ' colored' : ''}`}
+              disabled={submitting || !isReady}
+              style={projectType ? { '--bc': fwConf.bc, '--bshadow': fwConf.bshadow } : {}}
+            >
+              {submitting ? (
+                <><span className="spinner" /> Creating project…</>
+              ) : (
+                <>
+                  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                  </svg>
+                  {isReady ? 'Launch Project →' : 'Fill in the fields above'}
+                </>
+              )}
+            </button>
+ 
+          </div>
+ 
+          {/* ════ RIGHT SIDEBAR ════ */}
+          <div className="cpv5-right">
+ 
+            {/* ── Progress stepper card ── */}
+            <div className="cpv5-progress-card">
+              <div className="cpv5-progress-head">
+                <span className="cpv5-progress-head-dot" />
+                Project Setup
+              </div>
+ 
+              <div className="cpv5-steps">
+                {steps.map((s, i) => (
+                  <div key={s.n} className="cpv5-step-row">
+                    <div className="cpv5-step-left">
+                      <div className={`cpv5-step-circle${s.done ? ' done' : s.active ? ' active' : ''}`}>
+                        {s.done ? (
+                          <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                            <path d="M20 6L9 17l-5-5"/>
+                          </svg>
+                        ) : s.n}
+                      </div>
+                      {i < steps.length - 1 && (
+                        <div className={`cpv5-step-line${s.done ? ' done' : ''}`} />
+                      )}
+                    </div>
+                    <div className="cpv5-step-body">
+                      <div className={`cpv5-step-title${s.done ? ' done' : s.active ? ' active' : ''}`}>
+                        {s.label}
+                      </div>
+                      <div className={`cpv5-step-val${s.done || (s.active && s.val !== 'Not selected yet' && s.val !== 'Enter a name…') ? ' filled' : ''}`}>
+                        {s.val}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+ 
+              <div className={`cpv5-summary-status${isReady ? ' ready' : ' waiting'}`}>
+                <span className={`cpv5-status-dot${isReady ? ' ready' : ''}`} />
+                {isReady ? 'Ready to launch your project' : 'Complete the required fields'}
+              </div>
+            </div>
+ 
+            {/* ── Tips card ── */}
+            <div className="cpv5-tips-card">
+              <div className="cpv5-tips-head">
+                <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+                </svg>
+                What happens next
+              </div>
+              <div className="cpv5-tips-body">
+                {[
+                  { icon: '🔗', text: 'Enter the URL or API endpoint you want to test' },
+                  { icon: '🎯', text: 'Choose your test type: Smoke, Functional, or Performance' },
+                  { icon: '⚡', text: 'Select a framework' },
+                  { icon: '📄', text: 'Download your generated test scripts instantly' },
+                ].map((tip, i) => (
+                  <div key={i} className="cpv5-tip-row">
+                    <div className="cpv5-tip-icon">{tip.icon}</div>
+                    <div className="cpv5-tip-text">{tip.text}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+ 
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Generate Panel — avec test_type + framework
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GeneratePanel({ goTo, setGeneration }) {
+function GeneratePanel({ goTo, setGeneration, project, initialUrl = '' }) {
+
   const { t } = useLang();
-  const [url,      setUrl]      = useState('');
-  const [fw,       setFw]       = useState('Selenium');
-  const [testType, setTestType] = useState('smoke');
+const [url, setUrl] = useState(initialUrl);
+const [fw,  setFw]  = useState('');
+  const [testType, setTestType] = useState('');
   const [loading,  setLoad]     = useState(false);
   const [error,    setError]    = useState('');
-  const [urlValid, setUrlValid] = useState(null);
+  const [urlValid, setUrlValid] = useState(() => {
+  if (!initialUrl) return null;
+  try { new URL(initialUrl); return true; } catch { return false; }
+});
 
-const TEST_TYPES = [
-  {
-    key: 'smoke',
-    label: 'Smoke Test',
-    desc: 'Visibility checks — elements present in DOM',
-    letter: 'S',
-    letterClass: 'gp4-letter-s',
-    badge: 'Quick',
-    badgeClass: 'gp-badge-quick',
-    time: '~30s',
-  },
-  {
-    key: 'functional',
-    label: 'Functional Test',
-    desc: 'Interactions — click, fill, submit + assertions',
-    letter: 'F',
-    letterClass: 'gp4-letter-f',
-    badge: 'Medium',
-    badgeClass: 'gp-badge-mid',
-    time: '~1min',
-  },
-  {
-    key: 'performance',
-    label: 'Performance Test',
-    desc: 'Performance test scenarios with load time and response time assertions',
-    letter: 'P',
-    letterClass: 'gp4-letter-r',
-    badge: 'Full',
-    badgeClass: 'gp-badge-full',
-    time: '~2min',
-  },
-];
+  const isInternal = project?.type === 'internal';
 
-const FRAMEWORKS = [
-  {
-    key: 'Selenium',
-    color: '#43B02A',
-    letters: 'Se',
-    letterClass: 'gp4-letter-se',
-  },
-  {
-    key: 'Cypress',
-    color: '#00BFA5',
-    letters: 'Cy',
-    letterClass: 'gp4-letter-cy',
-  },
-  {
-    key: 'Playwright',
-    color: '#E2574C',
-    letters: 'Pl',
-    letterClass: 'gp4-letter-pl',
-  },
-];
+  const PUBLIC_TEST_TYPES = [
+    {
+      key: 'smoke',
+      label: 'Smoke Test',
+      desc: 'Visibility checks — elements present in DOM',
+      letter: 'S', letterClass: 'gp4-letter-s',
+      badge: 'Quick', badgeClass: 'gp-badge-quick', time: '~30s',
+    },
+    {
+      key: 'functional',
+      label: 'Functional Test',
+      desc: 'Interactions — click, fill, submit + assertions',
+      letter: 'F', letterClass: 'gp4-letter-f',
+      badge: 'Medium', badgeClass: 'gp-badge-mid', time: '~1min',
+    },
+    {
+      key: 'performance',
+      label: 'Performance Test',
+      desc: 'Load time and response time assertions',
+      letter: 'P', letterClass: 'gp4-letter-r',
+      badge: 'Full', badgeClass: 'gp-badge-full', time: '~2min',
+    },
+  ];
+
+  const INTERNAL_TEST_TYPES = [
+    {
+      key: 'unit',
+      label: 'Unit Test',
+      desc: 'Test individual functions and components in isolation',
+      letter: 'U', letterClass: 'gp4-letter-unit',
+      badge: 'Fast', badgeClass: 'gp-badge-quick', time: '~15s',
+    },
+    {
+      key: 'regression',
+      label: 'Regression Test',
+      desc: 'Ensure existing features still work after changes',
+      letter: 'R', letterClass: 'gp4-letter-reg',
+      badge: 'Thorough', badgeClass: 'gp-badge-mid', time: '~3min',
+    },
+    {
+      key: 'security',
+      label: 'Security Test',
+      desc: 'Check for vulnerabilities, auth issues, injection risks',
+      letter: 'S', letterClass: 'gp4-letter-sec',
+      badge: 'Critical', badgeClass: 'gp-badge-full', time: '~5min',
+    },
+  ];
+
+  const PUBLIC_FRAMEWORKS = [
+    { key: 'Selenium',   color: '#43B02A', letters: 'Se', letterClass: 'gp4-letter-se' },
+    { key: 'Cypress',    color: '#00BFA5', letters: 'Cy', letterClass: 'gp4-letter-cy' },
+    { key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl' },
+  ];
+
+  const INTERNAL_FRAMEWORKS = [
+    { key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl' },
+    { key: 'Selenium',   color: '#43B02A', letters: 'Se', letterClass: 'gp4-letter-se' },
+    { key: 'Cypress',    color: '#00BFA5', letters: 'Cy', letterClass: 'gp4-letter-cy', note: 'Optional' },
+  ];
+
+  const TEST_TYPES = isInternal ? INTERNAL_TEST_TYPES : PUBLIC_TEST_TYPES;
+  const FRAMEWORKS = isInternal ? INTERNAL_FRAMEWORKS : PUBLIC_FRAMEWORKS;
 
   const validateUrl = (val) => {
     try { new URL(val); setUrlValid(true); }
@@ -405,7 +1546,14 @@ const FRAMEWORKS = [
     if (!url) return;
     setLoad(true); setError('');
     try {
-      const res = await api.post('/generate', { url, framework: fw, test_type: testType });
+     const res = await api.post('/generate', {
+  url,
+  framework: fw,
+  test_type: testType,
+  project_name: project?.name,
+  project_type: project?.type,
+  project_id: project?.id,  // ← AJOUTE
+});
       setGeneration(res.data);
       goTo('execution');
     } catch (err) {
@@ -416,14 +1564,25 @@ const FRAMEWORKS = [
 
   const selectedType = TEST_TYPES.find(t => t.key === testType);
   const selectedFw   = FRAMEWORKS.find(f => f.key === fw);
-  const isReady      = urlValid === true;
+  const isReady      = urlValid === true && testType !== '' && fw !== '';
+
+  const urlPlaceholder = isInternal ? 'https://api.internal.company.com/v1' : 'https://myapp.com';
+  const urlLabel       = isInternal ? 'Target URL or API Endpoint' : 'Target URL';
+  const urlHint        = isInternal ? 'Supports REST API endpoints and internal services' : 'Enter the web application you want to test';
 
   return (
     <div className="panel">
-      {/* Header */}
       <div className="p-header" style={{ marginBottom: 32 }}>
         <div>
-          
+          {project && (
+            <div className="gen-project-crumb">
+              <span className={`gen-project-type-dot ${project.type}`} />
+              <span className="gen-project-name">{project.name}</span>
+              <span className="gen-project-type-badge" data-type={project.type}>
+                {project.type === 'internal' ? '🔒 Internal' : '🌐 Public'}
+              </span>
+            </div>
+          )}
           <h1 className="p-title">
             New <span className="g">Generation</span>
           </h1>
@@ -441,8 +1600,6 @@ const FRAMEWORKS = [
 
       <form onSubmit={submit}>
         <div className="gp4-layout">
-
-          {/* ── LEFT COLUMN ── */}
           <div className="gp4-left">
 
             {/* STEP 1 — URL */}
@@ -450,35 +1607,35 @@ const FRAMEWORKS = [
               <div className="gp4-section-header">
                 <span className="gp4-num">01</span>
                 <div>
-                  <div className="gp4-section-title">Target URL</div>
-                  <div className="gp4-section-sub">Enter the web application you want to test</div>
+                  <div className="gp4-section-title">{urlLabel}</div>
+                  <div className="gp4-section-sub">{urlHint}</div>
                 </div>
               </div>
               <div className={`gp4-url-wrap${urlValid === true ? ' valid' : urlValid === false ? ' invalid' : ''}`}>
                 <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                  {isInternal
+                    ? <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    : <><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></>
+                  }
                 </svg>
                 <input
                   type="url"
-                  placeholder="https://myapp.com"
+                  placeholder={urlPlaceholder}
                   value={url}
                   onChange={e => { setUrl(e.target.value); validateUrl(e.target.value); }}
                   required
                 />
-                {urlValid === true && (
-                  <svg width="16" height="16" fill="none" stroke="#10b981" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path d="M20 6L9 17l-5-5"/>
-                  </svg>
-                )}
-                {urlValid === false && (
-                  <svg width="16" height="16" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path d="M18 6L6 18M6 6l12 12"/>
-                  </svg>
-                )}
+                {urlValid === true  && <svg width="16" height="16" fill="none" stroke="#10b981" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>}
+                {urlValid === false && <svg width="16" height="16" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>}
               </div>
               {urlValid === false && (
                 <div className="gp4-url-error">Please enter a valid URL starting with https://</div>
+              )}
+              {isInternal && (
+                <div className="gen-api-hint">
+                  <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                  Internal endpoints are scanned securely without exposing credentials
+                </div>
               )}
             </div>
 
@@ -488,7 +1645,9 @@ const FRAMEWORKS = [
                 <span className="gp4-num">02</span>
                 <div>
                   <div className="gp4-section-title">Test Type</div>
-                  <div className="gp4-section-sub">Choose the depth of test coverage</div>
+                  <div className="gp4-section-sub">
+                    {isInternal ? 'Choose testing strategy for internal services' : 'Choose the depth of test coverage'}
+                  </div>
                 </div>
               </div>
               <div className="gp4-types">
@@ -499,9 +1658,7 @@ const FRAMEWORKS = [
                     onClick={() => setTestType(tt.key)}
                   >
                     <div className="gp4-type-left">
-                      <div className={`gp4-letter-badge ${tt.letterClass}`}>
-  {tt.letter}
-</div>
+                      <div className={`gp4-letter-badge ${tt.letterClass}`}>{tt.letter}</div>
                       <div>
                         <div className="gp4-type-name">{tt.label}</div>
                         <div className="gp4-type-desc">{tt.desc}</div>
@@ -532,15 +1689,13 @@ const FRAMEWORKS = [
                 {FRAMEWORKS.map(f => (
                   <div
                     key={f.key}
-                    className={`gp4-fw-card${fw === f.key ? ' selected' : ''}`}
+                    className={`gp4-fw-card${fw === f.key ? ' selected' : ''}${f.note ? ' gp4-fw-card--optional' : ''}`}
                     onClick={() => setFw(f.key)}
                     style={{ '--fw-color': f.color }}
                   >
-                   <div className={`gp4-fw-letter-badge ${f.letterClass}`}>
-                    {f.letters}
-                      </div>
-                    
-                  <span className="gp4-fw-name">{f.key}</span>
+                    <div className={`gp4-fw-letter-badge ${f.letterClass}`}>{f.letters}</div>
+                    <span className="gp4-fw-name">{f.key}</span>
+                    {f.note && <span className="gp4-fw-note">{f.note}</span>}
                     {fw === f.key && (
                       <div className="gp4-fw-check">
                         <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
@@ -553,12 +1708,7 @@ const FRAMEWORKS = [
               </div>
             </div>
 
-            {/* GENERATE BUTTON */}
-            <button
-              type="submit"
-              className="gp4-submit"
-              disabled={loading || !isReady}
-            >
+            <button type="submit" className="gp4-submit" disabled={loading || !isReady}>
               {loading ? (
                 <><span className="spinner" /> Analyzing & Generating...</>
               ) : (
@@ -567,17 +1717,14 @@ const FRAMEWORKS = [
                     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                   </svg>
                   Generate Tests
-                  {isReady && <span className="gp4-submit-arrow"></span>}
+                  {isReady && <span className="gp4-submit-arrow">→</span>}
                 </>
               )}
             </button>
-
           </div>
 
-          {/* ── RIGHT COLUMN — Config Summary ── */}
+          {/* COLONNE DROITE */}
           <div className="gp4-right">
-
-            {/* Live Config */}
             <div className="gp4-summary-card">
               <div className="gp4-summary-head">
                 <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -586,47 +1733,54 @@ const FRAMEWORKS = [
                 Configuration Summary
               </div>
               <div className="gp4-summary-body">
+                {project && (
+                  <>
+                    <div className="gp4-sum-row">
+                      <span className="gp4-sum-label">Project</span>
+                      <span className="gp4-sum-val" style={{ fontSize: 11, color: 'var(--indigo3)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                        {project.name}
+                      </span>
+                    </div>
+                    <div className="gp4-sum-divider" />
+                  </>
+                )}
                 <div className="gp4-sum-row">
                   <span className="gp4-sum-label">URL</span>
                   <span className="gp4-sum-val">
-                    {url ? (
-                      <span style={{ color: urlValid ? 'var(--green)' : 'var(--red)', fontSize: 11, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                        {url}
-                      </span>
-                    ) : (
-                      <span className="gp4-sum-empty">Not set</span>
-                    )}
+                    {url
+                      ? <span style={{ color: urlValid ? 'var(--green)' : 'var(--red)', fontSize: 11, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{url}</span>
+                      : <span className="gp4-sum-empty">Not set</span>
+                    }
                   </span>
                 </div>
                 <div className="gp4-sum-divider" />
                 <div className="gp4-sum-row">
                   <span className="gp4-sum-label">Test Type</span>
                   <span className="gp4-sum-val">
-                    {selectedType?.icon} {selectedType?.label}
+                    {selectedType?.label || <span className="gp4-sum-empty">Not selected</span>}
                   </span>
                 </div>
                 <div className="gp4-sum-divider" />
                 <div className="gp4-sum-row">
                   <span className="gp4-sum-label">Framework</span>
                   <span className="gp4-sum-val">
-                    {selectedFw?.logo} {selectedFw?.key}
+                    {selectedFw?.key || <span className="gp4-sum-empty">Not selected</span>}
                   </span>
                 </div>
                 <div className="gp4-sum-divider" />
                 <div className="gp4-sum-row">
                   <span className="gp4-sum-label">Est. Time</span>
                   <span className="gp4-sum-val" style={{ color: 'var(--indigo2)' }}>
-                    {selectedType?.time}
+                    {selectedType?.time || '—'}
                   </span>
                 </div>
               </div>
               <div className={`gp4-summary-status ${isReady ? 'ready' : 'waiting'}`}>
                 <span className={`gp4-status-dot ${isReady ? 'ready' : ''}`} />
-                {isReady ? 'Ready to generate' : 'Waiting for valid URL'}
+                {isReady ? 'Ready to generate' : 'Complete all fields'}
               </div>
             </div>
 
-            {/* How it works */}
             <div className="gp4-how-card">
               <div className="gp4-how-head">
                 <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -654,7 +1808,6 @@ const FRAMEWORKS = [
                 ))}
               </div>
             </div>
-
           </div>
         </div>
       </form>
@@ -1466,17 +2619,23 @@ function HistoryPanel({ goTo, setGeneration }) {
   const [loading,   setLoading]   = useState(true);
   const [search,    setSearch]    = useState('');
   const [filterFw,  setFilterFw]  = useState('all');
+  const [filterProject, setFilterProject] = useState('all');
+  const [projects, setProjects] = useState([]);
   const [sortKey,   setSortKey]   = useState('date');
   const [sortDir,   setSortDir]   = useState('desc');
   const [selected,  setSelected]  = useState(null);
   const [deleting,  setDeleting]  = useState(null);
  
-  useEffect(() => {
-    api.get('/generations')
-      .then(res => setHistories(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+ useEffect(() => {
+  Promise.all([
+    api.get('/generations'),
+    api.get('/projects'),
+  ]).then(([genRes, projRes]) => {
+    setHistories(genRes.data);
+    setProjects(projRes.data);
+  }).catch(console.error)
+    .finally(() => setLoading(false));
+}, []);
  
   const totalGen   = histories.length;
   const totalTests = histories.reduce((s, h) => s + (h.pass_count || 0) + (h.fail_count || 0) + (h.skip_count || 0), 0);
@@ -1485,11 +2644,12 @@ function HistoryPanel({ goTo, setGeneration }) {
     ? Math.round(histories.reduce((s, h) => s + (h.pass_rate || 0), 0) / histories.length)
     : 0;
  
-  const filtered = histories
-    .filter(h =>
-      h.url.toLowerCase().includes(search.toLowerCase()) &&
-      (filterFw === 'all' || h.framework === filterFw)
-    )
+   const filtered = histories
+  .filter(h =>
+    h.url.toLowerCase().includes(search.toLowerCase()) &&
+    (filterFw === 'all' || h.framework === filterFw) &&
+    (filterProject === 'all' || String(h.project_id) === String(filterProject))
+  )
     .sort((a, b) => {
       let va, vb;
       if (sortKey === 'date')  { va = new Date(a.created_at); vb = new Date(b.created_at); }
@@ -1605,7 +2765,24 @@ function HistoryPanel({ goTo, setGeneration }) {
               </button>
             )}
           </div>
- 
+           {/* Project filter dropdown */}
+<select
+  value={filterProject}
+  onChange={e => setFilterProject(e.target.value)}
+  style={{
+    padding: '8px 14px', borderRadius: 8,
+    background: 'var(--card)', border: '1.5px solid var(--border)',
+    color: 'var(--text)', fontSize: 12, fontWeight: 600,
+    fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
+  }}
+>
+  <option value="all">All Projects</option>
+  {projects.map(p => (
+    <option key={p.id} value={p.id}>
+      {p.type === 'public' ? '🌐' : '🔒'} {p.name}
+    </option>
+  ))}
+</select>
           <div className="hp2-filters">
             {['all', 'Selenium', 'Cypress', 'Playwright', 'Both'].map(fw => {
               const conf = FW_CONFIG[fw];
@@ -2204,20 +3381,50 @@ function SettingsPanel({ theme, setTheme }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [page,       setPage]      = useState('dashboard');
-  const [collapsed,  setCollapse]  = useState(false);
-  const [theme,      setTheme]     = useState('light');
-  const [generation, setGeneration] = useState(null);
+  const [page,           setPage]          = useState('dashboard');
+  const [collapsed,      setCollapse]      = useState(false);
+  const [theme, setTheme] = useState(() => {
+  const saved = localStorage.getItem('nextest-theme');
+  if (saved === 'light' || saved === 'dark') return saved;
+  localStorage.setItem('nextest-theme', 'dark');
+  document.documentElement.setAttribute('data-theme', 'dark');
+  return 'dark';
+});
+  const [generation,     setGeneration]    = useState(null);
+  const [currentProject, setCurrentProject] = useState(null); 
+  const [selectedPageUrl, setSelectedPageUrl] = useState('');
+  const [projectStep,    setProjectStep]   = useState('list'); // ← NOUVEAU : 'create' | 'generate'
+
   const { user, logout } = useAuth();
   const { t }            = useLang();
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('nextest-theme', theme);
+}, [theme]);
+
+ 
+
+const handleGenerateNav = () => {
+  setProjectStep('list');
+  setCurrentProject(null);
+  setSelectedPageUrl('');
+  setPage('generate');
+};
+
+  const handleProjectCreated = (project) => {
+    setCurrentProject(project);
+    setProjectStep('generate');
+  };
+
+  const handleBackToCreate = () => {
+    setProjectStep('create');
+    setCurrentProject(null);
+  };
 
   const NAV_MAIN = [
     { id: 'dashboard', label: t('dashboard'),     badge: null     },
-    { id: 'generate',  label: t('newGeneration'), badge: t('new') },
+    { id: 'generate',  label: 'Projects', badge: t('new') },
     { id: 'execution', label: t('testExecution'), badge: null     },
     { id: 'history',   label: t('history'),       badge: null     },
   ];
@@ -2243,7 +3450,15 @@ export default function Dashboard() {
         <nav className="s-nav">
           <div className="s-group">
             {!collapsed && <div className="s-label">{t('main')}</div>}
-            {NAV_MAIN.map(it => (<SItem key={it.id} {...it} active={page === it.id} collapsed={collapsed} onClick={setPage} />))}
+            {NAV_MAIN.map(it => (
+              <SItem
+                key={it.id}
+                {...it}
+                active={page === it.id}
+                collapsed={collapsed}
+                onClick={it.id === 'generate' ? handleGenerateNav : setPage}
+              />
+            ))}
           </div>
           <div className="s-divider" />
           <div className="s-group">
@@ -2266,6 +3481,7 @@ export default function Dashboard() {
               <span className="h-bc-root">NexTest</span>
               <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: '#e5e7f0' }}><path d="M9 18l6-6-6-6" /></svg>
               <span className="h-bc-page">{LABELS[page]}</span>
+              
             </div>
           </div>
           <div className="h-search">
@@ -2273,13 +3489,18 @@ export default function Dashboard() {
             <input type="text" placeholder={t('searchPlaceholder')} />
           </div>
           <div className="h-right">
+            <ThemeToggle theme={theme} setTheme={setTheme} />
+
             <button className="h-icon-btn">
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span className="notif-dot" />
             </button>
             <div className="h-sep" />
             <div className="h-avatar">
-              {user?.avatar ? <img src={user.avatar} alt="av" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <span>{user?.name?.[0]?.toUpperCase() || 'U'}</span>}
+              {user?.avatar
+                ? <img src={user.avatar} alt="av" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                : <span>{user?.name?.[0]?.toUpperCase() || 'U'}</span>
+              }
             </div>
             <div>
               <div className="h-user-name">{user?.name?.split(' ')[0] || 'User'}</div>
@@ -2290,13 +3511,99 @@ export default function Dashboard() {
 
         <div className="content">
           {page === 'dashboard' && <DashboardPanel user={user} goTo={setPage} />}
-          {page === 'generate'  && <GeneratePanel  goTo={setPage} setGeneration={setGeneration} />}
+          {page === 'generate' && (
+  <>
+    {projectStep === 'list' && (
+      <ProjectsListPanel
+        onNewProject={() => setProjectStep('create')}
+        onSelectProject={(project) => {
+          setCurrentProject(project);
+          setProjectStep('detail');
+        }}
+      />
+    )}
+
+    {projectStep === 'detail' && (
+      <ProjectDetailPanel
+        project={currentProject}
+        onBack={() => setProjectStep('list')}
+        onNewGeneration={() => {
+          setSelectedPageUrl('');
+          setProjectStep('generate');
+        }}
+        setGeneration={setGeneration}
+        goTo={setPage}
+      />
+    )}
+
+    {projectStep === 'create' && (
+      <>
+        <button
+          onClick={() => setProjectStep('list')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontSize: 11, fontWeight: 700, color: 'var(--muted)',
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '0 0 20px', transition: 'color .18s',
+            letterSpacing: '.5px', textTransform: 'uppercase',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--indigo2)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+        >
+          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+          Back to projects
+        </button>
+        <CreateProjectPanel onProjectCreated={(project) => {
+          setCurrentProject(project);
+          setProjectStep('detail');
+        }} />
+      </>
+    )}
+
+    {projectStep === 'generate' && (
+      <>
+        <button
+          onClick={() => setProjectStep('detail')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontSize: 11, fontWeight: 700, color: 'var(--muted)',
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '0 0 20px', transition: 'color .18s',
+            letterSpacing: '.5px', textTransform: 'uppercase',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--indigo2)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+        >
+          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+          Back to project
+        </button>
+        <GeneratePanel
+          goTo={(p) => {
+            setProjectStep('list');
+            setPage(p);
+          }}
+          setGeneration={setGeneration}
+          project={currentProject}
+          initialUrl={selectedPageUrl}
+        />
+      </>
+    )}
+  </>
+)}
+
           {page === 'execution' && <ExecutionPanel generation={generation} />}
           {page === 'history'   && <HistoryPanel   goTo={setPage} setGeneration={setGeneration} />}
           {page === 'account'   && <AccountPanel   user={user} />}
           {page === 'settings'  && <SettingsPanel  theme={theme} setTheme={setTheme} />}
         </div>
       </div>
+     <NextestChatbot theme={theme} />
+     
+
     </div>
   );
 }

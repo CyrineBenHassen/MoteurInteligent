@@ -172,6 +172,7 @@ class GenerationController extends Controller
             // ── Step 4: Persist ─────────────────────────────────────────────
             $generation = Generation::create([
                 'user_id'             => auth()->id(),
+                'project_id'          => $request->project_id ?? null,  // ← AJOUTE ICI
                 'url'                 => $url,
                 'framework'           => $framework,
                 'test_type'           => $testType,
@@ -291,14 +292,15 @@ class GenerationController extends Controller
 
     // ── Unchanged methods ───────────────────────────────────────────────────
 
-    public function index()
-    {
-        $generations = Generation::where('user_id', auth()->id())
-            ->orderBy('created_at', 'desc')
-            ->get();
+public function index()
+{
+    $generations = Generation::where('user_id', auth()->id())
+        ->with('project:id,name')
+        ->orderBy('created_at', 'desc')
+        ->get();
 
-        return response()->json($generations);
-    }
+    return response()->json($generations);
+}
 
     public function show($id)
     {

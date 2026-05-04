@@ -8,6 +8,7 @@ class Generation extends Model
 {
     protected $fillable = [
         'user_id',
+        'project_id',
         'url',
         'framework',
         'test_type',
@@ -43,4 +44,8 @@ class Generation extends Model
     {
         return $this->belongsTo(User::class);
     }
+    public function project()
+{
+    return $this->belongsTo(\App\Models\Project::class);
+}
 }

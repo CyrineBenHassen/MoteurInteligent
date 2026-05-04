@@ -236,19 +236,25 @@ export default function HomePage() {
       {/* ══ NAV ══ */}
       <nav className={`nav ${navSolid ? 'nav--solid' : ''}`}>
         <div className="nav__inner">
-          <Link to="/" className="nav__brand">
-            <div className="nav__gem">
-              <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
-                <rect width="44" height="44" rx="11" fill="none"/>
-                <polyline points="8,14 22,30 36,14" stroke="#060e1e" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="8" y1="30" x2="36" y2="30" stroke="rgba(6,14,30,0.5)" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <div>
-              <div className="nav__name">NexTest</div>
-              <div className="nav__sub">Test Automation</div>
-            </div>
-          </Link>
+         
+         <Link to="/" className="nav__brand">
+  <div
+    className="nav__gem"
+    style={{
+      background: 'linear-gradient(135deg, #8a6a00, #C9A227, #E8C84A)',
+      boxShadow: '0 4px 16px rgba(201,162,39,0.5)'
+    }}
+  >
+    <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
+      <circle cx="22" cy="22" r="17" stroke="#060e1e" strokeWidth="2" fill="none" opacity="0.6"/>
+      <polyline points="13,22 20,30 32,14" stroke="#060e1e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    </svg>
+  </div>
+  <div>
+    <div className="nav__name">NexTest</div>
+    <div className="nav__sub">Test Automation</div>
+  </div>
+</Link>
 
           <ul className="nav__links">
             {NAV_ITEMS.map(item => (
@@ -496,18 +502,23 @@ export default function HomePage() {
       <footer className="footer">
         <div className="footer__inner">
           <div className="footer__brand">
-            <div className="nav__gem">
-              <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
-                <rect width="44" height="44" rx="11" fill="none"/>
-                <polyline points="8,14 22,30 36,14" stroke="#060e1e" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="8" y1="30" x2="36" y2="30" stroke="rgba(6,14,30,0.5)" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <div>
-              <div className="nav__name">NexTest</div>
-              <div className="nav__sub">Test Automation</div>
-            </div>
-          </div>
+  <div
+    className="nav__gem"
+    style={{
+      background: 'linear-gradient(135deg, #8a6a00, #C9A227, #E8C84A)',
+      boxShadow: '0 4px 16px rgba(201,162,39,0.5)'
+    }}
+  >
+    <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
+      <circle cx="22" cy="22" r="17" stroke="#060e1e" strokeWidth="2" fill="none" opacity="0.6"/>
+      <polyline points="13,22 20,30 32,14" stroke="#060e1e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    </svg>
+  </div>
+  <div>
+    <div className="nav__name">NexTest</div>
+    <div className="nav__sub">Test Automation</div>
+  </div>
+</div>
           <p className="footer__copy">© 2025–2026 NexTest · Software Engineering PFE — Cyrine Ben Hassen · Tac-Tic</p>
           <nav className="footer__links">
             {['Privacy', 'Terms', 'Documentation', 'Status'].map(l => (

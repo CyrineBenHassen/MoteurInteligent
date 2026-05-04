@@ -13,13 +13,35 @@ function pwStrength(pw) {
   return s;
 }
 
+// œil barré = password caché (par défaut)
+const EyeOff = () => (
+  <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+    <line x1="1" y1="1" x2="23" y2="23"/>
+  </svg>
+);
+
+// œil ouvert = password visible
+const EyeOpen = () => (
+  <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
   const [fErr, setFErr] = useState({});
   const [loading, setLoading] = useState(false);
-  const { register, loginWithGoogle } = useAuth(); 
+
+  // false = caché | true = visible
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm,  setShowConfirm]  = useState(false);
+
+  const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -45,7 +67,7 @@ export default function RegisterPage() {
     setError(''); setLoading(true);
     try {
       await register({ name: form.name, email: form.email, password: form.password, password_confirmation: form.confirm });
-      navigate('/dashboard');
+      navigate('/login');
     } catch (err) {
       setError(err?.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
@@ -73,14 +95,14 @@ export default function RegisterPage() {
           <div className="left-headline">
             <h1>Smart Testing<br />Starts <span className="gold">Here</span></h1>
             <div className="gold-line" />
-           <p>Stop writing tests manually. Our generative AI engine crawls your web app, identifies interactive elements, and instantly produces Selenium & Cypress automation scripts.</p>
+            <p>Stop writing tests manually. Our generative AI engine crawls your web app, identifies interactive elements, and instantly produces Selenium & Cypress automation scripts.</p>
           </div>
 
           <div className="steps">
             {[
               { n: '01', t: 'Sign up for free', d: 'Instant access — no setup, no credit card' },
               { n: '02', t: 'Submit your app URL', d: 'Drop a URL and let the engine do the rest' },
-              { n: '03', t:'AI generates test cases', d: 'Covers functional scenarios, edge cases & error flows automatically'},
+              { n: '03', t: 'AI generates test cases', d: 'Covers functional scenarios, edge cases & error flows automatically' },
               { n: '04', t: 'Download Selenium & Cypress scripts', d: 'Production-ready scripts with a full PDF report, zero manual effort' },
             ].map((s, i, arr) => (
               <div className="step" key={s.n}>
@@ -115,6 +137,8 @@ export default function RegisterPage() {
               )}
 
               <form onSubmit={handleSubmit}>
+
+                {/* ── Full Name — inchangé ── */}
                 <div className="field">
                   <label>Full Name</label>
                   <div className="input-wrap">
@@ -135,6 +159,7 @@ export default function RegisterPage() {
                   {fErr.name && <div className="field-err">✕ {fErr.name}</div>}
                 </div>
 
+                {/* ── Email — inchangé ── */}
                 <div className="field">
                   <label>Email Address</label>
                   <div className="input-wrap">
@@ -155,22 +180,33 @@ export default function RegisterPage() {
                   {fErr.email && <div className="field-err">✕ {fErr.email}</div>}
                 </div>
 
+                {/* ── Password — cadenas à gauche (inchangé) + œil toggle à droite ── */}
                 <div className="field">
                   <label>Password</label>
                   <div className="input-wrap">
                     <input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       placeholder="Create a password"
                       autoComplete="new-password"
                       value={form.password}
                       onChange={set('password')}
                       className={fErr.password ? 'err' : ''}
                     />
+                    {/* cadenas à gauche — inchangé */}
                     <span className="input-ico">
                       <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                         <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                       </svg>
                     </span>
+                    {/* œil toggle à droite */}
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowPassword(p => !p)}
+                      className="eye-btn"
+                    >
+                      {showPassword ? <EyeOpen /> : <EyeOff />}
+                    </button>
                   </div>
                   {form.password && (
                     <>
@@ -185,22 +221,33 @@ export default function RegisterPage() {
                   {fErr.password && <div className="field-err">✕ {fErr.password}</div>}
                 </div>
 
+                {/* ── Confirm Password — cadenas à gauche (inchangé) + œil toggle à droite ── */}
                 <div className="field">
                   <label>Confirm Password</label>
                   <div className="input-wrap">
                     <input
-                      type="password"
+                      type={showConfirm ? 'text' : 'password'}
                       placeholder="Confirm your password"
                       autoComplete="new-password"
                       value={form.confirm}
                       onChange={set('confirm')}
                       className={fErr.confirm ? 'err' : ''}
                     />
+                    {/* cadenas à gauche — inchangé */}
                     <span className="input-ico">
                       <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                         <path d="M9 12l2 2 4-4" /><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                       </svg>
                     </span>
+                    {/* œil toggle à droite */}
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowConfirm(p => !p)}
+                      className="eye-btn"
+                    >
+                      {showConfirm ? <EyeOpen /> : <EyeOff />}
+                    </button>
                   </div>
                   {fErr.confirm && <div className="field-err">✕ {fErr.confirm}</div>}
                 </div>
@@ -219,7 +266,6 @@ export default function RegisterPage() {
                 <span /><small>or</small><span />
               </div>
 
-             
               <button type="button" className="google-btn" onClick={loginWithGoogle}>
                 <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z" />

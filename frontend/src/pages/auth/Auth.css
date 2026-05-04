@@ -139,7 +139,7 @@
 .left-tagline h1 .gold { color: #d4af37; }
 .left-tagline p { font-size: 14px; color: rgba(255,255,255,0.4); font-weight: 400; }
 
-/* ─── Stats Grid (kept for reference, replaced by benefits on login) ─── */
+/* ─── Stats Grid ─── */
 .stats-grid {
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 16px; width: 100%; max-width: 400px; margin-bottom: 36px;
@@ -172,7 +172,7 @@
   text-transform: uppercase; letter-spacing: 1.5px;
 }
 
-/* ─── Benefits List (Login page) ─── */
+/* ─── Benefits List ─── */
 .benefits-list {
   display: flex; flex-direction: column;
   width: 100%; max-width: 400px;
@@ -452,3 +452,16 @@
   font-size: 13px;
   margin-bottom: 16px;
 }
+
+.eye-btn {
+  position: absolute; right: 14px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  color: #c8d4e0; padding: 4px;
+  display: flex; align-items: center;
+  transition: color 0.2s; z-index: 2;
+}
+.eye-btn:hover { color: #d4af37; }
+
+
+
