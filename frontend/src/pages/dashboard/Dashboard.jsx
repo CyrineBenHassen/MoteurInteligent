@@ -772,11 +772,13 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
     setDeleting(null);
   };
 
-  const handleView = (item) => {
+ const handleView = (item) => {
     setGeneration({
       url: item.url, framework: item.framework,
-      generation: { id: item.id, url: item.url, framework: item.framework, load_time_ms: item.load_time_ms },
+      test_type: item.test_type,
+      generation: { id: item.id, url: item.url, framework: item.framework, load_time_ms: item.load_time_ms, test_type: item.test_type },
       result: {
+        test_type:           item.test_type           || 'smoke',
         test_cases:          item.test_cases          || [],
         test_cases_selenium: item.test_cases_selenium || [],
         test_cases_cypress:  item.test_cases_cypress  || [],
@@ -785,6 +787,7 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
         script_playwright:   item.script_playwright   || '',
         script_cypress:      item.script_cypress      || '',
         execution_results:   item.execution_results   || [],
+        performance:         item.performance         || null,
       },
     });
     goTo('execution');
@@ -799,13 +802,8 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
   const totalFail  = generations.reduce((s, g) => s + (g.fail_count || 0), 0);
 
   // Grouper par URL — dernière génération par URL
-  const byUrl = {};
-  generations.forEach(g => {
-    if (!byUrl[g.url] || new Date(g.created_at) > new Date(byUrl[g.url].created_at)) {
-      byUrl[g.url] = g;
-    }
-  });
-  const urlCards = Object.values(byUrl);
+  const urlCards = generations;
+
 
   const rateColor = (r) => r >= 80 ? '#10b981' : r >= 50 ? '#f59e0b' : '#ef4444';
 
@@ -886,7 +884,7 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
         {[
           { icon: '🚀', val: totalGen,      lbl: 'Generations', accent: `linear-gradient(90deg,${color},${color}88)` },
-          { icon: '🔗', val: urlCards.length, lbl: 'URLs Tested', accent: 'linear-gradient(90deg,#6366f1,#818cf8)' },
+          { icon: '🔗', val: urlCards.length, lbl: 'Total Generations', accent: 'linear-gradient(90deg,#6366f1,#818cf8)' },
           { icon: '✅', val: totalPass,     lbl: 'Total Passed', accent: 'linear-gradient(90deg,#10b981,#34d399)' },
           { icon: '🎯', val: `${avgRate}%`, lbl: 'Avg Pass Rate', accent: avgRate >= 80 ? 'linear-gradient(90deg,#10b981,#34d399)' : avgRate >= 50 ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' : 'linear-gradient(90deg,#ef4444,#f87171)' },
         ].map((s, i) => (
@@ -945,7 +943,7 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
       ) : (
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 14 }}>
-            🔗 URLs Tested — {urlCards.length} unique
+            🔗 All Generations — {urlCards.length} total
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {urlCards.map((item, i) => {
@@ -986,7 +984,9 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                     }}>
                       <span style={{ fontSize: 14, fontWeight: 800, color: rc, lineHeight: 1 }}>
-                        {item.pass_rate || 0}%
+                        {item.test_type === 'performance' && item.performance?.global_score != null
+  ? item.performance.global_score
+  : item.pass_rate || 0}%
                       </span>
                       <span style={{ fontSize: 8, color: 'var(--muted)', letterSpacing: .5 }}>PASS</span>
                     </div>
@@ -1489,16 +1489,39 @@ const [fw,  setFw]  = useState('');
       badge: 'Medium', badgeClass: 'gp-badge-mid', time: '~1min',
     },
     {
-      key: 'performance',
-      label: 'Performance Test',
-      desc: 'Load time and response time assertions',
-      letter: 'P', letterClass: 'gp4-letter-r',
-      badge: 'Full', badgeClass: 'gp-badge-full', time: '~2min',
-    },
+    key: 'performance',
+    label: 'Performance Test',
+    desc: 'Web Vitals: LCP, FCP, TTI, Load Time, Resource Size',
+    letter: 'P', letterClass: 'gp4-letter-r',
+    badge: 'Advanced', badgeClass: 'gp-badge-full', time: '~3min',
+  },
   ];
 
   const INTERNAL_TEST_TYPES = [
-    {
+    
+
+      {
+    key: 'smoke',
+    label: 'Smoke Test',
+    desc: 'Visibility checks — elements present in DOM',
+    letter: 'S', letterClass: 'gp4-letter-s',
+    badge: 'Quick', badgeClass: 'gp-badge-quick', time: '~30s',
+  },
+  {
+    key: 'functional',
+    label: 'Functional Test',
+    desc: 'Interactions — click, fill, submit + assertions',
+    letter: 'F', letterClass: 'gp4-letter-f',
+    badge: 'Medium', badgeClass: 'gp-badge-mid', time: '~1min',
+  },
+  {
+    key: 'performance',
+    label: 'Performance Test',
+    desc: 'Web Vitals: LCP, FCP, TTI, Load Time, Resource Size',
+    letter: 'P', letterClass: 'gp4-letter-r',
+    badge: 'Advanced', badgeClass: 'gp-badge-full', time: '~3min',
+  },
+  {
       key: 'unit',
       label: 'Unit Test',
       desc: 'Test individual functions and components in isolation',
@@ -1530,11 +1553,21 @@ const [fw,  setFw]  = useState('');
   const INTERNAL_FRAMEWORKS = [
     { key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl' },
     { key: 'Selenium',   color: '#43B02A', letters: 'Se', letterClass: 'gp4-letter-se' },
-    { key: 'Cypress',    color: '#00BFA5', letters: 'Cy', letterClass: 'gp4-letter-cy', note: 'Optional' },
+    { key: 'Cypress',    color: '#00BFA5', letters: 'Cy', letterClass: 'gp4-letter-cy'},
   ];
 
+ const PERFORMANCE_FRAMEWORKS = [
+  { key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl', note: 'Web Vitals' },
+];
+
+const BACKEND_FRAMEWORKS = [
+  { key: 'k6', color: '#7D64FF', letters: 'k6', letterClass: 'gp4-letter-k6', note: 'Load Test' },
+]
+
   const TEST_TYPES = isInternal ? INTERNAL_TEST_TYPES : PUBLIC_TEST_TYPES;
-  const FRAMEWORKS = isInternal ? INTERNAL_FRAMEWORKS : PUBLIC_FRAMEWORKS;
+const FRAMEWORKS = testType === 'performance'
+  ? (isInternal ? [...PERFORMANCE_FRAMEWORKS, ...BACKEND_FRAMEWORKS] : PERFORMANCE_FRAMEWORKS)
+  : isInternal ? INTERNAL_FRAMEWORKS : PUBLIC_FRAMEWORKS;
 
   const validateUrl = (val) => {
     try { new URL(val); setUrlValid(true); }
@@ -1574,28 +1607,7 @@ const [fw,  setFw]  = useState('');
     <div className="panel">
       <div className="p-header" style={{ marginBottom: 32 }}>
         <div>
-          {project && (
-  <div style={{ marginBottom: 8 }}>
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '5px 12px',
-      background: 'rgba(99,102,241,.08)',
-      border: '1px solid rgba(99,102,241,.2)',
-      borderRadius: 20, marginBottom: 14,
-    }}>
-      <span style={{
-        width: 7, height: 7, borderRadius: '50%',
-        background: '#6366f1', display: 'inline-block',
-      }} />
-      <span style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: 1.5,
-        textTransform: 'uppercase', color: '#6366f1',
-      }}>
-        New Generation
-      </span>
-    </div>
-  </div>
-)}
+ 
 <h1 className="p-title">
   New <span className="g">Generation</span>
 </h1>
@@ -1676,8 +1688,7 @@ const [fw,  setFw]  = useState('');
               )}
               {isInternal && (
                 <div className="gen-api-hint">
-                  <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-                  Internal endpoints are scanned securely without exposing credentials
+                  
                 </div>
               )}
             </div>
@@ -1698,7 +1709,7 @@ const [fw,  setFw]  = useState('');
                   <div
                     key={tt.key}
                     className={`gp4-type-card${testType === tt.key ? ' selected' : ''}`}
-                    onClick={() => setTestType(tt.key)}
+                     onClick={() => { setTestType(tt.key); setFw(''); }}
                   >
                     <div className="gp4-type-left">
                       <div className={`gp4-letter-badge ${tt.letterClass}`}>{tt.letter}</div>
@@ -1860,7 +1871,590 @@ const [fw,  setFw]  = useState('');
 // ─────────────────────────────────────────────────────────────────────────────
 // Execution Panel — affichage riche avec assertions
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PERFORMANCE EXECUTION PANEL — À coller dans Dashboard.jsx
+// Remplace la partie "TEST LIST" dans ExecutionPanel quand test_type === 'performance'
+// ─────────────────────────────────────────────────────────────────────────────
 
+// ── 1. PerformanceScoreRing — score circulaire Lighthouse-style ───────────────
+function PerformanceScoreRing({ score, label, color }) {
+  const radius = 54;
+  const circ   = 2 * Math.PI * radius;
+  const offset = circ - (score / 100) * circ;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <svg width="140" height="140" viewBox="0 0 140 140">
+        {/* Track */}
+        <circle cx="70" cy="70" r={radius}
+          fill="none" stroke="var(--border)" strokeWidth="10" />
+        {/* Fill */}
+        <circle cx="70" cy="70" r={radius}
+          fill="none" stroke={color} strokeWidth="10"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform="rotate(-90 70 70)"
+          style={{ transition: 'stroke-dashoffset 1.5s ease' }}
+        />
+        {/* Score */}
+        <text x="70" y="65" textAnchor="middle" dominantBaseline="middle"
+          fontSize="28" fontWeight="800" fill={color} fontFamily="var(--C)">
+          {score}
+        </text>
+        <text x="70" y="88" textAnchor="middle" dominantBaseline="middle"
+          fontSize="10" fill="var(--muted)" fontFamily="var(--D)">
+          / 100
+        </text>
+      </svg>
+      <div style={{
+        padding: '4px 14px', borderRadius: 20,
+        background: `${color}15`, border: `1px solid ${color}33`,
+        fontSize: 12, fontWeight: 700, color,
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+// ── 2. MetricBar — barre de progression pour une métrique ────────────────────
+function MetricBar({ value, good, poor, unit }) {
+  if (value == null) return <div style={{ fontSize: 11, color: 'var(--muted)' }}>N/A</div>;
+  const pct   = Math.min(100, (value / poor) * 100);
+  const color = value <= good ? '#10b981' : value >= poor ? '#ef4444' : '#f59e0b';
+
+  return (
+    <div style={{ width: '100%' }}>
+      <div style={{ height: 6, background: 'var(--border)', borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
+        {/* Good zone */}
+        <div style={{
+          position: 'absolute', left: 0, top: 0, bottom: 0,
+          width: `${(good / poor) * 100}%`,
+          background: 'rgba(16,185,129,.1)',
+          borderRight: '1px dashed rgba(16,185,129,.3)',
+        }} />
+        {/* Value fill */}
+        <div style={{
+          height: '100%', borderRadius: 6,
+          width: `${pct}%`,
+          background: color,
+          transition: 'width 1.2s ease',
+        }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
+        <span style={{ fontSize: 9, color: '#10b981' }}>Good ≤{good}{unit}</span>
+        <span style={{ fontSize: 9, color: '#ef4444' }}>Poor ≥{poor}{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── 3. RecommendationCard ────────────────────────────────────────────────────
+function RecommendationCard({ rec, index }) {
+  const PRIORITY_CONFIG = {
+    critical: { color: '#ef4444', bg: 'rgba(239,68,68,.08)', border: 'rgba(239,68,68,.2)', icon: '🔴' },
+    high:     { color: '#f97316', bg: 'rgba(249,115,22,.08)', border: 'rgba(249,115,22,.2)', icon: '🟠' },
+    medium:   { color: '#f59e0b', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.2)', icon: '🟡' },
+    low:      { color: '#10b981', bg: 'rgba(16,185,129,.08)', border: 'rgba(16,185,129,.2)', icon: '🟢' },
+  };
+  const CATEGORY_ICONS = {
+    images: '🖼', javascript: '⚡', css: '🎨', server: '🖥',
+    caching: '📦', fonts: '✍', network: '🌐',
+  };
+  const conf     = PRIORITY_CONFIG[rec.priority] || PRIORITY_CONFIG.medium;
+  const catIcon  = CATEGORY_ICONS[rec.category]  || '🔧';
+
+  return (
+    <div style={{
+      background: conf.bg, border: `1px solid ${conf.border}`,
+      borderRadius: 12, padding: '14px 16px',
+      animation: `dFadeUp .3s var(--ease) ${index * 0.06}s both`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <span style={{ fontSize: 20, flexShrink: 0 }}>{catIcon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+              {rec.title}
+            </span>
+            <span style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: 1,
+              padding: '2px 8px', borderRadius: 20,
+              color: conf.color, background: `${conf.color}15`,
+              border: `1px solid ${conf.color}33`,
+              textTransform: 'uppercase',
+            }}>
+              {conf.icon} {rec.priority}
+            </span>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--sub)', margin: 0, lineHeight: 1.6 }}>
+            {rec.description}
+          </p>
+          {rec.impact && (
+            <div style={{
+              marginTop: 8, fontSize: 11, fontWeight: 600,
+              color: '#10b981', display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+              </svg>
+              Impact: {rec.impact}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 4. PerformanceMetricRow — ligne dans le tableau de métriques ─────────────
+function PerformanceMetricRow({ test, index }) {
+  const SECTION_COLORS = {
+    timing:  '#6366f1',
+    network: '#0ea5e9',
+    dom:     '#8b5cf6',
+    assets:  '#f97316',
+  };
+  const color = SECTION_COLORS[test.section] || '#6366f1';
+  const value = test.metric_value;
+  const good  = test.metric_good;
+  const poor  = test.metric_poor;
+  const unit  = test.metric_unit || '';
+
+  const scoreColor = test.status === 'pass' ? '#10b981'
+                   : test.status === 'fail' ? '#ef4444'
+                   : '#f59e0b';
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: '2fr 1fr 1fr 1fr 2fr',
+      gap: 12, padding: '14px 20px',
+      borderBottom: '1px solid var(--border)',
+      alignItems: 'center',
+      animation: `dFadeUp .25s var(--ease) ${index * 0.04}s both`,
+      background: test.status === 'fail' ? 'rgba(239,68,68,.02)' : 'transparent',
+    }}>
+      {/* Metric name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+          background: `${color}12`, border: `1px solid ${color}22`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 15,
+        }}>
+          {test.name.split(' ')[0]}
+        </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+            {test.name.replace(/^[^\s]+\s/, '')}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
+            {test.section}
+          </div>
+        </div>
+      </div>
+
+      {/* Measured value */}
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: scoreColor, fontFamily: 'var(--C)' }}>
+          {test.value}
+        </div>
+        <div style={{ fontSize: 9, color: 'var(--muted)' }}>measured</div>
+      </div>
+
+      {/* Threshold */}
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>
+          ≤ {good}{unit}
+        </div>
+        <div style={{ fontSize: 9, color: 'var(--dimmed)' }}>good</div>
+      </div>
+
+      {/* Status */}
+      <div style={{ textAlign: 'center' }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '3px 10px', borderRadius: 20,
+          fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+          background: test.status === 'pass' ? 'rgba(16,185,129,.1)'
+                    : test.status === 'fail' ? 'rgba(239,68,68,.1)'
+                    : 'rgba(245,158,11,.1)',
+          color: scoreColor,
+          border: `1px solid ${scoreColor}33`,
+        }}>
+          {test.status === 'pass' ? '✓' : test.status === 'fail' ? '✗' : '—'} {test.status}
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <MetricBar value={value} good={good} poor={poor} unit={unit} />
+    </div>
+  );
+}
+
+// ── 5. PerformanceExecutionPanel — panel complet ─────────────────────────────
+// USAGE dans ExecutionPanel : si test_type === 'performance', afficher ce composant
+// Exemple d'intégration dans ExecutionPanel :
+/*
+  if (testType === 'performance') {
+    return <PerformanceExecutionPanel generation={generation} />;
+  }
+*/
+
+function PerformanceExecutionPanel({ generation }) {
+  const [activeSection, setActiveSection] = useState('metrics');
+
+  const result      = generation?.result || {};
+  const perf        = result?.performance || generation?.performance || {};
+  const tests       = result?.test_cases || result?.execution_results || [];
+  const metrics = perf?.metrics 
+  || result?.performance?.metrics 
+  || result?.metrics
+  || {};
+  const recs        = perf?.recommendations || [];
+  const score       = perf?.global_score    || 0;
+  const scoreLabel  = perf?.score_label     || 'N/A';
+  const scoreColor  = perf?.score_color     || '#f59e0b';
+  const siteType    = perf?.site_type       || 'landing';
+  const analysis    = perf?.site_analysis   || '';
+  const summary     = perf?.performance_summary || '';
+  const url         = generation?.generation?.url || generation?.url || '';
+const framework = generation?.framework 
+  || generation?.generation?.framework 
+  || generation?.result?.framework
+  || generation?.result?.performance?.framework
+  || '';
+  const pass = tests.filter(t => t.status === 'pass').length;
+  const fail = tests.filter(t => t.status === 'fail').length;
+  const skip = tests.filter(t => t.status === 'skip').length;
+
+  // Group tests by section
+  const bySection = tests.reduce((acc, t) => {
+    const s = t.section || 'other';
+    if (!acc[s]) acc[s] = [];
+    acc[s].push(t);
+    return acc;
+  }, {});
+
+  const SECTIONS = ['timing', 'network', 'assets', 'dom'];
+  const SECTION_LABELS = {
+    timing:  '⏱ Timing',
+    network: '🌐 Network',
+    assets:  '📦 Assets',
+    dom:     '🌲 DOM',
+  };
+  const SECTION_COLORS = {
+    timing:  '#6366f1', network: '#0ea5e9', assets: '#f97316', dom: '#8b5cf6',
+  };
+
+  return (
+    <div className="panel">
+
+      {/* ── HEADER ── */}
+      <div className="ep-header">
+        <div className="ep-header-left">
+          <div className="gp-tag" style={{ marginBottom: 8, background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)' }}>
+            <span className="gp-tag-dot" style={{ background: '#6366f1' }} />
+            Performance Analysis
+          </div>
+          <h1 className="p-title">
+            Performance <span className="g">Report</span>
+          </h1>
+          <div className="ep-info-bar">
+            <div className="ep-info-chip">
+              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10"/>
+              </svg>
+              <span>{url}</span>
+            </div>
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: 1, padding: '3px 10px',
+              borderRadius: 20, textTransform: 'uppercase',
+              background: 'rgba(99,102,241,.1)', color: '#6366f1',
+              border: '1px solid rgba(99,102,241,.2)',
+            }}>
+              {siteType}
+            </span>
+          </div>
+        </div>
+
+        {/* ── Actions + Score ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 16 }}>
+
+          {/* Download buttons */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            {/* Download Script */}
+            <button
+              onClick={() => {
+                const content = generation?.result?.script_playwright || generation?.result?.script || '';
+                const blob = new Blob([content], { type: 'text/plain' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'performance_playwright.py';
+                link.click();
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '9px 16px', borderRadius: 8,
+                background: 'var(--card)', border: '1px solid var(--border)',
+                color: '#E2574C', fontSize: 11, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+                transition: 'all .18s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#E2574C'; e.currentTarget.style.background = 'rgba(226,87,76,.08)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--card)'; }}
+            >
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span style={{ color: '#E2574C', fontWeight: 800, fontSize: 10 }}>Pl</span> .py
+            </button>
+
+            {/* Download Report */}
+            <button
+              onClick={async () => {
+                try {
+                  const id = generation?.generation?.id;
+                  if (!id) return;
+                  const res = await api.get(`/generations/${id}/pdf`, { responseType: 'blob' });
+                  const blob = new Blob([res.data], { type: 'application/pdf' });
+                  const link = document.createElement('a');
+                  link.href = URL.createObjectURL(blob);
+                  link.download = `performance_report_${id}.pdf`;
+                  link.click();
+                } catch (err) { console.error(err); }
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '9px 16px', borderRadius: 8,
+                background: 'linear-gradient(135deg, #6366f1, #818cf8)',
+                border: 'none', color: '#fff',
+                fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                fontFamily: 'inherit',
+                boxShadow: '0 3px 12px rgba(99,102,241,.4)',
+                transition: 'all .18s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              Download Report
+            </button>
+          </div>
+
+          {/* Score ring */}
+          <PerformanceScoreRing score={score} label={scoreLabel} color={scoreColor} />
+        </div>
+      </div>
+
+      {/* ── SITE ANALYSIS (LLaMA) ── */}
+      {analysis && (
+        <div style={{
+          background: 'rgba(99,102,241,.04)', border: '1px solid rgba(99,102,241,.15)',
+          borderRadius: 12, padding: '14px 18px', marginBottom: 20,
+          display: 'flex', alignItems: 'flex-start', gap: 12,
+        }}>
+          <span style={{ fontSize: 22, flexShrink: 0 }}>🤖</span>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>
+              LLaMA Analysis
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--sub)', margin: 0, lineHeight: 1.7 }}>
+              {analysis}
+            </p>
+            {summary && (
+              <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, fontStyle: 'italic' }}>
+                {summary}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── STAT CARDS ── */}
+      <div className="ep-stats" style={{ marginBottom: 24 }}>
+        {[
+          { label: 'Passed',   val: pass, color: '#10B981', bg: 'rgba(16,185,129,.08)',  border: 'rgba(16,185,129,.2)' },
+          { label: 'Failed',   val: fail, color: '#EF4444', bg: 'rgba(239,68,68,.08)',   border: 'rgba(239,68,68,.2)' },
+          { label: 'Skipped',  val: skip, color: '#F59E0B', bg: 'rgba(245,158,11,.08)',  border: 'rgba(245,158,11,.2)' },
+          { label: 'Score',    val: `${score}`, color: scoreColor, bg: `${scoreColor}12`, border: `${scoreColor}33` },
+        ].map((s, i) => (
+          <div key={s.label} className="ep-stat"
+            style={{ '--sc': s.color, '--sb': s.bg, '--sbo': s.border, '--i': i }}>
+            <div className="ep-stat-body">
+              <div className="ep-stat-val" style={{ color: s.color }}>{s.val}</div>
+              <div className="ep-stat-lbl">{s.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── KEY METRICS QUICK VIEW ── */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 12, marginBottom: 24,
+      }}>
+        {[
+  { key: 'load_time_ms', label: 'Load Time', icon: '⏱', unit: 'ms' },
+  { key: 'fcp_ms',       label: 'FCP',       icon: '🎨', unit: 'ms' },
+  { key: 'lcp_ms',       label: 'LCP',       icon: '🖼', unit: 'ms' },
+  { key: 'tti_ms',       label: 'TTI',       icon: '🖱', unit: 'ms' },
+].map(m => {
+        
+          const val = metrics[m.key] ?? perf?.[m.key] ?? null;
+          const test = tests.find(t => t.metric_key === m.key);
+          const color = test?.status === 'pass' ? '#10b981'
+                      : test?.status === 'fail' ? '#ef4444'
+                      : '#f59e0b';
+          return (
+            <div key={m.key} style={{
+              background: 'var(--card)', border: '1px solid var(--border)',
+              borderRadius: 12, padding: '16px',
+              borderTop: `3px solid ${color}`,
+            }}>
+              <div style={{ fontSize: 20, marginBottom: 8 }}>{m.icon}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color, fontFamily: 'var(--C)', lineHeight: 1 }}>
+                {val != null ? `${val.toLocaleString()}${m.unit}` : 'N/A'}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{m.label}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── TABS ── */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+        {[
+          { key: 'metrics',        label: '📊 Metrics',        count: tests.length },
+          { key: 'recommendations', label: '💡 Recommendations', count: recs.length },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveSection(tab.key)}
+            style={{
+              padding: '10px 18px', border: 'none', background: 'none',
+              cursor: 'pointer', fontFamily: 'var(--D)', fontSize: 13,
+              fontWeight: 700, color: activeSection === tab.key ? 'var(--indigo2)' : 'var(--muted)',
+              borderBottom: activeSection === tab.key ? '2px solid var(--indigo2)' : '2px solid transparent',
+              marginBottom: -1, transition: 'all .18s',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}
+          >
+            {tab.label}
+            <span style={{
+              padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+              background: activeSection === tab.key ? 'var(--indigo-bg)' : 'var(--bg2)',
+              color: activeSection === tab.key ? 'var(--indigo2)' : 'var(--muted)',
+            }}>
+              {tab.count}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── METRICS TAB ── */}
+      {activeSection === 'metrics' && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+          {/* Table header */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 2fr',
+            gap: 12, padding: '12px 20px',
+            background: 'var(--bg)', borderBottom: '1px solid var(--border)',
+          }}>
+            {['Metric', 'Value', 'Threshold', 'Status', 'Distribution'].map(h => (
+              <div key={h} style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: 1.5,
+                textTransform: 'uppercase', color: 'var(--muted)',
+              }}>{h}</div>
+            ))}
+          </div>
+
+          {/* Rows grouped by section */}
+          {SECTIONS.map(sec => {
+            const secTests = bySection[sec] || [];
+            if (!secTests.length) return null;
+            return (
+              <div key={sec}>
+                <div style={{
+                  padding: '8px 20px',
+                  background: `${SECTION_COLORS[sec]}08`,
+                  borderBottom: '1px solid var(--border)',
+                  fontSize: 10, fontWeight: 700, letterSpacing: 2,
+                  textTransform: 'uppercase',
+                  color: SECTION_COLORS[sec],
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: SECTION_COLORS[sec] }} />
+                  {SECTION_LABELS[sec] || sec}
+                </div>
+                {secTests.map((test, i) => (
+                  <PerformanceMetricRow key={test.id} test={test} index={i} />
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── RECOMMENDATIONS TAB ── */}
+      {activeSection === 'recommendations' && (
+        <div>
+          {recs.length === 0 ? (
+            <div style={{
+              textAlign: 'center', padding: '60px 32px',
+              background: 'var(--card)', border: '1px solid var(--border)',
+              borderRadius: 16,
+            }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
+              <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>No recommendations!</h3>
+              <p style={{ color: 'var(--muted)', fontSize: 13 }}>
+                Your site performs well — LLaMA found no major issues.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Priority summary */}
+              <div style={{
+                display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8,
+              }}>
+                {['critical', 'high', 'medium', 'low'].map(p => {
+                  const count = recs.filter(r => r.priority === p).length;
+                  if (!count) return null;
+                  const colors = {
+                    critical: '#ef4444', high: '#f97316',
+                    medium: '#f59e0b', low: '#10b981',
+                  };
+                  return (
+                    <span key={p} style={{
+                      padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                      color: colors[p], background: `${colors[p]}12`,
+                      border: `1px solid ${colors[p]}30`,
+                      textTransform: 'capitalize',
+                    }}>
+                      {count} {p}
+                    </span>
+                  );
+                })}
+              </div>
+
+              {recs.map((rec, i) => (
+                <RecommendationCard key={i} rec={rec} index={i} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ExecutionPanel({ generation }) {
   const { t } = useLang();
@@ -1884,6 +2478,10 @@ function ExecutionPanel({ generation }) {
 
   const framework = generation?.generation?.framework || generation?.framework || 'Selenium';
   const testType  = generation?.result?.test_type     || generation?.test_type  || 'smoke';
+
+  if (testType === 'performance') {
+    return <PerformanceExecutionPanel generation={generation} />;
+  }
 
   useEffect(() => {
     if (!generation) return;
@@ -1940,6 +2538,7 @@ function ExecutionPanel({ generation }) {
   const shown = filter === 'all' ? tests : tests.filter(t => t.status === filter);
 
   const url        = generation?.generation?.url || generation?.url || '';
+  
   const loadTimeMs = generation?.generation?.load_time_ms || generation?.scraped?.load_time_ms || 0;
 
   const rateColor = rate >= 80 ? '#10B981' : rate >= 50 ? '#F59E0B' : '#EF4444';
@@ -2708,11 +3307,13 @@ function HistoryPanel({ goTo, setGeneration }) {
     else { setSortKey(key); setSortDir('desc'); }
   };
  
-  const handleView = (item) => {
+ const handleView = (item) => {
     setGeneration({
       url: item.url, framework: item.framework,
-      generation: { id: item.id, url: item.url, framework: item.framework, load_time_ms: item.load_time_ms },
+      test_type: item.test_type,
+      generation: { id: item.id, url: item.url, framework: item.framework, load_time_ms: item.load_time_ms, test_type: item.test_type },
       result: {
+        test_type:           item.test_type           || 'smoke',
         test_cases:          item.test_cases          || [],
         test_cases_selenium: item.test_cases_selenium || [],
         test_cases_cypress:  item.test_cases_cypress  || [],
@@ -2721,6 +3322,7 @@ function HistoryPanel({ goTo, setGeneration }) {
         script_playwright:   item.script_playwright   || '',
         script_cypress:      item.script_cypress      || '',
         execution_results:   item.execution_results   || [],
+        performance:         item.performance         || null,
       },
     });
     goTo('execution');

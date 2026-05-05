@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Log;
 
 class GenerationController extends Controller
 {
-    // Valid test types — single source of truth
-    private const VALID_TEST_TYPES = ['smoke', 'functional', 'regression'];
+    // ── Valid test types ─────────────────────────────────────────────────────
+    private const VALID_TEST_TYPES = ['smoke', 'functional', 'regression', 'performance'];
 
     public function generate(Request $request)
     {
@@ -19,12 +19,10 @@ class GenerationController extends Controller
 
         $request->validate([
             'url'       => 'required|url',
-            'framework' => 'nullable|in:Selenium,Cypress,Playwright,Both,All',
-            'test_type' => 'nullable|in:smoke,functional,regression',
+            'framework' => 'required|in:Selenium,Cypress,Playwright,k6',
+            'test_type' => 'nullable|in:smoke,functional,regression,performance',
         ]);
 
-        // FIX 1: Normalise casing BEFORE validate() would reject lowercase values.
-        // The validate() above already ran, so we normalise for downstream usage.
         $url       = $request->url;
         $framework = $request->framework ?? 'Selenium';
         $testType  = $request->test_type  ?? 'smoke';
@@ -53,8 +51,11 @@ class GenerationController extends Controller
         ]);
 
         try {
-            // ── Step 1: Generate tests via LLM ─────────────────────────────
-            $response = Http::timeout(120)->post('http://127.0.0.1:8001/generate', [
+            // ── Call Python AI service ───────────────────────────────────────
+            // Performance tests prennent plus de temps (mesure réelle + LLaMA)
+            $timeout = $testType === 'performance' ? 180 : 120;
+
+            $response = Http::timeout($timeout)->post('http://127.0.0.1:8001/generate', [
                 'url'       => $url,
                 'framework' => $framework,
                 'test_type' => $testType,
@@ -70,37 +71,28 @@ class GenerationController extends Controller
             $data   = $response->json();
             $result = $data['result'] ?? [];
 
-            if (!empty($result['validation_errors'])) {
-                Log::warning('[NEXTEST] Generation validation errors', [
-                    'test_type' => $testType,
-                    'errors'    => $result['validation_errors'],
-                ]);
+            // ── PERFORMANCE : traitement spécifique ──────────────────────────
+            if ($testType === 'performance') {
+                return $this->handlePerformanceResult($request, $data, $result, $url, $framework);
             }
 
+            // ── SMOKE / FUNCTIONAL / REGRESSION ─────────────────────────────
             $wasDowngraded   = $result['downgraded']       ?? false;
             $downgradeReason = $result['downgrade_reason'] ?? null;
             $executionType   = $result['execution_type']   ?? $testType;
-
-            if ($wasDowngraded) {
-                Log::info('[NEXTEST] Test type downgraded', [
-                    'requested'      => $testType,
-                    'execution_type' => $executionType,
-                    'reason'         => $downgradeReason,
-                ]);
-            }
 
             $testCases         = $result['test_cases']          ?? [];
             $testCasesSelenium = $result['test_cases_selenium'] ?? [];
             $testCasesCypress  = $result['test_cases_cypress']  ?? [];
             $script            = $result['script']              ?? '';
             $scriptSelenium    = $result['script_selenium']     ?? '';
-            $scriptPlaywright  = $result['script_playwright']   ?? '';  // FIX 2: added
+            $scriptPlaywright  = $result['script_playwright']   ?? '';
             $scriptCypress     = $result['script_cypress']      ?? '';
             $scraped           = $data['scraped']               ?? [];
             $pageType          = $result['page_type']
                               ?? ($testCases[0]['page_type'] ?? 'general');
 
-            // ── Step 2: PHP-side validation ─────────────────────────────────
+            // PHP validation
             if ($wasDowngraded) {
                 $validationResult = ['valid' => true, 'errors' => [], 'warnings' => [
                     "Test type downgraded from {$testType} to smoke: {$downgradeReason}",
@@ -110,12 +102,6 @@ class GenerationController extends Controller
             }
 
             if (!$validationResult['valid']) {
-                Log::error('[NEXTEST] PHP validation failed — aborting run', [
-                    'test_type' => $testType,
-                    'errors'    => $validationResult['errors'],
-                    'steps'     => array_column($testCases, 'action'),
-                ]);
-
                 return response()->json([
                     'error'             => 'Generated tests do not match test_type contract',
                     'validation_errors' => $validationResult['errors'],
@@ -124,24 +110,10 @@ class GenerationController extends Controller
                 ], 422);
             }
 
-            if (!empty($validationResult['warnings'])) {
-                Log::warning('[NEXTEST] Validation warnings', $validationResult['warnings']);
-            }
-
-            // ── Step 3: Execute tests ───────────────────────────────────────
-            $pass             = 0;
-            $fail             = 0;
-            $skip             = 0;
-            $rate             = 0;
+            // Execute tests
+            $pass = $fail = $skip = $rate = 0;
             $executionResults = [];
-
             $testCasesToRun = $framework === 'Both' ? $testCasesSelenium : $testCases;
-
-            Log::info('[NEXTEST] Running tests', [
-                'test_type' => $testType,
-                'count'     => count($testCasesToRun),
-                'actions'   => array_column($testCasesToRun, 'action'),
-            ]);
 
             if (!empty($testCasesToRun)) {
                 $runResponse = Http::timeout(150)->post('http://127.0.0.1:8001/run', [
@@ -151,10 +123,6 @@ class GenerationController extends Controller
                     'test_type'  => $testType,
                 ]);
 
-                Log::info('[NEXTEST] /run response', [
-                    'status' => $runResponse->status(),
-                ]);
-
                 if ($runResponse->successful()) {
                     $runData          = $runResponse->json();
                     $pass             = $runData['pass_count'] ?? 0;
@@ -162,17 +130,13 @@ class GenerationController extends Controller
                     $skip             = $runData['skip_count'] ?? 0;
                     $rate             = $runData['pass_rate']  ?? 0;
                     $executionResults = $runData['results']    ?? [];
-                } else {
-                    Log::error('[NEXTEST] /run failed', ['body' => $runResponse->body()]);
                 }
-            } else {
-                Log::warning('[NEXTEST] No test cases to run');
             }
 
-            // ── Step 4: Persist ─────────────────────────────────────────────
+            // Persist
             $generation = Generation::create([
                 'user_id'             => auth()->id(),
-                'project_id'          => $request->project_id ?? null,  // ← AJOUTE ICI
+                'project_id'          => $request->project_id ?? null,
                 'url'                 => $url,
                 'framework'           => $framework,
                 'test_type'           => $testType,
@@ -182,7 +146,7 @@ class GenerationController extends Controller
                 'test_cases_cypress'  => $testCasesCypress,
                 'script'              => $script,
                 'script_selenium'     => $scriptSelenium,
-                'script_playwright'   => $scriptPlaywright,  // FIX 2: added
+                'script_playwright'   => $scriptPlaywright,
                 'script_cypress'      => $scriptCypress,
                 'execution_results'   => $executionResults,
                 'load_time_ms'        => $scraped['load_time_ms'] ?? 0,
@@ -203,12 +167,10 @@ class GenerationController extends Controller
                     'page_type'         => $pageType,
                     'test_type'         => $testType,
                     'execution_type'    => $executionType,
-                    'script_playwright' => $scriptPlaywright,  // FIX 2: added
+                    'script_playwright' => $scriptPlaywright,
                 ]),
                 'scraped'             => $scraped,
-                'page_type'           => $pageType,
                 'test_type'           => $testType,
-                'execution_type'      => $executionType,
                 'downgraded'          => $wasDowngraded,
                 'downgrade_reason'    => $downgradeReason,
                 'validation_warnings' => $validationResult['warnings'],
@@ -221,12 +183,87 @@ class GenerationController extends Controller
     }
 
     /**
-     * PHP-side contract validation — mirrors Python's _validate_steps().
+     * Handle performance test result specifically.
+     */
+    private function handlePerformanceResult(
+        Request $request,
+        array   $data,
+        array   $result,
+        string  $url,
+        string  $framework
+    ) {
+        $scraped      = $data['scraped']    ?? [];
+        $testCases    = $result['test_cases'] ?? [];
+        $performance  = $result['performance'] ?? [];
+
+        $pass = $performance['pass_count'] ?? 0;
+        $fail = $performance['fail_count'] ?? 0;
+        $skip = $performance['skip_count'] ?? 0;
+        $rate = ($pass + $fail) > 0
+            ? round($pass / ($pass + $fail) * 100)
+            : 0;
+
+        Log::info('[NEXTEST] Performance result', [
+            'url'          => $url,
+            'global_score' => $performance['global_score'] ?? 0,
+            'pass'         => $pass, 'fail' => $fail, 'skip' => $skip,
+        ]);
+
+        // Persist — on stocke les métriques dans execution_results
+        $generation = Generation::create([
+            'user_id'             => auth()->id(),
+            'project_id'          => $request->project_id ?? null,
+            'url'                 => $url,
+            'framework'           => $framework,
+            'test_type'           => 'performance',
+            'status'              => 'completed',
+            'test_cases'          => $testCases,
+            'test_cases_selenium' => $testCases,
+            'test_cases_cypress'  => $testCases,
+            'script'              => $result['script']            ?? '',
+            'script_selenium'     => $result['script_selenium']   ?? '',
+            'script_playwright'   => $result['script_playwright'] ?? '',
+            'script_cypress'      => $result['script_cypress']    ?? '',
+            'execution_results'   => $testCases,  // déjà avec status pass/fail
+            'load_time_ms'        => $performance['metrics']['load_time_ms'] ?? ($scraped['load_time_ms'] ?? 0),
+            'is_spa'              => $scraped['is_spa']   ?? false,
+            'pass_count'          => $pass,
+            'fail_count'          => $fail,
+            'skip_count'          => $skip,
+            'pass_rate'           => $rate,
+            'page_type'           => 'general',
+            'scraped'             => $scraped,
+            // Colonne JSON pour stocker les données performance
+            // Ajoute cette colonne dans ta migration si elle n'existe pas :
+            // $table->json('performance_data')->nullable();
+            // 'performance_data' => $performance,
+        ]);
+
+        return response()->json([
+            'message'    => 'Performance tests completed',
+            'generation' => $generation,
+            'result'     => array_merge($result, [
+                'execution_results' => $testCases,
+                'test_type'         => 'performance',
+            ]),
+            'scraped'    => $scraped,
+            'test_type'  => 'performance',
+            'performance' => $performance,
+        ]);
+    }
+
+    /**
+     * PHP-side contract validation.
      */
     private function validateTestCases(array $testCases, string $testType): array
     {
         $errors   = [];
         $warnings = [];
+
+        // Performance tests : pas de validation classique
+        if ($testType === 'performance') {
+            return ['valid' => true, 'errors' => [], 'warnings' => []];
+        }
 
         $interactionActions = ['click', 'fill', 'submit'];
         $assertionTypes     = ['url_contains', 'element_visible', 'element_exists',
@@ -243,13 +280,10 @@ class GenerationController extends Controller
             if (!empty($forbidden)) {
                 $errors[] = 'Smoke test contains forbidden actions: ' . implode(', ', $forbidden);
             }
-
         } elseif (in_array($testType, ['functional', 'regression'])) {
             $interactions = array_filter($actions, fn($a) => in_array($a, $interactionActions));
             if (empty($interactions)) {
-                $errors[] = "{$testType} test has no interactions (click/fill) — "
-                          . "this is a smoke test in disguise. "
-                          . "Actions found: " . implode(', ', array_unique($actions));
+                $errors[] = "{$testType} test has no interactions (click/fill).";
             }
 
             foreach ($testCases as $i => $step) {
@@ -258,27 +292,14 @@ class GenerationController extends Controller
                 $assertion = $step['assertion'] ?? null;
                 if (empty($assertion) || !is_array($assertion)) {
                     $errors[] = sprintf(
-                        'Step %d (%s on %s) has no assertion — '
-                        . 'every interaction must validate its outcome',
+                        'Step %d (%s on %s) has no assertion',
                         $i + 1, $step['action'], $step['selector'] ?? '?'
                     );
                 } elseif (!in_array($assertion['type'] ?? '', $assertionTypes)) {
                     $errors[] = sprintf(
-                        'Step %d has invalid assertion type "%s". Must be one of: %s',
-                        $i + 1, $assertion['type'] ?? 'null', implode(', ', $assertionTypes)
+                        'Step %d has invalid assertion type "%s"',
+                        $i + 1, $assertion['type'] ?? 'null'
                     );
-                }
-            }
-
-            if ($testType === 'regression') {
-                $assertSteps = array_filter($testCases, fn($s) => !empty($s['assertion']));
-                if (count($assertSteps) < 3) {
-                    $warnings[] = 'Regression test has ' . count($assertSteps)
-                                . ' assertions (recommended minimum: 3)';
-                }
-                if (count($testCases) < 8) {
-                    $warnings[] = 'Regression test has ' . count($testCases)
-                                . ' steps (recommended minimum: 8)';
                 }
             }
         }
@@ -290,17 +311,17 @@ class GenerationController extends Controller
         ];
     }
 
-    // ── Unchanged methods ───────────────────────────────────────────────────
+    // ── Unchanged methods ────────────────────────────────────────────────────
 
-public function index()
-{
-    $generations = Generation::where('user_id', auth()->id())
-        ->with('project:id,name')
-        ->orderBy('created_at', 'desc')
-        ->get();
+    public function index()
+    {
+        $generations = Generation::where('user_id', auth()->id())
+            ->with('project:id,name')
+            ->orderBy('created_at', 'desc')
+            ->get();
 
-    return response()->json($generations);
-}
+        return response()->json($generations);
+    }
 
     public function show($id)
     {
@@ -358,7 +379,7 @@ public function index()
                 'test_cases_cypress'  => $generation->test_cases_cypress  ?? [],
                 'script'              => $generation->script              ?? '',
                 'script_selenium'     => $generation->script_selenium     ?? '',
-                'script_playwright'   => $generation->script_playwright   ?? '',  // FIX 2: added
+                'script_playwright'   => $generation->script_playwright   ?? '',
                 'script_cypress'      => $generation->script_cypress      ?? '',
                 'execution_results'   => $generation->execution_results   ?? [],
                 'load_time_ms'        => $generation->load_time_ms,

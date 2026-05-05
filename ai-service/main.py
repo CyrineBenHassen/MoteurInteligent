@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from scraper import scrape_page
 from generator import generate_tests
+from generator_performance import generate_performance_tests
+from runner_performance import run_performance
 from analyzer import analyze_error
 from runner import run_selenium_script
 from fastapi.responses import Response
@@ -11,7 +13,7 @@ app = FastAPI(title="NexTest AI Service")
 
 @app.get("/")
 def root():
-    return {"message": "NexTest AI Service is running — v11"}
+    return {"message": "NexTest AI Service is running — v14 (Performance)"}
 
 
 @app.post("/scrape")
@@ -31,19 +33,20 @@ def generate(data: dict):
     password      = data.get("password")
     wait_time     = data.get("wait_time", 2000)
     test_type     = data.get("test_type", "smoke")
-    user_scenario = data.get("user_scenario", None)   # ← NOUVEAU : scénario utilisateur
+    user_scenario = data.get("user_scenario", None)
 
     if not url:
         return {"error": "URL is required"}
 
-    # Normalise test_type
-    valid_test_types = {"smoke", "functional", "regression"}
+    # ── Normalise test_type ──────────────────────────────────────────────────
+    valid_test_types = {"smoke", "functional", "regression", "performance"}
     test_type = test_type.lower() if test_type else "smoke"
     if test_type not in valid_test_types:
         test_type = "smoke"
 
-    print(f"[GENERATE] url={url} | framework={framework} | test_type={test_type} | scenario={bool(user_scenario)}")
+    print(f"[GENERATE] url={url} | framework={framework} | test_type={test_type}")
 
+    # ── Scrape the page ──────────────────────────────────────────────────────
     scraped = scrape_page(url, wait_time=wait_time)
 
     if "error" in scraped:
@@ -60,13 +63,41 @@ def generate(data: dict):
             }
         }
 
+    # ── PERFORMANCE : chemin dédié ───────────────────────────────────────────
+    if test_type == "performance":
+        print(f"[GENERATE] Performance test | framework={framework} | url={url}")
+
+        if framework == "k6":
+            # ── K6 : Load Test ───────────────────────────────────────────
+            from runner_performance import run_k6_performance
+            result = run_k6_performance(url, scraped)
+
+        else:
+            # ── PLAYWRIGHT : Web Vitals ──────────────────────────────────
+            metrics = run_performance(url)
+            result  = generate_performance_tests(
+                scraped=scraped,
+                framework=framework,
+                metrics=metrics,
+            )
+
+        return {
+            "url":           url,
+            "framework":     framework,
+            "test_type":     "performance",
+            "user_scenario": "",
+            "scraped":       scraped,
+            "result":        result,
+        }
+
+    # ── SMOKE / FUNCTIONAL / REGRESSION : chemin classique ──────────────────
     result = generate_tests(
         scraped,
         framework,
         username,
         password,
         test_type=test_type,
-        user_scenario=user_scenario,   # ← NOUVEAU
+        user_scenario=user_scenario,
     )
 
     return {
@@ -86,9 +117,25 @@ def run_tests(data: dict):
     test_cases = data.get("test_cases", [])
     test_type  = data.get("test_type", "smoke")
 
-    print(f"[RUN] script len={len(script)} | test_cases count={len(test_cases)} | framework={framework} | test_type={test_type}")
-    if test_cases:
-        print(f"[RUN] first step = {test_cases[0]}")
+    print(f"[RUN] test_cases={len(test_cases)} | framework={framework} | test_type={test_type}")
+
+    # Performance tests — résultats déjà dans test_cases, pas de re-run
+    if test_type == "performance":
+        pass_count = sum(1 for tc in test_cases if tc.get("status") == "pass")
+        fail_count = sum(1 for tc in test_cases if tc.get("status") == "fail")
+        skip_count = sum(1 for tc in test_cases if tc.get("status") == "skip")
+        executed   = pass_count + fail_count
+        pass_rate  = round(pass_count / executed * 100) if executed else 0
+        return {
+            "results":    test_cases,
+            "pass_count": pass_count,
+            "fail_count": fail_count,
+            "skip_count": skip_count,
+            "pass_rate":  pass_rate,
+            "total":      len(test_cases),
+            "duration_s": 0,
+            "raw_output": "",
+        }
 
     if not script and not test_cases:
         return {"error": "script or test_cases is required"}
@@ -111,20 +158,15 @@ def analyze(data: dict):
         return {"error": "script is required"}
 
     result = analyze_error(error, script, framework)
+    return {"framework": framework, "original_error": error, "analysis": result}
 
-    return {
-        "framework":      framework,
-        "original_error": error,
-        "analysis":       result,
-    }
-    
-    
+
 @app.post("/chat")
 def chat(data: dict):
-    message  = data.get("message", "")
-    lang     = data.get("lang", "fr")
-    history  = data.get("history", [])
-    
+    message = data.get("message", "")
+    lang    = data.get("lang", "fr")
+    history = data.get("history", [])
+
     if not message:
         return {"error": "message is required"}
 
@@ -132,43 +174,16 @@ def chat(data: dict):
         "Tu es l'assistant IA de NexTest, un outil de génération automatique de tests web.\n"
         "NexTest utilise LLaMA 3 via Groq pour analyser les pages web et générer des scripts de test.\n\n"
         "FONCTIONNALITÉS DE NEXTEST :\n"
-        "- Scraping automatique du DOM (inputs, boutons, nav, forms, footer, hero...)\n"
+        "- Scraping automatique du DOM\n"
         "- Génération par sections : header, hero, search, forms, content, footer, workflow\n"
-        "- Frameworks : Selenium (.py), Playwright (.py), Cypress (.js), Both (les 3)\n"
-        "- Types de tests : smoke (~30s), functional (~1min), regression (~3min), unit, security (~5min)\n"
-        "- Projets Public (web apps) ou Internal (APIs, microservices)\n"
-        "- Assertions : url_contains, element_visible, text_contains, input_value, element_not_visible\n"
-        "- Export rapports : CSV, HTML, PDF\n"
-        "- Historique des générations avec pass rate\n\n"
-        "WORKFLOW NEXTEST :\n"
-        "1. Projects → créer un projet (Public ou Internal)\n"
-        "2. Ajouter une page (URL cible)\n"
-        "3. Cliquer Generate → choisir test type + framework\n"
-        "4. Voir les résultats dans Test Execution\n"
-        "5. Télécharger le rapport ou le script\n\n"
+        "- Frameworks : Selenium (.py), Playwright (.py), Cypress (.js), Both\n"
+        "- Types de tests : smoke, functional, regression, performance\n"
+        "- Performance : mesure LCP, FCP, TTI, Load Time, DOM Size, Resource Size\n"
+        "- Score global Lighthouse-style (0-100) + recommandations LLaMA\n"
+        "- Projets Public ou Internal\n"
+        "- Export rapports : CSV, HTML, PDF\n\n"
         f"Réponds {'en français' if lang == 'fr' else 'in English'}, "
-        "de manière concise. Utilise **gras** pour les termes importants. "
-        "Max 5 phrases sauf si besoin de plus."
-    ) if lang == 'fr' else (
-        "You are the AI assistant for NexTest, an automated web test generation tool.\n"
-        "NexTest uses LLaMA 3 via Groq to analyze web pages and generate test scripts.\n\n"
-        "NEXTEST FEATURES:\n"
-        "- Automatic DOM scraping (inputs, buttons, nav, forms, footer, hero...)\n"
-        "- Section-based generation: header, hero, search, forms, content, footer, workflow\n"
-        "- Frameworks: Selenium (.py), Playwright (.py), Cypress (.js), Both (all 3)\n"
-        "- Test types: smoke (~30s), functional (~1min), regression (~3min), unit, security (~5min)\n"
-        "- Public projects (web apps) or Internal (APIs, microservices)\n"
-        "- Assertions: url_contains, element_visible, text_contains, input_value, element_not_visible\n"
-        "- Export reports: CSV, HTML, PDF\n"
-        "- Generation history with pass rate\n\n"
-        "NEXTEST WORKFLOW:\n"
-        "1. Projects → create a project (Public or Internal)\n"
-        "2. Add a page (target URL)\n"
-        "3. Click Generate → choose test type + framework\n"
-        "4. See results in Test Execution\n"
-        "5. Download report or script\n\n"
-        "Respond in English, concisely. Use **bold** for important terms. "
-        "Max 5 sentences unless more is needed."
+        "de manière concise. Max 5 phrases."
     )
 
     messages = [
@@ -182,21 +197,21 @@ def chat(data: dict):
         from dotenv import load_dotenv
         import os
         load_dotenv()
-        
+
         groq_client = OpenAI(
             base_url="https://api.groq.com/openai/v1",
             api_key=os.getenv("GROQ_API_KEY"),
         )
-        
+
         resp = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=messages,
             temperature=0.7,
             max_tokens=1000,
         )
-        
+
         return {"reply": resp.choices[0].message.content.strip()}
-    
+
     except Exception as e:
         return {"error": str(e)}
 
