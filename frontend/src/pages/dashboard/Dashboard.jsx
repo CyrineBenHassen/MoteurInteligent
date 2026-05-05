@@ -1575,18 +1575,61 @@ const [fw,  setFw]  = useState('');
       <div className="p-header" style={{ marginBottom: 32 }}>
         <div>
           {project && (
-            <div className="gen-project-crumb">
-              <span className={`gen-project-type-dot ${project.type}`} />
-              <span className="gen-project-name">{project.name}</span>
-              <span className="gen-project-type-badge" data-type={project.type}>
-                {project.type === 'internal' ? '🔒 Internal' : '🌐 Public'}
-              </span>
-            </div>
-          )}
-          <h1 className="p-title">
-            New <span className="g">Generation</span>
-          </h1>
-          <p className="p-sub">{t('generateDesc')}</p>
+  <div style={{ marginBottom: 8 }}>
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '5px 12px',
+      background: 'rgba(99,102,241,.08)',
+      border: '1px solid rgba(99,102,241,.2)',
+      borderRadius: 20, marginBottom: 14,
+    }}>
+      <span style={{
+        width: 7, height: 7, borderRadius: '50%',
+        background: '#6366f1', display: 'inline-block',
+      }} />
+      <span style={{
+        fontSize: 10, fontWeight: 700, letterSpacing: 1.5,
+        textTransform: 'uppercase', color: '#6366f1',
+      }}>
+        New Generation
+      </span>
+    </div>
+  </div>
+)}
+<h1 className="p-title">
+  New <span className="g">Generation</span>
+</h1>
+{project && (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '5px 12px', borderRadius: 20,
+      background: 'var(--card)', border: '1px solid var(--border)',
+      fontSize: 12, color: 'var(--muted)',
+    }}>
+      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>
+      {project.name}
+    </div>
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '5px 12px', borderRadius: 20,
+      background: isInternal ? 'rgba(139,92,246,.1)' : 'rgba(79,134,232,.1)',
+      border: `1px solid ${isInternal ? 'rgba(139,92,246,.25)' : 'rgba(79,134,232,.25)'}`,
+      fontSize: 12, fontWeight: 700,
+      color: isInternal ? '#8b5cf6' : '#4f86e8',
+    }}>
+      <span style={{
+        width: 7, height: 7, borderRadius: '50%',
+        background: isInternal ? '#8b5cf6' : '#4f86e8',
+      }} />
+      {isInternal ? 'Internal' : 'Public'}
+    </div>
+  </div>
+)}
+<p className="p-sub" style={{ marginTop: 8 }}>{t('generateDesc')}</p>
         </div>
         {isReady && (
           <div className="gp-ready-badge">
@@ -2426,7 +2469,6 @@ const FW_CONFIG = {
   Selenium:   { color: '#43B02A', bg: 'rgba(67,176,42,.12)',  border: 'rgba(67,176,42,.3)',  letters: 'Se' },
   Cypress:    { color: '#00BFA5', bg: 'rgba(0,191,165,.12)',  border: 'rgba(0,191,165,.3)',  letters: 'Cy' },
   Playwright: { color: '#E2574C', bg: 'rgba(226,87,76,.12)',  border: 'rgba(226,87,76,.3)',  letters: 'Pl' },
-  Both:       { color: '#C9A227', bg: 'rgba(201,162,39,.12)', border: 'rgba(201,162,39,.3)', letters: '∞'  },
 };
  
 const TYPE_CONFIG = {
@@ -2784,7 +2826,7 @@ function HistoryPanel({ goTo, setGeneration }) {
   ))}
 </select>
           <div className="hp2-filters">
-            {['all', 'Selenium', 'Cypress', 'Playwright', 'Both'].map(fw => {
+            {['all', 'Selenium', 'Cypress', 'Playwright'].map(fw => {
               const conf = FW_CONFIG[fw];
               return (
                 <button key={fw}
