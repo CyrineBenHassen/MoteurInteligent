@@ -29,6 +29,7 @@ class Generation extends Model
         'pass_rate',
         'page_type',
         'scraped',
+        'performance_data',
     ];
 
     protected $casts = [
@@ -38,6 +39,7 @@ class Generation extends Model
         'execution_results'   => 'array',
         'scraped'             => 'array',
         'is_spa'              => 'boolean',
+        'performance_data' => 'array',
     ];
 
     public function user()

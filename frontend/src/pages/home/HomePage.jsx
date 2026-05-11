@@ -380,7 +380,7 @@ export default function HomePage() {
       <div className="band">
         <div className="band__inner">
           <span className="band__label">Built with</span>
-          {['React', 'Laravel', 'FastAPI', 'StarCoder2', 'PostgreSQL', 'Selenium', 'Cypress', 'Playwright'].map(item => (
+          {['React', 'Laravel', 'FastAPI', 'GROQ', 'LLAMA3', 'PostgreSQL', 'Selenium', 'Cypress', 'Playwright', 'K6'].map(item => (
             <span key={item} className="band__item">{item}</span>
           ))}
         </div>

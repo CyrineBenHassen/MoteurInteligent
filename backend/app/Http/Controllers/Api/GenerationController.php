@@ -7,6 +7,7 @@ use App\Models\Generation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use App\Models\Project;
 
 class GenerationController extends Controller
 {
@@ -233,10 +234,7 @@ class GenerationController extends Controller
             'pass_rate'           => $rate,
             'page_type'           => 'general',
             'scraped'             => $scraped,
-            // Colonne JSON pour stocker les données performance
-            // Ajoute cette colonne dans ta migration si elle n'existe pas :
-            // $table->json('performance_data')->nullable();
-            // 'performance_data' => $performance,
+            'performance_data' => $performance,
         ]);
 
         return response()->json([
@@ -249,6 +247,8 @@ class GenerationController extends Controller
             'scraped'    => $scraped,
             'test_type'  => 'performance',
             'performance' => $performance,
+            'framework'   => $framework,              // ← AJOUTE ICI
+             'url'         => $url,
         ]);
     }
 
@@ -312,16 +312,14 @@ class GenerationController extends Controller
     }
 
     // ── Unchanged methods ────────────────────────────────────────────────────
+public function index()
+{
+    $generations = Generation::where('user_id', auth()->id())
+        ->orderBy('created_at', 'desc')
+        ->get();
 
-    public function index()
-    {
-        $generations = Generation::where('user_id', auth()->id())
-            ->with('project:id,name')
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return response()->json($generations);
-    }
+    return response()->json($generations);
+}
 
     public function show($id)
     {

@@ -8,25 +8,30 @@ use Illuminate\Http\Request;
 
 class ProjectController extends Controller
 {
+
 public function index()
 {
     $projects = Project::where('user_id', auth()->id())
+        ->withCount('generations')  // ← c'est tout ce qu'il manque
         ->orderBy('created_at', 'desc')
         ->get();
 
     return response()->json($projects);
 }
 
-    public function store(Request $request)
-    {
-        $project = Project::create([
-            'user_id'     => auth()->id(),
-            'name'        => $request->name,
-            'type'        => $request->type,
-            'description' => $request->description,
-        ]);
-        return response()->json($project, 201);
-    }
+public function store(Request $request)
+{
+    $project = Project::create([
+        'user_id'     => auth()->id(),
+        'name'        => $request->name,
+        'type'        => $request->type,
+        'description' => $request->description,
+    ]);
+
+    $project->loadCount('generations');  // ← déjà présent chez toi, bien
+
+    return response()->json($project, 201);
+}
 
     public function destroy($id)
     {

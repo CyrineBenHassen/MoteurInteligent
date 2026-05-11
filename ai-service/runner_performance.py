@@ -7,7 +7,7 @@ import os
 import json
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
-_NAV_TIMEOUT  = 45_000
+_NAV_TIMEOUT  = 90_000
 _WAIT_TIMEOUT = 15_000
 
 
