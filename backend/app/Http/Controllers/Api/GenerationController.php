@@ -117,7 +117,7 @@ class GenerationController extends Controller
             $testCasesToRun = $framework === 'Both' ? $testCasesSelenium : $testCases;
 
             if (!empty($testCasesToRun)) {
-                $runResponse = Http::timeout(150)->post('http://127.0.0.1:8001/run', [
+                $runResponse = Http::timeout(300)->post('http://127.0.0.1:8001/run', [
                     'script'     => $framework === 'Both' ? $scriptSelenium : $script,
                     'framework'  => 'Selenium',
                     'test_cases' => $testCasesToRun,

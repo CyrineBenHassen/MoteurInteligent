@@ -154,46 +154,46 @@ const FEATURES = [
   {
     icon: '🧠',
     tag: 'Generative AI',
-    title: 'Intelligent DOM Analysis',
-    desc: 'The engine automatically scans your application\'s DOM structure — forms, buttons, fields, links — with zero manual configuration required.',
+    title: 'AI-Powered Analysis',
+    desc: 'Automatically scans application interfaces, detects interactive elements, and prepares intelligent test scenarios.',
   },
   {
     icon: '⚡',
     tag: 'Speed',
-    title: 'Generation in Under 3s',
-    desc: 'Dozens of functional test cases generated in seconds: happy paths, edge cases, authentication flows, and error scenarios — all at once.',
+    title: 'Fast Test Generation',
+    desc: 'Generate automated test cases within seconds, including user flows, validations, and edge cases.',
   },
   {
     icon: '🎯',
     tag: 'Export',
-    title: 'Multi-Framework Scripts',
-    desc: 'Clean, production-ready scripts for Selenium, Cypress, and Playwright. Drop them directly into your CI/CD pipeline with zero post-processing.',
+    title: 'Multi-Framework Support',
+    desc: 'Export ready-to-use scripts for Selenium, Cypress, and Playwright with seamless CI/CD integration.',
   },
   {
     icon: '🛡️',
     tag: 'Quality',
-    title: 'Full Functional Coverage',
-    desc: 'The AI surfaces boundary conditions and accessibility scenarios that your manual process would consistently miss every single time.',
+    title: 'Comprehensive Testing',
+    desc: 'Support multiple testing types including functional, UI, regression, and performance testing.',
   },
   {
     icon: '🔄',
     tag: 'Reliability',
-    title: 'Self-Adapting Tests',
-    desc: 'UI changed? The engine detects the diff and regenerates only the affected tests — keeping your suite green and up-to-date automatically.',
+    title: 'Smart Adaptation',
+    desc: 'Automatically detects interface changes and updates affected test scenarios dynamically.',
   },
   {
     icon: '📊',
     tag: 'Reports',
-    title: 'Reports & History',
-    desc: 'View and download detailed reports. Track your analysis history and manage everything from your personal dashboard and notifications.',
+    title: 'Reports & Insights',
+    desc: 'Access smart recommendations, reports, alerts, history, and generated test scripts from a centralized dashboard.',
   },
 ];
 
 const STEPS = [
-  { n: '01', icon: '🔗', title: 'Provide a URL',         desc: 'Paste any web application URL — production, staging, or localhost via tunnel. The engine handles everything else.' },
-  { n: '02', icon: '🤖', title: 'AI Maps the Interface', desc: 'Every interactive element, flow, and application state is scanned and modeled by the AI engine within seconds.' },
-  { n: '03', icon: '📋', title: 'Review Test Scenarios',  desc: 'Read generated test cases written in plain language. Edit or approve them with a single click.' },
-  { n: '04', icon: '🚀', title: 'Export & Integrate',     desc: 'Download your Selenium, Cypress or Playwright scripts. Plug them into GitHub Actions, GitLab CI, or Jenkins seamlessly.' },
+  { n: '01', icon: '🔗', title: 'Provide a URL',         desc: 'Enter a public or internal web application URL to start the automated testing process.'},
+  { n: '02', icon: '🤖', title: 'AI Analyzes the Application', desc: 'The system scans the interface, detects interactive elements, pages, and user flows automatically.' },
+  { n: '03', icon: '🧪', title: 'Generate & Execute Automated Tests',  desc: 'Run different types of automated tests including smoke, functional, regression, UI, and performance testing directly from the dashboard.' },
+  { n: '04', icon: '🚀', title: 'Smart Recommendations, Reports & Script Generation',     desc: 'Receive intelligent recommendations, detailed reports, execution history and automatically generated test scripts to improve application quality.' },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -490,7 +490,7 @@ export default function HomePage() {
             {[
               {icon:'🔒', text:'Secured user data'},
               {icon:'⚡', text:'99.9% uptime SLA'},
-              {icon:'🤖', text:'Open-source AI (StarCoder2)'},
+              {icon:'🤖', text:'Open-source AI (LLam3)'},
             ].map(x => (
               <span key={x.text} className="ctrust">{x.icon} {x.text}</span>
             ))}

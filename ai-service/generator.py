@@ -151,14 +151,31 @@ def _extract_sections(scraped: dict) -> dict:
 
     # Lang switch
     for ls in scraped.get("lang_switcher", []):
-        css = ls.get("css_selector", "").strip()
+        hreflang = ls.get("hreflang", "").strip()
+        href     = ls.get("href", "").strip()
+        text     = ls.get("text", hreflang or "lang").strip()
+ 
+        # Build the best possible selector
+        if hreflang:
+            css = f"a[hreflang='{hreflang}']"
+        elif href and "#pll_switcher" not in href:
+            slug = href.rstrip("/").split("/")[-1]
+            css  = f"a[href*='/{slug}/']" if slug else ""
+        else:
+            # Skip #pll_switcher anchors — they open a dropdown, not navigate
+            continue
+ 
+        OPTIONAL_LANGS = {"en", "de", "it", "pt", "zh", "ja", "ru", "es"}
+
         if css:
             _add("header", {
-                "css":     css,
-                "text":    ls.get("text", ls.get("hreflang", "lang")),
-                "type":    "lang_switch",
-                "section": "header",
-                "priority":"medium",
+                "css":      css,
+                "text":     text,
+                "hreflang": hreflang,
+                "type":     "lang_switch",
+                "section":  "header",
+                "priority": "medium",
+                "optional": hreflang.lower() in OPTIONAL_LANGS,
             })
 
     # ── HERO: hero/banner buttons and CTAs ───────────────────────────────────
@@ -556,13 +573,18 @@ def _generate_section_steps(
     # Section-specific strategy instructions
     strategies = {
         "header": (
-            "SECTION: HEADER / NAVBAR\n"
-            "For EACH nav link:\n"
-            "  - Step A: check_visible (assertion: null)\n"
-            "  - Step B: click → assert url_contains the slug\n"
-            "For logo: check_visible (assertion: null)\n"
-            "For lang_switch: click → assert url_contains a lang code\n"
-        ),
+    "SECTION: HEADER / NAVBAR\n"
+    "For EACH nav link:\n"
+    "  - Step A: check_visible (assertion: null)\n"
+    "  - Step B: click → assert url_contains the slug\n"
+    "For logo: check_visible (assertion: null)\n"
+    "For lang_switch:\n"
+    "  - Step A: check_visible (assertion: null)\n"
+    "  - Step B: click → assert url_contains the hreflang code\n"
+    "    IMPORTANT: use selector a[hreflang='xx'] NOT a[href*='#pll_switcher']\n"
+    "    The assertion value must be the lang code e.g. 'fr', 'ar', 'en'\n"
+    "    If the lang is already the current page lang, skip the click step\n"
+),
         "hero": (
             "SECTION: HERO / BANNER\n"
             "For hero sections: check_visible (assertion: null)\n"

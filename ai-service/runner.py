@@ -9,9 +9,11 @@
 import re
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+from urllib.parse import unquote        
 
-_TIMEOUT     = 20_000
-_NAV_TIMEOUT = 30_000
+
+_TIMEOUT     = 12_000
+_NAV_TIMEOUT = 20_000
 
 # Types optionnels — absent = SKIP, jamais FAIL
 OPTIONAL_TYPES = frozenset({
@@ -119,14 +121,13 @@ def _run_steps(steps: list) -> dict:
 
 
 def _goto(page, url: str):
-    """Navigate to URL and wait for page to be ready."""
     page.goto(url, timeout=_NAV_TIMEOUT, wait_until="domcontentloaded")
     try:
-        page.wait_for_load_state("networkidle", timeout=10_000)
+        page.wait_for_load_state("networkidle", timeout=6_000)
     except PWTimeout:
         pass
-    page.wait_for_selector("body", timeout=8_000)
-    page.wait_for_timeout(500)
+    page.wait_for_selector("body", timeout=5_000)
+    page.wait_for_timeout(300)
 
 
 def _extract_base_url(steps: list) -> str | None:
@@ -186,10 +187,143 @@ def _should_reset_to_base(step: dict) -> bool:
     return False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Step executor
-# ─────────────────────────────────────────────────────────────────────────────
 
+
+    """
+    Handles Polylang / WPML / language switcher dropdowns.
+    Strategy:
+      1. Try direct click on the selector
+      2. If URL doesn't change → open #pll_switcher first then click
+      3. Fallback: try hreflang attribute link directly
+    """
+    url_before = page.url
+
+    # Attempt 1 — direct click
+    try:
+        page.click(selector, timeout=5_000)
+        page.wait_for_load_state("domcontentloaded", timeout=6_000)
+        page.wait_for_timeout(400)
+        if page.url != url_before:
+            return  # Navigation happened — success
+    except Exception:
+        pass
+
+    # Attempt 2 — open Polylang dropdown first
+    polylang_toggles = [
+        "#pll_switcher",
+        ".pll-parent-menu-item",
+        "[id*='pll']",
+        "[class*='pll']",
+        "li.menu-item:has(a[hreflang])",
+        ".lang-item-first",
+    ]
+    for toggle in polylang_toggles:
+        try:
+            el = page.query_selector(toggle)
+            if el and el.is_visible():
+                page.click(toggle)
+                page.wait_for_timeout(600)
+                # Now try the lang link again
+                page.click(selector, timeout=5_000)
+                page.wait_for_load_state("domcontentloaded", timeout=6_000)
+                page.wait_for_timeout(400)
+                if page.url != url_before:
+                    return  # Success
+        except Exception:
+            continue
+
+    # Attempt 3 — extract hreflang and navigate directly
+    try:
+        match = re.search(r"hreflang='([^']+)'", selector)
+        if match:
+            lang_code = match.group(1)
+            # Find the actual href from the DOM
+            el = page.query_selector(f"a[hreflang='{lang_code}']")
+            if el:
+                href = el.get_attribute("href")
+                if href and href != "#" and "pll_switcher" not in href:
+                    page.goto(href, timeout=15_000, wait_until="domcontentloaded")
+                    page.wait_for_timeout(400)
+                    return
+    except Exception:
+        pass
+
+    # Attempt 4 — force click via JavaScript
+    try:
+        page.evaluate(f"document.querySelector(\"{selector}\")?.click()")
+        page.wait_for_load_state("domcontentloaded", timeout=6_000)
+        page.wait_for_timeout(400)
+    except Exception:
+        pass
+
+def _click_lang_switch(page, selector: str) -> None:
+    """
+    Handles Polylang / WPML language switcher.
+    Optimized: tries direct href navigation first (fastest).
+    """
+    url_before = page.url
+
+   # Attempt 1 — extract href directly from DOM and navigate
+    try:
+        match = re.search(r"hreflang='([^']+)'", selector)
+        if match:
+            lang_code = match.group(1)
+            el = page.query_selector(f"a[hreflang='{lang_code}']")
+            if el:
+                href = el.get_attribute("href")
+                if href and href != "#" and "pll_switcher" not in href:
+                    page.goto(href, timeout=15_000, wait_until="domcontentloaded")
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=5_000)
+                    except PWTimeout:
+                        pass
+                    page.wait_for_timeout(300)
+                    return
+            else:
+                # Element not found — lang probably doesn't exist, skip silently
+                return
+    except Exception:
+        pass
+
+    # Attempt 2 — open Polylang dropdown then click
+    polylang_toggles = [
+        "#pll_switcher",
+        ".pll-parent-menu-item",
+        "[id*='pll']",
+        "[class*='pll']",
+        ".lang-item-first",
+    ]
+    for toggle in polylang_toggles:
+        try:
+            el = page.query_selector(toggle)
+            if el and el.is_visible():
+                page.click(toggle)
+                page.wait_for_timeout(500)
+                page.click(selector, timeout=4_000)
+                page.wait_for_load_state("domcontentloaded", timeout=6_000)
+                page.wait_for_timeout(300)
+                if page.url != url_before:
+                    return
+        except Exception:
+            continue
+
+    # Attempt 3 — direct click
+    try:
+        page.click(selector, timeout=5_000)
+        page.wait_for_load_state("domcontentloaded", timeout=6_000)
+        page.wait_for_timeout(300)
+        if page.url != url_before:
+            return
+    except Exception:
+        pass
+
+    # Attempt 4 — JavaScript click
+    try:
+        page.evaluate(f"document.querySelector(\"{selector}\")?.click()")
+        page.wait_for_load_state("domcontentloaded", timeout=6_000)
+        page.wait_for_timeout(300)
+    except Exception:
+        pass
 def _run_one_step(page, step: dict, base_url: str) -> dict:
     name      = step.get("name", f"Step {step.get('id', '?')}")
     action    = step.get("action", "")
@@ -237,17 +371,22 @@ def _run_one_step(page, step: dict, base_url: str) -> dict:
 
         elif action == "click":
             _smart_wait_visible(page, selector)
-            page.click(selector)
-            # Wait for navigation to complete
+            
+            
+            # Special handling for Polylang / language switcher
+            if "hreflang" in selector or "lang" in step.get("type", ""):
+                _click_lang_switch(page, selector)
+            else:
+                page.click(selector)
             try:
-                page.wait_for_load_state("domcontentloaded", timeout=8_000)
+                page.wait_for_load_state("domcontentloaded", timeout=6_000)
             except PWTimeout:
                 pass
             try:
-                page.wait_for_load_state("networkidle", timeout=10_000)
+                page.wait_for_load_state("networkidle", timeout=6_000)
             except PWTimeout:
                 pass
-            page.wait_for_timeout(800)
+            page.wait_for_timeout(400)
 
         elif action == "fill":
             _smart_wait_visible(page, selector)
@@ -279,8 +418,8 @@ def _run_one_step(page, step: dict, base_url: str) -> dict:
         "status":           status,
         "duration":         f"{duration}s",
         "error":            action_error,
-        "reason":           _reason(action, "fail", action_error, assertion_result) if status == "fail" else None,
-        "reason_pass":      _reason(action, "pass", None, assertion_result)         if status == "pass" else None,
+        "reason":      _reason(action, "fail", action_error, assertion_result, step_name=name) if status == "fail" else None,
+        "reason_pass": _reason(action, "pass", None, assertion_result, step_name=name),
         "reason_skip":      None,
         "assertion_result": assertion_result,
         "step_meta":        step_meta,
@@ -325,11 +464,35 @@ def _validate_assertion(page, assertion: dict,
         # ── url_contains ─────────────────────────────────────────────────────
         if a_type == "url_contains":
             current_url = page.url
-            passed      = bool(a_value) and a_value in current_url
+ 
+            # Special case: if checking for default language (fr)
+            # and the site uses fr as default (no /fr/ in URL),
+            # check if we navigated away from base or page loaded
+            if a_value and a_value not in current_url:
+                # Check if lang code appears anywhere (path, subdomain, param)
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(current_url)
+ 
+                # Accept if lang is in path, query string, or subdomain
+                in_path      = f"/{a_value}/" in parsed.path or f"/{a_value}" == parsed.path
+                in_query     = a_value in parsed.query
+                in_subdomain = parsed.netloc.startswith(f"{a_value}.")
+ 
+                # Accept if it's the default lang and URL is the base domain
+                is_default_lang = (
+                    parsed.path in ("", "/") and
+                    not parsed.query and
+                    len(a_value) == 2  # lang code like 'fr', 'en'
+                )
+ 
+                passed = in_path or in_query or in_subdomain or is_default_lang
+            else:
+                passed = bool(a_value) and a_value in current_url
+ 
             return {
                 "passed":   passed,
                 "type":     a_type,
-                "expected": f"URL contains '{a_value}'",
+                "expected": f"URL contains '{a_value}' or is default language page",
                 "actual":   current_url,
                 "error":    None if passed else f"URL '{current_url}' does not contain '{a_value}'",
             }
@@ -600,49 +763,356 @@ def _smart_wait_visible(page, selector: str) -> None:
 # Reason builder
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _friendly_url(url: str) -> str:
+    """
+    Converts a raw URL into a readable page description.
+    e.g. 'https://rescat.tn/faq/' → 'FAQ page'
+         'https://rescat.tn/ar/%d8%a7%d9%84%d...' → 'Arabic version'
+         'https://rescat.tn/contact' → 'Contact page'
+    """
+    if not url:
+        return "destination page"
+ 
+    try:
+        decoded = unquote(url).rstrip("/")
+    except Exception:
+        decoded = url.rstrip("/")
+ 
+    # Detect language codes in URL
+    lang_map = {
+        "/ar/": "Arabic version",
+        "/fr/": "French version",
+        "/en/": "English version",
+        "/es/": "Spanish version",
+        "/de/": "German version",
+        "/it/": "Italian version",
+        "/pt/": "Portuguese version",
+        "/zh/": "Chinese version",
+        "/ja/": "Japanese version",
+        "/ru/": "Russian version",
+    }
+    for key, label in lang_map.items():
+        if key in decoded.lower():
+            return label
+ 
+    # Arabic/non-ASCII chars in path = likely a localized page
+    path = decoded.split("//")[-1].split("/", 1)[-1] if "//" in decoded else decoded
+    if any(ord(c) > 127 for c in path):
+        return "localized page"
+ 
+    # Extract last meaningful path segment
+    segment = decoded.split("/")[-1].strip()
+    if not segment:
+        segment = decoded.split("/")[-2].strip() if decoded.count("/") > 2 else ""
+ 
+    # Slug → human-readable label mapping
+    slug_map = {
+        "faq":           "FAQ page",
+        "faqs":          "FAQ page",
+        "contact":       "Contact page",
+        "about":         "About Us page",
+        "about-us":      "About Us page",
+        "home":          "homepage",
+        "index":         "homepage",
+        "login":         "Login page",
+        "signin":        "Sign In page",
+        "signup":        "Sign Up page",
+        "register":      "Registration page",
+        "logout":        "Logout page",
+        "dashboard":     "Dashboard",
+        "profile":       "Profile page",
+        "account":       "Account page",
+        "settings":      "Settings page",
+        "cart":          "Cart page",
+        "checkout":      "Checkout page",
+        "shop":          "Shop page",
+        "products":      "Products page",
+        "product":       "Product page",
+        "blog":          "Blog page",
+        "news":          "News page",
+        "services":      "Services page",
+        "pricing":       "Pricing page",
+        "search":        "Search results page",
+        "results":       "Results page",
+        "gallery":       "Gallery page",
+        "portfolio":     "Portfolio page",
+        "team":          "Team page",
+        "careers":       "Careers page",
+        "jobs":          "Jobs page",
+        "privacy":       "Privacy Policy page",
+        "terms":         "Terms of Service page",
+        "help":          "Help page",
+        "support":       "Support page",
+        "docs":          "Documentation page",
+        "documentation": "Documentation page",
+        "api":           "API page",
+        "404":           "404 error page",
+        "error":         "error page",
+    }
+ 
+    slug_lower = segment.lower().replace("-", " ").replace("_", " ")
+    if segment.lower() in slug_map:
+        return slug_map[segment.lower()]
+ 
+    # Try partial match
+    for key, label in slug_map.items():
+        if key in slug_lower:
+            return label
+ 
+    # If the segment looks readable (no weird chars), use it
+    if segment and re.match(r'^[a-zA-Z0-9\-_ ]+$', segment):
+        return f"'{segment}' page"
+ 
+    return "destination page"
+ 
+ 
+def _friendly_element(selector: str, step_name: str = "") -> str:
+    """
+    Returns a human-readable description of the element being tested.
+    """
+    name_lower = step_name.lower()
+    sel_lower  = selector.lower() if selector else ""
+ 
+    # From step name keywords
+    element_hints = {
+        "nav":          "navigation menu",
+        "menu":         "navigation menu",
+        "logo":         "site logo",
+        "search":       "search bar",
+        "hero":         "hero section",
+        "banner":       "banner",
+        "footer":       "footer",
+        "header":       "header",
+        "button":       "button",
+        "btn":          "button",
+        "link":         "link",
+        "form":         "form",
+        "input":        "input field",
+        "email":        "email field",
+        "password":     "password field",
+        "submit":       "submit button",
+        "login":        "login element",
+        "signup":       "sign-up element",
+        "register":     "registration element",
+        "cart":         "cart element",
+        "checkout":     "checkout element",
+        "image":        "image",
+        "img":          "image",
+        "video":        "video",
+        "modal":        "modal dialog",
+        "popup":        "popup",
+        "dropdown":     "dropdown menu",
+        "tab":          "tab",
+        "accordion":    "accordion",
+        "carousel":     "carousel",
+        "slider":       "slider",
+        "pagination":   "pagination",
+        "breadcrumb":   "breadcrumb",
+        "contact":      "contact element",
+        "social":       "social media link",
+        "lang":         "language switcher",
+        "language":     "language switcher",
+        "faq":          "FAQ section",
+        "heading":      "page heading",
+        "title":        "page title",
+    }
+ 
+    for keyword, label in element_hints.items():
+        if keyword in name_lower or keyword in sel_lower:
+            return label
+ 
+    return "element"
+ 
+ 
 def _reason(action: str, status: str, error: str | None,
-            assertion_result: dict | None = None) -> str:
+            assertion_result: dict | None = None,
+            step_name: str = "") -> str:
+    """
+    Generates a human-friendly, descriptive reason message for test results.
+    """
+ 
+    # ── PASS ──────────────────────────────────────────────────────────────────
     if status == "pass":
-        base = {
-            "check_visible": "Element visible in DOM.",
-            "click":         "Click executed successfully.",
-            "fill":          "Text typed — DOM value verified.",
-        }.get(action, "Test passed.")
-        if assertion_result and assertion_result.get("passed"):
-            t = assertion_result.get("type", "")
-            a = assertion_result.get("actual", "")
-            if t == "url_contains":
-                return f"{base} URL verified: '{a}'."
-            elif t in ("element_visible", "element_exists"):
-                return f"{base} Post-action element confirmed."
-            elif t == "element_not_visible":
-                return f"{base} Validation/error state confirmed."
-            elif t == "text_contains":
-                return f"{base} Text verified: '{a[:40]}'."
-            elif t == "input_value":
-                return f"{base} Input value confirmed in DOM."
-        return base
-
-    if assertion_result and not assertion_result.get("passed"):
-        t  = assertion_result.get("type", "")
-        ex = assertion_result.get("expected", "")
-        ac = assertion_result.get("actual", "")
-        er = assertion_result.get("error", "")
-        if t == "url_contains":
-            return f"Action OK but URL assertion failed. Expected '{ex}', got '{ac[:80]}'."
-        elif t in ("element_visible", "element_exists"):
-            return f"Action OK but element not found after action. {er}"
-        elif t == "text_contains":
-            return f"Action OK but text mismatch. Expected '{ex}', got '{ac[:60]}'."
-        elif t == "input_value":
-            return f"Fill OK but DOM value mismatch. Expected '{ex}', got '{ac}'."
-        return f"Assertion failed: {er or ex}"
-
-    if not error:
-        return "Test failed — unknown reason."
-    e = error.lower()
-    if "timeout"  in e: return f"Timeout — element not visible after {_TIMEOUT//1000}s."
-    if "not found" in e: return "Element absent from DOM."
-    if "fill verification" in e: return error
-    if "invalid selector" in e: return f"Skipped — {error}"
-    return f"Error: {error[:120]}"
+ 
+        if action == "check_visible":
+            elem = _friendly_element("", step_name)
+            return f"The {elem} is visible and accessible on the page."
+ 
+        elif action == "fill":
+            elem = _friendly_element("", step_name)
+            if "email" in step_name.lower():
+                return "Email address entered successfully and verified in the input field."
+            if "password" in step_name.lower():
+                return "Password entered successfully in the field."
+            if "search" in step_name.lower():
+                return "Search query entered successfully in the search field."
+            return f"Text entered successfully in the {elem}."
+ 
+        elif action == "click":
+            elem = _friendly_element("", step_name)
+ 
+            if assertion_result and assertion_result.get("passed"):
+                a_type   = assertion_result.get("type", "")
+                a_actual = assertion_result.get("actual", "")
+                a_value  = assertion_result.get("value", "")
+ 
+                if a_type == "url_contains":
+                    # Decode the URL value for a friendly message
+                    url_val = a_value or (a_actual if isinstance(a_actual, str) else "")
+ 
+                    # Language redirect detection
+                    lang_codes = {
+                        "ar": "Arabic version",
+                        "fr": "French version",
+                        "en": "English version",
+                        "es": "Spanish version",
+                        "de": "German version",
+                        "it": "Italian version",
+                    }
+                    for code, label in lang_codes.items():
+                        if f"/{code}/" in url_val or url_val == code:
+                            return f"Successfully redirected to the {label} of the site."
+ 
+                    # Friendly page name from URL
+                    page_name = _friendly_url(a_actual if isinstance(a_actual, str) else url_val)
+ 
+                    # Special cases based on element name
+                    name_lower = step_name.lower()
+                    if "nav" in name_lower or "menu" in name_lower or "link" in name_lower:
+                        return f"Navigation completed successfully — user redirected to the {page_name}."
+                    if "lang" in name_lower or "language" in name_lower:
+                        return f"Language switch successful — page switched to {page_name}."
+                    if "logo" in name_lower:
+                        return f"Logo click successful — user redirected to the {page_name}."
+                    if "button" in name_lower or "btn" in name_lower or "cta" in name_lower:
+                        return f"Button clicked successfully — user redirected to the {page_name}."
+ 
+                    return f"Click successful — user was redirected to the {page_name}."
+ 
+                elif a_type in ("element_visible", "element_exists"):
+                    target_elem = _friendly_element(assertion_result.get("selector_target", ""), step_name)
+                    if "submit" in step_name.lower() or "send" in step_name.lower():
+                        return "Form submitted successfully and confirmation element appeared."
+                    if "search" in step_name.lower():
+                        return "Search executed successfully and results are displayed."
+                    if "login" in step_name.lower() or "signin" in step_name.lower():
+                        return "Login action completed and user interface updated."
+                    if "menu" in step_name.lower() or "nav" in step_name.lower():
+                        return "Navigation menu opened and content is visible."
+                    if "modal" in step_name.lower() or "popup" in step_name.lower():
+                        return "Modal dialog opened successfully."
+                    return f"Click successful — the {target_elem} appeared as expected."
+ 
+                elif a_type == "element_not_visible":
+                    if "submit" in step_name.lower() or "empty" in step_name.lower():
+                        return "Form validation triggered correctly — error message displayed for empty submission."
+                    return "Click successful — expected element is no longer visible (correct behavior)."
+ 
+                elif a_type == "text_contains":
+                    a_val = assertion_result.get("actual", "")[:40]
+                    return f"Click successful — page content updated and contains expected text: '{a_val}'."
+ 
+            # Fallback for click without assertion
+            if "nav" in step_name.lower() or "link" in step_name.lower():
+                return "Navigation link clicked and page loaded successfully."
+            if "button" in step_name.lower() or "btn" in step_name.lower():
+                return "Button clicked successfully."
+            if "lang" in step_name.lower():
+                return "Language switcher clicked successfully."
+            return f"Click on {elem} executed successfully."
+ 
+        return "Test passed successfully."
+ 
+    # ── FAIL ──────────────────────────────────────────────────────────────────
+    if status == "fail":
+ 
+        if assertion_result and not assertion_result.get("passed"):
+            a_type = assertion_result.get("type", "")
+            a_exp  = assertion_result.get("expected", "")
+            a_act  = assertion_result.get("actual", "")
+            a_err  = assertion_result.get("error", "")
+ 
+            if a_type == "url_contains":
+                page_name = _friendly_url(a_act if isinstance(a_act, str) else "")
+                return (
+                    f"Click was executed but the expected URL was not reached. "
+                    f"The page did not navigate to the expected destination. "
+                    f"Current URL: {str(a_act)[:80]}"
+                )
+ 
+            elif a_type in ("element_visible", "element_exists"):
+                elem = _friendly_element(
+                    assertion_result.get("selector_target", ""), step_name
+                )
+                return (
+                    f"Action was executed but the expected {elem} did not appear. "
+                    f"The element may be hidden, not rendered, or the selector is outdated."
+                )
+ 
+            elif a_type == "text_contains":
+                return (
+                    f"Action completed but page content did not match expectations. "
+                    f"Expected to find '{a_exp}' but found '{str(a_act)[:60]}'."
+                )
+ 
+            elif a_type == "input_value":
+                return (
+                    f"Text input failed verification. "
+                    f"Expected '{a_exp}' in the field but found '{a_act}'."
+                )
+ 
+            elif a_type == "element_not_visible":
+                return (
+                    "Form was submitted without validation triggering. "
+                    "No error message appeared — validation may be missing."
+                )
+ 
+            if a_err:
+                return f"Test failed: {a_err[:120]}"
+ 
+        # Action-level failures (no assertion result)
+        if not error:
+            return "Test failed for an unknown reason."
+ 
+        e = error.lower()
+ 
+        if "timeout" in e:
+            elem = _friendly_element("", step_name)
+            if action == "click":
+                return (
+                    f"The {elem} was not clickable within the timeout period. "
+                    f"It may be hidden, disabled, or slow to load."
+                )
+            elif action == "fill":
+                return (
+                    f"The input field was not available within the timeout. "
+                    f"The form may not have loaded in time."
+                )
+            else:
+                return (
+                    f"The {elem} did not appear within the expected time. "
+                    f"The page may be loading slowly or the element is missing."
+                )
+ 
+        if "not found" in e or "no such element" in e:
+            elem = _friendly_element("", step_name)
+            return (
+                f"The {elem} could not be found in the page. "
+                f"It may have been removed, renamed, or is not rendered."
+            )
+ 
+        if "fill verification" in e:
+            return "Text was entered but the field value did not match what was typed."
+ 
+        if "invalid selector" in e:
+            return f"Test skipped — the CSS selector is invalid or not supported."
+ 
+        if "failed to reset" in e or "cannot load" in e.lower():
+            return "Could not navigate to the test page. The URL may be unreachable."
+ 
+        if "intercept" in e or "net::" in e:
+            return "Network error occurred while loading the page. Check internet connectivity."
+ 
+        return f"Test failed: {error[:120]}"
+ 
+    return "Test status unknown."

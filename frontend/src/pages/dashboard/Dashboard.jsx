@@ -592,7 +592,12 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {urlCards.map((item, i) => {
               const fw    = FW_CONFIG[item.framework] || FW_CONFIG.Selenium;
-              const rc    = rateColor(item.pass_rate || 0);
+              const rawRate = item.pass_rate != null ? item.pass_rate : (
+  item.pass_count != null && (item.pass_count + item.fail_count + item.skip_count) > 0
+    ? Math.round(item.pass_count / (item.pass_count + item.fail_count + item.skip_count) * 100)
+    : 0
+);
+const rc = rateColor(rawRate);
               const total = (item.pass_count || 0) + (item.fail_count || 0) + (item.skip_count || 0);
               return (
                 <div key={item.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', transition: 'all .25s', position: 'relative', overflow: 'hidden', animation: `dFadeUp .3s var(--ease) ${i * 0.05}s both` }}

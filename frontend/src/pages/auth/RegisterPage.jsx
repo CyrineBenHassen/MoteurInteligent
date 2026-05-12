@@ -95,7 +95,7 @@ export default function RegisterPage() {
           <div className="left-headline">
             <h1>Smart Testing<br />Starts <span className="gold">Here</span></h1>
             <div className="gold-line" />
-            <p>Stop writing tests manually. Our generative AI engine crawls your web app, identifies interactive elements, and instantly produces Selenium & Cypress automation scripts.</p>
+            <p>Stop writing tests manually. Our generative AI engine crawls your web app, identifies interactive elements, and instantly produces Selenium,Cypress and Playwright automation scripts.</p>
           </div>
 
           <div className="steps">

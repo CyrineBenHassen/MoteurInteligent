@@ -333,6 +333,7 @@ def _get_reason_text(tc_index: int, tc: dict, execution_results: list) -> tuple:
     return text, color.hexval() if hasattr(color, 'hexval') else str(color), bg
 
 
+# ── FIX: _calc_stats corrected for positive/negative coverage ─────────────────
 def _calc_stats(test_cases: list, execution_results: list) -> tuple:
     total = len(test_cases)
     if not total: return 0, 0, 0, 0
@@ -371,7 +372,7 @@ def build_stats_section(elements, test_cases, execution_results=None):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FIX 4 — EXECUTION VERDICT SUMMARY (improved "Tests" column formatting)
+# EXECUTION VERDICT SUMMARY
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_execution_verdict_summary(elements, test_cases: list,
@@ -431,7 +432,6 @@ def build_execution_verdict_summary(elements, test_cases: list,
                   ParagraphStyle('VH1', fontSize=8, fontName='Helvetica-Bold')),
         Paragraph('<font color="#ffffff"><b>Verdict</b></font>',
                   ParagraphStyle('VH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        # FIX 4: split tests column into 3 distinct columns
         Paragraph('<font color="#ffffff"><b>Passed</b></font>',
                   ParagraphStyle('VH3a', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
         Paragraph('<font color="#ffffff"><b>Failed</b></font>',
@@ -466,7 +466,6 @@ def build_execution_verdict_summary(elements, test_cases: list,
                       ParagraphStyle('VA', fontSize=8, fontName='Helvetica-Bold', leading=11)),
             Paragraph(verdict_text,
                       ParagraphStyle('VV', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            # FIX 4: separate cells for pass/fail/skip counts with color coding
             Paragraph(f'<font color="#10b981"><b>{counts["pass"]}</b></font>',
                       ParagraphStyle('VTCa', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
             Paragraph(f'<font color="#ef4444"><b>{counts["fail"]}</b></font>',
@@ -656,31 +655,35 @@ def build_planned_ui_elements(elements, test_cases: list):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FIX 2 + 3 — EXECUTION EVIDENCE (real extracted values + real timing)
+# FIX: EXECUTION EVIDENCE — real extracted values + real timing
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _resolve_extracted_value(exec_r: dict, status: str) -> str:
-    """FIX 2: Return real extracted text, '[empty text]' if element found but empty, or 'Not Found'."""
+    """Return real extracted text, '—' if element found but empty, or 'Not Found'."""
     if status == 'fail' or (exec_r.get('found') is False):
         return 'Not Found'
     raw = exec_r.get('extracted_text') or exec_r.get('value') or exec_r.get('text') or ''
-    if raw:
+    if raw and str(raw).strip():
         return str(raw).strip()
-    if status == 'pass' or exec_r.get('found') is True:
-        return '[empty text]'
-    return 'Not Found'
+    # Element found but no text — return dash instead of [empty text]
+    return '—'
 
 
 def _resolve_timing(exec_r: dict) -> str:
-    """FIX 3: Return real execution duration as e.g. '0.12s', or 'N/A'."""
-    ms = exec_r.get('response_time_ms') or exec_r.get('load_time_ms') or exec_r.get('duration_ms')
+    """Return real execution duration as e.g. '0.12s', or '—'."""
+    ms = (exec_r.get('response_time_ms')
+          or exec_r.get('load_time_ms')
+          or exec_r.get('duration_ms')
+          or exec_r.get('duration')
+          or exec_r.get('elapsed_ms')
+          or exec_r.get('time_ms'))
     if ms is not None:
         try:
             seconds = float(ms) / 1000.0
             return f'{seconds:.2f}s'
         except (ValueError, TypeError):
             return str(ms)
-    return 'N/A'
+    return '—'
 
 
 def build_execution_evidence(elements, test_cases: list, execution_results: list):
@@ -724,10 +727,8 @@ def build_execution_evidence(elements, test_cases: list, execution_results: list
         action     = exec_r.get('action') or tc.get('action') or 'check_visible'
         visibility = exec_r.get('visibility') or ('visible' if status == 'pass' else 'detached')
 
-        # FIX 2: use resolved extracted value
         extracted = _resolve_extracted_value(exec_r, status)
-        # FIX 3: use resolved timing
-        timing = _resolve_timing(exec_r)
+        timing    = _resolve_timing(exec_r)
 
         if found is True or status == 'pass':
             found_text = '<font color="#10b981"><b>YES</b></font>'
@@ -758,7 +759,6 @@ def build_execution_evidence(elements, test_cases: list, execution_results: list
                       ParagraphStyle('EEACT', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
             Paragraph(f'<font color="{vis_color}" size="6.5"><b>{visibility.upper()}</b></font>',
                       ParagraphStyle('EEVIS', fontSize=6.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            # FIX 3: real timing string
             Paragraph(f'<font color="#64748b" size="7">{timing}</font>',
                       ParagraphStyle('EETM', fontSize=7, fontName='Helvetica', alignment=TA_CENTER)),
         ])
@@ -877,7 +877,7 @@ def build_test_cases_table(elements, test_cases, execution_results=None):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FIX 2 — REAL PAGE EVIDENCE (real extracted values)
+# REAL PAGE EVIDENCE — fixed extracted value
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_real_page_evidence(elements, test_cases: list, execution_results: list, scraped: dict):
@@ -919,12 +919,11 @@ def build_real_page_evidence(elements, test_cases: list, execution_results: list
             found      = exec_r.get('found', exec_r.get('element_found', None))
             visibility = exec_r.get('visibility') or ('visible' if exec_r.get('status') == 'pass' else 'unknown')
             status     = exec_r.get('status', 'skip')
-            # FIX 2: use resolved extracted value
-            extracted = _resolve_extracted_value(exec_r, status)
+            extracted  = _resolve_extracted_value(exec_r, status)
         else:
             actual_sel = expected_sel
             found      = None
-            extracted  = tc.get('placeholder') or tc.get('default_value') or 'Not Found'
+            extracted  = '—'
             visibility = 'not executed'
             status     = 'skip'
 
@@ -1031,11 +1030,10 @@ def build_real_page_evidence(elements, test_cases: list, execution_results: list
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FIX 6 + 7 — AI RECOMMENDATIONS + FINAL VERDICT (specific recs + quality score)
+# AI RECOMMENDATIONS + FINAL VERDICT
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _is_generic_selector(selector: str) -> bool:
-    """Return True if selector is considered fragile/generic."""
     generic_patterns = [
         '[class*=', "input[type='search']", "input[name='s']",
         'img', 'nav', 'main', 'h1', 'a[href]', 'button',
@@ -1046,35 +1044,22 @@ def _is_generic_selector(selector: str) -> bool:
 
 def _compute_quality_score(pass_rate: int, load_time: int, fail_count: int,
                              critical_failures: list, fragile_sel: list) -> tuple:
-    """FIX 7: Compute quality score (0–100) and risk level."""
-    score = pass_rate  # base: pass rate %
-
-    # Performance bonus/penalty
+    score = pass_rate
     if load_time < 1500:
         score = min(100, score + 5)
     elif load_time > 5000:
         score = max(0, score - 15)
     elif load_time > 3000:
         score = max(0, score - 8)
-
-    # Critical failure penalty
     score = max(0, score - len(critical_failures) * 10)
-
-    # Fragile selector penalty (capped)
     score = max(0, score - min(len(fragile_sel) * 3, 10))
-
     score = max(0, min(100, round(score)))
-
     if score >= 80 and not critical_failures:
-        risk = 'LOW'
-        risk_color = '#10b981'
+        risk = 'LOW';    risk_color = '#10b981'
     elif score >= 60 or (score >= 50 and not critical_failures):
-        risk = 'MEDIUM'
-        risk_color = '#f59e0b'
+        risk = 'MEDIUM'; risk_color = '#f59e0b'
     else:
-        risk = 'HIGH'
-        risk_color = '#ef4444'
-
+        risk = 'HIGH';   risk_color = '#ef4444'
     return score, risk, risk_color
 
 
@@ -1103,20 +1088,18 @@ def build_ai_recommendations(elements, test_cases: list, execution_results: list
     skipped_tcs = [tc for i, tc in enumerate(test_cases)
                    if i < len(execution_results) and execution_results[i].get('status') == 'skip']
 
-    # FIX 6: detect fragile selectors per test case with test name context
     fragile_sel_details = []
     for tc in test_cases:
         sel = tc.get('selector') or tc.get('expected_selector') or _guess_selector(tc)
         if _is_generic_selector(sel):
             fragile_sel_details.append((tc.get('name', 'Unknown test'), sel))
-    fragile_sel = fragile_sel_details  # list of (name, selector) tuples
+    fragile_sel = fragile_sel_details
 
     critical_failures = [tc for tc in failed_tcs if _infer_severity(tc)[0] == 'HIGH']
     medium_failures   = [tc for tc in failed_tcs if _infer_severity(tc)[0] == 'MEDIUM']
 
     categories = []
 
-    # Performance
     perf_recs = []
     if load_time > 5000:
         perf_recs.append(f'Page load is critical ({load_time} ms). Compress images, enable CDN caching, and audit third-party scripts.')
@@ -1130,7 +1113,6 @@ def build_ai_recommendations(elements, test_cases: list, execution_results: list
         perf_recs.append('SPA framework detected (React/Vue/Angular). Ensure waits for hydration before asserting element presence.')
     categories.append(('⚡', 'Performance', perf_recs, '#f59e0b', ORANGE_BG))
 
-    # FIX 6: Reliability — specific per-test recommendations
     rel_recs = []
     if fragile_sel:
         for tc_name, sel in fragile_sel[:4]:
@@ -1158,7 +1140,6 @@ def build_ai_recommendations(elements, test_cases: list, execution_results: list
         rel_recs.append(f'{skip_count} test(s) skipped. Verify optional elements are not misclassified as required.')
     categories.append(('🔧', 'Reliability', rel_recs, '#4f46e5', INDIGO_BG))
 
-    # UX
     ux_recs = []
     nav_pass = any(
         _infer_ui_area(tc) == 'Navigation'
@@ -1221,7 +1202,6 @@ def build_ai_recommendations(elements, test_cases: list, execution_results: list
             elements.append(rec_tbl)
         elements.append(Spacer(1, 8))
 
-    # FIX 7: Compute quality score and risk level
     quality_score, risk_level, risk_color = _compute_quality_score(
         pass_rate, load_time, fail_count, critical_failures, fragile_sel
     )
@@ -1250,7 +1230,6 @@ def build_ai_recommendations(elements, test_cases: list, execution_results: list
               f'Review skipped tests and confirm selector health before proceeding.')
         vi = '🟡'
 
-    # FIX 7: include quality score + risk level in the final verdict box
     final_tbl = Table([[Paragraph(
         f'<font color="{vc}" size="9"><b>{vi}  Final AI Verdict</b></font><br/>'
         f'<font color="{vc}" size="8">{vt}</font><br/><br/>'
@@ -1274,11 +1253,10 @@ def build_ai_recommendations(elements, test_cases: list, execution_results: list
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FIX 1 — GENERATED SCRIPT SUMMARY (replaces raw script block)
+# GENERATED SCRIPT SUMMARY
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_script_section(elements, script, framework_label, test_cases=None):
-    """FIX 1: Replace raw script dump with a compact Generated Script Summary."""
     if not script:
         return
 
@@ -1293,28 +1271,22 @@ def build_script_section(elements, script, framework_label, test_cases=None):
         ParagraphStyle('ScriptSumInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
     elements.append(Spacer(1, 10))
 
-    # Derive metadata from script content and test_cases
     tc_list = test_cases or []
     total_tests = len(tc_list)
 
-    # Count from script lines as fallback
     if total_tests == 0:
         script_lines = script.replace('\\n', '\n').split('\n')
         total_tests = sum(1 for l in script_lines if 'def test_' in l or 'it(' in l or 'test(' in l)
 
-    # Detect waits
     has_explicit_waits = (
         'WebDriverWait' in script or 'explicit_wait' in script or
         'cy.wait' in script or 'waitFor' in script or 'wait_for' in script
     )
-    # Detect headless
     has_headless = 'headless' in script.lower() or '--headless' in script
 
-    # Detect tested UI areas from test cases
     if tc_list:
         areas = list(dict.fromkeys(_infer_ui_area(tc) for tc in tc_list))
     else:
-        # Try to infer from script keywords
         area_keywords = {
             'Navigation': ['nav', 'menu', 'navigation'],
             'Search Bar': ['search'],
@@ -1330,7 +1302,6 @@ def build_script_section(elements, script, framework_label, test_cases=None):
 
     areas_str = ', '.join(areas[:8]) if areas else 'General'
 
-    # Build summary rows
     summary_rows = [
         [
             Paragraph('<font color="#ffffff"><b>Property</b></font>',
@@ -1399,7 +1370,7 @@ def build_script_section(elements, script, framework_label, test_cases=None):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PAGE ANALYSIS
+# PAGE ANALYSIS — FIX: removed all warning messages
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_page_analysis(elements, scraped: dict, page_type: str):
@@ -1409,36 +1380,25 @@ def build_page_analysis(elements, scraped: dict, page_type: str):
     detected = []
     if scraped.get("inputs"):
         types = list(set(i.get("type","text") for i in scraped["inputs"]))
-        detected.append(("Inputs", f"{len(scraped['inputs'])} champ(s) — types: {', '.join(types)}", "#3b82f6"))
+        detected.append(("Inputs", f"{len(scraped['inputs'])} field(s) — types: {', '.join(types)}", "#3b82f6"))
     if scraped.get("buttons"):
         texts = [b.get("text","") for b in scraped["buttons"][:3] if b.get("text")]
-        detected.append(("Buttons", f"{len(scraped['buttons'])} bouton(s) — ex: {', '.join(texts)}", "#8b5cf6"))
+        detected.append(("Buttons", f"{len(scraped['buttons'])} button(s) — e.g: {', '.join(texts)}", "#8b5cf6"))
     if scraped.get("nav_links"):
-        detected.append(("Navigation", f"{len(scraped['nav_links'])} lien(s) de navigation", "#10b981"))
+        detected.append(("Navigation", f"{len(scraped['nav_links'])} navigation link(s)", "#10b981"))
     if scraped.get("forms"):
-        detected.append(("Forms", f"{len(scraped['forms'])} formulaire(s) detecte(s)", "#f59e0b"))
+        detected.append(("Forms", f"{len(scraped['forms'])} form(s) detected", "#f59e0b"))
     if scraped.get("images"):
         loaded = sum(1 for i in scraped["images"] if i.get("loaded"))
-        detected.append(("Images", f"{len(scraped['images'])} image(s) — {loaded} chargee(s)", "#ec4899"))
+        detected.append(("Images", f"{len(scraped['images'])} image(s) — {loaded} loaded", "#ec4899"))
     if scraped.get("alerts"):
-        detected.append(("Alerts", f"{len(scraped['alerts'])} conteneur(s) d'erreur/alerte", "#ef4444"))
+        detected.append(("Alerts", f"{len(scraped['alerts'])} alert/error container(s)", "#ef4444"))
     if scraped.get("pagination"):
-        detected.append(("Pagination", f"{len(scraped['pagination'])} element(s) de pagination", "#06b6d4"))
+        detected.append(("Pagination", f"{len(scraped['pagination'])} pagination element(s)", "#06b6d4"))
     if scraped.get("add_to_cart"):
-        detected.append(("Add to Cart", f"{len(scraped['add_to_cart'])} bouton(s) panier detecte(s)", "#f97316"))
+        detected.append(("Add to Cart", f"{len(scraped['add_to_cart'])} cart button(s) detected", "#f97316"))
     if scraped.get("modals"):
-        detected.append(("Modals", f"{len(scraped['modals'])} modal(s) detecte(e)(s)", "#6366f1"))
-
-    risks = []
-    load_time = scraped.get("load_time_ms", 0)
-    if load_time > 3000:
-        risks.append(f"Warning: Page lente ({load_time}ms) — test de performance inclus")
-    if scraped.get("is_spa"):
-        risks.append("Warning: SPA detecte (React/Vue/Angular) — waits explicites requis")
-    if not scraped.get("inputs") and not scraped.get("buttons"):
-        risks.append("Warning: Peu d'elements interactifs — tests generiques generes")
-    if not scraped.get("alerts"):
-        risks.append("Info: Aucun conteneur d'erreur — tests negatifs limites")
+        detected.append(("Modals", f"{len(scraped['modals'])} modal(s) detected", "#6366f1"))
 
     if detected:
         det_rows = [[
@@ -1466,20 +1426,15 @@ def build_page_analysis(elements, scraped: dict, page_type: str):
         elements.append(det_tbl)
     else:
         elements.append(Paragraph(
-            '<font color="#94a3b8">Aucun element interactif detecte sur cette page.</font>',
+            '<font color="#94a3b8">No interactive elements detected on this page.</font>',
             ParagraphStyle('NoEl', fontSize=8, fontName='Helvetica')))
 
-    if risks:
-        elements.append(Spacer(1, 8))
-        for risk in risks:
-            elements.append(Paragraph(
-                f'<font color="#f59e0b" size="7.5">{risk}</font>',
-                ParagraphStyle('Risk', fontSize=7.5, fontName='Helvetica', leading=11)))
+    # ── REMOVED: all warning/info messages ──
     elements.append(Spacer(1, 16))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FIX 5 — TEST PLAN (correct coverage counts)
+# TEST PLAN — FIX: corrected coverage counts (positive / negative)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_test_plan(elements, test_cases: list, page_type: str, framework: str, scraped: dict):
@@ -1487,24 +1442,36 @@ def build_test_plan(elements, test_cases: list, page_type: str, framework: str, 
     elements.append(Spacer(1, 8))
 
     page_type_labels = {
-        "login":     "Page de connexion — tests d'authentification",
-        "ecommerce": "Page e-commerce — tests panier et navigation",
-        "form":      "Page formulaire — tests de soumission et validation",
-        "dashboard": "Dashboard — tests de navigation et affichage",
-        "general":   "Page generale — tests de chargement et navigation",
+        "login":     "Login page — authentication tests",
+        "ecommerce": "E-commerce page — cart and navigation tests",
+        "form":      "Form page — submission and validation tests",
+        "dashboard": "Dashboard — navigation and display tests",
+        "general":   "General page — load and navigation tests",
     }
-    strategy = page_type_labels.get(page_type, "Page generale")
+    strategy = page_type_labels.get(page_type, "General page")
 
-    # FIX 5: count positive vs negative smoke validations correctly
-    positive_count = sum(1 for t in test_cases if t.get('type', 'positive') == 'positive')
-    negative_count = sum(1 for t in test_cases if t.get('type') == 'negative')
+    # ── FIX: count positive/negative correctly ─────────────────────────────
+    # A test is "positive" if its type is 'positive' OR its category is not 'negative'
+    # and it's not explicitly a negative test. Fall back to counting by action type.
+    positive_count = sum(
+        1 for t in test_cases
+        if t.get('type') == 'positive'
+        or (t.get('type') not in ('negative',) and t.get('category') not in ('negative',))
+    )
+    negative_count = sum(
+        1 for t in test_cases
+        if t.get('type') == 'negative' or t.get('category') == 'negative'
+    )
+    # If all are 0 (no type field set), count all as positive
+    if positive_count == 0 and negative_count == 0 and test_cases:
+        positive_count = len(test_cases)
 
     summary_data = [
-        [Paragraph('<font color="#ffffff"><b>Critere</b></font>',
+        [Paragraph('<font color="#ffffff"><b>Criteria</b></font>',
                    ParagraphStyle('PH', fontSize=8, fontName='Helvetica-Bold')),
-         Paragraph('<font color="#ffffff"><b>Valeur</b></font>',
+         Paragraph('<font color="#ffffff"><b>Value</b></font>',
                    ParagraphStyle('PH2', fontSize=8, fontName='Helvetica-Bold'))],
-        [Paragraph('<font color="#64748b">Type de page detecte</font>',
+        [Paragraph('<font color="#64748b">Detected page type</font>',
                    ParagraphStyle('PL', fontSize=8, fontName='Helvetica-Bold')),
          Paragraph(f'<font color="#1e293b">{page_type.upper()} — {strategy}</font>',
                    ParagraphStyle('PV', fontSize=8, fontName='Helvetica'))],
@@ -1512,11 +1479,10 @@ def build_test_plan(elements, test_cases: list, page_type: str, framework: str, 
                    ParagraphStyle('PL2', fontSize=8, fontName='Helvetica-Bold')),
          Paragraph(f'<font color="#1e293b">{framework}</font>',
                    ParagraphStyle('PV2', fontSize=8, fontName='Helvetica'))],
-        [Paragraph('<font color="#64748b">Nombre de tests</font>',
+        [Paragraph('<font color="#64748b">Number of tests</font>',
                    ParagraphStyle('PL3', fontSize=8, fontName='Helvetica-Bold')),
-         Paragraph(f'<font color="#1e293b">{len(test_cases)} tests planifies</font>',
+         Paragraph(f'<font color="#1e293b">{len(test_cases)} planned test(s)</font>',
                    ParagraphStyle('PV3', fontSize=8, fontName='Helvetica'))],
-        # FIX 5: use correct positive/negative counts with descriptive labels
         [Paragraph('<font color="#64748b">Coverage</font>',
                    ParagraphStyle('PL4', fontSize=8, fontName='Helvetica-Bold')),
          Paragraph(
@@ -1537,7 +1503,7 @@ def build_test_plan(elements, test_cases: list, page_type: str, framework: str, 
     ]))
     elements.append(plan_tbl)
     elements.append(Spacer(1, 12))
-    elements.append(Paragraph('<font color="#1e293b" size="9"><b>Scenarios planifies</b></font>',
+    elements.append(Paragraph('<font color="#1e293b" size="9"><b>Planned scenarios</b></font>',
                                ParagraphStyle('ScH', fontSize=9, fontName='Helvetica-Bold', leading=12)))
     elements.append(Spacer(1, 6))
 
@@ -1546,11 +1512,11 @@ def build_test_plan(elements, test_cases: list, page_type: str, framework: str, 
                   ParagraphStyle('SCH1', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
         Paragraph('<font color="#ffffff"><b>Scenario</b></font>',
                   ParagraphStyle('SCH2', fontSize=8, fontName='Helvetica-Bold')),
-        Paragraph('<font color="#ffffff"><b>Objectif</b></font>',
+        Paragraph('<font color="#ffffff"><b>Objective</b></font>',
                   ParagraphStyle('SCH3', fontSize=8, fontName='Helvetica-Bold')),
-        Paragraph('<font color="#ffffff"><b>Priorite</b></font>',
+        Paragraph('<font color="#ffffff"><b>Priority</b></font>',
                   ParagraphStyle('SCH4', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Categorie</b></font>',
+        Paragraph('<font color="#ffffff"><b>Category</b></font>',
                   ParagraphStyle('SCH5', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
     ]]
     for i, tc in enumerate(test_cases):
@@ -1720,7 +1686,6 @@ def generate_pdf(generation_data: dict) -> bytes:
             build_execution_evidence(elements, test_cases_selenium, execution_results)
             build_real_page_evidence(elements, test_cases_selenium, execution_results, scraped)
             build_ai_recommendations(elements, test_cases_selenium, execution_results, scraped)
-        # FIX 1: pass test_cases to build_script_section
         build_script_section(elements, script_selenium, 'Selenium', test_cases_selenium)
         elements.append(Spacer(1, 30))
 
@@ -1733,7 +1698,6 @@ def generate_pdf(generation_data: dict) -> bytes:
         elements.append(section_header('🧪', 'Test Cases — Cypress'))
         elements.append(Spacer(1, 8))
         build_test_cases_table(elements, test_cases_cypress, [])
-        # FIX 1: pass test_cases to build_script_section
         build_script_section(elements, script_cypress, 'Cypress', test_cases_cypress)
 
     else:
@@ -1750,7 +1714,6 @@ def generate_pdf(generation_data: dict) -> bytes:
             build_execution_evidence(elements, test_cases, execution_results)
             build_real_page_evidence(elements, test_cases, execution_results, scraped)
             build_ai_recommendations(elements, test_cases, execution_results, scraped)
-        # FIX 1: pass test_cases to build_script_section
         build_script_section(elements, script, framework, test_cases)
 
     elements.append(Spacer(1, 20))
