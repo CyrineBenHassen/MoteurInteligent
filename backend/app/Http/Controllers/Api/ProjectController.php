@@ -41,6 +41,23 @@ public function store(Request $request)
         $project->delete();
         return response()->json(['deleted' => true]);
     }
+
+    
+public function update(Request $request, $id)
+{
+    $project = Project::where('id', $id)
+        ->where('user_id', auth()->id())
+        ->firstOrFail();
+
+    $project->update([
+        'name'        => $request->name,
+        'description' => $request->description,
+    ]);
+
+    $project->loadCount('generations');
+
+    return response()->json($project);
+}    
     
 
  public function generations($id)

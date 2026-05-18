@@ -314,9 +314,21 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
   const [search,     setSearch]     = useState('');
   const [filterType, setFilterType] = useState('all');
 
+const [editingProject, setEditingProject] = useState(null);
+const [editName,       setEditName]       = useState('');
+const [editDesc,       setEditDesc]       = useState('');
+const [editSaving,     setEditSaving]     = useState(false);
+
   useEffect(() => {
     api.get('/projects').then(res => setProjects(res.data)).catch(console.error).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+  if (editingProject) {
+    setEditName(editingProject.name);
+    setEditDesc(editingProject.description || '');
+  }
+}, [editingProject]);
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
@@ -371,25 +383,96 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
         ))}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 220, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
-          <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit', width: '100%' }} placeholder="Search projects…" value={search} onChange={e => setSearch(e.target.value)} />
-          {search && (
-            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}>
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            </button>
-          )}
-        </div>
-        {['all', 'public', 'internal'].map(f => (
-          <button key={f} onClick={() => setFilterType(f)} style={{ padding: '9px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '.5px', border: filterType === f ? 'none' : '1.5px solid var(--border)', background: filterType === f ? (f === 'public' ? '#4f86e8' : f === 'internal' ? '#8b5cf6' : 'var(--indigo)') : 'var(--card)', color: filterType === f ? '#fff' : 'var(--muted)', boxShadow: filterType === f ? '0 2px 10px rgba(99,102,241,.3)' : 'none', transition: 'all .18s', textTransform: 'capitalize' }}>
-            {f === 'all' ? 'All' : f === 'public' ? '🌐 Public' : '🔒 Internal'}
-          </button>
-        ))}
-        <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: 'var(--muted)', padding: '6px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8 }}>
-          {filtered.length} project{filtered.length !== 1 ? 's' : ''}
+      {/* ── SEARCH + FILTER BAR ── */}
+<div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+  
+  {/* Search input */}
+  <div style={{
+    display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 220,
+    background: 'var(--card)', border: '1.5px solid var(--border)',
+    borderRadius: 10, padding: '9px 14px', transition: 'border-color .2s'
+  }}
+    onFocusCapture={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,.5)'}
+    onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--border)'}
+  >
+    <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    <input
+      value={search}
+      onChange={e => setSearch(e.target.value)}
+      placeholder="Search projects by name…"
+      style={{
+        flex: 1, background: 'none', border: 'none', outline: 'none',
+        color: 'var(--text)', fontSize: 13, fontFamily: 'inherit'
+      }}
+    />
+    {search && (
+      <button onClick={() => setSearch('')} style={{
+        background: 'none', border: 'none', color: 'var(--muted)',
+        cursor: 'pointer', display: 'flex', padding: 0
+      }}>
+        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    )}
+  </div>
+
+  {/* Type filter buttons */}
+  <div style={{ display: 'flex', gap: 6 }}>
+    {[
+      { key: 'all',      label: 'All',      icon: '📁' },
+      { key: 'public',   label: 'Public',   icon: '🌐' },
+      { key: 'internal', label: 'Internal', icon: '🔒' },
+    ].map(f => (
+      <button
+        key={f.key}
+        onClick={() => setFilterType(f.key)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
+          fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+          transition: 'all .18s',
+          background: filterType === f.key
+            ? f.key === 'public'   ? 'rgba(79,134,232,.12)'
+            : f.key === 'internal' ? 'rgba(139,92,246,.12)'
+            : 'rgba(99,102,241,.12)'
+            : 'var(--card)',
+          border: filterType === f.key
+            ? f.key === 'public'   ? '1.5px solid rgba(79,134,232,.4)'
+            : f.key === 'internal' ? '1.5px solid rgba(139,92,246,.4)'
+            : '1.5px solid rgba(99,102,241,.4)'
+            : '1.5px solid var(--border)',
+          color: filterType === f.key
+            ? f.key === 'public'   ? '#4f86e8'
+            : f.key === 'internal' ? '#8b5cf6'
+            : '#818cf8'
+            : 'var(--muted)',
+        }}
+      >
+        <span>{f.icon}</span>
+        {f.label}
+        <span style={{
+          padding: '1px 7px', borderRadius: 20, fontSize: 10,
+          background: filterType === f.key ? 'rgba(255,255,255,.1)' : 'var(--bg2)',
+          color: filterType === f.key ? 'currentColor' : 'var(--muted)'
+        }}>
+          {f.key === 'all'      ? projects.length
+         : f.key === 'public'   ? projects.filter(p => p.type === 'public').length
+         : projects.filter(p => p.type === 'internal').length}
         </span>
-      </div>
+      </button>
+    ))}
+  </div>
+
+  {/* Results count */}
+  {(search || filterType !== 'all') && (
+    <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
+      {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+    </span>
+  )}
+</div>
 
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -433,13 +516,26 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
                       <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '2px 8px', borderRadius: 20, color, background: colorBg, border: `1px solid ${colorBd}` }}>{isPublic ? 'Public' : 'Internal'}</span>
                     </div>
                   </div>
-                  <button onClick={(e) => handleDelete(e, project.id)} disabled={deleting === project.id}
-                    style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.borderColor = 'var(--red-border)'; e.currentTarget.style.color = 'var(--red)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
-                    {deleting === project.id ? '...' : (<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>)}
-                  </button>
-                </div>
+                  
+        
+<div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+  <button onClick={(e) => { e.stopPropagation(); setEditingProject(project); }}
+    style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
+    onMouseEnter={e => { e.currentTarget.style.background = 'var(--indigo-bg)'; e.currentTarget.style.borderColor = 'var(--indigo-border)'; e.currentTarget.style.color = 'var(--indigo2)'; }}
+    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
+    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+  </button>
+  <button onClick={(e) => handleDelete(e, project.id)} disabled={deleting === project.id}
+    style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
+    onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.borderColor = 'var(--red-border)'; e.currentTarget.style.color = 'var(--red)'; }}
+    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
+    {deleting === project.id ? '...' : (<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>)}
+  </button>
+</div>
+</div>
                 {project.description ? (
                   <p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 16, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{project.description}</p>
                 ) : (
@@ -463,6 +559,103 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
             );
           })}
         </div>
+      )}
+
+      {editingProject && createPortal(
+        <div onClick={() => setEditingProject(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ width: 480, background: '#0d1526', border: '1px solid rgba(99,102,241,.3)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif", animation: 'dFadeUp .2s ease both' }}>
+            
+            <div style={{ height: 3, background: 'linear-gradient(90deg, transparent, #6366f1, transparent)' }} />
+
+            <div style={{ padding: '24px 28px 18px', borderBottom: '1px solid rgba(255,255,255,.06)', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="18" height="18" fill="none" stroke="#818cf8" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>Edit Project</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Update name and description</div>
+              </div>
+              <button onClick={() => setEditingProject(null)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+
+            <div style={{ padding: '24px 28px' }}>
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: 8 }}>
+                  Project Name *
+                </label>
+                <input
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  maxLength={60}
+                  placeholder="e.g. Login Flow QA"
+                  autoFocus
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: `1.5px solid ${editName.trim() ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.08)'}`, color: '#e2e8f0', fontSize: 14, fontFamily: 'inherit', outline: 'none', transition: 'border-color .2s' }}
+                />
+                <div style={{ fontSize: 10, color: '#475569', marginTop: 4, textAlign: 'right' }}>{editName.length}/60</div>
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: 8 }}>
+                  Description <span style={{ color: '#475569', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                </label>
+                <textarea
+                  value={editDesc}
+                  onChange={e => setEditDesc(e.target.value)}
+                  maxLength={280}
+                  rows={3}
+                  placeholder="Briefly describe what this project tests…"
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1.5px solid rgba(255,255,255,.08)', color: '#e2e8f0', fontSize: 14, fontFamily: 'inherit', outline: 'none', resize: 'vertical' }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(99,102,241,.4)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,.08)'}
+                />
+                <div style={{ fontSize: 10, color: '#475569', marginTop: 4, textAlign: 'right' }}>{editDesc.length}/280</div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.15)', marginBottom: 24 }}>
+                <svg width="13" height="13" fill="none" stroke="#f59e0b" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                <span style={{ fontSize: 11, color: '#f59e0b' }}>Project type (<strong>{editingProject.type}</strong>) cannot be changed after creation.</span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setEditingProject(null)}
+                  style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Cancel
+                </button>
+                <button
+                  disabled={!editName.trim() || editSaving}
+                  onClick={async () => {
+                    if (!editName.trim()) return;
+                    setEditSaving(true);
+                    try {
+                      await api.put(`/projects/${editingProject.id}`, {
+                        name: editName.trim(),
+                        description: editDesc.trim(),
+                      });
+                      setProjects(prev => prev.map(p => p.id === editingProject.id
+                        ? { ...p, name: editName.trim(), description: editDesc.trim() }
+                        : p
+                      ));
+                      setEditingProject(null);
+                    } catch (err) { console.error(err); }
+                    setEditSaving(false);
+                  }}
+                  style={{ flex: 2, padding: '12px', borderRadius: 10, background: editName.trim() ? 'linear-gradient(135deg,#6366f1,#4f46e5)' : 'rgba(99,102,241,.1)', border: 'none', color: editName.trim() ? '#fff' : 'rgba(99,102,241,.3)', fontSize: 13, fontWeight: 800, cursor: editName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: editName.trim() ? '0 4px 16px rgba(99,102,241,.35)' : 'none', transition: 'all .2s' }}>
+                  {editSaving
+                    ? <><span className="spinner" /> Saving…</>
+                    : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg> Save Changes</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -739,7 +932,17 @@ export function CreateProjectPanel({ onProjectCreated }) {
               </div>
               <div className={`cpv5-input-wrap${nameError ? ' error' : ''}${name ? ' filled' : ''}`}>
                 <svg className="cpv5-input-ico" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <input ref={inputRef} className="cpv5-input" type="text" placeholder="e.g. Login Flow QA" value={name} maxLength={60} onChange={e => { setName(e.target.value); setNameError(''); }} onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }} autoComplete="off" />
+<input
+  ref={inputRef}
+  className="cpv5-input"
+  type="text"
+  placeholder="e.g. Login Flow QA"
+  value={name}
+  maxLength={60}
+  onChange={e => { setName(e.target.value); setNameError(''); }}
+  onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
+  autoComplete="off"
+/>
                 {name.length > 0 && <span className="cpv5-input-count">{name.length}/60</span>}
               </div>
               {nameError && (<div className="cpv5-error"><svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>{nameError}</div>)}
@@ -814,7 +1017,7 @@ export function CreateProjectPanel({ onProjectCreated }) {
 // GeneratePanel
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GeneratePanel({ goTo, setGeneration, project, initialUrl = '' }) {
+function GeneratePanel({ goTo, setGeneration, project, initialUrl = '', onGenerationSaved  }) {
   const { t } = useLang();
   const [url,      setUrl]      = useState(initialUrl);
   const [fw,       setFw]       = useState('');
@@ -865,8 +1068,24 @@ function GeneratePanel({ goTo, setGeneration, project, initialUrl = '' }) {
         genData.result.performance = genData.performance || genData.result?.performance;
         genData.result.test_cases  = genData.result.test_cases || genData.generation?.test_cases || [];
       }
-      setGeneration(genData);
-      goTo('execution');
+   setGeneration(genData);
+const notifData = {
+  url: genData?.generation?.url || genData?.url || '',
+  framework: genData?.generation?.framework || genData?.framework || '',
+  testType: genData?.result?.test_type || genData?.test_type || '',
+ passCount: (genData?.result?.execution_results?.length
+  ? genData.result.execution_results
+  : genData?.result?.test_cases || []
+).filter(t => t.status === 'pass').length,
+failCount: (genData?.result?.execution_results?.length
+  ? genData.result.execution_results
+  : genData?.result?.test_cases || []
+).filter(t => t.status === 'fail').length,
+  timestamp: Date.now(),
+};
+localStorage.setItem('nextest-last-notif', JSON.stringify(notifData));
+onGenerationSaved(notifData);
+goTo('execution');
     } catch (err) { setError(err.response?.data?.error || 'Une erreur est survenue'); }
     setLoad(false);
   };
@@ -897,7 +1116,13 @@ function GeneratePanel({ goTo, setGeneration, project, initialUrl = '' }) {
           )}
           <p className="p-sub" style={{ marginTop: 8 }}>{t('generateDesc')}</p>
         </div>
-        {isReady && (<div className="gp-ready-badge"><span className="gp-ready-dot" />Ready to generate</div>)}
+        
+{isReady && (
+  <div className="gp-ready-badge" style={loading ? { background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.3)', color: 'var(--indigo2)' } : {}}>
+    <span className="gp-ready-dot" style={loading ? { background: 'var(--indigo2)' } : {}} />
+    {loading ? 'In execution...' : 'Ready to generate'}
+  </div>
+)}
       </div>
 
       {error && <div className="error-msg" style={{ marginBottom: 24 }}>✗ {error}</div>}
@@ -961,7 +1186,7 @@ function GeneratePanel({ goTo, setGeneration, project, initialUrl = '' }) {
             </div>
 
             <button type="submit" className="gp4-submit" disabled={loading || !isReady}>
-              {loading ? (<><span className="spinner" /> Analyzing & Generating...</>) : (<><svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Generate Tests{isReady && <span className="gp4-submit-arrow">→</span>}</>)}
+              {loading ? (<><span className="spinner" /> Analyzing & Generating...</>) : (<><svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Generate Tests{isReady && <span className="gp4-submit-arrow"></span>}</>)}
             </button>
           </div>
 
@@ -2399,7 +2624,18 @@ function ExecutionPanel({ generation }) {
 
   const buildTests = (test_cases, execution_results) => {
     if (execution_results && execution_results.length > 0) {
-      return execution_results.map((r, i) => ({ id: i + 1, name: r.name, status: r.status, duration: r.duration || '—', suite: r.reason_pass || r.reason || r.error || 'Test', assertion_result: r.assertion_result || null, step_meta: r.step_meta || null, category: r.category || 'smoke', priority: r.priority || 'medium' }));
+return execution_results.map((r, i) => ({
+  id: i + 1,
+  name: r.name,
+  status: r.status,
+  duration: r.duration || '—',
+  suite: r.reason_pass || r.reason || r.error || 'Test',
+  assertion_result: r.assertion_result || null,
+  step_meta: r.step_meta || null,
+  category: r.category || 'smoke',
+  priority: r.priority || 'medium',
+  screenshot: r.screenshot || null,  // ← AJOUTE
+}));
     }
     return (test_cases || []).map((tc, i) => ({ id: tc.id || i + 1, name: tc.name, status: 'skip', duration: '—', suite: 'Not executed', assertion_result: null, step_meta: null, category: tc.category || 'smoke', priority: tc.priority || 'medium' }));
   };
@@ -3278,6 +3514,14 @@ const downloadHtml = () => {
                   <div className="ep-row-name">{test.name}</div>
                   <div className="ep-row-suite">{test.suite}</div>
                   {test.assertion_result && <AssertionBadge assertion_result={test.assertion_result} step_meta={test.step_meta} />}
+                  {test.screenshot && (
+  <img
+    src={`data:image/png;base64,${test.screenshot}`}
+    style={{ width:'100%', maxWidth:480, borderRadius:8, marginTop:8,
+      border:'1px solid rgba(239,68,68,.3)', cursor:'pointer' }}
+    onClick={() => window.open(`data:image/png;base64,${test.screenshot}`)}
+  />
+)}
                 </div>
                 <div className="ep-row-meta">
                   <span className="ep-cat-badge" style={{ color: test.category === 'functional' ? '#6366f1' : test.category === 'performance' ? '#8b5cf6' : '#64748b', background: test.category === 'functional' ? 'rgba(99,102,241,.1)' : test.category === 'performance' ? 'rgba(139,92,246,.1)' : 'rgba(100,116,139,.1)', border: `1px solid ${test.category === 'functional' ? 'rgba(99,102,241,.2)' : test.category === 'performance' ? 'rgba(139,92,246,.2)' : 'rgba(100,116,139,.2)'}` }}>
@@ -3757,6 +4001,40 @@ useEffect(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 // AccountPanel
 // ─────────────────────────────────────────────────────────────────────────────
+function FloatField({ label, value, onChange, type = 'text', icon, autoCompleteType }) {
+  const [showPwd, setShowPwd] = useState(false);
+  const isPassword = type === 'password';
+  const inputType  = isPassword ? (showPwd ? 'text' : 'password') : type;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+      <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--muted)' }}>
+        {label}
+      </label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg2)', border: '1.5px solid var(--border2)', borderRadius: 12, padding: '11px 14px' }}>
+        <span style={{ color: 'var(--muted)', flexShrink: 0, display: 'flex' }}>{icon}</span>
+        <input
+          type={inputType}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={label}
+          autoComplete={autoCompleteType || 'off'}
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit', transition: 'none', WebkitTextFillColor: 'var(--text)' }}
+        />
+        {isPassword && (
+          <button type="button" onClick={() => setShowPwd(v => !v)} tabIndex={-1}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: showPwd ? 'var(--gold)' : 'var(--muted)', display: 'flex', alignItems: 'center', flexShrink: 0, padding: 4, borderRadius: 6, transition: 'none' }}>
+            {showPwd ? (
+              <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            ) : (
+              <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function AccountPanel({ user }) {
   const { setUser } = useAuth();
@@ -3769,6 +4047,20 @@ function AccountPanel({ user }) {
   const [msg,        setMsg]        = useState('');
   const [error,      setError]      = useState('');
   const [loading,    setLoading]    = useState(false);
+  const [stats, setStats] = useState({ generations_count: 0, projects_count: 0 });
+const [statsLoading, setStatsLoading] = useState(true);
+
+useEffect(() => {
+  api.get('/profile')
+    .then(res => {
+      setStats({
+        generations_count: res.data.generations_count || 0,
+        projects_count:    res.data.projects_count    || 0,
+      });
+    })
+    .catch(console.error)
+    .finally(() => setStatsLoading(false));
+}, []);
 
   const saveProfile = async () => {
     setLoading(true); setMsg(''); setError('');
@@ -3788,60 +4080,7 @@ function AccountPanel({ user }) {
   const IconEyeOn  = (<svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>);
   const IconEyeOff = (<svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>);
 
- function FloatField({ label, value, onChange, type = 'text', icon }) {
-  const [focused, setFocused] = useState(false);
-  const [showPwd, setShowPwd] = useState(false);
-  const isPassword = type === 'password';
-  const inputType  = isPassword ? (showPwd ? 'text' : 'password') : type;
-  const active     = focused || (value?.length > 0);
 
-  const IconEyeOn = (
-    <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-      <circle cx="12" cy="12" r="3"/>
-    </svg>
-  );
-
-  const IconEyeOff = (
-    <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-      <line x1="1" y1="1" x2="23" y2="23"/>
-    </svg>
-  );
-
- return (
-  <div className={`ac2-field ${active ? 'active' : ''} ${focused ? 'focused' : ''}`}>
-    <div className="ac2-field-icon">{icon}</div>
-    <div className="ac2-field-inner">
-      <label className="ac2-label">{label}</label>
-      <input
-        className="ac2-input"
-        type={inputType}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        autoComplete="off"
-      />
-    </div>
-
-    {/* ← œil visible SEULEMENT quand le champ est actif (focus ou valeur) */}
-    {isPassword && active && (
-      <button
-        type="button"
-        className={`ac2-eye-btn${showPwd ? ' visible' : ''}`}
-        onClick={() => setShowPwd(v => !v)}
-        tabIndex={-1}
-      >
-        {showPwd ? IconEyeOn : IconEyeOff}
-      </button>
-    )}
-
-    <div className="ac2-field-bar" />
-  </div>
-);
-}
   const IconUser   = (<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>);
   const IconMail   = (<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>);
   const IconLock   = (<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>);
@@ -3858,7 +4097,50 @@ function AccountPanel({ user }) {
           <input type="file" id="avatar-upload" accept="image/*" style={{ display:'none' }} onChange={async (e) => { const file=e.target.files[0]; if(!file) return; const fd=new FormData(); fd.append('avatar',file); try { const res=await api.post('/profile/avatar',fd,{headers:{'Content-Type':'multipart/form-data'}}); setUser(prev=>({...prev,avatar:res.data.avatar})); } catch(err){console.error(err);} }} />
           <button className="ac2-avatar-btn" onClick={() => document.getElementById('avatar-upload').click()}><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
         </div>
-        <div className="ac2-hero-info"><div className="ac2-hero-name">{user?.name||'User'}</div><div className="ac2-hero-email">{user?.email||'—'}</div><div className="ac2-hero-badge"><span className="ac2-badge-dot"/>QA Engineer</div></div>
+
+ <div className="ac2-hero-info" style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+  
+  {/* Colonne gauche : nom, email, badge */}
+  <div>
+    <div className="ac2-hero-name">{user?.name || 'User'}</div>
+    <div className="ac2-hero-email">{user?.email || '—'}</div>
+    <div className="ac2-hero-badge"><span className="ac2-badge-dot"/>QA Engineer</div>
+  </div>
+
+  {/* Colonne droite : stats */}
+  <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      padding: '16px 28px', borderRadius: 14,
+      background: 'rgba(201,162,39,.08)', border: '1px solid rgba(201,162,39,.2)',
+      minWidth: 110
+    }}>
+      <svg width="18" height="18" fill="none" stroke="#c9a227" strokeWidth="2" viewBox="0 0 24 24" style={{ marginBottom: 6 }}>
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+      <span style={{ fontSize: 28, fontWeight: 800, color: '#c9a227', lineHeight: 1 }}>
+        {statsLoading ? '…' : stats.generations_count}
+      </span>
+      <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, fontWeight: 600 }}>Generations</span>
+    </div>
+
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      padding: '16px 28px', borderRadius: 14,
+      background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)',
+      minWidth: 110
+    }}>
+      <svg width="18" height="18" fill="none" stroke="#818cf8" strokeWidth="2" viewBox="0 0 24 24" style={{ marginBottom: 6 }}>
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span style={{ fontSize: 28, fontWeight: 800, color: '#818cf8', lineHeight: 1 }}>
+        {statsLoading ? '…' : stats.projects_count}
+      </span>
+      <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, fontWeight: 600 }}>Projects</span>
+    </div>
+  </div>
+
+</div>
       </div>
       <div className="ac2-grid">
         <div className="ac2-card">
@@ -3872,9 +4154,16 @@ function AccountPanel({ user }) {
         <div className="ac2-card">
           <div className="ac2-card-head"><div className="ac2-card-head-icon">{IconShield}</div><div><div className="ac2-card-title">{t('changePassword')}</div><div className="ac2-card-sub">Keep your account secure</div></div></div>
           <div className="ac2-card-body">
-            <FloatField label={t('currentPassword')} value={currPwd} onChange={setCurrPwd} type="password" icon={IconLock} />
-            <FloatField label={t('newPassword')} value={newPwd} onChange={setNewPwd} type="password" icon={IconLock} />
-            <FloatField label={t('confirmNewPassword')} value={confirmPwd} onChange={setConfirmPwd} type="password" icon={IconLock} />
+            <FloatField 
+  label={t('currentPassword')} 
+  value={currPwd} 
+  onChange={setCurrPwd} 
+  type="password" 
+  icon={IconLock} 
+  autoCompleteType="current-password"
+/>
+<FloatField label={t('newPassword')} value={newPwd} onChange={setNewPwd} type="password" icon={IconLock} autoCompleteType="new-password" />
+<FloatField label={t('confirmNewPassword')} value={confirmPwd} onChange={setConfirmPwd} type="password" icon={IconLock} autoCompleteType="new-password" />
             {newPwd.length > 0 && (
               <div className="ac2-strength">
                 <div className="ac2-strength-bars">{[1,2,3,4].map(n => (<div key={n} className={`ac2-strength-bar ${newPwd.length>=n*3?(n<=1?'weak':n<=2?'fair':n<=3?'good':'strong'):''}`}/>))}</div>
@@ -3895,6 +4184,7 @@ function AccountPanel({ user }) {
 
 function SettingsPanel({ theme, setTheme }) {
   const { t, setLanguage: applyLang } = useLang();
+  const { logout } = useAuth();
   const [notifs,    setNotifs]    = useState(true);
   const [weekly,    setWeekly]    = useState(false);
   const [framework, setFramework] = useState('Selenium');
@@ -3902,46 +4192,151 @@ function SettingsPanel({ theme, setTheme }) {
   const [msg,       setMsg]       = useState('');
   const [loading,   setLoading]   = useState(false);
 
+  // Danger Zone states
+  const [showDeleteHistory, setShowDeleteHistory] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [confirmText,       setConfirmText]       = useState('');
+  const [dangerLoading,     setDangerLoading]     = useState(false);
+  const [dangerMsg,         setDangerMsg]         = useState('');
+
   useEffect(() => {
-    api.get('/settings').then(res => { setNotifs(res.data.email_notifications); setWeekly(res.data.weekly_report); setFramework(res.data.default_framework); if (!theme||theme==='light') setTheme(res.data.theme||'light'); setLanguage(res.data.language||'en'); });
+    api.get('/settings').then(res => {
+      setNotifs(res.data.email_notifications);
+      setWeekly(res.data.weekly_report);
+      setFramework(res.data.default_framework);
+      if (!theme || theme === 'light') setTheme(res.data.theme || 'light');
+      setLanguage(res.data.language || 'en');
+    });
   }, []);
 
   const saveSettings = async () => {
     setLoading(true); setMsg('');
-    try { await api.put('/settings/update', { email_notifications:notifs, weekly_report:weekly, default_framework:framework, theme, language }); applyLang(language); setMsg(t('settingsSaved')); setTimeout(() => setMsg(''), 3000); }
-    catch (err) { console.error(err); }
+    try {
+      await api.put('/settings/update', {
+        email_notifications: notifs,
+        weekly_report: weekly,
+        default_framework: framework,
+        theme,
+        language
+      });
+      applyLang(language);
+      setMsg(t('settingsSaved'));
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) { console.error(err); }
     setLoading(false);
   };
 
-  const LANGS = [{ code:'en', label:'English', flag:'🇬🇧' }, { code:'fr', label:'Français', flag:'🇫🇷' }, { code:'ar', label:'العربية', flag:'🇹🇳' }];
+const handleDeleteHistory = async () => {
+  if (confirmText !== 'CONFIRM') return;
+  setDangerLoading(true);
+  try {
+    await api.delete('/generations/all');
+    setDangerLoading(false);
+    setShowDeleteHistory(false);
+    setConfirmText('');
+    setDangerMsg('✓ All history deleted successfully.');
+    document.querySelector('.dash-root .content')?.scrollTo({ top: 0, behavior: 'smooth' }); // ← ICI
+    setTimeout(() => setDangerMsg(''), 8000);
+  } catch (err) {
+    setDangerLoading(false);
+    setShowDeleteHistory(false);
+    setDangerMsg('✗ Error deleting history. Please try again.');
+    document.querySelector('.dash-root .content')?.scrollTo({ top: 0, behavior: 'smooth' }); // ← ET ICI
+  }
+};
+
+ const handleDeleteAccount = async () => {
+  if (confirmText !== 'CONFIRM') return;
+  setDangerLoading(true);
+  try {
+    await api.delete('/profile/delete');
+    logout();
+  } catch (err) {
+    setDangerLoading(false);
+    setShowDeleteAccount(false);
+    setDangerMsg('✗ Error deleting account. Please try again.');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+};
+
+  const LANGS = [
+    { code: 'en', label: 'English',  flag: '🇬🇧' },
+    { code: 'fr', label: 'Français', flag: '🇫🇷' },
+    { code: 'ar', label: 'العربية', flag: '🇹🇳' },
+  ];
 
   return (
     <div className="panel">
-      <div className="p-header"><div><h1 className="p-title">{t('appSettings')} <span className="g">{t('settings')}</span></h1><p className="p-sub">{t('customize')}</p></div><button className="btn-primary" onClick={saveSettings} disabled={loading}>{loading?<><span className="spinner"/>{t('saving')}</>:<>{t('saveSettings')}</>}</button></div>
+      <div className="p-header">
+        <div>
+          <h1 className="p-title">{t('appSettings')} <span className="g">{t('settings')}</span></h1>
+          <p className="p-sub">{t('customize')}</p>
+        </div>
+        <button className="btn-primary" onClick={saveSettings} disabled={loading}>
+          {loading ? <><span className="spinner"/>{t('saving')}</> : <>{t('saveSettings')}</>}
+        </button>
+      </div>
+
       {msg && <div className="success-msg">✓ {msg}</div>}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+      {dangerMsg && (
+  <div className={dangerMsg.startsWith('✓') ? 'success-msg' : 'error-msg'} style={{ marginBottom: 16 }}>
+    {dangerMsg}
+  </div>
+)}
+
+      {/* Existing sections */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
         <div className="set-group">
           <div className="set-group-title">{t('notifications')}</div>
-          <div className="set-row"><div><div className="set-name">{t('emailNotif')}</div><div className="set-desc">{t('emailNotifDesc')}</div></div><div className={`toggle${notifs?' on':''}`} onClick={() => setNotifs(p=>!p)}><span className="toggle-knob"/></div></div>
-          <div className="set-row"><div><div className="set-name">{t('weeklyReport')}</div><div className="set-desc">{t('weeklyReportDesc')}</div></div><div className={`toggle${weekly?' on':''}`} onClick={() => setWeekly(p=>!p)}><span className="toggle-knob"/></div></div>
+          <div className="set-row">
+            <div>
+              <div className="set-name">{t('emailNotif')}</div>
+              <div className="set-desc">{t('emailNotifDesc')}</div>
+            </div>
+            <div className={`toggle${notifs ? ' on' : ''}`} onClick={() => setNotifs(p => !p)}>
+              <span className="toggle-knob"/>
+            </div>
+          </div>
+          <div className="set-row">
+            <div>
+              <div className="set-name">{t('weeklyReport')}</div>
+              <div className="set-desc">{t('weeklyReportDesc')}</div>
+            </div>
+            <div className={`toggle${weekly ? ' on' : ''}`} onClick={() => setWeekly(p => !p)}>
+              <span className="toggle-knob"/>
+            </div>
+          </div>
         </div>
         <div className="set-group">
           <div className="set-group-title">{t('exportDefaults')}</div>
-          <div className="set-row"><div><div className="set-name">{t('defaultFramework')}</div><div className="set-desc">{t('defaultFrameworkDesc')}</div></div><select className="set-select" value={framework} onChange={e => setFramework(e.target.value)}><option>Selenium</option><option>Cypress</option><option>Playwright</option><option>Both</option></select></div>
+          <div className="set-row">
+            <div>
+              <div className="set-name">{t('defaultFramework')}</div>
+              <div className="set-desc">{t('defaultFrameworkDesc')}</div>
+            </div>
+            <select className="set-select" value={framework} onChange={e => setFramework(e.target.value)}>
+              <option>Selenium</option>
+              <option>Cypress</option>
+              <option>Playwright</option>
+              <option>Both</option>
+            </select>
+          </div>
         </div>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
         <div className="set-group">
           <div className="set-group-title">{t('appearance')}</div>
-          <div style={{ padding:'16px 20px' }}>
-            <div className="set-name" style={{ marginBottom:4 }}>{t('theme')}</div>
-            <div className="set-desc" style={{ marginBottom:14 }}>{t('themeDesc')}</div>
-            <div style={{ display:'flex', gap:12 }}>
-              {[{ key:'light', emoji:'☀️', label:'Light' }, { key:'dark', emoji:'🌙', label:'Dark' }, { key:'system', emoji:'💻', label:'System' }].map(th => (
-                <div key={th.key} onClick={() => { setTheme(th.key); api.put('/settings/update', { theme:th.key }); }} style={{ flex:1, padding:'14px 12px', borderRadius:12, cursor:'pointer', border:theme===th.key?'2px solid var(--gold)':'1.5px solid var(--border)', background:theme===th.key?'var(--goldbg)':'var(--bg)', transition:'all .2s', textAlign:'center' }}>
-                  <div style={{ fontSize:24, marginBottom:6 }}>{th.emoji}</div>
-                  <div style={{ fontSize:12, fontWeight:700, color:theme===th.key?'var(--gold)':'var(--muted)' }}>{th.label}</div>
-                  {theme===th.key && <div style={{ width:8, height:8, borderRadius:'50%', background:'var(--gold)', margin:'6px auto 0' }}/>}
+          <div style={{ padding: '16px 20px' }}>
+            <div className="set-name" style={{ marginBottom: 4 }}>{t('theme')}</div>
+            <div className="set-desc" style={{ marginBottom: 14 }}>{t('themeDesc')}</div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              {[{ key: 'light', emoji: '☀️', label: 'Light' }, { key: 'dark', emoji: '🌙', label: 'Dark' }, { key: 'system', emoji: '💻', label: 'System' }].map(th => (
+                <div key={th.key} onClick={() => { setTheme(th.key); api.put('/settings/update', { theme: th.key }); }}
+                  style={{ flex: 1, padding: '14px 12px', borderRadius: 12, cursor: 'pointer', border: theme === th.key ? '2px solid var(--gold)' : '1.5px solid var(--border)', background: theme === th.key ? 'var(--goldbg)' : 'var(--bg)', transition: 'all .2s', textAlign: 'center' }}>
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>{th.emoji}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: theme === th.key ? 'var(--gold)' : 'var(--muted)' }}>{th.label}</div>
+                  {theme === th.key && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)', margin: '6px auto 0' }}/>}
                 </div>
               ))}
             </div>
@@ -3949,32 +4344,581 @@ function SettingsPanel({ theme, setTheme }) {
         </div>
         <div className="set-group">
           <div className="set-group-title">{t('language')}</div>
-          <div style={{ padding:'16px 20px' }}>
-            <div className="set-name" style={{ marginBottom:4 }}>{t('interfaceLang')}</div>
-            <div className="set-desc" style={{ marginBottom:14 }}>{t('langDesc')}</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ padding: '16px 20px' }}>
+            <div className="set-name" style={{ marginBottom: 4 }}>{t('interfaceLang')}</div>
+            <div className="set-desc" style={{ marginBottom: 14 }}>{t('langDesc')}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {LANGS.map(l => (
-                <div key={l.code} onClick={() => setLanguage(l.code)} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderRadius:10, cursor:'pointer', border:language===l.code?'2px solid var(--gold)':'1.5px solid var(--border)', background:language===l.code?'var(--goldbg)':'var(--bg)', transition:'all .2s' }}>
-                  <span style={{ fontSize:20 }}>{l.flag}</span>
-                  <span style={{ fontSize:13, fontWeight:600, color:language===l.code?'var(--gold)':'var(--muted)', flex:1 }}>{l.label}</span>
-                  {language===l.code && <svg width="16" height="16" fill="none" stroke="var(--gold)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>}
+                <div key={l.code} onClick={() => setLanguage(l.code)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, cursor: 'pointer', border: language === l.code ? '2px solid var(--gold)' : '1.5px solid var(--border)', background: language === l.code ? 'var(--goldbg)' : 'var(--bg)', transition: 'all .2s' }}>
+                  <span style={{ fontSize: 20 }}>{l.flag}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: language === l.code ? 'var(--gold)' : 'var(--muted)', flex: 1 }}>{l.label}</span>
+                  {language === l.code && <svg width="16" height="16" fill="none" stroke="var(--gold)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>}
                 </div>
               ))}
             </div>
           </div>
         </div>
       </div>
+
+      {/* ══ DANGER ZONE ══ */}
+      <div style={{
+        border: '1.5px solid rgba(239,68,68,0.2)',
+        borderRadius: 16,
+        overflow: 'hidden',
+        boxShadow: '0 4px 24px rgba(239,68,68,0.08)'
+      }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '16px 24px',
+          background: 'rgba(239,68,68,0.06)',
+          borderBottom: '1px solid rgba(239,68,68,0.15)'
+        }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: 'rgba(239,68,68,0.1)',
+            border: '1px solid rgba(239,68,68,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <svg width="18" height="18" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#ef4444' }}>Danger Zone</div>
+            <div style={{ fontSize: 11, color: 'rgba(239,68,68,0.6)', marginTop: 1 }}>
+              These actions are irreversible. Please be careful.
+            </div>
+          </div>
+        </div>
+
+        {/* Delete History Row */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '20px 24px',
+          borderBottom: '1px solid rgba(239,68,68,0.1)',
+          gap: 20, flexWrap: 'wrap'
+        }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+              Delete All History
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+              Permanently delete all your test generations and results.<br/>
+              <strong style={{ color: 'rgba(239,68,68,0.7)' }}>This action cannot be undone.</strong>
+            </div>
+          </div>
+          <button
+            onClick={() => { setShowDeleteHistory(true); setShowDeleteAccount(false); setConfirmText(''); }}
+            style={{
+              padding: '10px 20px', borderRadius: 10,
+              background: 'rgba(239,68,68,0.08)',
+              border: '1.5px solid rgba(239,68,68,0.3)',
+              color: '#ef4444', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit',
+              transition: 'all .2s', flexShrink: 0,
+              letterSpacing: '.5px', textTransform: 'uppercase'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; e.currentTarget.style.borderColor = '#ef4444'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; }}
+          >
+            Delete History
+          </button>
+        </div>
+
+        {/* Delete Account Row */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '20px 24px',
+          gap: 20, flexWrap: 'wrap'
+        }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+              Delete My Account
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+              Permanently delete your account, all projects, and data.<br/>
+              <strong style={{ color: 'rgba(239,68,68,0.7)' }}>This action cannot be undone.</strong>
+            </div>
+          </div>
+          <button
+            onClick={() => { setShowDeleteAccount(true); setShowDeleteHistory(false); setConfirmText(''); }}
+            style={{
+              padding: '10px 20px', borderRadius: 10,
+              background: 'rgba(239,68,68,0.08)',
+              border: '1.5px solid rgba(239,68,68,0.3)',
+              color: '#ef4444', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit',
+              transition: 'all .2s', flexShrink: 0,
+              letterSpacing: '.5px', textTransform: 'uppercase'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; e.currentTarget.style.borderColor = '#ef4444'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; }}
+          >
+            Delete Account
+          </button>
+        </div>
+      </div>
+
+      {(showDeleteHistory || showDeleteAccount) && createPortal(
+  <div
+    onClick={() => { setShowDeleteHistory(false); setShowDeleteAccount(false); setConfirmText(''); }}
+    style={{
+      position: 'fixed', inset: 0, zIndex: 99999,
+      background: 'rgba(0,0,0,0.6)',
+      backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}
+  >
+    <div
+      onClick={e => e.stopPropagation()}
+      className="danger-modal-inner"
+      style={{
+        width: 500,
+        borderRadius: 18,
+        overflow: 'hidden',
+        boxShadow: '0 24px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(239,68,68,.12)',
+        animation: 'dFadeUp .2s ease both',
+        fontFamily: "'DM Sans', sans-serif",
+      }}
+    >
+      {/* Top accent line */}
+      <div style={{ height: 3, background: 'linear-gradient(90deg, transparent, #ef4444, transparent)' }} />
+
+      {/* Header */}
+      <div style={{
+  padding: '24px 28px 18px',
+  background: theme === 'light' ? '#ffffff' : '#0d1526',
+  borderBottom: `1px solid ${theme === 'light' ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.05)'}`,
+  display: 'flex', alignItems: 'center', gap: 14,
+}}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+          background: 'rgba(239,68,68,.1)',
+          border: '1px solid rgba(239,68,68,.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {showDeleteHistory ? (
+            <svg width="20" height="20" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+            </svg>
+          ) : (
+            <svg width="20" height="20" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+          )}
+        </div>
+        <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: theme === 'light' ? '#0f1729' : '#e2e8f0', marginBottom: 3 }}>
+  {showDeleteHistory ? 'Delete all history?' : 'Delete your account?'}
+</div>
+<div style={{ fontSize: 12, color: theme === 'light' ? '#64748b' : '#475569', fontWeight: 500 }}>
+  This action is permanent and cannot be reversed
+</div>
+        </div>
+        <button
+          onClick={() => { setShowDeleteHistory(false); setShowDeleteAccount(false); setConfirmText(''); }}
+          style={{
+            width: 30, height: 30, borderRadius: 8,
+            background: 'rgba(255,255,255,.04)',
+            border: '1px solid rgba(255,255,255,.06)',
+            color: theme === 'light' ? '#94a3b8' : '#475569', cursor: 'pointer',
+
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 17, lineHeight: 1, transition: 'all .15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#e2e8f0'; e.currentTarget.style.background = 'rgba(255,255,255,.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'rgba(255,255,255,.04)'; }}
+        >×</button>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: '24px 28px', background: theme === 'light' ? '#f4f6fb' : '#080f1e' }}>
+
+
+        {/* Description */}
+        <p style={{ fontSize: 13.5, color: theme === 'light' ? '#475569' : '#64748b', lineHeight: 1.75, marginBottom: 18 }}>
+
+          {showDeleteHistory
+            ? 'This will permanently delete all your test generations, execution results, and scripts. Your account will remain active.'
+            : 'This will permanently delete your account, all projects, generations, and associated data. You will be logged out immediately.'}
+        </p>
+
+        {/* Warning */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 16px', borderRadius: 10, marginBottom: 22,
+          background: 'rgba(239,68,68,.06)',
+          border: '1px solid rgba(239,68,68,.15)',
+        }}>
+          <svg width="14" height="14" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span style={{ fontSize: 12.5, color: '#ef4444', fontWeight: 600 }}>
+            {showDeleteHistory
+              ? 'All generations and their results will be permanently removed.'
+              : 'Your account and all associated data will be permanently removed.'}
+          </span>
+        </div>
+
+        {/* Input */}
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ fontSize: 12, color: '#475569', marginBottom: 9, fontWeight: 500 }}>
+            Type{' '}
+            <code style={{
+              color: '#ef4444', background: 'rgba(239,68,68,.1)',
+              padding: '1px 7px', borderRadius: 5,
+              fontFamily: 'monospace', fontSize: 12, fontWeight: 700,
+            }}>CONFIRM</code>
+            {' '}to proceed
+          </div>
+          <input
+            autoFocus
+            value={confirmText}
+            onChange={e => setConfirmText(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && confirmText === 'CONFIRM') {
+                showDeleteHistory ? handleDeleteHistory() : handleDeleteAccount();
+              }
+              if (e.key === 'Escape') {
+                setShowDeleteHistory(false); setShowDeleteAccount(false); setConfirmText('');
+              }
+            }}
+            placeholder="CONFIRM"
+            style={{
+              width: '100%', padding: '12px 16px', borderRadius: 10,
+              background: theme === 'light' ? '#ffffff' : 'rgba(255,255,255,.03)',
+
+              border: `1.5px solid ${confirmText === 'CONFIRM' ? '#10b981' : 'rgba(239,68,68,.15)'}`,
+              color: confirmText === 'CONFIRM' ? '#10b981' : (theme === 'light' ? '#0f1729' : '#e2e8f0'),
+
+              fontSize: 14, fontFamily: 'monospace', fontWeight: 700,
+              outline: 'none', transition: 'border-color .2s, color .2s',
+              boxShadow: confirmText === 'CONFIRM' ? '0 0 0 3px rgba(16,185,129,.08)' : 'none',
+            }}
+          />
+        </div>
+
+        {/* Buttons */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => { setShowDeleteHistory(false); setShowDeleteAccount(false); setConfirmText(''); }}
+            style={{
+  flex: 1, padding: '12px', borderRadius: 10,
+  background: theme === 'light' ? 'rgba(0,0,0,.04)' : 'rgba(255,255,255,.04)',
+  border: `1px solid ${theme === 'light' ? 'rgba(0,0,0,.1)' : 'rgba(255,255,255,.07)'}`,
+  color: '#64748b', fontSize: 13, fontWeight: 700,
+  cursor: 'pointer', fontFamily: 'inherit', transition: 'all .18s',
+}}
+            onMouseEnter={e => { e.currentTarget.style.color = '#e2e8f0'; e.currentTarget.style.background = 'rgba(255,255,255,.07)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.background = 'rgba(255,255,255,.04)'; }}
+          >Cancel</button>
+
+          <button
+            onClick={showDeleteHistory ? handleDeleteHistory : handleDeleteAccount}
+            disabled={confirmText !== 'CONFIRM' || dangerLoading}
+            style={{
+              flex: 2, padding: '12px', borderRadius: 10,
+              background: confirmText === 'CONFIRM'
+                ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
+                : 'rgba(239,68,68,.06)',
+              border: `1px solid ${confirmText === 'CONFIRM' ? 'rgba(220,38,38,.6)' : 'rgba(239,68,68,.12)'}`,
+              color: confirmText === 'CONFIRM' ? '#fff' : 'rgba(239,68,68,.25)',
+              fontSize: 13, fontWeight: 800,
+              cursor: confirmText === 'CONFIRM' ? 'pointer' : 'not-allowed',
+              fontFamily: 'inherit', transition: 'all .22s',
+              letterSpacing: '.8px', textTransform: 'uppercase',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              boxShadow: confirmText === 'CONFIRM' ? '0 4px 16px rgba(220,38,38,.35)' : 'none',
+            }}
+            onMouseEnter={e => {
+              if (confirmText === 'CONFIRM') {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(220,38,38,.5)';
+              }
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = confirmText === 'CONFIRM' ? '0 4px 16px rgba(220,38,38,.35)' : 'none';
+            }}
+          >
+            
+{dangerLoading ? (
+  <><span className="spinner" /> Deleting…</>
+) : confirmText === 'CONFIRM' && !dangerLoading ? (
+  <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg> Delete History</>
+            ) : showDeleteHistory ? (
+              <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg> Delete History</>
+            ) : (
+              <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Delete Account</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>,
+  document.body
+)}
     </div>
   );
 }
 
+ 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Root Dashboard
 // ─────────────────────────────────────────────────────────────────────────────
+function CommandPalette({ open, onClose, histories, projects, goTo, setGeneration }) {
+  const [query, setQuery] = useState('');
+  const [cursor, setCursor] = useState(0);
+  const inputRef = useRef(null);
 
+  useEffect(() => {
+    if (open) { setTimeout(() => inputRef.current?.focus(), 50); setQuery(''); setCursor(0); }
+  }, [open]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); open ? onClose() : null; }
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onClose]);
+
+  const q = query.toLowerCase().trim();
+
+  const projectResults = projects
+    .filter(p => !q || p.name.toLowerCase().includes(q) || p.type.toLowerCase().includes(q))
+    .slice(0, 3)
+    .map(p => ({
+      type: 'project', id: `proj-${p.id}`, icon: p.type === 'public' ? '🌐' : '🔒',
+      title: p.name, sub: `${p.type} project · ${p.generations_count || 0} generations`,
+      color: p.type === 'public' ? '#4f86e8' : '#8b5cf6',
+      action: () => { /* navigation déjà gérée par la sélection dans Projects */ goTo('generate'); onClose(); }
+    }));
+
+  const genResults = histories
+    .filter(h => !q || h.url?.toLowerCase().includes(q) || h.framework?.toLowerCase().includes(q) || h.test_type?.toLowerCase().includes(q))
+    .slice(0, 5)
+    .map(h => {
+      const rc = (h.pass_rate || 0) >= 80 ? '#10b981' : (h.pass_rate || 0) >= 50 ? '#f59e0b' : '#ef4444';
+      const FW = { Selenium: { l: 'Se', c: '#43B02A' }, Cypress: { l: 'Cy', c: '#00BFA5' }, Playwright: { l: 'Pl', c: '#E2574C' }, Both: { l: '∞', c: '#C9A227' } };
+      const fw = FW[h.framework] || FW.Selenium;
+      return {
+        type: 'generation', id: `gen-${h.id}`,
+        icon: null, fw, rc,
+        title: h.url, sub: `${h.framework} · ${h.test_type} · ${h.pass_rate || 0}% pass`,
+        passRate: h.pass_rate || 0,
+        action: () => {
+          setGeneration({
+            url: h.url, framework: h.framework, test_type: h.test_type,
+            generation: { id: h.id, url: h.url, framework: h.framework, load_time_ms: h.load_time_ms, test_type: h.test_type },
+            result: {
+              test_type: h.test_type || 'smoke', test_cases: h.test_cases || [],
+              test_cases_selenium: h.test_cases_selenium || [], test_cases_cypress: h.test_cases_cypress || [],
+              script: h.script || '', script_selenium: h.script_selenium || '',
+              script_playwright: h.script_playwright || '', script_cypress: h.script_cypress || '',
+              execution_results: h.execution_results || [],
+              performance: h.performance_data || h.performance || null,
+            },
+          });
+          goTo('execution'); onClose();
+        }
+      };
+    });
+
+  const navResults = !q ? [] : [
+    { id: 'nav-dash',    title: 'Dashboard',      sub: 'Overview & stats',          icon: '🏠', action: () => { goTo('dashboard'); onClose(); } },
+    { id: 'nav-gen',     title: 'New Generation', sub: 'Generate tests for a URL',  icon: '⚡', action: () => { goTo('generate');  onClose(); } },
+    { id: 'nav-hist',    title: 'History',         sub: 'All past generations',      icon: '🕐', action: () => { goTo('history');   onClose(); } },
+    { id: 'nav-account', title: 'Account',         sub: 'Profile & settings',        icon: '👤', action: () => { goTo('account');   onClose(); } },
+  ].filter(n => n.title.toLowerCase().includes(q) || n.sub.toLowerCase().includes(q));
+
+  const allResults = [...navResults, ...projectResults, ...genResults];
+
+  useEffect(() => { setCursor(0); }, [query]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setCursor(c => Math.min(c + 1, allResults.length - 1)); }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); setCursor(c => Math.max(c - 1, 0)); }
+      if (e.key === 'Enter' && allResults[cursor]) { allResults[cursor].action(); }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, cursor, allResults]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 99999,
+        background: 'rgba(0,0,0,0.6)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        paddingTop: '12vh',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: 560, maxHeight: '60vh',
+          background: '#0d1526',
+          border: '1px solid rgba(99,102,241,.3)',
+          borderRadius: 16,
+          boxShadow: '0 24px 80px rgba(0,0,0,.8)',
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+          fontFamily: "'DM Sans', sans-serif",
+          animation: 'cpFadeIn .15s ease both',
+        }}
+      >
+        <style>{`
+          @keyframes cpFadeIn { from { opacity:0; transform:translateY(-8px) scale(.98) } to { opacity:1; transform:none } }
+          .cp-row:hover { background: rgba(99,102,241,.08) !important; }
+        `}</style>
+
+        {/* Search input */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+          <svg width="16" height="16" fill="none" stroke="#6b7280" strokeWidth="2" viewBox="0 0 24 24" style={{flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search URLs, projects, pages…"
+            style={{
+              flex: 1, background: 'none', border: 'none', outline: 'none',
+              color: '#e2e8f0', fontSize: 15, fontFamily: 'inherit',
+            }}
+          />
+          {query && (
+            <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+          )}
+          <kbd style={{ fontSize: 10, color: '#4b5563', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 6, padding: '2px 6px' }}>ESC</kbd>
+        </div>
+
+        {/* Results */}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {allResults.length === 0 && (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#4b5563', fontSize: 13 }}>
+              {query ? `No results for "${query}"` : 'Start typing to search…'}
+            </div>
+          )}
+
+          {/* Nav group */}
+          {navResults.length > 0 && (
+            <div>
+              <div style={{ padding: '8px 18px 4px', fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#374151' }}>Navigation</div>
+              {navResults.map((r, i) => {
+                const idx = i;
+                return (
+                  <div key={r.id} className="cp-row" onClick={r.action} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', cursor: 'pointer', background: cursor === idx ? 'rgba(99,102,241,.12)' : 'transparent', transition: 'background .1s' }}>
+                    <span style={{ fontSize: 18, width: 28, textAlign: 'center' }}>{r.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{r.title}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{r.sub}</div>
+                    </div>
+                    <svg width="12" height="12" fill="none" stroke="#374151" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Projects group */}
+          {projectResults.length > 0 && (
+            <div>
+              <div style={{ padding: '8px 18px 4px', fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#374151' }}>Projects</div>
+              {projectResults.map((r, i) => {
+                const idx = navResults.length + i;
+                return (
+                  <div key={r.id} className="cp-row" onClick={r.action} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', cursor: 'pointer', background: cursor === idx ? 'rgba(99,102,241,.12)' : 'transparent', transition: 'background .1s' }}>
+                    <span style={{ fontSize: 18, width: 28, textAlign: 'center' }}>{r.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{r.title}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{r.sub}</div>
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: r.color, background: `${r.color}18`, border: `1px solid ${r.color}33`, padding: '2px 8px', borderRadius: 20 }}>{r.title.includes('public') ? 'Public' : 'Open'}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Generations group */}
+          {genResults.length > 0 && (
+            <div>
+              <div style={{ padding: '8px 18px 4px', fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#374151' }}>Recent Generations</div>
+              {genResults.map((r, i) => {
+                const idx = navResults.length + projectResults.length + i;
+                return (
+                  <div key={r.id} className="cp-row" onClick={r.action} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', cursor: 'pointer', background: cursor === idx ? 'rgba(99,102,241,.12)' : 'transparent', transition: 'background .1s' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, width: 28, height: 28, borderRadius: '50%', background: `${r.fw.c}18`, border: `1px solid ${r.fw.c}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: r.fw.c, flexShrink: 0 }}>{r.fw.l}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{r.sub}</div>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: r.rc, flexShrink: 0 }}>{r.passRate}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '8px 18px', borderTop: '1px solid rgba(255,255,255,.04)', display: 'flex', gap: 16, alignItems: 'center' }}>
+          {[['↑↓', 'navigate'], ['↵', 'select'], ['esc', 'close']].map(([k, l]) => (
+            <span key={k} style={{ fontSize: 11, color: '#4b5563', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <kbd style={{ fontSize: 10, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 4, padding: '1px 5px', color: '#9ca3af' }}>{k}</kbd>{l}
+            </span>
+          ))}
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#374151' }}>{allResults.length} result{allResults.length !== 1 ? 's' : ''}</span>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 export default function Dashboard() {
-  const [page,           setPage]          = useState('dashboard');
-  const [collapsed,      setCollapse]      = useState(false);
+
+  const [page, setPage]= useState('dashboard');
+  useEffect(() => {
+  const titles = {
+    dashboard: 'Dashboard - NexTest',
+    generate:  'Projects - NexTest',
+    execution: 'Test Execution - NexTest',
+    history:   'History - NexTest',
+    account:   'Account - NexTest',
+    settings:  'Settings - NexTest',
+  };
+  document.title = titles[page] || 'NexTest';
+}, [page]);
+
+  const [collapsed, setCollapse]= useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
+
+const [notifs, setNotifs] = useState([]);
+  
+  const [searchHistories, setSearchHistories] = useState([]);   // ← AJOUTE
+  const [searchProjects,  setSearchProjects]  = useState([]); 
+  const [headerSearch, setHeaderSearch] = useState('');
+const [headerResults, setHeaderResults] = useState([]);
+const [headerOpen, setHeaderOpen] = useState(false);
+const headerRef = useRef(null);
+
   const [theme,          setTheme]         = useState(() => {
     const saved = localStorage.getItem('nextest-theme');
     if (saved === 'light' || saved === 'dark') return saved;
@@ -3988,10 +4932,45 @@ export default function Dashboard() {
   const [projectStep,     setProjectStep]   = useState('list');
 
   const { user, logout } = useAuth();
+  useEffect(() => {
+  if (user?.id) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`nextest-notifs-${user.id}`)) || [];
+      setNotifs(saved);
+    } catch { setNotifs([]); }
+  }
+}, [user?.id]);
   const { t }            = useLang();
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('nextest-theme', theme); }, [theme]);
+// ← AJOUTE CES DEUX useEffect ICI
+  useEffect(() => {
+  if (!user?.id) return;
+  setSearchHistories([]);
+  setSearchProjects([]);
+  api.get('/generations').then(r => setSearchHistories(r.data)).catch(() => {});
+  api.get('/projects').then(r => setSearchProjects(r.data)).catch(() => {});
+}, [user?.id]);
 
+  useEffect(() => {
+  if (!headerSearch.trim()) { setHeaderResults([]); setHeaderOpen(false); return; }
+  const q = headerSearch.toLowerCase();
+  const projRes = searchProjects
+    .filter(p => p.name.toLowerCase().includes(q) || p.type.toLowerCase().includes(q))
+    .slice(0, 3).map(p => ({ type: 'project', id: p.id, icon: p.type === 'public' ? '🌐' : '🔒', title: p.name, sub: `${p.type} · ${p.generations_count || 0} generations`, color: p.type === 'public' ? '#4f86e8' : '#8b5cf6', data: p }));
+  const genRes = searchHistories
+    .filter(h => h.url?.toLowerCase().includes(q) || h.framework?.toLowerCase().includes(q))
+    .slice(0, 5).map(h => ({ type: 'generation', id: h.id, title: h.url, sub: `${h.framework} · ${h.test_type} · ${h.pass_rate || 0}% pass`, data: h }));
+  setHeaderResults([...projRes, ...genRes]);
+  setHeaderOpen(true);
+}, [headerSearch, searchProjects, searchHistories]);
+
+useEffect(() => {
+  const handler = (e) => { if (headerRef.current && !headerRef.current.contains(e.target)) setHeaderOpen(false); };
+  document.addEventListener('mousedown', handler);
+  return () => document.removeEventListener('mousedown', handler);
+}, []);
+  
   const handleGenerateNav = () => { setProjectStep('list'); setCurrentProject(null); setSelectedPageUrl(''); setPage('generate'); };
 
   const NAV_MAIN = [
@@ -4035,13 +5014,129 @@ export default function Dashboard() {
               <span className="h-bc-page">{LABELS[page]}</span>
             </div>
           </div>
-          <div className="h-search"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color:'#9ca3af', flexShrink:0 }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" placeholder={t('searchPlaceholder')} /></div>
+       <div ref={headerRef} style={{ position: 'relative', flex: 1, maxWidth: 400 }}>
+  <div className="h-search" style={{ cursor: 'text' }}>
+    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color:'#9ca3af', flexShrink:0 }}>
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    <input
+      value={headerSearch}
+      onChange={e => setHeaderSearch(e.target.value)}
+      placeholder="Search projects, URLs..."
+      style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit', width: '100%' }}
+    />
+    {headerSearch && (
+      <button onClick={() => { setHeaderSearch(''); setHeaderOpen(false); }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex' }}>
+        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    )}
+  </div>
+  {headerOpen && headerResults.length > 0 && (
+    <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, background: '#0d1526', border: '1px solid rgba(99,102,241,.3)', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,.5)', zIndex: 9999, overflow: 'hidden' }}>
+      {headerResults.map((r, i) => (
+        <div key={`${r.type}-${r.id}`} onClick={() => {
+          if (r.type === 'project') {
+            setCurrentProject(r.data); setProjectStep('detail'); setPage('generate');
+          } else {
+            setGeneration({
+              url: r.data.url, framework: r.data.framework, test_type: r.data.test_type,
+              generation: { id: r.data.id, url: r.data.url, framework: r.data.framework, load_time_ms: r.data.load_time_ms, test_type: r.data.test_type },
+              result: {
+                test_type: r.data.test_type || 'smoke', test_cases: r.data.test_cases || [],
+                test_cases_selenium: r.data.test_cases_selenium || [], test_cases_cypress: r.data.test_cases_cypress || [],
+                script: r.data.script || '', script_selenium: r.data.script_selenium || '',
+                script_playwright: r.data.script_playwright || '', script_cypress: r.data.script_cypress || '',
+                execution_results: r.data.execution_results || [],
+                performance: r.data.performance_data || r.data.performance || null,
+              },
+            });
+            setPage('history');
+          }
+          setHeaderSearch(''); setHeaderOpen(false);
+        }}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: 'pointer', borderBottom: i < headerResults.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none', transition: 'background .15s' }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,.1)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>{r.type === 'project' ? r.icon : '🔗'}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
+            <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{r.sub}</div>
+          </div>
+          {r.type === 'project' && <span style={{ fontSize: 10, fontWeight: 700, color: r.color, background: `${r.color}18`, border: `1px solid ${r.color}33`, padding: '2px 8px', borderRadius: 20 }}>Open</span>}
+          {r.type === 'generation' && <span style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>{r.data.pass_rate || 0}%</span>}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
+  
           <div className="h-right">
             <ThemeToggle theme={theme} setTheme={setTheme} />
-            <button className="h-icon-btn"><svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg><span className="notif-dot"/></button>
-            <div className="h-sep"/>
-            <div className="h-avatar">{user?.avatar ? <img src={user.avatar} alt="av" style={{ width:'100%', height:'100%', borderRadius:'50%', objectFit:'cover' }}/> : <span>{user?.name?.[0]?.toUpperCase()||'U'}</span>}</div>
-            <div><div className="h-user-name">{user?.name?.split(' ')[0]||'User'}</div><div className="h-user-role">{t('qaEngineer')}</div></div>
+            <div style={{ position: 'relative' }}>
+  <button
+  className="h-icon-btn"
+  onClick={() => { setNotifOpen(o => !o); setNotifCount(0); }}
+  style={{ position: 'relative' }}
+>
+  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>
+  </svg>
+  {notifCount > 0 && (
+    <span style={{
+      position: 'absolute', top: -4, right: -4,
+      width: 16, height: 16, borderRadius: '50%',
+      background: '#ef4444', border: '2px solid var(--bg)',
+      fontSize: 9, fontWeight: 800, color: '#fff',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'inherit'
+    }}>
+      {notifCount > 9 ? '9+' : notifCount}
+    </span>
+  )}
+</button>
+
+{notifOpen && (
+  <NotifPanel
+    notifs={notifs}
+    onClose={() => setNotifOpen(false)}
+   onDelete={(id) => {
+  const updated = notifs.filter(n => n.id !== id);
+  setNotifs(updated);
+  localStorage.setItem(`nextest-notifs-${user?.id}`, JSON.stringify(updated));
+}}
+onClearAll={() => {
+  setNotifs([]);
+  localStorage.setItem(`nextest-notifs-${user?.id}`, JSON.stringify([]));
+}}
+   
+    goTo={setPage}
+    setGeneration={setGeneration}
+  />
+)}
+</div>
+                       <div className="h-sep"/>
+                       <div
+  onClick={() => setPage('account')}
+  style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+  title="Go to Account"
+>
+  <div className="h-avatar">
+    {user?.avatar
+      ? <img src={user.avatar} alt="av" style={{ width:'100%', height:'100%', borderRadius:'50%', objectFit:'cover' }}/>
+      : <span>{user?.name?.[0]?.toUpperCase() || 'U'}</span>
+    }
+  </div>
+  <div>
+    <div className="h-user-name" style={{ transition: 'color .18s' }}
+      onMouseEnter={e => e.currentTarget.style.color = 'var(--gold)'}
+      onMouseLeave={e => e.currentTarget.style.color = ''}>
+      {user?.name?.split(' ')[0] || 'User'}
+    </div>
+    <div className="h-user-role">{t('qaEngineer')}</div>
+  </div>
+</div>
+          
           </div>
         </header>
 
@@ -4064,7 +5159,27 @@ export default function Dashboard() {
                   <button onClick={() => setProjectStep('detail')} style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:11, fontWeight:700, color:'var(--muted)', background:'none', border:'none', cursor:'pointer', padding:'0 0 20px', transition:'color .18s', letterSpacing:'.5px', textTransform:'uppercase' }} onMouseEnter={e=>e.currentTarget.style.color='var(--indigo2)'} onMouseLeave={e=>e.currentTarget.style.color='var(--muted)'}>
                     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>Back to project
                   </button>
-                  <GeneratePanel goTo={(p) => { setProjectStep('list'); setPage(p); }} setGeneration={setGeneration} project={currentProject} initialUrl={selectedPageUrl} />
+                  <GeneratePanel goTo={(p) => { setProjectStep('list'); setPage(p); }} setGeneration={setGeneration} project={currentProject} initialUrl={selectedPageUrl} onGenerationSaved={(notif) => {
+  const newNotif = { ...notif, id: Date.now(), date: new Date().toISOString() };
+ setNotifs(prev => {
+  const updated = [newNotif, ...prev];
+  localStorage.setItem(`nextest-notifs-${user?.id}`, JSON.stringify(updated));
+  return updated;
+});
+  setNotifCount(c => c + 1);
+  // sound
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.frequency.setValueAtTime(520, ctx.currentTime);
+  osc.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
+  gain.gain.setValueAtTime(0.3, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.4);
+}} />
                 </>
               )}
             </>
@@ -4079,3 +5194,179 @@ export default function Dashboard() {
     </div>
   );
 }
+
+function NotifPanel({ notifs, onClose, onDelete, onClearAll, goTo }) {
+  const [page, setPage] = useState(0);
+  const PER_PAGE = 4;
+  const totalPages = Math.ceil(notifs.length / PER_PAGE);
+  const visible = notifs.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+
+  const timeAgoNotif = (iso) => {
+    const diff = (Date.now() - new Date(iso)) / 1000;
+    if (diff < 60)    return `${Math.floor(diff)}s ago`;
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+<div style={{
+  position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+  width: 320, background: 'var(--card)', border: '1px solid var(--border)',
+  borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,.4)',
+  zIndex: 9999, overflow: 'visible', animation: 'dFadeUp .2s var(--ease) both'
+}}>
+
+  {/* Triangle arrow */}
+  <div style={{
+    position: 'absolute', top: -6, right: 14,
+    width: 12, height: 12,
+    background: 'var(--card)',
+    border: '1px solid var(--border)',
+    borderBottom: 'none', borderRight: 'none',
+    transform: 'rotate(45deg)',
+    zIndex: 1
+  }} />
+
+  {/* Content wrapper */}
+  <div style={{ position: 'relative', zIndex: 2, borderRadius: 14, overflow: 'hidden' }}>
+
+  {/* Header */}
+      <div style={{
+        background: 'linear-gradient(135deg,#0a0f1e,#1e2a4a)',
+        padding: '12px 16px', borderBottom: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>
+            Notifications <span style={{ color: '#64748b' }}>({notifs.length})</span>
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {notifs.length > 0 && (
+            <button onClick={onClearAll} style={{
+              background: 'none', border: 'none', color: '#ef4444',
+              fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              letterSpacing: '.5px', textTransform: 'uppercase'
+            }}>Delete all</button>
+          )}
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', color: '#64748b',
+            cursor: 'pointer', fontSize: 16, lineHeight: 1
+          }}>✕</button>
+        </div>
+      </div>
+      
+      {/* List */}
+      <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+        {notifs.length === 0 ? (
+          <div style={{ padding: '32px 16px', textAlign: 'center', color: '#64748b', fontSize: 12 }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
+            No notifications yet
+          </div>
+        ) : (
+          visible.map((n, i) => (
+            <div key={n.id} style={{
+              padding: '12px 16px',
+              borderBottom: '1px solid var(--border)',
+              background: i === 0 && page === 0 ? 'rgba(99,102,241,.04)' : 'transparent',
+              transition: 'background .15s'
+            }}>
+              {/* Top row */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                <span style={{ fontSize: 18, flexShrink: 0 }}>
+                  {n.failCount === 0 ? '✅' : '❌'}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {n.url}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                    {n.framework} · {n.testType} ·{' '}
+                    <span style={{ color: '#10b981', fontWeight: 700 }}>{n.passCount} pass</span>
+                    {n.failCount > 0 && (
+                      <span style={{ color: '#ef4444', fontWeight: 700 }}> · {n.failCount} fail</span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => onDelete(n.id)} style={{
+                  background: 'none', border: 'none', color: '#475569',
+                  cursor: 'pointer', flexShrink: 0, padding: 2,
+                  display: 'flex', alignItems: 'center', transition: 'color .15s'
+                }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#475569'}
+                >
+                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Email hint */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 8px', borderRadius: 6, marginBottom: 8,
+                background: 'rgba(99,102,241,.07)', border: '1px solid rgba(99,102,241,.15)'
+              }}>
+                <svg width="11" height="11" fill="none" stroke="#818cf8" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                  <polyline points="22,6 12,13 2,6"/>
+                </svg>
+                <span style={{ fontSize: 10, color: '#a5b4fc' }}>
+                  Report & results sent · check your email.
+                </span>
+              </div>
+
+              {/* Date + actions */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 10, color: '#475569' }}>
+                  🕐 {timeAgoNotif(n.date)}
+                </span>
+                <button onClick={() => { goTo('execution'); onClose(); }} style={{
+                  fontSize: 10, fontWeight: 700, color: 'var(--indigo2)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4
+                }}>
+                  View results
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+     {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 16px', borderTop: '1px solid var(--border)',
+          background: 'var(--bg)'
+        }}>
+          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+              padding: '4px 10px', color: page === 0 ? 'var(--muted)' : 'var(--text)',
+              cursor: page === 0 ? 'default' : 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
+            Prev
+          </button>
+          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+            {page + 1} / {totalPages}
+          </span>
+          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}
+            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+              padding: '4px 10px', color: page === totalPages - 1 ? 'var(--muted)' : 'var(--text)',
+              cursor: page === totalPages - 1 ? 'default' : 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
+            Next
+          </button>
+        </div>
+      )}
+
+    </div> {/* fin content wrapper */}
+  </div>
+     
+  );
+}
+      
+ 

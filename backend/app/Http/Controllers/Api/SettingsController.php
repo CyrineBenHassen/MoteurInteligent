@@ -30,14 +30,16 @@ class SettingsController extends Controller
             'language'            => 'in:en,fr,ar',            
         ]);
 
-        $settings = UserSetting::updateOrCreate(
-            ['user_id' => auth()->id()],
-            $request->only([
-                'email_notifications',
-                'weekly_report',
-                'default_framework'
-            ])
-        );
+       $settings = UserSetting::updateOrCreate(
+    ['user_id' => auth()->id()],
+    $request->only([
+        'email_notifications',
+        'weekly_report',
+        'default_framework',
+        'theme',      // ← manquait
+        'language',   // ← manquait
+    ])
+);
 
         return response()->json([
             'message'  => 'Settings saved',

@@ -30,4 +30,8 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+'n8n' => [
+    'webhook_url' => env('N8N_WEBHOOK_URL'),
+],
+
 ];

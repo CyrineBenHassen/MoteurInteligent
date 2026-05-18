@@ -6,7 +6,8 @@ use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\GenerationController;
-use App\Http\Controllers\Api\ProjectController;   // ← ajoute ça
+use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\OnboardingController;
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
@@ -23,21 +24,29 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile/update',   [ProfileController::class, 'update']);
     Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
     Route::post('/profile/avatar',  [ProfileController::class, 'updateAvatar']);
+    Route::delete('/profile/delete', [ProfileController::class, 'deleteAccount']);
+    Route::get('/profile', [ProfileController::class, 'show']);
+
 
     Route::get('/settings',         [SettingsController::class, 'index']);
     Route::put('/settings/update',  [SettingsController::class, 'update']);
 
-    Route::post('/generate',              [GenerationController::class, 'generate']);
-    Route::get('/generations',            [GenerationController::class, 'index']);
-    Route::get('/generations/{id}',       [GenerationController::class, 'show']);
-    Route::delete('/generations/{id}',    [GenerationController::class, 'destroy']);
-    Route::post('/analyze',               [GenerationController::class, 'analyze']);
-    Route::get('/generations/{id}/pdf',   [GenerationController::class, 'downloadPdf']);
-    Route::post('/crawl',                 [GenerationController::class, 'crawl']);
+    Route::post('/generate',             [GenerationController::class, 'generate']);
+    Route::post('/analyze',              [GenerationController::class, 'analyze']);
+    Route::post('/crawl',                [GenerationController::class, 'crawl']);
+    Route::post('/run',                  [GenerationController::class, 'run']);
 
-    // Projects                            // ← propre, dans le même groupe
-    Route::get('/projects',               [ProjectController::class, 'index']);
-    Route::post('/projects',              [ProjectController::class, 'store']);
-    Route::delete('/projects/{id}',       [ProjectController::class, 'destroy']);
-    Route::get('/projects/{id}/generations', [ProjectController::class, 'generations']);
+    Route::get('/generations',           [GenerationController::class, 'index']);
+    Route::delete('/generations/all',    [GenerationController::class, 'destroyAll']);
+    Route::get('/generations/{id}',      [GenerationController::class, 'show']);
+    Route::delete('/generations/{id}',   [GenerationController::class, 'destroy']);
+    Route::get('/generations/{id}/pdf',  [GenerationController::class, 'downloadPdf']);
+
+    Route::get('/projects',                      [ProjectController::class, 'index']);
+    Route::post('/projects',                     [ProjectController::class, 'store']);
+    Route::put('/projects/{id}',                 [ProjectController::class, 'update']);
+    Route::delete('/projects/{id}',              [ProjectController::class, 'destroy']);
+    Route::get('/projects/{id}/generations',     [ProjectController::class, 'generations']);
+    Route::post('/onboarding', [OnboardingController::class, 'store']);
+
 });

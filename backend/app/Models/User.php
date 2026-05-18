@@ -16,7 +16,9 @@ class User extends Authenticatable
         'email',
         'password',
         'google_id',  
-        'avatar',     
+        'avatar',  
+        'onboarding_completed',  // ← ajoute
+        'onboarding_data',       // ← ajoute   
     ];
 
     protected $hidden = [
@@ -27,10 +29,23 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'onboarding_completed' => 'boolean',  
+        'onboarding_data'      => 'array', 
     ];
 
     public function sendPasswordResetNotification($token)
 {
     $this->notify(new ResetPasswordNotification($token));
 }
+
+public function generations()
+{
+    return $this->hasMany(Generation::class);
+}
+
+public function projects()
+{
+    return $this->hasMany(\App\Models\Project::class);
+}
+
 }

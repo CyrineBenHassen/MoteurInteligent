@@ -522,20 +522,44 @@ export default function NextestChatbot({ theme = 'dark' }) {
           .nxc-tooltip { display:none }
           .nxc-msgs { max-height:calc(100vh - 320px) }
         }
+          @keyframes nxcSlideMsg {
+  from { opacity:0; transform:translateY(8px) scale(.95) }
+  to   { opacity:1; transform:translateY(0) scale(1) }
+}
       `}</style>
 
       {/* ── FAB ── */}
       <div className="nxc-fab-wrap">
-        <div className="nxc-tooltip">
-          {uiLang === 'fr' ? 'Demandez à Nextest AI' : 'Ask Nextest AI'}
-        </div>
-        <button className="nxc-fab" onClick={() => setOpen(v => !v)}>
-          {pulse && <span className="nxc-ring" />}
-          <span className="nxc-online-dot" />
-          {unread > 0 && !open && <span className="nxc-badge">{unread > 9 ? '9+' : unread}</span>}
-          {open ? <XIcon /> : <BotIcon />}
-        </button>
-      </div>
+  <div className="nxc-tooltip">
+    {uiLang === 'fr' ? 'Demandez à Nextest AI' : 'Ask Nextest AI'}
+  </div>
+
+  {/* Bulle de message */}
+  {!open && pulse && (
+    <div style={{
+      position: 'absolute', bottom: '68px', right: 0,
+      background: isLight ? '#ffffff' : '#0d1526',
+      border: `1px solid ${isLight ? 'rgba(99,102,241,.2)' : 'rgba(99,102,241,.3)'}`,
+      borderRadius: '12px 12px 2px 12px',
+      padding: '8px 12px',
+      fontSize: 11, fontWeight: 600,
+      color: isLight ? '#0f1729' : '#e2e8f0',
+      whiteSpace: 'nowrap',
+      boxShadow: isLight ? '0 4px 16px rgba(15,23,41,.12)' : '0 4px 20px rgba(0,0,0,.4)',
+      animation: 'nxcSlideMsg .4s cubic-bezier(.34,1.4,.64,1) both',
+      cursor: 'pointer',
+    }} onClick={() => setOpen(true)}>
+      👋 Need assistance? I’m here to help.
+    </div>
+  )}
+
+  <button className="nxc-fab" onClick={() => setOpen(v => !v)}>
+    {pulse && <span className="nxc-ring" />}
+    <span className="nxc-online-dot" />
+    {unread > 0 && !open && <span className="nxc-badge">{unread > 9 ? '9+' : unread}</span>}
+    {open ? <XIcon /> : <BotIcon />}
+  </button>
+</div>
 
       {/* ── Chat window ── */}
       <div className={`nxc-win ${open ? 'open' : 'closed'}`} role="dialog" aria-label="Nextest AI Assistant">

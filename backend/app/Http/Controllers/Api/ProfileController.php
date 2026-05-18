@@ -8,7 +8,7 @@ use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
 {
-    public function update(Request $request)
+public function update(Request $request)
 {
     $user = $request->user();
 
@@ -22,14 +22,16 @@ class ProfileController extends Controller
         'email' => $request->email,
     ]);
 
-    // Ajouter l'URL complète de l'avatar
     if ($user->avatar) {
         $user->avatar = asset('storage/' . $user->avatar);
     }
 
     return response()->json([
         'message' => 'Profile updated successfully',
-        'user'    => $user
+        'user'    => array_merge($user->toArray(), [
+            'generations_count' => $user->generations()->count(),
+            'projects_count'    => $user->projects()->count(),
+        ])
     ]);
 }
 
@@ -78,5 +80,26 @@ class ProfileController extends Controller
         'message' => 'Avatar updated successfully',
         'avatar'  => asset('storage/' . $path) // 👈 URL complète
     ]);
+}
+
+public function deleteAccount(Request $request)
+{
+    $user = $request->user();
+    $user->tokens()->delete();
+    $user->delete();
+    return response()->json(['message' => 'Account deleted successfully']);
+}
+
+public function show(Request $request)
+{
+    $user = $request->user();
+    $userData = $user->toArray();
+    if ($user->avatar && !str_starts_with($user->avatar, 'http')) {
+        $userData['avatar'] = asset('storage/' . $user->avatar);
+    }
+    $userData['generations_count'] = $user->generations()->count();
+    $userData['projects_count']    = $user->projects()->count();
+
+    return response()->json($userData);
 }
 }

@@ -1,0 +1,516 @@
+/* ════════════════════════════════════════
+   ONBOARDING — uses same CSS variables as Dashboard.css
+   ════════════════════════════════════════ */
+/* Onboarding.css — ajoute ça tout en haut */
+.ob-root {
+  --bg:     #060e1e;
+  --bg2:    #0b1829;
+  --card:   #0d1f35;
+  --border: rgba(99,102,241,0.12);
+  --border2: rgba(99,102,241,0.08);
+  --border3: rgba(99,102,241,0.06);
+  --text:   #e8eaf0;
+  --sub:    #8892a4;
+  --muted:  #6b7585;
+  --dimmed: #4a5260;
+  --gold:   #c9a227;
+  --gold2:  #e8c547;
+  --shadow2: 0 24px 60px rgba(0,0,0,0.5);
+  --sgold:  0 4px 18px rgba(201,162,39,0.3);
+  --green:  #34d399;
+  --green-bg: rgba(52,211,153,0.08);
+  --green-border: rgba(52,211,153,0.2);
+  --ease:   cubic-bezier(0.16,1,0.3,1);
+  --ease2:  cubic-bezier(0.34,1.56,0.64,1);
+  --C: 'Cormorant Garamond', serif;
+  --D: 'DM Sans', sans-serif;
+}
+/* ── Root layout ── */
+.ob-root {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 9999;
+  overflow: hidden;
+
+  /* same subtle grid as dashboard content area */
+  background-image:
+    linear-gradient(rgba(99,102,241,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99,102,241,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* ── Ambient blobs (mirrors hero section) ── */
+.ob-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.ob-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.14;
+}
+.ob-blob-a {
+  width: 600px; height: 600px;
+  top: -200px; left: -120px;
+  background: radial-gradient(circle, #4f86e8, transparent 70%);
+  animation: obFloat 20s ease-in-out infinite alternate;
+}
+.ob-blob-b {
+  width: 480px; height: 480px;
+  bottom: -120px; right: -80px;
+  background: radial-gradient(circle, #8b5cf6, transparent 70%);
+  animation: obFloat 26s ease-in-out infinite alternate-reverse;
+}
+@keyframes obFloat {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(30px, 20px) scale(1.08); }
+}
+.ob-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(201,162,39,0.06) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+/* ── Card ── */
+.ob-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 560px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 36px 40px;
+  box-shadow: var(--shadow2);
+  animation: obCardIn 0.45s var(--ease) both;
+}
+@keyframes obCardIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Logo ── */
+.ob-logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.ob-gem {
+  width: 40px; height: 40px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #8a6a00, var(--gold), var(--gold2));
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--sgold);
+  flex-shrink: 0;
+}
+.ob-brand-name {
+  font-family: var(--C);
+  font-size: 18px; font-weight: 700;
+  color: var(--text);
+  letter-spacing: 3px;
+  line-height: 1;
+}
+.ob-brand-sub {
+  font-family: var(--D);
+  font-size: 8px; font-weight: 500;
+  color: var(--gold);
+  letter-spacing: 4px;
+  opacity: 0.7;
+  margin-top: 3px;
+}
+
+/* ── Step progress bar ── */
+.ob-step-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 32px;
+}
+.ob-step-pip {
+  flex: 1;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--border2);
+  transition: background 0.4s var(--ease);
+}
+.ob-step-pip.active {
+  background: linear-gradient(90deg, var(--gold), var(--gold2));
+  box-shadow: 0 0 8px rgba(201,162,39,0.3);
+}
+
+/* ── Screen container ── */
+.ob-screen {
+  animation: obFadeUp 0.38s var(--ease) both;
+}
+@keyframes obFadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Typography ── */
+.ob-eyebrow {
+  font-family: var(--D);
+  font-size: 9.5px; font-weight: 700;
+  letter-spacing: 2.5px;
+  color: var(--gold);
+  opacity: 0.75;
+  margin-bottom: 8px;
+}
+.ob-title {
+  font-family: var(--C);
+  font-size: 34px; font-weight: 700;
+  color: var(--text);
+  line-height: 1.08;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+.ob-sub {
+  font-size: 13.5px;
+  color: var(--sub);
+  line-height: 1.7;
+  margin-bottom: 28px;
+  font-weight: 300;
+}
+
+/* ════════════════════════════════
+   STEP 1 — Role cards
+   ════════════════════════════════ */
+.ob-roles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.ob-role-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px 16px;
+  border-radius: 14px;
+  background: var(--bg2);
+  border: 1.5px solid var(--border2);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--D);
+  transition: all 0.22s var(--ease);
+  overflow: hidden;
+}
+.ob-role-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  transform: scaleX(0);
+  transition: transform 0.3s var(--ease);
+}
+.ob-role-card:hover {
+  border-color: rgba(201,162,39,0.35);
+  background: rgba(201,162,39,0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.ob-role-card:hover::before { transform: scaleX(1); }
+.ob-role-card.selected {
+  border-color: var(--gold);
+  background: rgba(201,162,39,0.08);
+  box-shadow: 0 0 0 1px rgba(201,162,39,0.2), 0 8px 24px rgba(201,162,39,0.1);
+}
+.ob-role-card.selected::before { transform: scaleX(1); }
+
+.ob-role-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: rgba(201,162,39,0.08);
+  border: 1px solid rgba(201,162,39,0.15);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gold);
+  flex-shrink: 0;
+  transition: transform 0.25s var(--ease2);
+}
+.ob-role-card:hover .ob-role-icon { transform: scale(1.1) rotate(-5deg); }
+.ob-role-name {
+  font-size: 13.5px; font-weight: 700;
+  color: var(--text);
+  transition: color 0.2s;
+}
+.ob-role-card.selected .ob-role-name { color: var(--gold); }
+.ob-role-desc {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.ob-role-check {
+  position: absolute;
+  top: 10px; right: 10px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  color: #060e1e;
+  animation: obCheckPop 0.2s var(--ease2) both;
+}
+@keyframes obCheckPop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* ════════════════════════════════
+   STEP 2 — Interests
+   ════════════════════════════════ */
+.ob-interests {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.ob-interest-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border2);
+  background: var(--bg2);
+  font-size: 12.5px; font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--D);
+  transition: all 0.18s var(--ease);
+}
+.ob-interest-pill:hover {
+  border-color: rgba(201,162,39,0.4);
+  color: var(--text);
+  background: rgba(201,162,39,0.05);
+  transform: translateY(-1px);
+}
+.ob-interest-pill.selected {
+  border-color: var(--gold);
+  background: rgba(201,162,39,0.1);
+  color: var(--gold2);
+  box-shadow: 0 0 0 1px rgba(201,162,39,0.15);
+}
+.ob-interest-icon { font-size: 13px; }
+
+.ob-exp-label {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.ob-exp-options {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.ob-exp-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 10px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border2);
+  background: var(--bg2);
+  cursor: pointer;
+  font-family: var(--D);
+  transition: all 0.2s var(--ease);
+}
+.ob-exp-btn:hover {
+  border-color: rgba(201,162,39,0.35);
+  background: rgba(201,162,39,0.04);
+}
+.ob-exp-btn.selected {
+  border-color: var(--gold);
+  background: rgba(201,162,39,0.08);
+  box-shadow: 0 0 0 1px rgba(201,162,39,0.15);
+}
+.ob-exp-btn-label {
+  font-size: 13px; font-weight: 700;
+  color: var(--text);
+  transition: color 0.2s;
+}
+.ob-exp-btn.selected .ob-exp-btn-label { color: var(--gold); }
+.ob-exp-btn-desc {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ════════════════════════════════
+   STEP 3 — Summary
+   ════════════════════════════════ */
+.ob-summary {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.ob-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border3);
+  gap: 16px;
+}
+.ob-summary-row:last-child { border-bottom: none; }
+.ob-summary-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+.ob-summary-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+.ob-ready-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green);
+  margin-bottom: 28px;
+}
+
+/* ════════════════════════════════
+   Actions row (shared)
+   ════════════════════════════════ */
+.ob-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ob-skip {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dimmed);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--D);
+  padding: 6px 2px;
+  transition: color 0.18s;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  flex-shrink: 0;
+}
+.ob-skip:hover { color: var(--muted); }
+
+.ob-btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 18px;
+  border-radius: 10px;
+  background: var(--bg2);
+  border: 1.5px solid var(--border2);
+  color: var(--muted);
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  font-family: var(--D);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.ob-btn-back:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+.ob-btn-back:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.ob-btn-next {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border: none;
+  color: #060e1e;
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: var(--D);
+  box-shadow: 0 4px 18px rgba(201,162,39,0.3);
+  transition: all 0.22s var(--ease);
+  position: relative;
+  overflow: hidden;
+}
+.ob-btn-next::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.5s var(--ease);
+}
+.ob-btn-next:hover::before { transform: translateX(100%); }
+.ob-btn-next:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 28px rgba(201,162,39,0.45);
+}
+.ob-btn-next:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.ob-btn-next:disabled::before { display: none; }
+
+/* ── Spinner (reuses dashboard .spinner) ── */
+.spinner {
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(6,14,30,0.3);
+  border-top-color: #060e1e;
+  animation: dSpin 0.8s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+@keyframes dSpin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .ob-card {
+    padding: 28px 22px;
+    border-radius: 16px;
+    margin: 12px;
+    max-width: 100%;
+  }
+  .ob-roles { grid-template-columns: 1fr; }
+  .ob-title { font-size: 26px; }
+  .ob-exp-options { flex-direction: column; }
+}

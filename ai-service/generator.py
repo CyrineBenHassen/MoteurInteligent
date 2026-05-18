@@ -11,14 +11,13 @@
 #   - Smoke test: unchanged (deterministic, no LLM)
 
 import os, json, re, time
-from openai import OpenAI
+import anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
 
-groq_client = OpenAI(
-    base_url="https://api.groq.com/openai/v1",
-    api_key=os.getenv("GROQ_API_KEY"),
+claude_client = anthropic.Anthropic(
+    api_key=os.getenv("ANTHROPIC_API_KEY"),
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -118,7 +117,7 @@ def _extract_sections(scraped: dict) -> dict:
         if not href or not text:
             continue
         slug = href.rstrip("/").split("/")[-1]
-        if not slug or slug in ("#", "pll_switcher", ""):
+        if not slug or slug in ("#", "pll_switcher", "", "index.html", "index", "home"):
             continue
         if href.startswith("http") and base_domain and base_domain not in href:
             continue
@@ -467,24 +466,20 @@ class CoverageTracker:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> str:
-    for model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
-        try:
-            resp = groq_client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user",   "content": user_prompt},
-                ],
-                temperature=0.0, max_tokens=max_tokens, seed=42,
-            )
-            content = resp.choices[0].message.content.strip()
-            if resp.choices[0].finish_reason != "length":
-                return content
-        except Exception as e:
-            if "429" not in str(e):
-                raise
-            time.sleep(2)
-    raise ValueError("All LLM models unavailable")
+    try:
+        resp = claude_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=max_tokens,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"{system_prompt}\n\n{user_prompt}"
+                }
+            ],
+        )
+        return resp.content[0].text.strip()
+    except Exception as e:
+        raise ValueError(f"Claude API error: {e}")
 
 
 def _safe_parse(content: str) -> dict:
@@ -525,6 +520,10 @@ _SYSTEM_BASE = (
     "5. Assertion types: url_contains, element_visible, text_contains, input_value, element_not_visible\n"
     "6. Generate a step for EVERY element listed — do not skip any\n"
     "7. Add section and priority fields to every step\n"
+    # ── NOUVEAU ──
+    "8. Test ALL page elements: buttons, forms, images, headings, sections, cards, footer — NOT only nav links\n"
+    "9. For EACH section generate COMPLETE tests covering ALL detected elements\n"
+    "10. Never skip any element — if it exists on the page, test it\n"
 )
 
 _STEP_SCHEMA = """{
@@ -631,8 +630,13 @@ PAGE TITLE: {title}
 IDs start at: {start_id}
 {extra_context}
 
-=== ELEMENTS TO TEST (test ALL of them) ===
+=== ELEMENTS TO TEST (test ALL of them — not only links!) ===
 {chr(10).join(elem_lines)}
+
+IMPORTANT:
+- Test EVERY element listed — buttons, forms, images, headings, sections
+- Do NOT focus only on navigation links
+- Cover the ENTIRE page content
 
 Return ONLY this JSON:
 {{
@@ -788,7 +792,7 @@ def _scraper_has_logo(scraped):
     for img in scraped.get("images_audit",[]):
         alt = img.get("alt","").lower(); src = img.get("src","").lower()
         if "logo" in alt or "logo" in src:
-            return True, img.get("css_selector","img[src*='logo']")
+            return True, "img[src*='logo'], .logo img, header img"
     return False, "img[src*='logo']"
 
 def _scraper_real_nav_links(scraped, max_links=4):
@@ -798,7 +802,8 @@ def _scraper_real_nav_links(scraped, max_links=4):
         href = nav.get("href","").strip(); text = nav.get("text","").strip()
         if not href or not text: continue
         slug = href.rstrip("/").split("/")[-1]
-        if not slug or slug in ("#","pll_switcher",""): continue
+        if not slug or slug in ("#", "pll_switcher", "", "index.html", "index", "home"):
+            continue
         if href.startswith("http") and base_domain and base_domain not in href: continue
         if slug in seen: continue
         seen.add(slug)

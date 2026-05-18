@@ -9,7 +9,13 @@
 import re
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
-from urllib.parse import unquote        
+from urllib.parse import unquote     
+import base64
+import os
+from pathlib import Path
+
+SCREENSHOTS_DIR = Path("screenshots")
+SCREENSHOTS_DIR.mkdir(exist_ok=True)   
 
 
 _TIMEOUT     = 12_000
@@ -176,6 +182,10 @@ def _should_reset_to_base(step: dict) -> bool:
     if action == "fill":
         return False
 
+    # lang_switch always resets to base_url before testing
+    if stype == "lang_switch":
+        return True
+    
     # click in navigation sections → reset
     if action == "click" and section in _RESET_SECTIONS:
         return True
@@ -324,6 +334,9 @@ def _click_lang_switch(page, selector: str) -> None:
         page.wait_for_timeout(300)
     except Exception:
         pass
+    
+    
+    
 def _run_one_step(page, step: dict, base_url: str) -> dict:
     name      = step.get("name", f"Step {step.get('id', '?')}")
     action    = step.get("action", "")
@@ -412,9 +425,14 @@ def _run_one_step(page, step: dict, base_url: str) -> dict:
         action_error = str(e)[:250]
 
     duration = round(time.time() - t0, 2)
+    # Screenshot uniquement sur FAIL
+    screenshot_b64 = None
+    if status == "fail":
+        screenshot_b64 = _take_screenshot(page, name, "fail")
 
     return {
         "name":             name,
+        "screenshot":       screenshot_b64,   # ← ajoute cette ligne
         "status":           status,
         "duration":         f"{duration}s",
         "error":            action_error,
@@ -435,6 +453,7 @@ def _skip_result(name: str, step: dict, reason: str, duration: str) -> dict:
         "status":           "skip",
         "duration":         duration,
         "error":            None,
+        "screenshot": None,
         "reason":           None,
         "reason_pass":      None,
         "reason_skip":      reason,
@@ -723,7 +742,7 @@ def _smart_wait_visible(page, selector: str) -> None:
     5. raise PWTimeout
     """
     try:
-        page.wait_for_selector(selector, state="visible", timeout=8_000)
+        page.wait_for_selector(selector, state="visible", timeout=5_000)
         return
     except PWTimeout:
         pass
@@ -744,14 +763,14 @@ def _smart_wait_visible(page, selector: str) -> None:
             continue
 
     try:
-        page.wait_for_selector(selector, state="visible", timeout=6_000)
+        page.wait_for_selector(selector, state="visible", timeout=3_000)
         return
     except PWTimeout:
         pass
 
     # Fallback: attached (in DOM but maybe not visible)
     try:
-        page.wait_for_selector(selector, state="attached", timeout=5_000)
+        page.wait_for_selector(selector, state="attached", timeout=2_000)
         return
     except PWTimeout:
         pass
@@ -1116,3 +1135,21 @@ def _reason(action: str, status: str, error: str | None,
         return f"Test failed: {error[:120]}"
  
     return "Test status unknown."
+
+
+def _take_screenshot(page, step_name: str, status: str) -> str | None:
+    """
+    Prend un screenshot et retourne le base64 ou le path.
+    Retourne None si échec.
+    """
+    try:
+        safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", step_name)[:40]
+        filename  = SCREENSHOTS_DIR / f"{status}_{safe_name}.png"
+        page.screenshot(path=str(filename), full_page=False)
+        
+        # Encode en base64 pour l'afficher dans le frontend
+        with open(filename, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("utf-8")
+        return b64
+    except Exception:
+        return None

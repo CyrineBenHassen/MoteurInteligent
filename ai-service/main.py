@@ -5,6 +5,7 @@ from generator_performance import generate_performance_tests
 from runner_performance import run_performance
 from analyzer import analyze_error
 from runner import run_selenium_script
+from runner_selenium import run_selenium_real
 from fastapi.responses import Response
 from pdf_generator import generate_pdf
 
@@ -143,6 +144,8 @@ def run_tests(data: dict):
     if framework.lower() not in ("selenium", "playwright"):
         return {"error": "Only Selenium/Playwright scripts supported"}
 
+    if framework.lower() == "selenium":
+        return run_selenium_real(script, test_cases)
     return run_selenium_script(script, test_cases)
 
 
