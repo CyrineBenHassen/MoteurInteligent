@@ -18,42 +18,47 @@ export function AuthProvider({ children }) {
     }
   };
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
+// useEffect
+useEffect(() => {
+    const token = localStorage.getItem('nextest_token') || localStorage.getItem('token');
     if (token) {
       api.get('/me')
-        .then(res => {
-          setUser(res.data);
-          // Pas de redirect ici — l'utilisateur est déjà sur une page
+        .then(res => setUser(res.data))
+        .catch(() => {
+          localStorage.removeItem('nextest_token');
+          localStorage.removeItem('token');
         })
-        .catch(() => localStorage.removeItem('token'))
         .finally(() => setLoading(false));
     } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
     }
-  }, []);
+}, []);
 
-  const register = async (data) => {
-    const res = await api.post('/auth/register', data);
-    localStorage.setItem('token', res.data.access_token);
-    setUser(res.data.user);
-    redirectAfterAuth(res.data.user); // ← nouveau user → toujours onboarding
-  };
-
-  const login = async (data) => {
+// login
+const login = async (data) => {
     const res = await api.post('/auth/login', data);
-    localStorage.setItem('token', res.data.access_token);
+    localStorage.setItem('nextest_token', res.data.access_token);
     setUser(res.data.user);
-    redirectAfterAuth(res.data.user); // ← redirige selon onboarding_completed
-  };
+    redirectAfterAuth(res.data.user);
+};
 
-  const logout = async () => {
+// register
+const register = async (data) => {
+    const res = await api.post('/auth/register', data);
+    localStorage.setItem('nextest_token', res.data.access_token);
+    setUser(res.data.user);
+    redirectAfterAuth(res.data.user);
+};
+
+// logout
+const logout = async () => {
     await api.post('/auth/logout');
+    localStorage.removeItem('nextest_token');
     localStorage.removeItem('token');
     setUser(null);
     navigate('/login');
-  };
+};;
 
   const setAuthFromGoogle = (token, userData) => {
     localStorage.setItem('token', token);

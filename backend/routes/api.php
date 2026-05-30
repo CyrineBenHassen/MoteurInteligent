@@ -7,7 +7,8 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\GenerationController;
 use App\Http\Controllers\Api\ProjectController;
-use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\Api\OnboardingController;
+
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
@@ -38,9 +39,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/generations',           [GenerationController::class, 'index']);
     Route::delete('/generations/all',    [GenerationController::class, 'destroyAll']);
+    Route::post('/generations/generate-api', [GenerationController::class, 'generateApi']);
+    Route::post('/generations/generate-security', [GenerationController::class, 'generateSecurity']);
+    Route::post('/generations/generate-regression', [GenerationController::class, 'generateRegression']);
     Route::get('/generations/{id}',      [GenerationController::class, 'show']);
     Route::delete('/generations/{id}',   [GenerationController::class, 'destroy']);
     Route::get('/generations/{id}/pdf',  [GenerationController::class, 'downloadPdf']);
+    #internel test
+    Route::post('/generate-internal', [GenerationController::class, 'generateInternal']);
+    
+
 
     Route::get('/projects',                      [ProjectController::class, 'index']);
     Route::post('/projects',                     [ProjectController::class, 'store']);

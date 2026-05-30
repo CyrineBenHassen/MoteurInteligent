@@ -106,6 +106,139 @@ const KB = [
     fr: 'Bonjour ! 👋 Je suis **Nextest AI** — je peux répondre à n\'importe quelle question, sur Nextest ou autre chose. Posez-moi n\'importe quoi !',
     en: 'Hello! 👋 I\'m the **Nextest AI** assistant. I can answer any question — about Nextest or anything else!\n\nWhat would you like to know?',
   },
+
+  // ── ACCOUNT / PROFILE ──
+{
+  tags: ['account', 'compte', 'profile', 'profil', 'avatar', 'photo', 'image'],
+  fr: 'Dans **Account** :\n• Modifiez votre **nom** et **email**\n• Changez votre **photo de profil** (cliquez sur l\'avatar)\n• Consultez vos stats : générations et projets',
+  en: 'In **Account**:\n• Edit your **name** and **email**\n• Change your **profile picture** (click the avatar)\n• View your stats: generations and projects',
+},
+
+// ── PASSWORD ──
+{
+  tags: ['password', 'mot de passe', 'changer mot de passe', 'change password', 'update password', 'sécurité', 'security'],
+  fr: 'Pour changer votre mot de passe :\n1. **Account** → section **Change Password**\n2. Entrez votre mot de passe actuel\n3. Entrez le nouveau mot de passe\n4. Confirmez et cliquez **Update Password**',
+  en: 'To change your password:\n1. **Account** → **Change Password** section\n2. Enter your current password\n3. Enter the new password\n4. Confirm and click **Update Password**',
+},
+
+// ── NOTIFICATIONS ──
+{
+  tags: ['notification', 'notifications', 'notif', 'badge', 'alerte', 'alert', 'cloche', 'bell'],
+  fr: 'Les **notifications** apparaissent en haut à droite (icône cloche).\n\nChaque génération terminée crée une notification avec :\n✅ Pass / ❌ Fail count\n🔗 URL testée\n⚙️ Framework utilisé\n\nVous pouvez supprimer une notif ou toutes les effacer.',
+  en: 'The **notifications** appear top right (bell icon).\n\nEach completed generation creates a notification with:\n✅ Pass / ❌ Fail count\n🔗 Tested URL\n⚙️ Framework used\n\nYou can delete one or clear all.',
+},
+
+// ── DELETE PROJECT ──
+{
+  tags: ['supprimer projet', 'delete project', 'effacer projet', 'remove project', 'supprimer', 'delete'],
+  fr: 'Pour supprimer un projet :\n**Projects** → survolez la carte → cliquez l\'icône 🗑️\n\n⚠️ La suppression est **irréversible** et efface toutes les générations associées.',
+  en: 'To delete a project:\n**Projects** → hover the card → click the 🗑️ icon\n\n⚠️ Deletion is **irreversible** and removes all associated generations.',
+},
+
+// ── EDIT PROJECT ──
+{
+  tags: ['modifier projet', 'edit project', 'renommer', 'rename', 'update project', 'changer nom projet'],
+  fr: 'Pour modifier un projet :\n**Projects** → survolez la carte → cliquez l\'icône ✏️\n\nVous pouvez modifier :\n• Le **nom** du projet\n• La **description**\n\n⚠️ Le **type** (Public/Internal) ne peut pas être changé après création.',
+  en: 'To edit a project:\n**Projects** → hover the card → click the ✏️ icon\n\nYou can edit:\n• The **name**\n• The **description**\n\n⚠️ The **type** (Public/Internal) cannot be changed after creation.',
+},
+
+// ── SEARCH ──
+{
+  tags: ['search', 'recherche', 'chercher', 'trouver', 'find', 'filter', 'filtrer'],
+  fr: 'Nextest propose une **recherche globale** dans le header :\n• Recherchez par **URL**, **projet**, ou **framework**\n• Les résultats affichent projets et générations\n• Cliquez un résultat pour naviguer directement',
+  en: 'Nextest has a **global search** in the header:\n• Search by **URL**, **project**, or **framework**\n• Results show projects and generations\n• Click a result to navigate directly',
+},
+
+// ── DASHBOARD ──
+{
+  tags: ['dashboard', 'tableau de bord', 'accueil', 'home', 'overview', 'statistiques', 'stats'],
+  fr: 'Le **Dashboard** affiche :\n📊 Scripts générés, apps analysées, couverture moyenne\n📈 Graphique des générations de la semaine\n🍩 Résultats globaux (Pass/Fail/Skip)\n🔗 Top URLs testées\n⚡ Activité récente',
+  en: 'The **Dashboard** shows:\n📊 Scripts generated, apps analyzed, avg coverage\n📈 Weekly generations chart\n🍩 Global results (Pass/Fail/Skip)\n🔗 Top tested URLs\n⚡ Recent activity',
+},
+
+// ── THEME ──
+{
+  tags: ['theme', 'dark mode', 'light mode', 'mode sombre', 'mode clair', 'apparence', 'appearance', 'couleur'],
+  fr: 'Pour changer le thème :\n• **Header** → bouton 🌙/☀️ (toggle rapide)\n• **Settings → Appearance** → choisissez Dark / Light / System\n\nLe thème est sauvegardé automatiquement.',
+  en: 'To change the theme:\n• **Header** → 🌙/☀️ button (quick toggle)\n• **Settings → Appearance** → choose Dark / Light / System\n\nThe theme is saved automatically.',
+},
+
+// ── LANGUAGE ──
+{
+  tags: ['langue', 'language', 'français', 'english', 'arabic', 'arabe', 'changer langue', 'change language'],
+  fr: 'Pour changer la langue :\n**Settings → Language**\n\n3 langues disponibles :\n🇬🇧 English\n🇫🇷 Français\n🇹🇳 العربية',
+  en: 'To change the language:\n**Settings → Language**\n\n3 languages available:\n🇬🇧 English\n🇫🇷 Français\n🇹🇳 العربية',
+},
+
+// ── DELETE HISTORY ──
+{
+  tags: ['supprimer historique', 'delete history', 'effacer historique', 'clear history', 'vider historique'],
+  fr: 'Pour supprimer tout l\'historique :\n**Settings → Danger Zone → Delete all history**\n\nTapez **CONFIRM** pour valider.\n\n⚠️ Toutes vos générations seront **définitivement supprimées**.',
+  en: 'To delete all history:\n**Settings → Danger Zone → Delete all history**\n\nType **CONFIRM** to proceed.\n\n⚠️ All your generations will be **permanently deleted**.',
+},
+
+// ── DELETE ACCOUNT ──
+{
+  tags: ['supprimer compte', 'delete account', 'effacer compte', 'fermer compte', 'close account'],
+  fr: 'Pour supprimer votre compte :\n**Settings → Danger Zone → Delete Account**\n\nTapez **CONFIRM** pour valider.\n\n⚠️ Action **irréversible** — tous vos projets, générations et données seront supprimés.',
+  en: 'To delete your account:\n**Settings → Danger Zone → Delete Account**\n\nType **CONFIRM** to proceed.\n\n⚠️ **Irreversible** — all your projects, generations and data will be deleted.',
+},
+
+// ── UNIT TEST ──
+{
+  tags: ['unit test', 'unit', 'test unitaire', 'unitaire', 'composant', 'component', 'isolation'],
+  fr: '**Unit Test** — teste des fonctions et composants de manière **isolée**.\n\nDisponible pour les projets **Internal**.\nDurée ~15s · Framework : Playwright ou Selenium.',
+  en: '**Unit Test** — tests individual functions and components in **isolation**.\n\nAvailable for **Internal** projects.\nDuration ~15s · Framework: Playwright or Selenium.',
+},
+
+// ── SECURITY TEST ──
+{
+  tags: ['security', 'sécurité', 'security test', 'test sécurité', 'vulnérabilité', 'vulnerability', 'injection', 'auth'],
+  fr: '**Security Test** — détecte les vulnérabilités, problèmes d\'authentification et risques d\'injection.\n\nDisponible pour les projets **Internal**.\nDurée ~5min · Framework : Playwright.',
+  en: '**Security Test** — detects vulnerabilities, auth issues and injection risks.\n\nAvailable for **Internal** projects.\nDuration ~5min · Framework: Playwright.',
+},
+
+// ── SCREENSHOT ──
+{
+  tags: ['screenshot', 'capture', 'capture écran', 'photo test', 'image test', 'voir erreur'],
+  fr: 'Les **screenshots** sont capturés automatiquement lors d\'un test **échoué** (Fail).\n\nPour les voir :\n**Test Execution → Results** → cliquez **Show details** sur un test échoué → section **Screenshot on Fail**',
+  en: '**Screenshots** are automatically captured when a test **fails**.\n\nTo view them:\n**Test Execution → Results** → click **Show details** on a failed test → **Screenshot on Fail** section',
+},
+
+// ── PASS RATE ──
+{
+  tags: ['pass rate', 'taux de réussite', 'taux', 'score', 'pourcentage', 'percentage', 'résumé'],
+  fr: 'Le **Pass Rate** est calculé automatiquement :\n\n`Pass Rate = (Tests passés / Total tests) × 100`\n\n🟢 ≥ 80% → Bon\n🟡 50-79% → Moyen\n🔴 < 50% → Critique\n\nVisible dans **History**, **Projects** et **Test Execution**.',
+  en: 'The **Pass Rate** is calculated automatically:\n\n`Pass Rate = (Passed tests / Total tests) × 100`\n\n🟢 ≥ 80% → Good\n🟡 50-79% → Medium\n🔴 < 50% → Critical\n\nVisible in **History**, **Projects** and **Test Execution**.',
+},
+
+// ── BOTH FRAMEWORK ──
+{
+  tags: ['both', 'les deux', 'tous les frameworks', 'multi framework', 'selenium et cypress', 'generate all'],
+  fr: 'Le framework **Both** génère les scripts pour **Selenium + Playwright + Cypress** en même temps.\n\nVous pouvez télécharger :\n• `.py` Selenium\n• `.py` Playwright\n• `.js` Cypress\n\nIdéal pour comparer les résultats entre frameworks.',
+  en: 'The **Both** framework generates scripts for **Selenium + Playwright + Cypress** at once.\n\nYou can download:\n• `.py` Selenium\n• `.py` Playwright\n• `.js` Cypress\n\nIdeal for comparing results across frameworks.',
+},
+
+// ── INTERNAL PROJECT ──
+{
+  tags: ['internal', 'interne', 'api', 'microservice', 'backend', 'privé', 'private'],
+  fr: 'Les projets **Internal** sont conçus pour :\n🔒 APIs REST\n🔒 Microservices\n🔒 Infrastructure privée\n\nTypes de tests disponibles :\n• Smoke · Functional · Performance\n• Unit · Regression · Security\n\nFrameworks : Playwright · Selenium · Cypress',
+  en: '**Internal** projects are designed for:\n🔒 REST APIs\n🔒 Microservices\n🔒 Private infrastructure\n\nAvailable test types:\n• Smoke · Functional · Performance\n• Unit · Regression · Security\n\nFrameworks: Playwright · Selenium · Cypress',
+},
+
+// ── PUBLIC PROJECT ──
+{
+  tags: ['public', 'web app', 'landing page', 'interface', 'site web', 'website', 'frontend'],
+  fr: 'Les projets **Public** sont conçus pour :\n🌐 Applications web\n🌐 Landing pages\n🌐 Interfaces utilisateur\n\nTypes de tests disponibles :\n• Smoke · Functional · Performance\n\nFrameworks : Selenium · Cypress · Playwright · Both',
+  en: '**Public** projects are designed for:\n🌐 Web applications\n🌐 Landing pages\n🌐 User interfaces\n\nAvailable test types:\n• Smoke · Functional · Performance\n\nFrameworks: Selenium · Cypress · Playwright · Both',
+},
+
+// ── GENERATION TIME ──
+{
+  tags: ['temps génération', 'generation time', 'durée', 'duration', 'combien de temps', 'how long', 'lent', 'slow'],
+  fr: 'Durées estimées par type de test :\n⚡ **Smoke** → ~30 secondes\n🔬 **Functional** → ~1 minute\n📊 **Performance** → ~3 minutes\n🔧 **Unit** → ~15 secondes\n🔄 **Regression** → ~3 minutes\n🔐 **Security** → ~5 minutes',
+  en: 'Estimated duration by test type:\n⚡ **Smoke** → ~30 seconds\n🔬 **Functional** → ~1 minute\n📊 **Performance** → ~3 minutes\n🔧 **Unit** → ~15 seconds\n🔄 **Regression** → ~3 minutes\n🔐 **Security** → ~5 minutes',
+},
 ];
 
 // ─── Smart KB Matching ─────────────────────────────────────────────────────────
@@ -141,31 +274,21 @@ function findKBAnswer(input, lang) {
 }
 
 // ─── Groq API via FastAPI ──────────────────────────────────────────────────────
-async function askNexTest(message, lang, conversationHistory) {
-  const response = await fetch('http://127.0.0.1:8001/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message,
-      lang,
-      history: conversationHistory,
-    }),
-  });
-  if (!response.ok) throw new Error(`API error: ${response.status}`);
-  const data = await response.json();
-  if (data.error) throw new Error(data.error);
-  return data.reply;
-}
+
 
 // ─── Main getBotResponse (KB first → Groq fallback) ───────────────────────────
-async function getBotResponse(message, lang, conversationHistory) {
-  const kbAnswer = findKBAnswer(message, lang);
+async function getBotResponse(message, lang) {
+   const kbAnswer = findKBAnswer(message, lang);
   if (kbAnswer) {
     await new Promise(r => setTimeout(r, 300 + Math.random() * 200));
     return { text: kbAnswer, source: 'kb' };
+
   }
-  const text = await askNexTest(message, lang, conversationHistory);
-  return { text, source: 'ai' };
+
+  const offTopicFr = "Je suis uniquement conçu pour répondre aux questions sur **Nextest**. Posez-moi des questions sur les tests, frameworks, projets, résultats ou exports.";
+  const offTopicEn = "I'm only designed to answer questions about **Nextest**. Ask me about tests, frameworks, projects, results or exports.";
+  
+  return { text: lang === 'fr' ? offTopicFr : offTopicEn, source: 'kb' };
 }
 
 // ─── Markdown Renderer ────────────────────────────────────────────────────────
@@ -226,7 +349,7 @@ export default function NextestChatbot({ theme = 'dark' }) {
   const [open,     setOpen]     = useState(false);
   const [messages, setMessages] = useState([{
     id: 1, from: 'bot', lang: 'fr', source: 'kb',
-    text: 'Bonjour ! 👋 Je suis **Nextest AI** — je peux répondre à n\'importe quelle question, sur Nextest ou n\'importe quel autre sujet. Demandez-moi tout !',
+    text: 'Bonjour ! 👋 Je suis **Nextest AI** — je réponds uniquement aux questions sur Nextest : tests, frameworks, projets, résultats, exports. Comment puis-je vous aider ?',
     time: new Date(),
   }]);
   const [input,    setInput]    = useState('');
@@ -245,11 +368,7 @@ export default function NextestChatbot({ theme = 'dark' }) {
     if (open) { setUnread(0); setTimeout(() => inputRef.current?.focus(), 320); }
   }, [open]);
 
-  const buildHistory = useCallback(() => {
-    return messages
-      .filter(m => m.from === 'user' || (m.from === 'bot' && m.source === 'ai'))
-      .map(m => ({ role: m.from === 'user' ? 'user' : 'assistant', content: m.text }));
-  }, [messages]);
+ 
 
   const sendMessage = useCallback(async (text) => {
     const q = (text || input).trim();
@@ -261,8 +380,8 @@ export default function NextestChatbot({ theme = 'dark' }) {
     setMessages(m => [...m, { id: Date.now(), from: 'user', lang, text: q, time: new Date() }]);
     setTyping(true);
     try {
-      const history = buildHistory();
-      const { text: answer, source } = await getBotResponse(q, lang, history);
+      const { text: answer, source } = await getBotResponse(q, lang);
+
       setMessages(m => [...m, { id: Date.now() + 1, from: 'bot', lang, source, text: answer, time: new Date() }]);
     } catch {
       const errMsg = lang === 'fr'
@@ -273,7 +392,7 @@ export default function NextestChatbot({ theme = 'dark' }) {
       setTyping(false);
       if (!open) setUnread(u => u + 1);
     }
-  }, [input, typing, open, buildHistory]);
+  }, [input, typing, open]);
 
   const fmt = d => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const currentSuggestions = SUGGESTIONS[uiLang] || SUGGESTIONS.fr;

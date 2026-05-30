@@ -86,10 +86,14 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
         except Exception:
             pass
         try:
+            page.evaluate("window.scrollTo(0, 300)")
+            page.wait_for_timeout(1000)
+            page.evaluate("window.scrollTo(0, 600)")
+            page.wait_for_timeout(1000)
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            page.wait_for_timeout(wait_time)
+            page.wait_for_timeout(wait_time)  
             page.evaluate("window.scrollTo(0, 0)")
-            page.wait_for_timeout(500)
+            page.wait_for_timeout(1000)
         except Exception:
             pass
 
@@ -433,7 +437,8 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
 
         # ── NEW: FOOTER DETECTION ─────────────────────────────────────────────
         footer_data = safe_eval(
-            "footer, [class*='footer'], #footer, [id*='footer']",
+            "footer, #footer, .footer, [class*='footer'], "
+            ".copyright, [class*='copyright']",
             _STABLE_CSS_JS + """
         els => els.slice(0, 3).map(el => {
             const css     = stableCSS(el, 'footer');
@@ -451,11 +456,12 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
         )
 
         # ── NEW: CONTENT SECTIONS (Piliers, Cards, Articles) ─────────────────
-        content_sections = safe_eval(
-            "section, article, [class*='pilier'], [class*='pillar'], "
-            "[class*='card'], [class*='bloc'], [class*='block'], "
-            "[class*='feature'], [class*='service'], [class*='item'], "
-            "[class*='post'], [class*='entry'], [class*='widget']",
+        content_sections = safe_eval(   
+            "section, article, .elementor-section, .elementor-widget, "
+            "[class*='service'], [class*='actualit'], [class*='event'], "
+            "[class*='partner'], [class*='partenaire'], [class*='slider'], "
+            "div.container > div, div.row > div[class*='col'], "
+            ".wp-block, [class*='block'], main > div > div",
             _STABLE_CSS_JS + """
         els => {
             const seen = new Set();
@@ -476,7 +482,7 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
 
         # ── NEW: HEADINGS (H2, H3) — vrais titres de sections ────────────────
         headings = safe_eval(
-            "h2, h3",
+            "h1, h2, h3, h4",
             _STABLE_CSS_JS + """
         els => {
             const seen = new Set();
@@ -546,6 +552,36 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
             }""")
         except Exception:
             pass
+
+
+      # ── EXTRACTION DIRECTE DU CONTENU ────────────────────────────────────────
+        try:
+            page_text = page.evaluate("""() => {
+                return {
+                    all_links: Array.from(document.querySelectorAll('a')).slice(0,50).map(a => ({
+                        text: (a.innerText||'').trim(),
+                        href: a.href||''
+                    })).filter(a => a.text && a.href),
+                    all_headings: Array.from(document.querySelectorAll('h1,h2,h3,h4')).map(h => ({
+                         tag: h.tagName,
+                         text: (h.innerText||'').trim()
+                    })).filter(h => h.text),
+                    all_buttons: Array.from(document.querySelectorAll('button, a.btn, a[class*=btn], input[type=submit]')).map(b => ({
+                        text: (b.innerText||b.value||'').trim(),
+                        href: b.href||''
+                    })).filter(b => b.text),
+                    all_sections: Array.from(document.querySelectorAll('section, .section, [class*=section]')).slice(0,10).map(s => ({
+                        class: s.className||'',
+                        text: (s.innerText||'').trim().slice(0,100)
+                    }))
+                }
+            }""")
+            print(f"[SCRAPER] all_links: {len(page_text.get('all_links', []))}")
+            print(f"[SCRAPER] all_headings: {len(page_text.get('all_headings', []))}")
+            print(f"[SCRAPER] all_buttons: {len(page_text.get('all_buttons', []))}")
+            print(f"[SCRAPER] all_sections: {len(page_text.get('all_sections', []))}")
+        except Exception as e:
+            print(f"[SCRAPER] page_text error: {e}")
 
         browser.close()
 

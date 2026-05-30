@@ -24,7 +24,7 @@ claude_client = anthropic.Anthropic(
 # Constants
 # ─────────────────────────────────────────────────────────────────────────────
 
-SMOKE_MAX_STEPS = 20
+SMOKE_MAX_STEPS = 50
 SMOKE_MIN_STEPS = 3
 
 INTERACTION_ACTIONS = {"click", "fill", "submit"}
@@ -468,7 +468,7 @@ class CoverageTracker:
 def _call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> str:
     try:
         resp = claude_client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5",
             max_tokens=max_tokens,
             messages=[
                 {
@@ -753,13 +753,13 @@ def _scraper_best_main_content(scraped):
     return "main, [role='main'], #content, .content, article"
 
 def _scraper_has_nav(scraped):
-    for nav in scraped.get("nav_links", []):
-        href = nav.get("href","").strip()
+        for nav in scraped.get("nav_links", []):
+            href = nav.get("href","").strip()
         text = nav.get("text","").strip()
         slug = href.rstrip("/").split("/")[-1] if href else ""
-        if text and slug and slug not in ("","#","pll_switcher"):
+        if text and slug and slug not in ("","#","pll_switcher","index.html","index","home"):
             return True, f"a[href*='{slug}']"
-    return False, "nav, [role='navigation']"
+        return False, "nav a, [role='navigation'] a, header a"
 
 def _scraper_has_search(scraped):
     for bar in scraped.get("search_bar", []):
@@ -823,7 +823,7 @@ def _make_smoke_step(name, selector, check_type, reason, optional=None):
         "expected": reason, "description": reason, "section": "smoke",
     }
 
-def _build_smoke_steps(scraped: dict) -> list:
+
     candidates = []
     url = scraped.get("url","")
 
@@ -880,7 +880,295 @@ def _build_smoke_steps(scraped: dict) -> list:
     for i, step in enumerate(final, 1):
         step["id"] = i; step["base_url"] = url
     return final
+def _build_smoke_steps(scraped: dict) -> list:
+    candidates = []
+    url = scraped.get("url", "")
+    seen_selectors = set()
+    # ── AJOUT ICI : HTTP 200 + SSL + Load Time ────────────────────────────────
+    import requests as req_lib
 
+    # HTTP 200
+    try:
+        resp        = req_lib.get(url, timeout=10, allow_redirects=True)
+        http_status = resp.status_code
+        http_ok     = http_status == 200
+    except Exception:
+        http_status = 0
+        http_ok     = False
+
+    # SSL
+    ssl_ok = url.startswith("https://")
+
+    # Load Time
+    load_time_ms    = scraped.get("load_time_ms", 0)
+    print(f"[DEBUG] load_time_ms from scraped = {load_time_ms}")
+
+    LOAD_THRESHOLD = 5000   # warning
+    LOAD_CRITICAL  = 8000   # fail
+    load_status = (
+    "pass" if load_time_ms < LOAD_THRESHOLD
+    else "fail" if load_time_ms > LOAD_CRITICAL
+    else "warn"   # entre 5s et 8s
+)
+    load_ok         = 0 < load_time_ms < LOAD_THRESHOLD
+
+    candidates.append({
+        "name":        f"HTTP Status 200 (got {http_status})",
+        "selector":    "body",
+        "type":        "http_status",
+        "tier":        1,
+        "score":       98,
+        "optional":    False,
+        "reason":      f"HTTP response must be 200 — got {http_status}",
+        "action":      "check_visible",
+        "value":       "",
+        "assertion":   None,
+        "category":    "smoke",
+        "priority":    "high",
+        "expected":    "HTTP 200 OK",
+        "description": f"HTTP response is {http_status}",
+        "section":     "smoke",
+        "status":      "pass" if http_ok else "fail",
+        "suite":       "Pass — HTTP 200 OK" if http_ok else f"FAIL — HTTP {http_status} (expected 200)",
+    })
+
+    candidates.append({
+        "name":        "SSL/HTTPS valid",
+        "selector":    "body",
+        "type":        "ssl",
+        "tier":        1,
+        "score":       97,
+        "optional":    False,
+        "reason":      "URL must use HTTPS",
+        "action":      "check_visible",
+        "value":       "",
+        "assertion":   None,
+        "category":    "smoke",
+        "priority":    "high",
+        "expected":    "URL starts with https://",
+        "description": "URL must use HTTPS",
+        "section":     "smoke",
+        "status":      "pass" if ssl_ok else "fail",
+        "suite":       "Pass — HTTPS valid" if ssl_ok else "FAIL — URL does not use HTTPS",
+    })
+
+    candidates.append({
+        "name":        f"Load time acceptable ({load_time_ms}ms)",
+        "selector":    "body",
+        "type":        "performance",
+        "tier":        1,
+        "score":       95,
+        "optional":    False,
+        "reason":      f"Load time must be < {LOAD_THRESHOLD}ms",
+        "action":      "check_visible",
+        "value":       "",
+        "assertion":   None,
+        "category":    "smoke",
+        "priority":    "high",
+        "expected":    f"< {LOAD_THRESHOLD}ms",
+        "description": f"Page loaded in {load_time_ms}ms",
+        "section":     "smoke",
+        "status":      "pass" if load_ok else "fail",
+        "suite":       f"Pass — {load_time_ms}ms < {LOAD_THRESHOLD}ms" if load_ok else f"FAIL — {load_time_ms}ms > {LOAD_THRESHOLD}ms",
+    })
+
+    def _add(step):
+        sel = step.get("selector", "")
+        if sel and sel not in seen_selectors:
+            seen_selectors.add(sel)
+            candidates.append(step)
+
+    # ── TIER 1 : éléments critiques (toujours testés) ─────────────────────────
+
+    # 1. Body
+    _add(_make_smoke_step("Page body rendered", "body", "body",
+        "body element present", False))
+
+    # 2. Heading
+    heading_sel = _scraper_best_heading(scraped)
+    _add(_make_smoke_step("Page heading visible", heading_sel, "heading",
+        "Heading present — correct page loaded", False))
+
+    # 3. Main content
+    content_sel = _scraper_best_main_content(scraped)
+    _add(_make_smoke_step("Main content area present", content_sel, "main_content",
+        "Content container present", False))
+
+    # 4. Auth
+    auth_found, auth_sel = _scraper_has_auth(scraped)
+    if auth_found:
+        _add(_make_smoke_step("Auth entry point present", auth_sel, "auth",
+            "Auth element detected", False))
+
+    # ── TIER 2 : navigation complète ─────────────────────────────────────────
+
+    nav_found, nav_sel = _scraper_has_nav(scraped)
+    if nav_found:
+        _add(_make_smoke_step("Navigation present", nav_sel, "navigation",
+            "Navigation detected"))
+
+        # TOUTES les nav links (plus de limite à 4)
+        for link in _scraper_real_nav_links(scraped, max_links=20):
+            _add(_make_smoke_step(
+                f"Nav link: {link['text'][:40]}",
+                link["css"], "nav_link",
+                f"Nav link '{link['text']}' present"))
+
+    # ── TIER 3 : search ───────────────────────────────────────────────────────
+
+    search_found, search_sel = _scraper_has_search(scraped)
+    if search_found:
+        _add(_make_smoke_step("Search bar present", search_sel, "search",
+            "Search component detected"))
+
+    # ── TIER 4 : logo ─────────────────────────────────────────────────────────
+
+    logo_found, logo_sel = _scraper_has_logo(scraped)
+    if logo_found:
+        _add(_make_smoke_step("Brand logo visible", logo_sel, "logo",
+            "Logo detected"))
+
+    # ── TIER 5 : footer + footer links ───────────────────────────────────────
+
+    footer_found, footer_sel = _scraper_has_footer(scraped)
+    if footer_found:
+        _add(_make_smoke_step("Footer present", footer_sel, "footer",
+            "Footer detected"))
+        # Footer links
+        for f in scraped.get("footer_data", []):
+            for link in f.get("links", [])[:8]:
+                lhref = link.get("href", "").strip()
+                ltext = link.get("text", "").strip()
+                if lhref and ltext:
+                    slug = lhref.rstrip("/").split("/")[-1]
+                    if slug and slug not in ("", "#", "pll_switcher", "index.html"):
+                        _add(_make_smoke_step(
+                            f"Footer link: {ltext[:40]}",
+                            f"footer a[href*='{slug}']", "footer",
+                            f"Footer link '{ltext}' present"))
+
+    # ── TIER 6 : headings H2/H3 ──────────────────────────────────────────────
+
+    for h in scraped.get("headings", [])[1:15]:  # Skip first heading (likely H1)
+        css  = h.get("css_selector", "").strip()
+        text = h.get("text", "").strip()
+        if css and text:
+            _add(_make_smoke_step(
+                f"Heading: {text[:40]}",
+                css, "heading",
+                f"Heading '{text[:40]}' visible"))
+
+    # ── TIER 7 : boutons CTA ─────────────────────────────────────────────────
+
+    cta_kw = {"get started", "start", "try", "demo", "buy", "shop", "book",
+              "order", "subscribe", "download", "contact", "learn more",
+              "en savoir", "découvrir", "voir", "commencer"}
+
+    for btn in scraped.get("buttons", [])[:20]:
+        css  = btn.get("css_selector", "")
+        text = btn.get("text", "").lower().strip()
+        if not css or not text:
+            continue
+        is_cta = any(k in text for k in cta_kw) or any(
+            k in css.lower() for k in ("primary", "cta", "hero", "action")
+        )
+        if is_cta:
+            _add(_make_smoke_step(
+                f"CTA button: {btn.get('text','')[:40]}",
+                css, "cta",
+                f"CTA button '{btn.get('text','')}' visible"))
+
+    # ── TIER 8 : formulaires (check_visible seulement) ───────────────────────
+
+    for f in scraped.get("forms", [])[:3]:
+        css = f.get("css_selector", "")
+        if css:
+            _add(_make_smoke_step(
+                "Form present",
+                css, "input_field",
+                "Form detected on page"))
+
+    for inp in scraped.get("input_fields", [])[:10]:
+        css = inp.get("css_selector", "")
+        if css and inp.get("visible"):
+            label = inp.get("label", inp.get("placeholder", inp.get("role", "input")))
+            _add(_make_smoke_step(
+                f"Input field: {label[:40]}",
+                css, "input_field",
+                f"Input '{label}' visible"))
+
+    # ── TIER 9 : sections/cards visibles ─────────────────────────────────────
+
+    for sec in scraped.get("content_sections", [])[:15]:
+        css   = sec.get("css_selector", "")
+        title = sec.get("title", sec.get("text", "section"))
+        if css and title:
+            _add(_make_smoke_step(
+                f"Section: {title[:40]}",
+                css, "section",
+                f"Content section '{title[:40]}' visible"))
+
+    for card in scraped.get("cards", [])[:12]:
+        css   = card.get("css_selector", "")
+        title = card.get("title", "card")
+        if css:
+            _add(_make_smoke_step(
+                f"Card: {title[:40]}",
+                css, "section",
+                f"Card '{title[:40]}' visible"))
+
+    # ── TIER 10 : images importantes ─────────────────────────────────────────
+
+ 
+    # APRÈS — indentation correcte (le if est DANS la boucle)
+    for i, img in enumerate(scraped.get("images_audit", [])[:5]):
+        css    = img.get("css_selector", "")
+        alt    = img.get("alt", "").strip()
+        loaded = img.get("loaded", False)
+        if css and loaded and img.get("width", 0) > 100:   # ← 8 espaces !
+            src  = img.get("src", "").split("/")[-1][:30]
+            name = alt if alt else (src if src else f"image-{i+1}")
+            _add(_make_smoke_step(
+                f"Image: {name[:40]}",
+                css, "image",
+                f"Image '{name}' visible and loaded"))
+
+    # ── TIER 11 : lang switch ─────────────────────────────────────────────────
+
+    for ls in scraped.get("lang_switcher", [])[:3]:
+        hreflang = ls.get("hreflang", "").strip()
+        text     = ls.get("text", hreflang or "lang").strip()
+        if hreflang:
+            css = f"a[hreflang='{hreflang}']"
+        else:
+            continue
+        _add(_make_smoke_step(
+            f"Lang switch: {text[:20]}",
+            css, "lang_switch",
+            f"Language switcher '{text}' present"))
+
+    # ── TIER 12 : pagination ──────────────────────────────────────────────────
+
+    if scraped.get("pagination"):
+        _add(_make_smoke_step(
+            "Pagination present",
+            ".pagination, [class*='pagination'], [class*='page-item']",
+            "pagination",
+            "Pagination detected"))
+
+    # ── Tri par score + déduplication ────────────────────────────────────────
+
+    candidates.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+    final = candidates[:SMOKE_MAX_STEPS]
+    if len(final) < SMOKE_MIN_STEPS:
+        final = candidates[:SMOKE_MIN_STEPS]
+
+    for i, step in enumerate(final, 1):
+        step["id"] = i
+        step["base_url"] = url
+
+    return final
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE PROFILE CLASSIFIER
@@ -1126,9 +1414,43 @@ def generate_tests(
     page_profile = _classify_page_profile(scraped)
 
     print(f"[GEN v13] {test_type} | profile={page_profile} | url={url}")
+    
+    print(f"[SCRAPER] buttons: {len(scraped.get('buttons', []))}")
+    print(f"[SCRAPER] nav_links: {len(scraped.get('nav_links', []))}")
+    print(f"[SCRAPER] content_sections: {len(scraped.get('content_sections', []))}")
+    print(f"[SCRAPER] footer_data: {len(scraped.get('footer_data', []))}")
+    print(f"[SCRAPER] headings: {len(scraped.get('headings', []))}")
+    print(f"[SCRAPER] cards: {len(scraped.get('cards', []))}")
+    print(f"[SCRAPER] images_audit: {len(scraped.get('images_audit', []))}")
+    print(f"[SCRAPER] forms: {len(scraped.get('forms', []))}")
 
     # ── SMOKE : deterministic, no LLM ────────────────────────────────────────
     if test_type == "smoke":
+        print(f"[DEBUG] ENTERING SMOKE BRANCH")
+        steps = _build_smoke_steps(scraped)
+        for step in steps:
+            step["base_url"] = url
+        scripts = _build_scripts(steps, url, framework)
+        print(f"[GEN v13] smoke OK | {len(steps)} steps")
+        return {
+            "test_cases":          steps,
+            "test_cases_selenium": steps,
+            "test_cases_cypress":  steps,
+            "script":              scripts["script"],
+            "script_selenium":     scripts["script_selenium"],
+            "script_playwright":   scripts["script_playwright"],
+            "script_cypress":      scripts["script_cypress"],
+            "page_type":           "general",
+            "test_type":           "smoke",
+            "page_profile":        page_profile,
+            "coverage_report":     None,
+        }
+
+    # ── FUNCTIONAL / REGRESSION : section-based full coverage ────────────────
+
+    # ── SMOKE : deterministic, no LLM ────────────────────────────────────────
+    if test_type == "smoke":
+        print(f"[DEBUG] ENTERING SMOKE BRANCH")
         steps = _build_smoke_steps(scraped)
         for step in steps:
             step["base_url"] = url
@@ -1151,11 +1473,16 @@ def generate_tests(
     # ── FUNCTIONAL / REGRESSION : section-based full coverage ────────────────
 
     if page_profile == "static" and not user_scenario:
-        print(f"[GEN v13] DOWNGRADE {test_type} → smoke (static page)")
-        result = generate_tests(scraped, framework, username, password, test_type="smoke")
-        result.update({"test_type": test_type, "downgraded": True,
-                       "downgrade_reason": "No interactable elements found."})
-        return result
+        print(f"[GEN v13] static page — no interactions found")
+        return {
+            "test_cases": [],
+            "test_type":  test_type,
+            "downgraded": True,
+            "downgrade_reason": "No interactable elements found.",
+        }
+
+    # 1. Extract sections
+    sections  = _extract_sections(scraped)
 
     # 1. Extract sections
     sections  = _extract_sections(scraped)

@@ -1,3 +1,5 @@
+from unittest import result
+
 from fastapi import FastAPI
 from scraper import scrape_page
 from generator import generate_tests
@@ -8,6 +10,30 @@ from runner import run_selenium_script
 from runner_selenium import run_selenium_real
 from fastapi.responses import Response
 from pdf_generator import generate_pdf
+#internal test
+from scraper_internal import scrape_internal
+from generator_internal import generate_internal_tests
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+from api_generator import generate_api_tests
+from api_runner    import run_api_tests
+from api_runner import _CACHED_TOKEN
+import threading
+
+from security_generator import generate_security_tests
+from security_runner import run_security_tests
+
+from regression_generator import generate_regression_tests
+from regression_runner import run_regression_tests
+
+_api_lock = threading.Lock()
+
+
+
+executor = ThreadPoolExecutor(max_workers=8)
+
+
 
 app = FastAPI(title="NexTest AI Service")
 
@@ -28,12 +54,18 @@ def scrape(data: dict):
 
 @app.post("/generate")
 def generate(data: dict):
+    print(f"==============================")
+    print(f"[MAIN] test_type = {data.get('test_type')}")
+    print(f"==============================")
+    
     url           = data.get("url")
     framework     = data.get("framework", "Selenium")
     username      = data.get("username")
     password      = data.get("password")
     wait_time     = data.get("wait_time", 2000)
     test_type     = data.get("test_type", "smoke")
+    
+
     user_scenario = data.get("user_scenario", None)
 
     if not url:
@@ -110,17 +142,16 @@ def generate(data: dict):
         "result":        result,
     }
 
-
 @app.post("/run")
-def run_tests(data: dict):
+async def run_tests(data: dict):
     script     = data.get("script", "")
-    framework  = data.get("framework", "Selenium")
+    framework = data.get("framework", "selenium")
     test_cases = data.get("test_cases", [])
     test_type  = data.get("test_type", "smoke")
 
     print(f"[RUN] test_cases={len(test_cases)} | framework={framework} | test_type={test_type}")
 
-    # Performance tests — résultats déjà dans test_cases, pas de re-run
+    # Performance tests
     if test_type == "performance":
         pass_count = sum(1 for tc in test_cases if tc.get("status") == "pass")
         fail_count = sum(1 for tc in test_cases if tc.get("status") == "fail")
@@ -141,13 +172,62 @@ def run_tests(data: dict):
     if not script and not test_cases:
         return {"error": "script or test_cases is required"}
 
-    if framework.lower() not in ("selenium", "playwright"):
-        return {"error": "Only Selenium/Playwright scripts supported"}
+    # ── Filtrer les pré-calculés ──────────────────────────────────────────────
+    PRE_CALC_TYPES = {"http_status", "ssl", "performance"}
+    pre_calculated = [s for s in test_cases if s.get("type") in PRE_CALC_TYPES and "status" in s]
+    to_run         = [s for s in test_cases if s.get("type") not in PRE_CALC_TYPES]
 
+    pre_results = []
+    for step in pre_calculated:
+        pre_results.append({
+            "name":             step.get("name", ""),
+            "status":           step.get("status", "fail"),
+            "duration":         "0s",
+            "error":            None if step.get("status") == "pass" else step.get("suite"),
+            "reason":           step.get("suite"),
+            "reason_pass":      step.get("suite") if step.get("status") == "pass" else None,
+            "reason_skip":      None,
+            "assertion_result": None,
+            "step_meta":        None,
+            "priority":         step.get("priority", "high"),
+            "category":         step.get("category", "smoke"),
+            "section":          step.get("section", "smoke"),
+            "screenshot":       None,
+        })
+
+    # ── Lancer le runner avec to_run seulement ────────────────────────────────
+    loop = asyncio.get_event_loop()
     if framework.lower() == "selenium":
-        return run_selenium_real(script, test_cases)
-    return run_selenium_script(script, test_cases)
+        run_result = await loop.run_in_executor(
+            executor, lambda: run_selenium_real(script, to_run)
+        )
+    elif framework.lower() == "playwright":
+        run_result = await loop.run_in_executor(
+            executor, lambda: run_selenium_script(script, to_run)
+        )
+    else:
+        run_result = await loop.run_in_executor(
+            executor, lambda: run_selenium_real(script, to_run)
+        )
 
+    # ── Combiner pré-calculés + résultats runner ──────────────────────────────
+    all_results = pre_results + run_result.get("results", [])
+    pass_count  = sum(1 for r in all_results if r["status"] == "pass")
+    fail_count  = sum(1 for r in all_results if r["status"] == "fail")
+    skip_count  = sum(1 for r in all_results if r["status"] == "skip")
+    executed    = pass_count + fail_count
+    pass_rate   = round(pass_count / executed * 100) if executed else 0
+
+    return {
+        "results":    all_results,
+        "pass_count": pass_count,
+        "fail_count": fail_count,
+        "skip_count": skip_count,
+        "pass_rate":  pass_rate,
+        "total":      len(all_results),
+        "duration_s": run_result.get("duration_s", 0),
+        "raw_output": "",
+    }
 
 @app.post("/analyze")
 def analyze(data: dict):
@@ -222,11 +302,257 @@ def chat(data: dict):
 @app.post("/generate-pdf")
 def generate_pdf_report(data: dict):
     try:
+        print(f"[PDF] Received data keys: {list(data.keys())}")
+        print(f"[PDF] test_type: {data.get('test_type')}")
+        print(f"[PDF] test_cases count: {len(data.get('test_cases', []))}")
+        print(f"[PDF] execution_results count: {len(data.get('execution_results', []))}")
+        
         pdf_bytes = generate_pdf(data)
+        
+        print(f"[PDF] Generated {len(pdf_bytes)} bytes")
+        
+        if len(pdf_bytes) < 100:
+            print(f"[PDF] WARNING — too small, content: {pdf_bytes}")
+            return {"error": f"PDF too small: {pdf_bytes}"}
+        
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=nextest_report.pdf"}
         )
     except Exception as e:
-        return {"error": str(e)}
+        import traceback
+        print(f"[PDF] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
+    
+@app.post("/generate-internal")
+def generate_internal(data: dict):
+
+    url          = data.get("url")
+    framework    = data.get("framework", "playwright")
+    test_type    = data.get("test_type", "smoke").lower()
+    cookies      = data.get("cookies", None)   
+    token        = data.get("token", None)
+    username     = data.get("username", None)
+    password     = data.get("password", None)
+    login_url    = data.get("login_url", None)
+    scrape_login = data.get("scrape_login", False)  # True → tester la page login
+    wait_time    = data.get("wait_time", 2000)
+
+    print(f"[INTERNAL] url={url} | test_type={test_type} | "
+          f"scrape_login={scrape_login} | has_cookies={bool(cookies)} | "
+          f"has_credentials={bool(username)}")
+
+    if not url:
+        return {"error": "URL is required"}
+
+    # ── 1. Scrape ────────────────────────────────────────────────────────────
+    scraped = scrape_internal(
+        target_url   = url,
+        cookies      = cookies,
+        token        = token,
+        username     = username,
+        password     = password,
+        login_url    = login_url,
+        scrape_login = scrape_login,
+        wait_time    = wait_time,
+    )
+    print(f"[INTERNAL] scraped is_login={scraped.get('is_login_page')} | is_dashboard={scraped.get('is_dashboard')} | url={scraped.get('url')}")
+    print(f"[INTERNAL] sidebar_items={len(scraped.get('sidebar_items', []))} | stat_cards={len(scraped.get('stat_cards', []))} | headings={len(scraped.get('headings', []))}")
+
+    if "error" in scraped:
+        return {
+            "error":   f"Scraping failed: {scraped['error']}",
+            "url":     url,
+            "scraped": scraped,
+        }
+
+    # ── 2. Generate tests ────────────────────────────────────────────────────
+    # Pour l'instant : smoke uniquement
+    # Tu pourras ajouter functional, security, etc. plus tard
+    VALID_TYPES = {"smoke", "functional", "regression", "security",
+                   "e2e", "api", "performance", "negative"}
+
+    if test_type not in VALID_TYPES:
+        test_type = "smoke"
+
+    result = generate_internal_tests(
+        scraped   = scraped,
+        framework = framework,
+    )
+
+    return {
+        "url":        url,
+        "framework":  framework,
+        "test_type":  test_type,
+        "scraped":    scraped,
+        "result":     result,
+    }
+    
+@app.post("/generate-api")
+def generate_api(data: dict):
+    if not _api_lock.acquire(blocking=False):
+        return {"error": "Request already in progress"}
+    try:
+        url       = data.get("url", "")
+        framework = data.get("framework", "Pytest")
+        token     = data.get("token", "")
+        domains   = data.get("domains", ["auth"])
+        username  = data.get("username", "")
+        password  = data.get("password", "")
+
+        if not url:
+            return {"error": "URL is required"}
+
+        base_api_url = data.get("base_api_url", "")
+        if not base_api_url:
+            if "demopro.tn" in url:
+                base_api_url = "https://anpe.back.demopro.tn:10443"
+            else:
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                base_api_url = f"{parsed.scheme}://{parsed.netloc}"
+
+        print(f"[GENERATE-API] base_api_url={base_api_url} | framework={framework} | domains={domains}")
+
+        # ── 1. Generate test cases ──
+        result = generate_api_tests(
+            base_url     = base_api_url,
+            framework    = framework,
+            token        = token,
+            domains      = domains,
+            original_url = url,
+        )
+
+        if not result:
+            return {"error": "generate_api_tests returned None"}
+        if "error" in result:
+            return {"error": result["error"]}
+
+        # ── 2. Use cached token as fallback ──
+        jwt_token = token if token else _CACHED_TOKEN
+        print(f"[GENERATE-API] Using token: {'frontend' if token else 'cached'}")
+
+        # ── 3. Run tests ──
+        test_cases = result.get("test_cases", [])
+        run_result = run_api_tests(test_cases, jwt_token)
+
+        execution_results = run_result.get("results", [])
+
+        return {
+            "url":       url,
+            "framework": framework,
+            "test_type": "api",
+            "scraped":   {"url": url, "load_time_ms": 0},
+            "result": {
+                **result,
+                "test_cases":        execution_results,
+                "execution_results": execution_results,
+                "pass_count":        run_result["pass_count"],
+                "fail_count":        run_result["fail_count"],
+                "skip_count":        run_result["skip_count"],
+                "pass_rate":         run_result["pass_rate"],
+            },
+        }
+    finally:
+        _api_lock.release()
+@app.post("/generate-security")
+def generate_security(data: dict):
+    url        = data.get("url", "")
+    token      = data.get("token", "")
+    categories = data.get("categories", None)  # None = all
+
+    if not url:
+        return {"error": "URL is required"}
+
+    from urllib.parse import urlparse
+    base_api_url = data.get("base_api_url", "")
+    if not base_api_url:
+        if "demopro.tn" in url:
+            base_api_url = "https://anpe.back.demopro.tn:10443"
+        else:
+            parsed = urlparse(url)
+            base_api_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    print(f"[SECURITY] base_api_url={base_api_url} | categories={categories}")
+
+    result = generate_security_tests(
+        base_url   = base_api_url,
+        categories = categories,
+    )
+
+    return {
+        "url":       url,
+        "framework": "security",
+        "test_type": "security",
+        "scraped":   {"url": url, "load_time_ms": 0},
+        "result":    result,
+    }
+
+
+@app.post("/run-security")
+def run_security(data: dict):
+    test_cases = data.get("test_cases", [])
+    token      = data.get("token", "")
+
+    if not test_cases:
+        return {"error": "test_cases is required"}
+
+    print(f"[RUN-SECURITY] Running {len(test_cases)} security tests")
+
+    run_result = run_security_tests(test_cases, token)
+
+    return {
+        "results":    run_result["results"],
+        "pass_count": run_result["pass_count"],
+        "warn_count": run_result["warn_count"],
+        "fail_count": run_result["fail_count"],
+        "pass_rate":  run_result["pass_rate"],
+        "total":      run_result["total"],
+    }
+@app.post("/generate-regression")
+def generate_regression(data: dict):
+    url = data.get("url", "")
+
+    if not url:
+        return {"error": "URL is required"}
+
+    from urllib.parse import urlparse
+    parsed   = urlparse(url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    print(f"[REGRESSION] base_url={base_url}")
+
+    # Generate tests
+    result = generate_regression_tests(base_url=base_url)
+    test_cases = result.get("test_cases", [])
+
+    # Run tests
+    run_result = run_regression_tests(
+        test_cases=test_cases,
+        base_url=base_url,
+    )
+
+    execution_results = run_result.get("results", [])
+    pass_count = run_result["pass_count"]
+    fail_count = run_result["fail_count"]
+    skip_count = run_result["skip_count"]
+    pass_rate  = run_result["pass_rate"]
+
+    return {
+        "url":       url,
+        "framework": "Playwright",
+        "test_type": "regression",
+        "scraped":   {"url": url, "load_time_ms": 0},
+        "result": {
+            **result,
+            "test_cases":        execution_results,
+            "execution_results": execution_results,
+            "pass_count":        pass_count,
+            "fail_count":        fail_count,
+            "skip_count":        skip_count,
+            "pass_rate":         pass_rate,
+            "test_type":         "regression",
+        },
+    }

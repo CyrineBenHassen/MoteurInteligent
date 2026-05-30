@@ -18,13 +18,17 @@ from selenium.common.exceptions import (
 )
 from webdriver_manager.chrome import ChromeDriverManager
 
+_CACHED_TOKEN= "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJhMGRmOWI3My01MzZmLTQxZmUtOGM1Ny01MTUwOGQ2NDE0NjQiLCJqdGkiOiI3YTkwYWI0OTMwNjU0YmQ1ZjE2ZTc3NmFhYjA4MGY1Y2FhNGViOTY1YTgzNWE4MzRkYjZhZjY4OGNlMzRhMmFlNjFmZDYyODBjNTQ3MWE4NCIsImlhdCI6MTc3OTYyMDQ5NC41NzE0NzUsIm5iZiI6MTc3OTYyMDQ5NC41NzE0NzYsImV4cCI6MTc5NTUxODA5NC41NzAyMzYsInN1YiI6ImEwMWVhMDA0LTUwNzQtNDUxMi05ZTBkLWE2Nzk4NDVmNWRjZSIsInNjb3BlcyI6W119.HNkxvxfwsyaEfWBdzWbB1n_gInONCt_xmcMqmgyZP-gCkMpQj8k5c_M4VckhJlFxVIwS85aNNuJLNp1n0FTJUoPWfmQ-9KqgdzlD_iCrMB9HECrAvTVPCzX-Y62STjPM423EsSpqbNRW6nCWvRg0JwPEPohxxc-GxgNcyDbRBSMMQhi4nU9sc8-IZswwvu8tnrFYC8ZQPf5FU-Ag_-NIh91sr7_jKh5khOD-KFiD44ZinMvkWLDudzt9ugsAhGaDKY_-GZufIqjDa4w-tnX6ECLJf7gupZSV7zTn3mbYsQtoHJBOXy_Mg26-WKRCKsWm6E7Bdsm6IFMjia22isXViEteKUu5SR_xlids6zJwjS-3MYwbnlrnNE-BSoFoscMsKRU0f15Wq5ugnnwuhWkjGBoANhbw73mvCc4wVZGXqtRGfvV2vawv7z_ZXE-GYv8moFwFrBvCowW4mBYc8YkoVSK7K7XhQEQQ_THuUNwErZd4Trrw2qD5O1DhMBrCvB6OhNKxnev7SJYKSZjDAPPERu8iPg9foSODbXjrU_UFPQRKJ8C_ens-Jyvx_xspDIHmrpb4j8M68X-WcfEGKhpoDUeDV81dfKGOI7MLm6QzKVjpomGX8wYEa5T2jwemMf1RuKZ3p_Yw_z3O7s6THqqVRmYOFmvttZ8MT1hYq04diHk"
+
+
+
 os.environ['WDM_CACHE_PATH'] = '.wdm_cache'
 os.environ['WDM_LOG'] = '0'
 SCREENSHOTS_DIR = Path("screenshots_selenium")
 SCREENSHOTS_DIR.mkdir(exist_ok=True)
 
-_TIMEOUT     = 12
-_NAV_TIMEOUT = 20
+_TIMEOUT     = 8
+_NAV_TIMEOUT = 15
 
 OPTIONAL_TYPES = frozenset({
     "lang_switch", "search_bar", "image_visible", "icon_present",
@@ -65,7 +69,7 @@ def run_selenium_real(script: str, test_cases: list = None) -> dict:
 
 def _setup_driver() -> webdriver.Chrome:
     opts = Options()
-    # Utilise l'ancien headless mode — plus stable sur Windows
+    opts.add_argument("--headless=new")
     opts.add_argument("--headless")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
@@ -88,8 +92,8 @@ def _setup_driver() -> webdriver.Chrome:
 
     service = Service(ChromeDriverManager().install())
     driver  = webdriver.Chrome(service=service, options=opts)
-    driver.set_page_load_timeout(60)
-    driver.implicitly_wait(5)
+    driver.set_page_load_timeout(30)
+    driver.implicitly_wait(3)
     return driver
 
 
@@ -102,19 +106,96 @@ def _run_steps(steps: list) -> dict:
     start_total = time.time()
     base_url    = _extract_base_url(steps)
 
+    # ── AJOUT : séparer les pré-calculés ─────────────────────────────────────
+    PRE_CALC_TYPES = {"http_status", "ssl", "performance"}
+    pre_calculated = [s for s in steps if s.get("type") in PRE_CALC_TYPES and "status" in s]
+    to_run         = [s for s in steps if s.get("type") not in PRE_CALC_TYPES]
+
+    for step in pre_calculated:
+        results.append({
+            "name":             step.get("name", ""),
+            "status":           step.get("status", "fail"),
+            "duration":         "0s",
+            "error":            None if step.get("status") == "pass" else step.get("suite"),
+            "reason":           step.get("suite"),
+            "reason_pass":      step.get("suite") if step.get("status") == "pass" else None,
+            "reason_skip":      None,
+            "assertion_result": None,
+            "step_meta":        None,
+            "priority":         step.get("priority", "high"),
+            "category":         step.get("category", "smoke"),
+            "section":          step.get("section", "smoke"),
+            "screenshot":       None,
+        })
+
     driver = _setup_driver()
 
     try:
         # Initial page load
         if base_url:
             try:
-                driver.get(base_url)
-                time.sleep(1)
+                INTERNAL_URLS = ["dashboard", "statistiques", "reception",
+                                 "gestion_commission", "reunions", "visites",
+                                 "traitement_dossier", "outbox"]
+
+                if any(u in base_url for u in INTERNAL_URLS):
+                    driver.get("https://anpe.demopro.tn:10443/dashboard")
+                    time.sleep(2)
+                    driver.execute_script("""
+                        localStorage.setItem('token', '""" + _CACHED_TOKEN + """');
+                        localStorage.setItem('refreshToken', 'b72e3bfac0af120fb4c55ade2c2d1ba6d8579302d1d37988be39d193acf9a113af6a1bcefee0a018');
+                        localStorage.setItem('i18nextLng', 'fr');
+                        localStorage.setItem('user', JSON.stringify({"id": "a01ea004-5074-4512-9e0d-a679845f5dce", "fullName": "Super Admin", "email": "admin@admin.com", "is_super": true, "status": "active"}));
+                        localStorage.setItem('roles', JSON.stringify([{"id": "a01ea004-0189-40e7-8dca-5f3e21a96630", "name": "super_admin"}]));
+                        localStorage.setItem('permissions', JSON.stringify([
+                            {"id": "31d71f0e-b76d-4417-902a-4ad1ac898917", "name": "view_dashboard", "type_code": "dashboard"},
+                            {"id": "a57fcffd-165c-4eda-a419-32370bc5a7ea", "name": "view_statistiques", "type_code": "statistiques"},
+                            {"id": "629569f8-cdbf-4f4f-b0c7-99e4dc89ab58", "name": "view_audit", "type_code": "audits"},
+                            {"id": "465b2adf-f586-489a-abda-09bc4a8fd9d1", "name": "read_dossiers", "type_code": "reception"},
+                            {"id": "bc41cdae-c3dd-40ae-b47d-89def93fd1d7", "name": "read_commission", "type_code": "commissions"},
+                            {"id": "93f27077-e2b1-40bc-9895-3da7fa16c99b", "name": "read_dossier_eie", "type_code": "eie"},
+                            {"id": "0bca0396-b649-462f-b955-513d4fa2a222", "name": "read_dossier_ed", "type_code": "ed"},
+                            {"id": "c20749b9-aa2c-4004-9a1c-1f3e6421a0fd", "name": "read_dossier_af", "type_code": "af"},
+                            {"id": "1c7bdc43-904c-4caf-9fc9-11d97346b591", "name": "read_role", "type_code": "role"},
+                            {"id": "700e4a75-2f10-42d5-a3ef-7d1a7d77e15f", "name": "read_user", "type_code": "user"},
+                            {"id": "7ecb6362-67fe-4693-8057-15d3d1e53377", "name": "refuse_visite", "type_code": "visite"},
+                            {"id": "b1b1d205-3b60-4f26-a236-409820452dd8", "name": "update_visite", "type_code": "visite"},
+                            {"id": "b4287f83-af63-4f9b-a42d-9a1747556561", "name": "accept_visite", "type_code": "visite"},
+                            {"id": "9b2c3d4e-5f6a-7890-bcde-f01234567890", "name": "read_reunion", "type_code": "reunions"},
+                            {"id": "65a0cbbf-50a9-4195-b1a0-b388429a7d2a", "name": "voir_toutes_les_reunions", "type_code": "commissions"}
+                        ]));
+                        localStorage.setItem('lastActivityTimestamp', Date.now().toString());
+                    """)
+                    driver.get(base_url)
+                    # Attendre que React rende le menu
+                    try:
+                        
+                        WebDriverWait(driver, 15).until(
+                            lambda d: len(d.find_elements(By.CSS_SELECTOR, ".ant-menu-item")) > 0
+                        )
+                        print("[RUNNER] React rendered ✅")
+                    except Exception:
+                        time.sleep(3)
+                    
+                    # Attendre aussi le header
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            lambda d: len(d.find_elements(By.CSS_SELECTOR, ".ant-layout-header")) > 0
+                        )
+                        print("[RUNNER] Header rendered ✅")
+                    except Exception:
+                        time.sleep(2)
+                    
+                    print("[RUNNER] JWT token injecté ✅")
+                else:
+                    driver.get(base_url)
+                    time.sleep(2)
+
             except Exception as e:
                 driver.quit()
                 return _fatal_result(f"Cannot load '{base_url}': {e}", len(steps))
 
-        for step in steps:
+        for step in to_run:
             result = _run_one_step(driver, step, base_url)
             results.append(result)
 
@@ -261,7 +342,7 @@ def _run_one_step(driver, step: dict, base_url: str) -> dict:
                 el.click()
             except ElementNotInteractableException:
                 driver.execute_script("arguments[0].click();", el)
-            time.sleep(1.5)
+            time.sleep(0.8)
 
         elif action == "fill":
             el = _smart_wait_visible(driver, selector)
@@ -468,6 +549,17 @@ def _normalize_selector(selector: str) -> str:
     if not selector:
         return selector
 
+    # Selenium ne supporte pas les sélecteurs multiples avec virgule
+    # Prendre seulement le premier sélecteur valide
+    if "," in selector:
+        parts = [s.strip() for s in selector.split(",")]
+        # Chercher le premier sélecteur Ant Design si possible
+        for part in parts:
+            if "ant-" in part:
+                return part
+        # Sinon retourner le premier
+        return parts[0]
+
     # Decode URL encoded Arabic selectors
     if "href*=" in selector and "%" in selector:
         try:
@@ -491,7 +583,7 @@ def _normalize_selector(selector: str) -> str:
     if "logo" in selector.lower() and "src*=" in selector:
         return "img[src*='logo'], .logo img, header img"
 
-    return selector    
+    return selector
 
 
 def _is_invalid_selector(selector: str) -> bool:
@@ -504,19 +596,18 @@ def _is_invalid_selector(selector: str) -> bool:
         return True
     return False
 
-
 def _smart_wait_visible(driver, selector: str):
-    """
-    Wait for element to be visible, try mobile menu if needed.
-    Returns the element.
-    """
-    try:
-        el = WebDriverWait(driver, 8).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, selector))
-        )
-        return el
-    except TimeoutException:
-        pass
+    # Gérer les sélecteurs multiples (virgule)
+    selectors = [s.strip() for s in selector.split(",")]
+
+    for sel in selectors:
+        try:
+            el = WebDriverWait(driver, 8).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, sel))
+            )
+            return el
+        except TimeoutException:
+            continue
 
     # Try opening mobile menu
     for toggle in [
@@ -532,19 +623,13 @@ def _smart_wait_visible(driver, selector: str):
         except Exception:
             continue
 
-    try:
-        el = WebDriverWait(driver, 6).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, selector))
-        )
-        return el
-    except TimeoutException:
-        pass
+    for sel in selectors:
+        try:
+            el = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, sel))
+            )
+            return el
+        except TimeoutException:
+            continue
 
-    # Fallback: presence only
-    try:
-        el = WebDriverWait(driver, 5).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-        )
-        return el
-    except TimeoutException:
-        raise TimeoutException(f"Element '{selector}' not found after all strategies")
+    raise TimeoutException(f"Element '{selector}' not found after all strategies")

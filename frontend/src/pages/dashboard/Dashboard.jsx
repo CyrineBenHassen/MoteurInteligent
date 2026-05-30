@@ -158,69 +158,80 @@ function AssertionBadge({ assertion_result, step_meta }) {
 // Dashboard Panel
 // ─────────────────────────────────────────────────────────────────────────────
 
-const TOP_URLS = [
-  { url: 'https://github.com/login',      framework: 'Selenium', tests: 12, pass: 10, date: '2h ago' },
-  { url: 'https://trello.com/login',      framework: 'Cypress',  tests: 8,  pass: 8,  date: '1d ago' },
-  { url: 'https://app.slack.com/sign-in', framework: 'Both',     tests: 15, pass: 12, date: '3d ago' },
-];
 
-function TopURLsSection({ goTo }) {
-  const { t } = useLang();
-  return (
-    <div className="section-box" style={{ marginBottom: 24 }}>
-      <div className="sb-head">
-        <span className="sb-title">🔗 {t('topUrls') || 'Top Tested URLs'}</span>
-        <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll') || 'View all'}</span>
-      </div>
-      <div style={{ padding: '8px 0' }}>
-        {TOP_URLS.map((item, i) => {
-          const rate = Math.round((item.pass / item.tests) * 100);
-          const statusColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
-          return (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 20px', borderBottom: i < TOP_URLS.length - 1 ? '1px solid var(--border)' : 'none', transition: 'background .15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-              <div style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, background: 'var(--goldbg)', border: '1px solid rgba(201,162,39,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--gold)' }}>{i + 1}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--navy)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.url}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{item.tests} tests · {item.date}</div>
-              </div>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', padding: '3px 10px', borderRadius: 20, background: 'rgba(79,134,232,.1)', color: '#4f86e8', border: '1px solid rgba(79,134,232,.2)', flexShrink: 0 }}>{item.framework}</span>
-              <div style={{ width: 80, flexShrink: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>pass rate</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{rate}%</span>
-                </div>
-                <div style={{ height: 4, borderRadius: 4, background: 'var(--border)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 4, width: `${rate}%`, background: statusColor, transition: 'width 1s ease' }} />
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function DashboardPanel({ user, goTo }) {
   const { t } = useLang();
+  const [stats, setStats] = useState({ total: 0, projects: 0, avgRate: 0, avgLoad: 0 });
+  const [barData, setBarData] = useState([
+    { day: 'Mon', count: 0 }, { day: 'Tue', count: 0 }, { day: 'Wed', count: 0 },
+    { day: 'Thu', count: 0 }, { day: 'Fri', count: 0 }, { day: 'Sat', count: 0 }, { day: 'Sun', count: 0 },
+  ]);
+  const [donutData, setDonutData] = useState([
+    { name: 'Passed',  value: 0, color: '#10b981' },
+    { name: 'Failed',  value: 0, color: '#ef4444' },
+    { name: 'Skipped', value: 0, color: '#f59e0b' },
+  ]);
+  const [topUrls, setTopUrls] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([api.get('/generations'), api.get('/projects')])
+      .then(([genRes, projRes]) => {
+        const gens  = genRes.data;
+        const projs = projRes.data;
+
+        const totalPass = gens.reduce((s, g) => s + (g.pass_count || 0), 0);
+        const totalFail = gens.reduce((s, g) => s + (g.fail_count || 0), 0);
+        const totalSkip = gens.reduce((s, g) => s + (g.skip_count || 0), 0);
+        const avgRate   = gens.length ? Math.round(gens.reduce((s, g) => s + (g.pass_rate || 0), 0) / gens.length) : 0;
+        const avgLoad   = gens.length ? Math.round(gens.reduce((s, g) => s + (g.load_time_ms || 0), 0) / gens.length) : 0;
+
+        setStats({ total: gens.length, projects: projs.length, avgRate, avgLoad });
+
+        const counts = [0,0,0,0,0,0,0];
+        const now = new Date();
+        gens.forEach(g => {
+          const d    = new Date(g.created_at);
+          const diff = Math.floor((now - d) / 86400000);
+          if (diff < 7) counts[(d.getDay() + 6) % 7]++;
+        });
+        setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({ day, count: counts[i] })));
+
+        const grandTotal = (totalPass + totalFail + totalSkip) || 1;
+        setDonutData([
+          { name: 'Passed',  value: Math.round(totalPass / grandTotal * 100), color: '#10b981' },
+          { name: 'Failed',  value: Math.round(totalFail / grandTotal * 100), color: '#ef4444' },
+          { name: 'Skipped', value: Math.round(totalSkip / grandTotal * 100), color: '#f59e0b' },
+        ]);
+
+        const urlMap = {};
+        gens.forEach(g => {
+          if (!urlMap[g.url]) urlMap[g.url] = { url: g.url, framework: g.framework, tests: 0, pass: 0, date: g.created_at };
+          urlMap[g.url].tests += (g.pass_count||0) + (g.fail_count||0) + (g.skip_count||0);
+          urlMap[g.url].pass  += g.pass_count || 0;
+          urlMap[g.url].date   = g.created_at;
+        });
+        setTopUrls(Object.values(urlMap).sort((a,b) => b.tests - a.tests).slice(0,3));
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
   const STATS = [
-    { icon: '🚀', val: '12',  lbl: t('scriptsGenerated'), accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)' },
-    { icon: '🔬', val: '3',   lbl: t('appsAnalyzed'),     accent: 'linear-gradient(90deg,#c9a227,#e8c84a)' },
-    { icon: '🎯', val: '82%', lbl: t('avgCoverage'),      accent: 'linear-gradient(90deg,#10b981,#34d399)' },
-    { icon: '⚡', val: '2s',  lbl: t('avgGenTime'),       accent: 'linear-gradient(90deg,#f97316,#fb923c)' },
+    { icon: '🚀', val: String(stats.total),    lbl: t('scriptsGenerated'), accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)' },
+    { icon: '🔬', val: String(stats.projects),  lbl: t('appsAnalyzed'),     accent: 'linear-gradient(90deg,#c9a227,#e8c84a)' },
+    { icon: '🎯', val: `${stats.avgRate}%`,     lbl: t('avgCoverage'),      accent: 'linear-gradient(90deg,#10b981,#34d399)' },
+    { icon: '⚡', val: `${stats.avgLoad}ms`,    lbl: t('avgGenTime'),       accent: 'linear-gradient(90deg,#f97316,#fb923c)' },
   ];
-  const barData = [
-    { day: 'Mon', count: 3 }, { day: 'Tue', count: 7 }, { day: 'Wed', count: 2 },
-    { day: 'Thu', count: 9 }, { day: 'Fri', count: 5 }, { day: 'Sat', count: 1 }, { day: 'Sun', count: 4 },
-  ];
-  const donutData = [
-    { name: 'Passed',  value: 62, color: '#10b981' },
-    { name: 'Failed',  value: 23, color: '#ef4444' },
-    { name: 'Skipped', value: 15, color: '#f59e0b' },
-  ];
-  const donutTotal = donutData.reduce((s, d) => s + d.value, 0);
+  const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1;
+  
+  if (loading) return (
+    <div className="panel" style={{ display:'flex', alignItems:'center', justifyContent:'center', height:300 }}>
+      <span className="spinner" style={{ width:24, height:24 }} />
+    </div>
+  );
+
   return (
     <div className="panel">
       <div className="p-header">
@@ -268,7 +279,7 @@ function DashboardPanel({ user, goTo }) {
                 </Pie>
                 <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--navy)', fontSize: 12 }} formatter={(val, name) => [`${val}%`, name]} />
                 <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
-                  <tspan x="50%" dy="-8" fontSize="20" fontWeight="700" fill="#10b981">{Math.round((donutData[0].value / donutTotal) * 100)}%</tspan>
+                  <tspan x="50%" dy="-8" fontSize="20" fontWeight="700" fill="#10b981">{donutData[0]?.value || 0}%</tspan>
                   <tspan x="50%" dy="18" fontSize="10" fill="var(--muted)">pass rate</tspan>
                 </text>
               </PieChart>
@@ -284,33 +295,206 @@ function DashboardPanel({ user, goTo }) {
           </div>
         </div>
       </div>
-      <TopURLsSection goTo={goTo} />
+      {/* ── TOP URLs ── */}
+      <div className="section-box" style={{ marginBottom: 24 }}>
+        <div className="sb-head">
+          <span className="sb-title">🔗 {t('topUrls') || 'Top Tested URLs'}</span>
+          <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll') || 'View all'}</span>
+        </div>
+        <div style={{ padding: '8px 0' }}>
+          {topUrls.length === 0 ? (
+            <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+              No URLs tested yet — generate your first test!
+            </div>
+          ) : topUrls.map((item, i) => {
+            const rate = Math.round((item.pass / item.tests) * 100) || 0;
+            const statusColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+            return (
+              <div
+                key={i}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 16,
+                  padding: '12px 20px',
+                  borderBottom: i < topUrls.length - 1 ? '1px solid var(--border)' : 'none',
+                  transition: 'background .15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{
+                  width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                  background: 'var(--goldbg)', border: '1px solid rgba(201,162,39,.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 700, color: 'var(--gold)',
+                }}>
+                  {i + 1}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+                    style={{
+                      fontSize: 13, fontWeight: 600, color: 'var(--indigo2)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                    onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                  >
+                    {item.url}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    {item.tests} test{item.tests !== 1 ? 's' : ''} &middot; {(() => {
+                      if (!item.date) return '—';
+                      const diff = (Date.now() - new Date(item.date)) / 1000;
+                      if (isNaN(diff)) return '—';
+                      if (diff < 60) return `${Math.floor(diff)}s ago`;
+                      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                      return `${Math.floor(diff / 86400)}d ago`;
+                    })()}
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: '1px',
+                  padding: '3px 10px', borderRadius: 20, flexShrink: 0,
+                  background: 'rgba(79,134,232,.1)', color: '#4f86e8',
+                  border: '1px solid rgba(79,134,232,.2)',
+                }}>
+                  {item.framework}
+                </span>
+                <div style={{ width: 80, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>pass rate</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{rate}%</span>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 4, background: 'var(--border)', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 4,
+                      width: `${rate}%`, background: statusColor,
+                      transition: 'width 1s ease',
+                    }} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── RECENT ACTIVITY ── */}
       <div className="section-box" style={{ marginBottom: 24 }}>
         <div className="sb-head">
           <span className="sb-title">{t('recentActivity')}</span>
           <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')}</span>
         </div>
-        <div className="empty-row">{t('noActivity')}</div>
-      </div>
-      <div className="quick-start">
-        <div className="qs-icon-wrap">
-          <svg width="32" height="32" fill="none" stroke="rgba(201,162,39,.8)" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        </div>
-        <h3>{t('noGenerations')}</h3>
-        <p>{t('noGenerationsDesc')}</p>
-        <button className="btn-gold" onClick={() => goTo('generate')}>
-          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          {t('generateFirst')}
-        </button>
+        {topUrls.length === 0 ? (
+          <div className="empty-row">{t('noActivity')}</div>
+        ) : (
+          <div style={{ padding: '4px 0' }}>
+            {topUrls.slice(0, 5).map((item, i) => {
+              const rate = Math.round((item.pass / item.tests) * 100) || 0;
+              const rc = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+              const FW_COLORS = { Selenium: '#43B02A', Cypress: '#00BFA5', Playwright: '#E2574C', Both: '#C9A227' };
+              const fwColor = FW_COLORS[item.framework] || '#4f86e8';
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '10px 20px',
+                  borderBottom: i < Math.min(topUrls.length, 5) - 1 ? '1px solid var(--border)' : 'none',
+                  transition: 'background .15s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                    background: rc, boxShadow: `0 0 6px ${rc}88`,
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 12, fontWeight: 600, color: 'var(--text)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>
+                      {item.url}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8 }}>
+                      <span style={{ color: fwColor, fontWeight: 700 }}>{item.framework}</span>
+                      <span>·</span>
+                      <span>{item.tests} tests</span>
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: 12, fontWeight: 800, color: rc,
+                    background: `${rc}12`, border: `1px solid ${rc}33`,
+                    padding: '3px 10px', borderRadius: 20, flexShrink: 0,
+                  }}>
+                    {rate}%
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, minWidth: 60, textAlign: 'right' }}>
+                    {(() => {
+                      if (!item.date) return '—';
+                      const diff = (Date.now() - new Date(item.date)) / 1000;
+                      if (isNaN(diff)) return '—';
+                      if (diff < 60) return `${Math.floor(diff)}s ago`;
+                      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                      return `${Math.floor(diff / 86400)}d ago`;
+                    })()}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
+      
+ 
+function DeleteConfirmModal({ project, onConfirm, onCancel, loading }) {
+  if (!project) return null;
+  return createPortal(
+    <div onClick={onCancel}
+      style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ width: 440, background: '#0d1526', border: '1px solid rgba(239,68,68,.3)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif", animation: 'dFadeUp .2s ease both' }}>
+        <div style={{ height: 3, background: 'linear-gradient(90deg, transparent, #ef4444, transparent)' }} />
+        <div style={{ padding: '24px 28px 18px', borderBottom: '1px solid rgba(255,255,255,.06)', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="18" height="18" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>Delete Project</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>This action cannot be undone</div>
+          </div>
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>✕</button>
+        </div>
+        <div style={{ padding: '24px 28px' }}>
+          <p style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.7, marginBottom: 20 }}>
+            Are you sure you want to delete <strong style={{ color: '#e2e8f0' }}>{project.name}</strong>? All generations and results associated with this project will be permanently removed.
+          </p>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={onCancel}
+              style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Cancel
+            </button>
+            <button onClick={onConfirm} disabled={loading}
+              style={{ flex: 2, padding: '12px', borderRadius: 10, background: 'linear-gradient(135deg,#dc2626,#b91c1c)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? .7 : 1 }}>
+              {loading ? <><span className="spinner" /> Deleting…</> : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg> Delete Project</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 export function ProjectsListPanel({ onNewProject, onSelectProject }) {
   const [projects,   setProjects]   = useState([]);
   const [loading,    setLoading]    = useState(true);
-  const [deleting,   setDeleting]   = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
   const [search,     setSearch]     = useState('');
   const [filterType, setFilterType] = useState('all');
 
@@ -318,6 +502,7 @@ const [editingProject, setEditingProject] = useState(null);
 const [editName,       setEditName]       = useState('');
 const [editDesc,       setEditDesc]       = useState('');
 const [editSaving,     setEditSaving]     = useState(false);
+const [deleting,   setDeleting]   = useState(null);
 
   useEffect(() => {
     api.get('/projects').then(res => setProjects(res.data)).catch(console.error).finally(() => setLoading(false));
@@ -330,11 +515,15 @@ const [editSaving,     setEditSaving]     = useState(false);
   }
 }, [editingProject]);
 
-  const handleDelete = async (e, id) => {
-    e.stopPropagation();
-    setDeleting(id);
-    try { await api.delete(`/projects/${id}`); setProjects(prev => prev.filter(p => p.id !== id)); } catch (err) { console.error(err); }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(deleteTarget.id);
+    try {
+      await api.delete(`/projects/${deleteTarget.id}`);
+      setProjects(prev => prev.filter(p => p.id !== deleteTarget.id));
+    } catch (err) { console.error(err); }
     setDeleting(null);
+    setDeleteTarget(null);
   };
 
   const filtered = projects.filter(p => {
@@ -528,11 +717,11 @@ const [editSaving,     setEditSaving]     = useState(false);
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
     </svg>
   </button>
-  <button onClick={(e) => handleDelete(e, project.id)} disabled={deleting === project.id}
+  <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(project); }}
     style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
     onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.borderColor = 'var(--red-border)'; e.currentTarget.style.color = 'var(--red)'; }}
     onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
-    {deleting === project.id ? '...' : (<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>)}
+    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
   </button>
 </div>
 </div>
@@ -657,6 +846,13 @@ const [editSaving,     setEditSaving]     = useState(false);
         </div>,
         document.body
       )}
+       {/* ADD THIS ↓ */}
+      <DeleteConfirmModal
+        project={deleteTarget}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+        loading={deleting === deleteTarget?.id}
+      />
     </div>
   );
 }
@@ -665,6 +861,8 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
   const [generations, setGenerations] = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [deleting,    setDeleting]    = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
 
   const isPublic = project?.type === 'public';
   const color    = isPublic ? '#4f86e8' : '#8b5cf6';
@@ -681,26 +879,57 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
     setDeleting(null);
   };
 
-  const handleView = (item) => {
-    setGeneration({
-      url: item.url, framework: item.framework, test_type: item.test_type,
-      generation: { id: item.id, url: item.url, framework: item.framework, load_time_ms: item.load_time_ms, test_type: item.test_type },
-      result: {
-        test_type: item.test_type || 'smoke', test_cases: item.test_cases || [],
-        test_cases_selenium: item.test_cases_selenium || [], test_cases_cypress: item.test_cases_cypress || [],
-        script: item.script || '', script_selenium: item.script_selenium || '',
-        script_playwright: item.script_playwright || '', script_cypress: item.script_cypress || '',
-        execution_results: item.execution_results || [],
-        performance: item.performance_data || item.performance || null,
-      },
-    });
-    goTo('execution');
-  };
+const handleView = (item) => {
+  setGeneration({
+    url: item.url, framework: item.framework, test_type: item.test_type,
+    generation: { 
+      id: item.id, 
+      url: item.url, 
+      framework: item.framework, 
+      load_time_ms: item.load_time_ms, 
+      test_type: item.test_type 
+    },
+  result: {
+      test_type: item.test_type || 'smoke',
+      test_cases: item.test_cases || [],
+      test_cases_selenium: item.test_cases_selenium || [],
+      test_cases_cypress: item.test_cases_cypress || [],
+      script: item.script || '',
+      script_selenium: item.script_selenium || '',
+      script_playwright: item.script_playwright || '',
+      script_cypress: item.script_cypress || '',
+      script_postman: item.script_postman || '',
+      script_pytest: item.script_pytest || '',
+      domains: item.domains || [],
+      base_url: item.base_url || item.url || '',
+      pass_count: item.pass_count || 0,
+      fail_count: item.fail_count || 0,
+      skip_count: item.skip_count || 0,
+      pass_rate: item.pass_rate || 0,
+      // ← ICI : on mappe pour s'assurer que screenshot est inclus
+      execution_results: (item.execution_results || []).map(r => ({
+        ...r,
+        screenshot: r.screenshot ?? null,
+      })),
+      performance: item.performance_data || item.performance || null,
+    },
+  });
+  goTo('execution');
+};
 
-  const totalGen  = generations.length;
-  const avgRate   = totalGen ? Math.round(generations.reduce((s, g) => s + (g.pass_rate || 0), 0) / totalGen) : 0;
-  const totalPass = generations.reduce((s, g) => s + (g.pass_count || 0), 0);
-  const urlCards  = generations;
+const totalGen       = generations.length;
+const avgRate        = totalGen ? Math.round(generations.reduce((s, g) => s + (g.pass_rate || 0), 0) / totalGen) : 0;
+const totalPass      = generations.reduce((s, g) => s + (g.pass_count || 0), 0);
+const totalFail      = generations.reduce((s, g) => s + (g.fail_count || 0), 0);
+const highPassCount  = generations.filter(g => (g.pass_rate || 0) >= 80).length;
+const urlCards       = generations;
+const totalPages = Math.ceil(urlCards.length / ITEMS_PER_PAGE);
+
+const paginatedCards = urlCards.slice(
+  (currentPage - 1) * ITEMS_PER_PAGE,
+  currentPage * ITEMS_PER_PAGE
+);
+
   const rateColor = (r) => r >= 80 ? '#10b981' : r >= 50 ? '#f59e0b' : '#ef4444';
   const timeAgo = (dateStr) => {
     const diff = (Date.now() - new Date(dateStr)) / 1000;
@@ -713,7 +942,8 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
     Selenium:   { color: '#43B02A', letters: 'Se' },
     Cypress:    { color: '#00BFA5', letters: 'Cy' },
     Playwright: { color: '#E2574C', letters: 'Pl' },
-    Both:       { color: '#C9A227', letters: '∞'  },
+    Pytest:     { color: '#3776AB', letters: 'Py' },
+    Postman:    { color: '#FF6C37', letters: 'Po'},
   };
 
   return (
@@ -746,10 +976,10 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
         {[
-          { icon: '🚀', val: totalGen,       lbl: 'Generations',       accent: `linear-gradient(90deg,${color},${color}88)` },
-          { icon: '🔗', val: urlCards.length, lbl: 'Total Generations', accent: 'linear-gradient(90deg,#6366f1,#818cf8)' },
-          { icon: '✅', val: totalPass,      lbl: 'Total Passed',      accent: 'linear-gradient(90deg,#10b981,#34d399)' },
-          { icon: '🎯', val: `${avgRate}%`,  lbl: 'Avg Pass Rate',     accent: avgRate >= 80 ? 'linear-gradient(90deg,#10b981,#34d399)' : avgRate >= 50 ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' : 'linear-gradient(90deg,#ef4444,#f87171)' },
+         { icon: '🚀', val: totalGen,       lbl: 'Total Generations', accent: `linear-gradient(90deg,${color},${color}88)` },
+{ icon: '✅', val: totalPass,      lbl: 'Total Passed',      accent: 'linear-gradient(90deg,#10b981,#34d399)' },
+{ icon: '❌', val: totalFail,      lbl: 'Total Failed',      accent: 'linear-gradient(90deg,#ef4444,#f87171)' },
+{ icon: '🏆', val: highPassCount,  lbl: 'Pass Rate ≥ 80%',   accent: 'linear-gradient(90deg,#f59e0b,#fbbf24)' },  
         ].map((s, i) => (
           <div key={s.lbl} className="stat-card" style={{ '--i': i, minHeight: 110 }}>
             <div className="stat-card-top"><div className="stat-icon-wrap">{s.icon}</div></div>
@@ -782,67 +1012,163 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
       ) : (
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 14 }}>🔗 All Generations — {urlCards.length} total</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {urlCards.map((item, i) => {
-              const fw    = FW_CONFIG[item.framework] || FW_CONFIG.Selenium;
-              const rawRate = item.pass_rate != null ? item.pass_rate : (
-  item.pass_count != null && (item.pass_count + item.fail_count + item.skip_count) > 0
-    ? Math.round(item.pass_count / (item.pass_count + item.fail_count + item.skip_count) * 100)
-    : 0
-);
-const rc = rateColor(rawRate);
-              const total = (item.pass_count || 0) + (item.fail_count || 0) + (item.skip_count || 0);
-              return (
-                <div key={item.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', transition: 'all .25s', position: 'relative', overflow: 'hidden', animation: `dFadeUp .3s var(--ease) ${i * 0.05}s both` }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,.2), 0 0 0 1px ${color}`; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, transparent, ${rc}, transparent)` }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <div style={{ width: 56, height: 56, borderRadius: '50%', flexShrink: 0, background: `${rc}15`, border: `2px solid ${rc}44`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: rc, lineHeight: 1 }}>
-                        {item.test_type === 'performance' && (item.performance_data?.global_score ?? item.performance?.global_score) != null
-                          ? (item.performance_data?.global_score ?? item.performance?.global_score)
-                          : item.pass_rate || 0}%
-                      </span>
-                      <span style={{ fontSize: 8, color: 'var(--muted)', letterSpacing: .5 }}>PASS</span>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 6 }}>{item.url}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: fw.color, background: `${fw.color}15`, border: `1px solid ${fw.color}30` }}>{fw.letters} · {item.framework}</span>
-                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{total} tests</span>
-                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>· {timeAgo(item.created_at)}</span>
-                      </div>
-                      <div style={{ display: 'flex', height: 4, borderRadius: 4, overflow: 'hidden', marginTop: 10, background: 'var(--border)' }}>
-                        <div style={{ width: `${total ? (item.pass_count || 0) / total * 100 : 0}%`, background: '#10b981' }} />
-                        <div style={{ width: `${total ? (item.fail_count || 0) / total * 100 : 0}%`, background: '#ef4444' }} />
-                        <div style={{ width: `${total ? (item.skip_count || 0) / total * 100 : 0}%`, background: '#f59e0b' }} />
-                      </div>
-                      <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
-                        {[{ val: item.pass_count || 0, color: '#10b981', lbl: 'pass' }, { val: item.fail_count || 0, color: '#ef4444', lbl: 'fail' }, { val: item.skip_count || 0, color: '#f59e0b', lbl: 'skip' }].map(s => (
-                          <span key={s.lbl} style={{ fontSize: 11, color: s.color, fontWeight: 700 }}>{s.val} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>{s.lbl}</span></span>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-                      <button onClick={() => handleView(item)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, background: `linear-gradient(135deg, ${color}, ${color}cc)`, border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '.5px', boxShadow: `0 3px 10px ${color}44`, transition: 'all .2s' }}
-                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
-                        <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                        View
-                      </button>
-                      <button onClick={() => handleDelete(item.id)} disabled={deleting === item.id}
-                        style={{ width: '100%', padding: '7px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.borderColor = 'var(--red-border)'; e.currentTarget.style.color = 'var(--red)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
-                        {deleting === item.id ? '...' : (<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>)}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          {/* Grouper par test_type */}
+{(() => {
+  const groups = {};
+  paginatedCards.forEach(item => {
+    const type = item.test_type || 'smoke';
+    if (!groups[type]) groups[type] = [];
+    groups[type].push(item);
+  });
+
+  const TYPE_CONFIG = {
+    smoke:       { label: 'Smoke Tests',       color: '#64748b', bg: 'rgba(100,116,139,.1)',  border: 'rgba(100,116,139,.25)', letter: 'S', icon: '🔍' },
+    functional:  { label: 'Functional Tests',  color: '#6366f1', bg: 'rgba(99,102,241,.1)',   border: 'rgba(99,102,241,.25)',  letter: 'F', icon: '⚙️' },
+    performance: { label: 'Performance Tests', color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',   border: 'rgba(139,92,246,.25)', letter: 'P', icon: '⚡' },
+    api:         { label: 'API Tests',         color: '#10b981', bg: 'rgba(16,185,129,.1)',   border: 'rgba(16,185,129,.25)', letter: 'A', icon: '🔗' },
+    regression:  { label: 'Regression Test',  color: '#f97316', bg: 'rgba(249,115,22,.1)',   border: 'rgba(249,115,22,.25)', letter: 'R', icon: '🔄' },
+    security:    { label: 'Security Test',    color: '#ef4444', bg: 'rgba(239,68,68,.1)',    border: 'rgba(239,68,68,.25)',  letter: 'S', icon: '🔒' },
+    unit:        { label: 'Unit Tests',        color: '#0ea5e9', bg: 'rgba(14,165,233,.1)',   border: 'rgba(14,165,233,.25)', letter: 'U', icon: '🧪' },
+  };
+
+  return Object.entries(groups).map(([type, items]) => {
+    const tc = TYPE_CONFIG[type] || TYPE_CONFIG.smoke;
+    const groupPass = items.reduce((s, g) => s + (g.pass_count || 0), 0);
+    const groupTotal = items.reduce((s, g) => s + (g.pass_count || 0) + (g.fail_count || 0) + (g.skip_count || 0), 0);
+    const groupRate = groupTotal > 0 ? Math.round(groupPass / groupTotal * 100) : 0;
+    const rc = groupRate >= 80 ? '#10b981' : groupRate >= 50 ? '#f59e0b' : '#ef4444';
+
+    return (
+      <div key={type} style={{ marginBottom: 28 }}>
+        
+        {/* ── GROUP HEADER ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 20px', marginBottom: 12,
+          background: tc.bg,
+          border: `1px solid ${tc.border}`,
+          borderRadius: 12,
+          position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: tc.color, borderRadius: '12px 0 0 12px' }} />
+          
+          <span style={{ fontSize: 20 }}>{tc.icon}</span>
+          
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 14, fontWeight: 800, color: tc.color, letterSpacing: '.5px' }}>
+                {tc.label}
+              </span>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                color: tc.color, background: `${tc.color}20`, border: `1px solid ${tc.border}`,
+                letterSpacing: 1,
+              }}>
+                {items.length} generation{items.length !== 1 ? 's' : ''}
+              </span>
+            </div>
           </div>
+
+          {/* Group stats */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+              <span style={{ color: '#10b981', fontWeight: 700 }}>{groupPass}</span> passed · <span style={{ color: 'var(--muted)' }}>{groupTotal} total</span>
+            </div>
+            <div style={{
+              fontSize: 14, fontWeight: 800, color: rc,
+              background: `${rc}15`, border: `1px solid ${rc}33`,
+              padding: '3px 12px', borderRadius: 20,
+            }}>
+              {groupRate}%
+            </div>
+          </div>
+        </div>
+
+        {/* ── GROUP ITEMS ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 8 }}>
+          {items.map((item, i) => {
+  const fw = FW_CONFIG[item.framework] || FW_CONFIG.Selenium;
+  const rawRate = item.pass_rate != null ? item.pass_rate : (
+    item.pass_count != null && (item.pass_count + item.fail_count + item.skip_count) > 0
+      ? Math.round(item.pass_count / (item.pass_count + item.fail_count + item.skip_count) * 100)
+      : 0
+  );
+  const rc = rateColor(rawRate);
+  const total = (item.pass_count || 0) + (item.fail_count || 0) + (item.skip_count || 0);
+  return (
+    <div key={item.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', transition: 'all .25s', position: 'relative', overflow: 'hidden', animation: `dFadeUp .3s var(--ease) ${i * 0.05}s both` }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,.2), 0 0 0 1px ${color}`; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, transparent, ${rc}, transparent)` }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', flexShrink: 0, background: `${rc}15`, border: `2px solid ${rc}44`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: rc, lineHeight: 1 }}>
+            {item.test_type === 'performance' && (item.performance_data?.global_score ?? item.performance?.global_score) != null
+              ? (item.performance_data?.global_score ?? item.performance?.global_score)
+              : item.pass_rate || 0}%
+          </span>
+          <span style={{ fontSize: 8, color: 'var(--muted)', letterSpacing: .5 }}>PASS</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 6 }}>{item.url}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: fw.color, background: `${fw.color}15`, border: `1px solid ${fw.color}30` }}>{fw.letters} · {item.framework}</span>
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>{total} tests</span>
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>· {timeAgo(item.created_at)}</span>
+          </div>
+          <div style={{ display: 'flex', height: 4, borderRadius: 4, overflow: 'hidden', marginTop: 10, background: 'var(--border)' }}>
+            <div style={{ width: `${total ? (item.pass_count || 0) / total * 100 : 0}%`, background: '#10b981' }} />
+            <div style={{ width: `${total ? (item.fail_count || 0) / total * 100 : 0}%`, background: '#ef4444' }} />
+            <div style={{ width: `${total ? (item.skip_count || 0) / total * 100 : 0}%`, background: '#f59e0b' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+            {[{ val: item.pass_count || 0, color: '#10b981', lbl: 'pass' }, { val: item.fail_count || 0, color: '#ef4444', lbl: 'fail' }, { val: item.skip_count || 0, color: '#f59e0b', lbl: 'skip' }].map(s => (
+              <span key={s.lbl} style={{ fontSize: 11, color: s.color, fontWeight: 700 }}>{s.val} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>{s.lbl}</span></span>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+          <button onClick={() => handleView(item)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, background: `linear-gradient(135deg, ${color}, ${color}cc)`, border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '.5px', boxShadow: `0 3px 10px ${color}44`, transition: 'all .2s' }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+            <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            View
+          </button>
+          <button onClick={() => handleDelete(item.id)} disabled={deleting === item.id}
+            style={{ width: '100%', padding: '7px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.borderColor = 'var(--red-border)'; e.currentTarget.style.color = 'var(--red)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
+            {deleting === item.id ? '...' : (<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+})}
+        </div>
+      </div>
+    );
+  });
+})()}
+{totalPages > 1 && (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 20, padding: '12px 0' }}>
+    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+      style={{ padding: '6px 16px', borderRadius: 8, background: 'var(--card)', border: '1px solid var(--border)', color: currentPage === 1 ? 'var(--muted)' : 'var(--text)', cursor: currentPage === 1 ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+      Prev
+    </button>
+    {Array.from({ length: totalPages }, (_, i) => (
+      <button key={i} onClick={() => setCurrentPage(i + 1)}
+        style={{ width: 32, height: 32, borderRadius: 8, background: currentPage === i + 1 ? 'var(--indigo)' : 'var(--card)', border: currentPage === i + 1 ? '1px solid var(--indigo2)' : '1px solid var(--border)', color: currentPage === i + 1 ? '#fff' : 'var(--muted)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+        {i + 1}
+      </button>
+    ))}
+    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+      style={{ padding: '6px 16px', borderRadius: 8, background: 'var(--card)', border: '1px solid var(--border)', color: currentPage === totalPages ? 'var(--muted)' : 'var(--text)', cursor: currentPage === totalPages ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+      Next 
+    </button>
+  </div>
+)}
+
         </div>
       )}
     </div>
@@ -1024,6 +1350,8 @@ function GeneratePanel({ goTo, setGeneration, project, initialUrl = '', onGenera
   const [testType, setTestType] = useState('');
   const [loading,  setLoad]     = useState(false);
   const [error,    setError]    = useState('');
+  const [jwtToken, setJwtToken] = useState('');
+
   const [urlValid, setUrlValid] = useState(() => {
     if (!initialUrl) return null;
     try { new URL(initialUrl); return true; } catch { return false; }
@@ -1040,55 +1368,130 @@ function GeneratePanel({ goTo, setGeneration, project, initialUrl = '', onGenera
     { key: 'smoke',       label: 'Smoke Test',       desc: 'Visibility checks — elements present in DOM',                  letter: 'S', letterClass: 'gp4-letter-s',    badge: 'Quick',    badgeClass: 'gp-badge-quick', time: '~30s'  },
     { key: 'functional',  label: 'Functional Test',  desc: 'Interactions — click, fill, submit + assertions',             letter: 'F', letterClass: 'gp4-letter-f',    badge: 'Medium',   badgeClass: 'gp-badge-mid',   time: '~1min' },
     { key: 'performance', label: 'Performance Test', desc: 'Web Vitals: LCP, FCP, TTI, Load Time, Resource Size',         letter: 'P', letterClass: 'gp4-letter-r',    badge: 'Advanced', badgeClass: 'gp-badge-full',  time: '~3min' },
-    { key: 'unit',        label: 'Unit Test',        desc: 'Test individual functions and components in isolation',        letter: 'U', letterClass: 'gp4-letter-unit', badge: 'Fast',     badgeClass: 'gp-badge-quick', time: '~15s'  },
+    { key: 'api',         label: 'API Test',         desc: 'REST endpoints — status codes, payloads, auth tokens',        letter: 'A', letterClass: 'gp4-letter-api',  badge: 'Technical',badgeClass: 'gp-badge-mid',   time: '~2min' },
     { key: 'regression',  label: 'Regression Test',  desc: 'Ensure existing features still work after changes',           letter: 'R', letterClass: 'gp4-letter-reg',  badge: 'Thorough', badgeClass: 'gp-badge-mid',   time: '~3min' },
     { key: 'security',    label: 'Security Test',    desc: 'Check for vulnerabilities, auth issues, injection risks',     letter: 'S', letterClass: 'gp4-letter-sec',  badge: 'Critical', badgeClass: 'gp-badge-full',  time: '~5min' },
   ];
+  const SECURITY_FRAMEWORKS = [
+  { key: 'Pytest', color: '#3776AB', letters: 'Py', letterClass: 'gp4-letter-pytest', note: 'requests' },
+];
+const REGRESSION_FRAMEWORKS = [
+  { key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl', note: 'Browser' },
+];
   const PUBLIC_FRAMEWORKS   = [{ key: 'Selenium', color: '#43B02A', letters: 'Se', letterClass: 'gp4-letter-se' }, { key: 'Cypress', color: '#00BFA5', letters: 'Cy', letterClass: 'gp4-letter-cy' }, { key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl' }];
   const INTERNAL_FRAMEWORKS = [{ key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl' }, { key: 'Selenium', color: '#43B02A', letters: 'Se', letterClass: 'gp4-letter-se' }, { key: 'Cypress', color: '#00BFA5', letters: 'Cy', letterClass: 'gp4-letter-cy' }];
+  const API_FRAMEWORKS = [
+  { key: 'Pytest',   color: '#3776AB', letters: 'Py', letterClass: 'gp4-letter-pytest',  note: 'requests' },
+  { key: 'Postman',  color: '#FF6C37', letters: 'Po', letterClass: 'gp4-letter-postman', note: 'Newman CLI' },
+  ];
   const PERFORMANCE_FRAMEWORKS = [{ key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl', note: 'Web Vitals' }];
   const BACKEND_FRAMEWORKS     = [{ key: 'k6', color: '#7D64FF', letters: 'k6', letterClass: 'gp4-letter-k6', note: 'Load Test' }];
 
   const TEST_TYPES = isInternal ? INTERNAL_TEST_TYPES : PUBLIC_TEST_TYPES;
-  const FRAMEWORKS = testType === 'performance' ? (isInternal ? [...PERFORMANCE_FRAMEWORKS, ...BACKEND_FRAMEWORKS] : PERFORMANCE_FRAMEWORKS) : isInternal ? INTERNAL_FRAMEWORKS : PUBLIC_FRAMEWORKS;
+  const FRAMEWORKS = testType === 'performance'
+  ? (isInternal ? [...PERFORMANCE_FRAMEWORKS, ...BACKEND_FRAMEWORKS] : PERFORMANCE_FRAMEWORKS)
+  : testType === 'api'
+  ? API_FRAMEWORKS
+  : testType === 'security'  ? SECURITY_FRAMEWORKS 
+  : testType === 'regression' ? REGRESSION_FRAMEWORKS 
+  : isInternal
+  ? INTERNAL_FRAMEWORKS
+  : PUBLIC_FRAMEWORKS;
 
   const validateUrl = (val) => {
     try { new URL(val); setUrlValid(true); } catch { setUrlValid(val.length > 0 ? false : null); }
   };
 
   const submit = async (e) => {
-    e.preventDefault();
-    if (!url) return;
-    setLoad(true); setError('');
-    try {
-      const res = await api.post('/generate', { url, framework: fw, test_type: testType, project_name: project?.name, project_type: project?.type, project_id: project?.id });
-      const genData = res.data;
-      if (genData.test_type === 'performance' || genData.result?.test_type === 'performance') {
-        genData.result = genData.result || {};
-        genData.result.performance = genData.performance || genData.result?.performance;
-        genData.result.test_cases  = genData.result.test_cases || genData.generation?.test_cases || [];
-      }
-   setGeneration(genData);
-const notifData = {
-  url: genData?.generation?.url || genData?.url || '',
-  framework: genData?.generation?.framework || genData?.framework || '',
-  testType: genData?.result?.test_type || genData?.test_type || '',
- passCount: (genData?.result?.execution_results?.length
-  ? genData.result.execution_results
-  : genData?.result?.test_cases || []
-).filter(t => t.status === 'pass').length,
-failCount: (genData?.result?.execution_results?.length
-  ? genData.result.execution_results
-  : genData?.result?.test_cases || []
-).filter(t => t.status === 'fail').length,
-  timestamp: Date.now(),
+  e.preventDefault();
+  if (!url) return;
+  setLoad(true); setError('');
+  try {
+    // ← ICI : choisir la route selon le type de projet
+ const endpoint = testType === 'api'
+  ? '/generations/generate-api'
+  : testType === 'security' ? '/generations/generate-security' 
+  : testType === 'regression' ? '/generations/generate-regression' 
+  : isInternal ? '/generate-internal' : '/generate';
+
+const anpeToken = localStorage.getItem('token') || '';
+const payload = testType === 'api'
+  ? {
+      url,
+      framework:    fw,
+      test_type:    'api',
+      project_id:   project?.id,
+      project_name: project?.name,
+      project_type: project?.type,
+      username:     "admin@admin.com",
+      password:     "password1%Aa",
+      anpe_token:   localStorage.getItem('refreshToken') || '',
+    }
+  : testType === 'regression'
+  ? {
+      url,
+      framework:    fw,
+      test_type:    'regression',
+      project_id:   project?.id,
+      project_name: project?.name,
+      project_type: project?.type,
+    }
+  : isInternal
+  ? {
+      url,
+      framework:    fw,
+      test_type:    testType,
+      project_id:   project?.id,
+      project_name: project?.name,
+      project_type: project?.type,
+      scrape_login: url.includes('login'),
+      username:     "admin@admin.com",
+      password:     "password1%Aa",
+    }
+  : {
+      url,
+      framework:    fw,
+      test_type:    testType,
+      project_name: project?.name,
+      project_type: project?.type,
+      project_id:   project?.id,
+      user_scenario: null,
+    };
+
+// Debug
+console.log('[SUBMIT] endpoint:', endpoint);
+console.log('[SUBMIT] token:', payload.token?.slice(0, 30));
+
+   const res = await api.post(endpoint, payload);
+    const genData = res.data;
+
+    if (genData.test_type === 'performance' || genData.result?.test_type === 'performance') {
+      genData.result = genData.result || {};
+      genData.result.performance = genData.performance || genData.result?.performance;
+      genData.result.test_cases  = genData.result.test_cases || genData.generation?.test_cases || [];
+    }
+
+    setGeneration(genData);
+    const notifData = {
+      url:        genData?.generation?.url       || genData?.url       || '',
+      framework:  genData?.generation?.framework  || genData?.framework  || '',
+      testType:   genData?.result?.test_type      || genData?.test_type  || '',
+      passCount: (genData?.result?.execution_results?.length
+        ? genData.result.execution_results
+        : genData?.result?.test_cases || []
+      ).filter(t => t.status === 'pass').length,
+      failCount: (genData?.result?.execution_results?.length
+        ? genData.result.execution_results
+        : genData?.result?.test_cases || []
+      ).filter(t => t.status === 'fail').length,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem('nextest-last-notif', JSON.stringify(notifData));
+    onGenerationSaved(notifData);
+    goTo('execution');
+  } catch (err) { setError(err.response?.data?.error || 'Une erreur est survenue'); }
+  setLoad(false);
 };
-localStorage.setItem('nextest-last-notif', JSON.stringify(notifData));
-onGenerationSaved(notifData);
-goTo('execution');
-    } catch (err) { setError(err.response?.data?.error || 'Une erreur est survenue'); }
-    setLoad(false);
-  };
 
   const selectedType = TEST_TYPES.find(t => t.key === testType);
   const selectedFw   = FRAMEWORKS.find(f => f.key === fw);
@@ -2484,7 +2887,7 @@ const sectionDetailedMetrics = `
         {[
           { label: 'Passed',  val: pass,       color: '#10B981', bg: 'rgba(16,185,129,.08)',  border: 'rgba(16,185,129,.2)'  },
           { label: 'Failed',  val: fail,       color: '#EF4444', bg: 'rgba(239,68,68,.08)',   border: 'rgba(239,68,68,.2)'   },
-          { label: 'Skipped', val: skip,       color: '#F59E0B', bg: 'rgba(245,158,11,.08)',  border: 'rgba(245,158,11,.2)'  },
+          { label: 'Warn/Skip', val: skip,       color: '#F59E0B', bg: 'rgba(245,158,11,.08)',  border: 'rgba(245,158,11,.2)'  },
           { label: 'Score',   val: `${score}`, color: scoreColor, bg: `${scoreColor}12`, border: `${scoreColor}33` },
         ].map((s, i) => (
           <div key={s.label} className="ep-stat" style={{ '--sc': s.color, '--sb': s.bg, '--sbo': s.border, '--i': i }}>
@@ -2582,11 +2985,12 @@ const sectionDetailedMetrics = `
 function ExecutionPanel({ generation }) {
   const { t } = useLang();
   const [filter,       setFilter]       = useState('all');
-  const [activeTab,    setActiveTab]    = useState('selenium');
+  const [activeTab,    setActiveTab]    = useState('results');
   const [pdfLoading,   setPdfLoading]   = useState(false);
   const [runResults,   setRunResults]   = useState(null);
   const [running,      setRunning]      = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [expandedTest, setExpandedTest] = useState(null);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -2605,12 +3009,17 @@ function ExecutionPanel({ generation }) {
   }
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  useEffect(() => {
+useEffect(() => {
     if (!generation) return;
     const savedResults = generation?.result?.execution_results || generation?.generation?.execution_results || [];
     if (savedResults.length > 0) { setRunResults({ results: savedResults }); return; }
+    // ← NE PAS re-runner pour les tests API
+    if (testType === 'api') return;
     if (!generation?.result?.test_cases?.length) return;
-    const currentFramework = generation?.generation?.framework || generation?.framework || 'Selenium';
+    const currentFramework = generation?.framework 
+    || generation?.generation?.framework 
+    || generation?.result?.framework
+    || 'Selenium';
     const run = async () => {
       setRunning(true); setRunResults(null);
       try {
@@ -2632,9 +3041,13 @@ return execution_results.map((r, i) => ({
   suite: r.reason_pass || r.reason || r.error || 'Test',
   assertion_result: r.assertion_result || null,
   step_meta: r.step_meta || null,
-  category: r.category || 'smoke',
-  priority: r.priority || 'medium',
-  screenshot: r.screenshot || null,  // ← AJOUTE
+  category:        r.category || 'api',
+  priority:        r.priority || 'medium',
+  screenshot:      r.screenshot ?? null,
+  ai_analysis:     r.ai_analysis || null,
+  http_status:     r.http_status || null,
+  expected_status: r.expected_status || null,
+  assertions_detail: r.assertions_detail || [],
 }));
     }
     return (test_cases || []).map((tc, i) => ({ id: tc.id || i + 1, name: tc.name, status: 'skip', duration: '—', suite: 'Not executed', assertion_result: null, step_meta: null, category: tc.category || 'smoke', priority: tc.priority || 'medium' }));
@@ -2648,9 +3061,11 @@ return execution_results.map((r, i) => ({
   const tests = isBoth ? (activeTab === 'selenium' ? testsSelenium : testsCypress) : testsSingle;
   const pass  = tests.filter(t => t.status === 'pass').length;
   const fail  = tests.filter(t => t.status === 'fail').length;
-  const skip  = tests.filter(t => t.status === 'skip').length;
+  const skip  = tests.filter(t => t.status === 'skip' || t.status === 'warn').length;
   const rate  = tests.length > 0 ? Math.round((pass / tests.length) * 100) : 0;
-  const shown = filter === 'all' ? tests : tests.filter(t => t.status === filter);
+  const shown = filter === 'all' ? tests 
+  : filter === 'skip' ? tests.filter(t => t.status === 'skip' || t.status === 'warn')
+  : tests.filter(t => t.status === filter);
 
   const url        = generation?.generation?.url || generation?.url || '';
   const loadTimeMs = generation?.generation?.load_time_ms || generation?.scraped?.load_time_ms || 0;
@@ -2662,30 +3077,82 @@ return execution_results.map((r, i) => ({
     smoke:       { label: 'Smoke',       color: '#64748b', bg: 'rgba(148,163,184,.12)', border: 'rgba(148,163,184,.3)',  letter: 'S' },
     functional:  { label: 'Functional',  color: '#6366f1', bg: 'rgba(99,102,241,.1)',   border: 'rgba(99,102,241,.25)', letter: 'F' },
     performance: { label: 'Performance', color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',   border: 'rgba(139,92,246,.25)', letter: 'P' },
+    api:         { label: 'API',         color: '#10b981', bg: 'rgba(16,185,129,.1)',   border: 'rgba(16,185,129,.25)', letter: 'A' },
+    regression:  { label: 'Regression',  color: '#f97316', bg: 'rgba(249,115,22,.1)',   border: 'rgba(249,115,22,.25)', letter: 'R' },
+    security:    { label: 'Security',    color: '#ef4444', bg: 'rgba(239,68,68,.1)',    border: 'rgba(239,68,68,.25)',  letter: 'S' },
   };
   const ttBadge = TEST_TYPE_BADGE[testType] || TEST_TYPE_BADGE.smoke;
+  const isRegression = testType === 'regression';
 
-  const EP_FW = { Selenium: { letters: 'Se', color: '#43B02A' }, Cypress: { letters: 'Cy', color: '#00BFA5' }, Playwright: { letters: 'Pl', color: '#E2574C' }, Both: { letters: '∞', color: '#C9A227' } };
-  const fwConf = EP_FW[framework] || EP_FW.Selenium;
+  const EP_FW = {
+  Selenium:   { letters: 'Se', color: '#43B02A' },
+  Cypress:    { letters: 'Cy', color: '#00BFA5' },
+  Playwright: { letters: 'Pl', color: '#E2574C' },
+  Both:       { letters: '∞',  color: '#C9A227' },
+  Postman:    { letters: 'Po', color: '#FF6C37' },
+  Pytest:     { letters: 'Py', color: '#3776AB' },
+  Newman:     { letters: 'Nw', color: '#FF6C37' },
+ 
+};
+  const fwConf = EP_FW[framework] || EP_FW[framework?.charAt(0).toUpperCase() + framework?.slice(1)] || EP_FW.Selenium;
 
   const downloadScript = (type = 'selenium') => {
-    let content, filename;
-    if (isBoth) {
-      content  = type === 'selenium' ? generation?.result?.script_selenium : type === 'playwright' ? generation?.result?.script_playwright : generation?.result?.script_cypress;
-      filename = type === 'selenium' ? 'test_selenium.py' : type === 'playwright' ? 'test_playwright.py' : 'test_cypress.js';
+  let content, filename;
+  const fw = framework?.toLowerCase();
+
+  // ── API test types (Postman / Pytest / Newman) ──
+  if (testType === 'api') {
+    if (fw === 'postman' || fw === 'newman') {
+      content  = generation?.result?.script_postman
+              || generation?.result?.script
+              || '';
+      filename = 'nextest_collection.json';
     } else {
-      const fw = framework?.toLowerCase();
-      content  = fw === 'playwright' ? (generation?.result?.script_playwright || generation?.result?.script || '') : fw === 'cypress' ? (generation?.result?.script_cypress || generation?.result?.script || '') : (generation?.result?.script_selenium || generation?.result?.script || '');
-      filename = fw === 'playwright' ? 'test_playwright.py' : fw === 'cypress' ? 'test_cypress.js' : 'test_selenium.py';
+      content  = generation?.result?.script_pytest
+              || generation?.result?.script
+              || '';
+      filename = 'test_api_pytest.py';
     }
     const blob = new Blob([content || ''], { type: 'text/plain' });
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob); link.download = filename; link.click();
-  };
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    return;
+  }
+
+  // ── Both (Selenium + Playwright + Cypress) ──
+  if (isBoth) {
+    content  = type === 'selenium'  ? generation?.result?.script_selenium
+             : type === 'playwright' ? generation?.result?.script_playwright
+             :                         generation?.result?.script_cypress;
+    filename = type === 'selenium'  ? 'test_selenium.py'
+             : type === 'playwright' ? 'test_playwright.py'
+             :                         'test_cypress.js';
+  } else {
+    content  = fw === 'playwright' ? (generation?.result?.script_playwright || generation?.result?.script || '')
+             : fw === 'cypress'    ? (generation?.result?.script_cypress    || generation?.result?.script || '')
+             :                       (generation?.result?.script_selenium   || generation?.result?.script || '');
+    filename = fw === 'playwright' ? 'test_playwright.py'
+             : fw === 'cypress'    ? 'test_cypress.js'
+             :                       'test_selenium.py';
+  }
+
+  const blob = new Blob([content || ''], { type: 'text/plain' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+};
 
   const downloadCsv = () => {
-    const headers = ['ID', 'Test Name', 'Status', 'Duration', 'Category', 'Section', 'Suite/Reason'];
-    const rows    = tests.map(t => [t.id, `"${t.name.replace(/"/g, '""')}"`, t.status, t.duration, t.category || 'smoke', t.section || '—', `"${(t.suite || '').replace(/"/g, '""')}"`]);
+    const headers = isRegression
+  ? ['ID', 'Test Name', 'Category', 'Severity', 'URL', 'Status', 'Reason', 'Duration']
+  : ['ID', 'Test Name', 'Status', 'Duration', 'Category', 'Section', 'Suite/Reason'];
+
+const rows = isRegression
+  ? tests.map(t => [t.id, `"${(t.name||'').replace(/"/g,'""')}"`, t.category||'navigation', t.severity||'medium', t.url||'—', t.status, `"${(t.suite||'').replace(/"/g,'""')}"`, t.duration])
+  : tests.map(t => [t.id, `"${t.name.replace(/"/g,'""')}"`, t.status, t.duration, t.category||'smoke', t.section||'—', `"${(t.suite||'').replace(/"/g,'""')}"`]);
     const csv     = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob    = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const link    = document.createElement('a');
@@ -3340,25 +3807,49 @@ const downloadHtml = () => {
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `nextest_report_${genId}.html`;
+  link.download = `${isRegression ? 'regression' : 'nextest'}_report_${genId}.html`;
+
   link.click();
   setDropdownOpen(false);
 };
  
 
-  const downloadPdf = async () => {
-    try {
-      setPdfLoading(true); setDropdownOpen(false);
-      const id = generation?.generation?.id;
-      if (!id) return;
-      const res  = await api.get(`/generations/${id}/pdf`, { responseType: 'blob' });
-      const blob = new Blob([res.data], { type: 'application/pdf' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `nextest_report_${id}.pdf`; link.click();
-    } catch (err) { console.error(err); }
-    finally { setPdfLoading(false); }
-  };
+const downloadPdf = async () => {
+  try {
+    setPdfLoading(true); setDropdownOpen(false);
+    const id = generation?.generation?.id || generation?.id || generation?.result?.id;
+    if (!id) { alert('No generation ID found.'); setPdfLoading(false); return; }
+
+    const res = await api.get(`/generations/${id}/pdf`, { responseType: 'blob' });
+    const contentType = res.headers['content-type'] || '';
+
+    if (contentType.includes('application/json')) {
+      // Lire le JSON pour voir l'erreur exacte
+      const text = await res.data.text();
+      console.error('[PDF] Backend error JSON:', text);
+      alert('PDF error: ' + text);
+      setPdfLoading(false);
+      return;
+    }
+
+    const blob = new Blob([res.data], { type: 'application/pdf' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${isRegression ? 'regression' : 'nextest'}_report_${id}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (err) {
+    if (err.response?.data instanceof Blob) {
+      const text = await err.response.data.text();
+      console.error('[PDF] Blob error:', text);
+      alert('PDF error: ' + text);
+    } else {
+      console.error('[PDF] Error:', err.response?.data || err.message);
+      alert('PDF failed: ' + (err.message || 'Unknown error'));
+    }
+  } finally { setPdfLoading(false); }
+};
 
   
 
@@ -3400,12 +3891,23 @@ const downloadHtml = () => {
               <button className="ep-dl-btn" onClick={() => downloadScript('cypress')}><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span className="ep-dl-letters" style={{ color: '#00BFA5' }}>Cy</span> .js</button>
             </>
           ) : (
-            <button className="ep-dl-btn" onClick={() => downloadScript()}>
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span className="ep-dl-letters" style={{ color: fwConf.color }}>{fwConf.letters}</span>
-              {framework === 'Cypress' ? '.js' : '.py'}
-            </button>
-          )}
+           <button className="ep-dl-btn" onClick={() => downloadScript()}>
+    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    <span className="ep-dl-letters" style={{ color: fwConf.color }}>{fwConf.letters}</span>
+    {testType === 'api' && (framework?.toLowerCase() === 'postman' || framework?.toLowerCase() === 'newman')
+      ? '.json'
+      : testType === 'api'
+      ? '.py'
+      : framework === 'Cypress'
+      ? '.js'
+      : '.py'
+    }
+  </button>
+)}
 
           <div ref={dropdownRef} style={{ position: 'relative' }}>
             <button className="ep-pdf-btn" onClick={() => setDropdownOpen(o => !o)} disabled={pdfLoading}>
@@ -3484,56 +3986,243 @@ const downloadHtml = () => {
         </div>
       </div>
 
-      <div className="ep-filters">
-        {[{ key: 'all', label: 'All', count: tests.length }, { key: 'pass', label: 'Passed', count: pass }, { key: 'fail', label: 'Failed', count: fail }, { key: 'skip', label: 'Skipped', count: skip }].map(f => (
-          <button key={f.key} className={`ep-filter${filter === f.key ? ' on' : ''}`} onClick={() => setFilter(f.key)}>
-            {f.key === 'pass' && <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>}
-            {f.key === 'fail' && <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>}
-            {f.key === 'skip' && <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>}
-            {f.label}<span className="ep-filter-count">{f.count}</span>
-          </button>
-        ))}
-        <div className="ep-filter-right"><span style={{ fontSize: 11, color: 'var(--muted)' }}>Showing {shown.length} of {tests.length}</span></div>
-      </div>
 
-      <div className="ep-list">
-        {running
-          ? Array.from({ length: tests.length || 4 }).map((_, i) => (
-              <div key={i} className="ep-row ep-row--skeleton" style={{ animationDelay: `${i * 0.05}s` }}>
-                <div className="ep-row-status-wrap"><div className="ep-skeleton-circle" /></div>
-                <div className="ep-row-body"><div className="ep-skeleton-line" style={{ width: '55%', height: 13 }} /><div className="ep-skeleton-line" style={{ width: '35%', height: 10, marginTop: 6 }} /></div>
-                <div className="ep-skeleton-pill" />
+{/* ── TABS ── */}
+<div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+  {[
+    { key: 'results',         label: '✅ Results',         count: tests.length },
+    { key: 'scenarios',       label: '📋 Scenarios',       count: tests.length },
+    { key: 'recommendations', label: '💡 Recommendations', count: (() => {
+  const perfRecs = [];
+  if (loadTimeMs > 5000 || loadTimeMs > 3000) perfRecs.push(1);
+  else perfRecs.push(1);
+  if (fail > 0) perfRecs.push(1);
+  if (skip > 0) perfRecs.push(1);
+  if (pass === tests.length && tests.length > 0) perfRecs.push(1);
+  return perfRecs.length;
+})() },
+  ].map(tab => (
+    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+      style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 700, color: activeTab === tab.key ? 'var(--indigo2)' : 'var(--muted)', borderBottom: activeTab === tab.key ? '2px solid var(--indigo2)' : '2px solid transparent', marginBottom: -1, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: 8 }}>
+      {tab.label}
+      <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: activeTab === tab.key ? 'var(--indigo-bg)' : 'var(--bg2)', color: activeTab === tab.key ? 'var(--indigo2)' : 'var(--muted)' }}>{tab.count}</span>
+    </button>
+  ))}
+</div>
+      
+
+      {activeTab === 'results' && (
+  <>
+    <div className="ep-filters">
+      {[{ key: 'all', label: 'All', count: tests.length }, { key: 'pass', label: 'Passed', count: pass }, { key: 'fail', label: 'Failed', count: fail }, { key: 'skip', label: 'Warn/Skip', count: skip }].map(f => (
+        <button key={f.key} className={`ep-filter${filter === f.key ? ' on' : ''}`} onClick={() => setFilter(f.key)}>
+          {f.key === 'pass' && <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>}
+          {f.key === 'fail' && <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>}
+          {f.key === 'skip' && <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>}
+          {f.label}<span className="ep-filter-count">{f.count}</span>
+        </button>
+      ))}
+      <div className="ep-filter-right"><span style={{ fontSize: 11, color: 'var(--muted)' }}>Showing {shown.length} of {tests.length}</span></div>
+    </div>
+
+    <div className="ep-list">
+      {running
+        ? Array.from({ length: tests.length || 4 }).map((_, i) => (
+            <div key={i} className="ep-row ep-row--skeleton" style={{ animationDelay: `${i * 0.05}s` }}>
+              <div className="ep-row-status-wrap"><div className="ep-skeleton-circle" /></div>
+              <div className="ep-row-body"><div className="ep-skeleton-line" style={{ width: '55%', height: 13 }} /><div className="ep-skeleton-line" style={{ width: '35%', height: 10, marginTop: 6 }} /></div>
+              <div className="ep-skeleton-pill" />
+            </div>
+          ))
+        : shown.length === 0
+        ? (<div className="ep-no-results"><svg width="24" height="24" fill="none" stroke="var(--muted)" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>No tests match this filter</div>)
+        : shown.map((test, i) => (
+            <div key={test.id} className={`ep-row ep-row--${test.status}`} style={{ animationDelay: `${i * 0.04}s` }}>
+              <div className="ep-row-status-wrap"><StatusIcon s={test.status} /></div>
+              <div className="ep-row-body">
+
+                <div className="ep-row-name">{test.name}</div>
+                <div className="ep-row-suite">{test.suite}</div>
+                {test.assertion_result && <AssertionBadge assertion_result={test.assertion_result} step_meta={test.step_meta} />}
+               
+                {/* Bouton Détails */}
+                <button
+                  onClick={() => setExpandedTest(expandedTest === test.id ? null : test.id)}
+                  style={{
+                    marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
+                    background: 'var(--bg2)', border: '1px solid var(--border)',
+                    color: 'var(--muted)', fontSize: 11, fontWeight: 700,
+                    fontFamily: 'inherit', transition: 'all .15s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--indigo2)'; e.currentTarget.style.color = 'var(--indigo2)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}
+                >
+                  {expandedTest === test.id ? '▲ Hide details' : '▼ Show details'}
+                </button>
+
+                {/* Panneau détails */}
+                {expandedTest === test.id && (
+                  <div style={{
+                    marginTop: 10, padding: '12px 16px', borderRadius: 10,
+                    background: 'var(--bg)', border: '1px solid var(--border)',
+                    fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6
+                  }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: 'rgba(99,102,241,.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,.2)' }}>
+                        {test.category?.toUpperCase() || 'SMOKE'}
+                      </span>
+                      <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: test.priority === 'high' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)', color: test.priority === 'high' ? '#ef4444' : '#f59e0b', border: `1px solid ${test.priority === 'high' ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}` }}>
+                        {test.priority?.toUpperCase() || 'MEDIUM'}
+                      </span>
+                      <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 10, background: 'var(--bg2)', color: 'var(--muted)', border: '1px solid var(--border)', fontFamily: 'monospace' }}>
+                        ⏱ {test.duration}
+                      </span>
+                    </div>
+                    {test.step_meta?.selector && (
+                      <div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Selector</span>
+                        <div style={{ marginTop: 3, padding: '5px 10px', borderRadius: 6, background: 'var(--card)', border: '1px solid var(--border)', fontFamily: 'monospace', fontSize: 11, color: '#818cf8', wordBreak: 'break-all' }}>
+                          {test.step_meta.selector}
+                        </div>
+                      </div>
+                    )}
+                    {test.step_meta?.action && (
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                        <span style={{ fontWeight: 700 }}>Action:</span> {test.step_meta.action}
+                        {test.step_meta?.value && <span> · <span style={{ fontWeight: 700 }}>Value:</span> {test.step_meta.value}</span>}
+                      </div>
+                    )}
+                    {test.suite && (
+                      <div style={{ fontSize: 11, color: 'var(--muted)', fontStyle: 'italic' }}>
+                        {test.suite}
+                      </div>
+                    )}
+                    {/* AI Analysis LLaMA */}
+                    {test.ai_analysis && (
+                      <div style={{
+                        marginTop: 8, padding: '10px 12px', borderRadius: 8,
+                        background: 'rgba(99,102,241,.06)',
+                        border: '1px solid rgba(99,102,241,.2)',
+                      }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#818cf8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          🤖 LLaMA Analysis
+                          <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 9, fontWeight: 800, color: test.ai_analysis.severity === 'critical' ? '#ef4444' : test.ai_analysis.severity === 'high' ? '#f97316' : '#f59e0b', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)' }}>
+                            {test.ai_analysis.severity?.toUpperCase()}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>
+                          <span style={{ fontWeight: 700, color: '#e2e8f0' }}>Root cause: </span>
+                          {test.ai_analysis.root_cause}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                          <span style={{ fontWeight: 700, color: '#10b981' }}>Fix: </span>
+                          {test.ai_analysis.fix}
+                        </div>
+                      </div>
+                    )}
+                    {test.screenshot && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+                          Screenshot on Fail
+                        </div>
+                        <img
+                          src={`data:image/png;base64,${test.screenshot}`}
+                          style={{ width: '100%', maxWidth: 480, borderRadius: 8, border: '1px solid rgba(239,68,68,.3)', cursor: 'pointer', display: 'block' }}
+                          onClick={() => window.open(`data:image/png;base64,${test.screenshot}`)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            ))
-          : shown.length === 0
-          ? (<div className="ep-no-results"><svg width="24" height="24" fill="none" stroke="var(--muted)" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>No tests match this filter</div>)
-          : shown.map((test, i) => (
-              <div key={test.id} className={`ep-row ep-row--${test.status}`} style={{ animationDelay: `${i * 0.04}s` }}>
-                <div className="ep-row-status-wrap"><StatusIcon s={test.status} /></div>
-                <div className="ep-row-body">
-                  <div className="ep-row-name">{test.name}</div>
-                  <div className="ep-row-suite">{test.suite}</div>
-                  {test.assertion_result && <AssertionBadge assertion_result={test.assertion_result} step_meta={test.step_meta} />}
-                  {test.screenshot && (
-  <img
-    src={`data:image/png;base64,${test.screenshot}`}
-    style={{ width:'100%', maxWidth:480, borderRadius:8, marginTop:8,
-      border:'1px solid rgba(239,68,68,.3)', cursor:'pointer' }}
-    onClick={() => window.open(`data:image/png;base64,${test.screenshot}`)}
-  />
+              <div className="ep-row-meta">
+               
+<span className="ep-cat-badge" style={{
+  color: test.category === 'functional' ? '#6366f1'
+       : test.category === 'performance' ? '#8b5cf6'
+       : test.category === 'security' ? '#ef4444'
+       : test.category === 'api' ? '#10b981'
+       : test.category === 'regression' ? '#f97316'
+       : '#64748b',
+  background: test.category === 'functional' ? 'rgba(99,102,241,.1)'
+            : test.category === 'performance' ? 'rgba(139,92,246,.1)'
+            : test.category === 'security' ? 'rgba(239,68,68,.1)'
+            : test.category === 'api' ? 'rgba(16,185,129,.1)'
+            : test.category === 'regression' ? 'rgba(249,115,22,.1)'
+            : 'rgba(100,116,139,.1)',
+  border: `1px solid ${
+    test.category === 'functional' ? 'rgba(99,102,241,.2)'
+    : test.category === 'performance' ? 'rgba(139,92,246,.2)'
+    : test.category === 'security' ? 'rgba(239,68,68,.2)'
+    : test.category === 'api' ? 'rgba(16,185,129,.2)'
+    : test.category === 'regression' ? 'rgba(249,115,22,.2)'
+    : 'rgba(100,116,139,.2)'
+  }`
+}}>
+ {test.category === 'security' ? 'S'
+ : test.category === 'functional' ? 'F'
+ : test.category === 'regression' ? 'R'
+ : (test.category === 'api' || testType === 'api') ? 'A'
+ : test.category === 'performance' ? 'P'
+ : testType === 'security' ? 'S'
+ : testType === 'regression' ? 'R'
+ : 'S'}
+</span>
+                <span className={`ep-status-badge ep-status-badge--${test.status}`}>{test.status}</span>
+                <span className="ep-duration">{test.duration}</span>
+              </div>
+            </div>
+          ))
+      }
+    </div>
+  </>
 )}
-                </div>
-                <div className="ep-row-meta">
-                  <span className="ep-cat-badge" style={{ color: test.category === 'functional' ? '#6366f1' : test.category === 'performance' ? '#8b5cf6' : '#64748b', background: test.category === 'functional' ? 'rgba(99,102,241,.1)' : test.category === 'performance' ? 'rgba(139,92,246,.1)' : 'rgba(100,116,139,.1)', border: `1px solid ${test.category === 'functional' ? 'rgba(99,102,241,.2)' : test.category === 'performance' ? 'rgba(139,92,246,.2)' : 'rgba(100,116,139,.2)'}` }}>
-                    {test.category === 'smoke' ? 'S' : test.category === 'functional' ? 'F' : 'R'}
-                  </span>
-                  <span className={`ep-status-badge ep-status-badge--${test.status}`}>{test.status}</span>
-                  <span className="ep-duration">{test.duration}</span>
-                </div>
-              </div>
-            ))
-        }
+
+{activeTab === 'scenarios' && (
+  <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 100px 100px', gap: 12, padding: '12px 20px', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+      {['#', 'Scenario', 'Category', 'Priority', 'Status'].map(h => (
+        <div key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
+      ))}
+    </div>
+    {tests.map((test, i) => (
+      <div key={test.id} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 100px 100px', gap: 12, padding: '14px 20px', borderBottom: '1px solid var(--border)', alignItems: 'center', animation: `dFadeUp .25s var(--ease) ${i * 0.04}s both` }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{test.id || i + 1}</div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{test.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>{test.suite || 'Test passed successfully.'}</div>
+        </div>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: test.category === 'functional' ? '#6366f1' : '#64748b', background: test.category === 'functional' ? 'rgba(99,102,241,.1)' : 'rgba(100,116,139,.1)', border: `1px solid ${test.category === 'functional' ? 'rgba(99,102,241,.2)' : 'rgba(100,116,139,.2)'}`, textTransform: 'uppercase', letterSpacing: 1 }}>
+          {test.category || 'smoke'}
+        </span>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: test.priority === 'high' ? '#ef4444' : test.priority === 'medium' ? '#f59e0b' : '#10b981', background: test.priority === 'high' ? 'rgba(239,68,68,.1)' : test.priority === 'medium' ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.1)', border: `1px solid ${test.priority === 'high' ? 'rgba(239,68,68,.2)' : test.priority === 'medium' ? 'rgba(245,158,11,.2)' : 'rgba(16,185,129,.2)'}`, textTransform: 'uppercase', letterSpacing: 1 }}>
+          {test.priority || 'medium'}
+        </span>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: test.status === 'pass' ? '#10b981' : test.status === 'fail' ? '#ef4444' : '#f59e0b', background: test.status === 'pass' ? 'rgba(16,185,129,.1)' : test.status === 'fail' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)', border: `1px solid ${test.status === 'pass' ? 'rgba(16,185,129,.2)' : test.status === 'fail' ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}` }}>
+          {test.status === 'pass' ? '✓ PASS' : test.status === 'fail' ? '✗ FAIL' : '— SKIP'}
+        </span>
       </div>
+    ))}
+  </div>
+)}
+
+{activeTab === 'recommendations' && (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    {(() => {
+      const perfRecs = [];
+      if (loadTimeMs > 5000) perfRecs.push({ priority: 'critical', category: 'server', title: 'Critical: Page Load Exceeds 5s', description: `Page loads in ${loadTimeMs}ms — very slow. Optimize images, enable CDN caching.`, impact: 'Could reduce load time by 40-60%' });
+      else if (loadTimeMs > 3000) perfRecs.push({ priority: 'high', category: 'server', title: 'Slow Page Load Detected', description: `Page loads in ${loadTimeMs}ms — above the 3000ms threshold. Consider asset optimization.`, impact: 'Improved user experience' });
+      else perfRecs.push({ priority: 'low', category: 'caching', title: 'Performance is Good', description: `Page load time is ${loadTimeMs}ms — within acceptable range. Continue monitoring.`, impact: 'Sustained good user experience' });
+      if (fail > 0) perfRecs.push({ priority: 'high', category: 'javascript', title: `${fail} Test(s) Failed`, description: 'Review failed tests and check selector stability. Elements may have changed.', impact: 'Fix failures to ensure full coverage' });
+      if (skip > 0) perfRecs.push({ priority: 'medium', category: 'network', title: `${skip} Test(s) Skipped`, description: 'Skipped tests may indicate optional or unstable elements. Review selectors.', impact: 'Better test coverage' });
+      if (pass === tests.length && tests.length > 0) perfRecs.push({ priority: 'low', category: 'caching', title: 'All Tests Passed 🎉', description: 'Excellent! All tests passed successfully. Keep monitoring for regressions.', impact: 'Application is stable' });
+      return perfRecs;
+    })().map((rec, i) => (
+      <RecommendationCard key={i} rec={rec} index={i} />
+    ))}
+  </div>
+)}
     </div>
   );
 }
@@ -3552,7 +4241,13 @@ const TYPE_CONFIG = {
   smoke:       { color: '#64748B', bg: 'rgba(100,116,139,.1)', border: 'rgba(100,116,139,.25)', label: 'Smoke',       letter: 'S' },
   functional:  { color: '#6366F1', bg: 'rgba(99,102,241,.1)',  border: 'rgba(99,102,241,.25)',  label: 'Functional',  letter: 'F' },
   performance: { color: '#8B5CF6', bg: 'rgba(139,92,246,.1)',  border: 'rgba(139,92,246,.25)',  label: 'Performance', letter: 'P' },
+  api:         { color: '#10B981', bg: 'rgba(16,185,129,.1)',  border: 'rgba(16,185,129,.25)',  label: 'API',         letter: 'A' },
+  regression:  { color: '#F97316', bg: 'rgba(249,115,22,.1)',  border: 'rgba(249,115,22,.25)',  label: 'Regression',  letter: 'R' },
+  security:    { color: '#EF4444', bg: 'rgba(239,68,68,.1)',   border: 'rgba(239,68,68,.25)',   label: 'Security',    letter: 'S' },
+  unit:        { color: '#0EA5E9', bg: 'rgba(14,165,233,.1)',  border: 'rgba(14,165,233,.25)',  label: 'Unit',        letter: 'U' },
+
 };
+
 
 const rateColor = (r) => r >= 80 ? '#10B981' : r >= 50 ? '#F59E0B' : '#EF4444';
 
@@ -3886,7 +4581,7 @@ useEffect(() => {
 
   const toggleSort = (key) => { if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { setSortKey(key); setSortDir('desc'); } };
 
-  const handleView = (item) => {
+ const handleView = (item) => {
     setGeneration({
       url: item.url, framework: item.framework, test_type: item.test_type,
       generation: { id: item.id, url: item.url, framework: item.framework, load_time_ms: item.load_time_ms, test_type: item.test_type },
@@ -3895,6 +4590,14 @@ useEffect(() => {
         test_cases_selenium: item.test_cases_selenium||[], test_cases_cypress: item.test_cases_cypress||[],
         script: item.script||'', script_selenium: item.script_selenium||'',
         script_playwright: item.script_playwright||'', script_cypress: item.script_cypress||'',
+        script_postman: item.script_postman || '',
+        script_pytest:  item.script_pytest  || '',
+        domains:        item.domains        || [],
+        base_url:       item.base_url       || item.url || '',
+        pass_count:     item.pass_count     || 0,
+        fail_count:     item.fail_count     || 0,
+        skip_count:     item.skip_count     || 0,
+        pass_rate:      item.pass_rate      || 0,
         execution_results: item.execution_results||[],
         performance: item.performance_data || item.performance || null,
       },
@@ -4093,8 +4796,31 @@ useEffect(() => {
       {error && (<div className="ac2-feedback ac2-feedback--err"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>{error}</div>)}
       <div className="ac2-hero">
         <div className="ac2-avatar-wrap">
-          <div className="ac2-avatar">{user?.avatar ? <img src={user.avatar} alt="avatar" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%' }}/> : <span>{user?.name?.[0]?.toUpperCase()||'U'}</span>}</div>
-          <input type="file" id="avatar-upload" accept="image/*" style={{ display:'none' }} onChange={async (e) => { const file=e.target.files[0]; if(!file) return; const fd=new FormData(); fd.append('avatar',file); try { const res=await api.post('/profile/avatar',fd,{headers:{'Content-Type':'multipart/form-data'}}); setUser(prev=>({...prev,avatar:res.data.avatar})); } catch(err){console.error(err);} }} />
+          <div className="ac2-avatar">{user?.avatar ? <img  key={user.avatar} src={user.avatar} alt="avatar" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%' }}/> : <span>{user?.name?.[0]?.toUpperCase()||'U'}</span>}</div>
+          <input 
+  type="file" 
+  id="avatar-upload" 
+  accept="image/*" 
+  style={{ display: 'none' }} 
+  onChange={async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('avatar', file);
+    try {
+      const res = await api.post('/profile/avatar', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const updatedUser = res.data.user ?? { ...user, avatar: res.data.avatar };
+      if (updatedUser.avatar) {
+        updatedUser.avatar = updatedUser.avatar + '?t=' + Date.now();
+      }
+      setUser(updatedUser);
+    } catch(err) {
+      console.error(err);
+    }
+  }} 
+/>
           <button className="ac2-avatar-btn" onClick={() => document.getElementById('avatar-upload').click()}><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
         </div>
 
@@ -4104,7 +4830,20 @@ useEffect(() => {
   <div>
     <div className="ac2-hero-name">{user?.name || 'User'}</div>
     <div className="ac2-hero-email">{user?.email || '—'}</div>
-    <div className="ac2-hero-badge"><span className="ac2-badge-dot"/>QA Engineer</div>
+    
+<div className="ac2-hero-badge">
+  <span className="ac2-badge-dot"/>
+  {(() => {
+    const role = user?.onboarding_data?.role;
+    const labels = {
+      developer: 'Developer',
+      tester:    'QA / Tester',
+      lead:      'Tech Lead',
+      other:     'Explorer',
+    };
+    return labels[role] || 'QA Engineer';
+  })()}
+</div>
   </div>
 
   {/* Colonne droite : stats */}
@@ -4395,39 +5134,7 @@ const handleDeleteHistory = async () => {
           </div>
         </div>
 
-        {/* Delete History Row */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 24px',
-          borderBottom: '1px solid rgba(239,68,68,0.1)',
-          gap: 20, flexWrap: 'wrap'
-        }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-              Delete All History
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
-              Permanently delete all your test generations and results.<br/>
-              <strong style={{ color: 'rgba(239,68,68,0.7)' }}>This action cannot be undone.</strong>
-            </div>
-          </div>
-          <button
-            onClick={() => { setShowDeleteHistory(true); setShowDeleteAccount(false); setConfirmText(''); }}
-            style={{
-              padding: '10px 20px', borderRadius: 10,
-              background: 'rgba(239,68,68,0.08)',
-              border: '1.5px solid rgba(239,68,68,0.3)',
-              color: '#ef4444', fontSize: 12, fontWeight: 700,
-              cursor: 'pointer', fontFamily: 'inherit',
-              transition: 'all .2s', flexShrink: 0,
-              letterSpacing: '.5px', textTransform: 'uppercase'
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; e.currentTarget.style.borderColor = '#ef4444'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; }}
-          >
-            Delete History
-          </button>
-        </div>
+        
 
         {/* Delete Account Row */}
         <div style={{
@@ -4463,7 +5170,7 @@ const handleDeleteHistory = async () => {
         </div>
       </div>
 
-      {(showDeleteHistory || showDeleteAccount) && createPortal(
+      {showDeleteAccount && createPortal(
   <div
     onClick={() => { setShowDeleteHistory(false); setShowDeleteAccount(false); setConfirmText(''); }}
     style={{
@@ -5112,6 +5819,7 @@ onClearAll={() => {
    
     goTo={setPage}
     setGeneration={setGeneration}
+    histories={searchHistories}
   />
 )}
 </div>
@@ -5133,7 +5841,18 @@ onClearAll={() => {
       onMouseLeave={e => e.currentTarget.style.color = ''}>
       {user?.name?.split(' ')[0] || 'User'}
     </div>
-    <div className="h-user-role">{t('qaEngineer')}</div>
+    <div className="h-user-role">
+  {(() => {
+    const role = user?.onboarding_data?.role;
+    const labels = {
+      developer: 'Developer',
+      tester:    'QA / Tester',
+      lead:      'Tech Lead',
+      other:     'Explorer',
+    };
+    return labels[role] || 'QA Engineer';
+  })()}
+</div>
   </div>
 </div>
           
@@ -5195,7 +5914,7 @@ onClearAll={() => {
   );
 }
 
-function NotifPanel({ notifs, onClose, onDelete, onClearAll, goTo }) {
+function NotifPanel({ notifs, onClose, onDelete, onClearAll, goTo, setGeneration, histories = [] }) {
   const [page, setPage] = useState(0);
   const PER_PAGE = 4;
   const totalPages = Math.ceil(notifs.length / PER_PAGE);
@@ -5276,7 +5995,11 @@ function NotifPanel({ notifs, onClose, onDelete, onClearAll, goTo }) {
               {/* Top row */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
                 <span style={{ fontSize: 18, flexShrink: 0 }}>
-                  {n.failCount === 0 ? '✅' : '❌'}
+                  {(() => {
+  const total = (n.passCount || 0) + (n.failCount || 0);
+  const rate = total > 0 ? Math.round((n.passCount / total) * 100) : 0;
+  return rate >= 80 ? '✅' : '❌';
+})()}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)',
@@ -5325,13 +6048,43 @@ function NotifPanel({ notifs, onClose, onDelete, onClearAll, goTo }) {
                 <span style={{ fontSize: 10, color: '#475569' }}>
                   🕐 {timeAgoNotif(n.date)}
                 </span>
-                <button onClick={() => { goTo('execution'); onClose(); }} style={{
-                  fontSize: 10, fontWeight: 700, color: 'var(--indigo2)',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4
-                }}>
-                  View results
-                </button>
+                <button onClick={() => {
+  const match = [...histories].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .find(h => h.url === n.url && h.framework === n.framework);
+  if (match && setGeneration) {
+    setGeneration({
+      url: match.url,
+      framework: match.framework,
+      test_type: match.test_type,
+      generation: {
+        id: match.id, url: match.url,
+        framework: match.framework,
+        load_time_ms: match.load_time_ms,
+        test_type: match.test_type,
+      },
+      result: {
+        test_type: match.test_type || 'smoke',
+        test_cases: match.test_cases || [],
+        test_cases_selenium: match.test_cases_selenium || [],
+        test_cases_cypress: match.test_cases_cypress || [],
+        script: match.script || '',
+        script_selenium: match.script_selenium || '',
+        script_playwright: match.script_playwright || '',
+        script_cypress: match.script_cypress || '',
+        execution_results: match.execution_results || [],
+        performance: match.performance_data || match.performance || null,
+      },
+    });
+  }
+  goTo('execution');
+  onClose();
+}} style={{
+  fontSize: 10, fontWeight: 700, color: 'var(--indigo2)',
+  background: 'none', border: 'none', cursor: 'pointer',
+  fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4
+}}>
+  View results
+</button>
               </div>
             </div>
           ))

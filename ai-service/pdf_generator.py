@@ -1,3 +1,5 @@
+from unittest import result
+
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.colors import HexColor, white, black
@@ -504,23 +506,27 @@ def build_execution_verdict_summary(elements, test_cases: list,
         and _infer_severity(tc)[0] == 'HIGH'
     ]
 
+    is_regression = scraped.get('_is_regression', False)
+
     if critical_failed:
         oc, ob, obrd, oi = '#ef4444', HexColor('#fef2f2'), RED,    '🔴'
         areas_str = ', '.join(set(_infer_ui_area(tc) for tc in critical_failed))
-        ot = (f'Smoke validation FAILED — critical UI issues detected in: {areas_str}. '
-              f'Core user journeys are blocked. Immediate investigation required.')
+        label = 'Regression' if is_regression else 'Smoke'
+        ot = (f'{label} validation FAILED — critical issues detected in: {areas_str}. '
+              f'These pages must be fixed before the next deployment.')
     elif fail_count > 0:
         oc, ob, obrd, oi = '#b45309', HexColor('#fffbeb'), ORANGE, '🟡'
-        ot = (f'Smoke validation passed with warnings — {fail_count} non-critical element(s) failed. '
-              f'Core navigation and content are operational but medium-priority issues require attention.')
+        label = 'Regression' if is_regression else 'Smoke'
+        ot = (f'{label} validation passed with warnings — {fail_count} page(s) failed. '
+              f'Core navigation is operational but failed pages require attention.')
     elif pass_rate >= 80:
         oc, ob, obrd, oi = '#059669', HexColor('#f0fdf4'), GREEN,  '🟢'
-        ot = ('Core user journey elements are operational and visible. '
-              'No critical UI blockers detected. Application is ready for functional testing.')
+        ot = ('All pages are operational and accessible. '
+              'No regressions detected. Application is stable after latest changes.')
     else:
         oc, ob, obrd, oi = '#b45309', HexColor('#fffbeb'), ORANGE, '🟡'
-        ot = (f'Smoke validation inconclusive — {pass_rate}% pass rate with significant skips. '
-              f'Verify page accessibility and selector stability before proceeding.')
+        ot = (f'Regression validation inconclusive — {pass_rate}% pass rate. '
+              f'Verify page accessibility before proceeding.')
 
     v_tbl = Table([[Paragraph(
         f'<font color="{oc}"><b>{oi}  Overall Verdict: </b></font>'
@@ -705,8 +711,7 @@ def build_execution_evidence(elements, test_cases: list, execution_results: list
                   ParagraphStyle('EEH1', fontSize=7.5, fontName='Helvetica-Bold')),
         Paragraph('<font color="#ffffff"><b>Found</b></font>',
                   ParagraphStyle('EEH2', fontSize=7.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Extracted Value</b></font>',
-                  ParagraphStyle('EEH3', fontSize=7.5, fontName='Helvetica-Bold')),
+        
         Paragraph('<font color="#ffffff"><b>Action</b></font>',
                   ParagraphStyle('EEH4', fontSize=7.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
         Paragraph('<font color="#ffffff"><b>Visibility</b></font>',
@@ -753,8 +758,7 @@ def build_execution_evidence(elements, test_cases: list, execution_results: list
                 ParagraphStyle('EEN', fontSize=7.5, fontName='Helvetica', leading=10)),
             Paragraph(found_text,
                       ParagraphStyle('EEF', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="#475569" size="7">{ext_short}</font>',
-                      ParagraphStyle('EEEX', fontSize=7, fontName='Helvetica', leading=9.5)),
+            
             Paragraph(f'<font color="#6366f1" size="7"><b>{action}</b></font>',
                       ParagraphStyle('EEACT', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
             Paragraph(f'<font color="{vis_color}" size="6.5"><b>{visibility.upper()}</b></font>',
@@ -764,7 +768,7 @@ def build_execution_evidence(elements, test_cases: list, execution_results: list
         ])
         row_styles.append(('BACKGROUND', (2, i+1), (2, i+1), found_bg))
 
-    tbl = Table(rows, colWidths=[8*mm, 44*mm, 14*mm, 38*mm, 24*mm, 18*mm, 22*mm], repeatRows=1)
+    tbl = Table(rows, colWidths=[8*mm, 58*mm, 14*mm, 30*mm, 18*mm, 22*mm], repeatRows=1)
     tbl.setStyle(TableStyle([
         ('BACKGROUND',    (0,0), (-1,0), NAVY),
         ('ROWBACKGROUNDS',(0,1), (-1,-1), [WHITE, HexColor('#f0fdfa')]),
@@ -899,8 +903,7 @@ def build_real_page_evidence(elements, test_cases: list, execution_results: list
                   ParagraphStyle('RPH3', fontSize=7.5, fontName='Helvetica-Bold')),
         Paragraph('<font color="#ffffff"><b>Found</b></font>',
                   ParagraphStyle('RPH4', fontSize=7.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Extracted Value</b></font>',
-                  ParagraphStyle('RPH5', fontSize=7.5, fontName='Helvetica-Bold')),
+        
         Paragraph('<font color="#ffffff"><b>Visibility</b></font>',
                   ParagraphStyle('RPH6', fontSize=7.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
     ]
@@ -959,8 +962,7 @@ def build_real_page_evidence(elements, test_cases: list, execution_results: list
                 ParagraphStyle('RPACT', fontSize=7, fontName='Courier', leading=9.5)),
             Paragraph(found_text,
                       ParagraphStyle('RPF', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="#475569" size="7">"{ext_short}"</font>',
-                      ParagraphStyle('RPEXT', fontSize=7, fontName='Helvetica', leading=9.5)),
+            
             Paragraph(f'<font color="{vis_color}" size="6.5"><b>{visibility.upper()}</b></font>',
                       ParagraphStyle('RPVIS', fontSize=6.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
         ])
@@ -1013,7 +1015,7 @@ def build_real_page_evidence(elements, test_cases: list, execution_results: list
             ri = len(rows) - 1
             row_styles.append(('BACKGROUND', (3, ri), (3, ri), found_bg))
 
-    tbl = Table(rows, colWidths=[30*mm, 36*mm, 36*mm, 14*mm, 34*mm, 18*mm], repeatRows=1)
+    tbl = Table(rows, colWidths=[36*mm, 46*mm, 46*mm, 16*mm, 24*mm], repeatRows=1)
     tbl.setStyle(TableStyle([
         ('BACKGROUND',    (0,0), (-1,0), NAVY),
         ('PADDING',       (0,0), (-1,-1), 6),
@@ -1169,7 +1171,8 @@ def build_ai_recommendations(elements, test_cases: list, execution_results: list
         ux_recs.append('Search capability is operational — content discovery is available.' if search_passed
                        else 'Search failed execution. Verify the selector and confirm it is not loaded asynchronously.')
     else:
-        ux_recs.append('Search functionality was not tested. Consider adding a search smoke check if it is a core feature.')
+        _type_label = 'regression' if scraped.get('_is_regression') else 'smoke'
+        ux_recs.append(f'Search functionality was not tested. Consider adding a search {_type_label} check if it is a core feature.')
     categories.append(('👤', 'UX & Accessibility', ux_recs, '#10b981', GREEN_BG))
 
     for emoji, cat_label, recs, color_hex, bg_color in categories:
@@ -1207,26 +1210,29 @@ def build_ai_recommendations(elements, test_cases: list, execution_results: list
     )
 
     elements.append(Spacer(1, 6))
+    _is_reg = scraped.get('_is_regression', False)
+    _label  = 'Regression' if _is_reg else 'Smoke'
+
     if critical_failures:
         vc, vb, vbrd = '#ef4444', HexColor('#fef2f2'), RED
         failed_areas  = ', '.join(set(_infer_ui_area(tc) for tc in critical_failures))
-        vt = (f'Smoke validation FAILED due to critical issues in: {failed_areas}. '
+        vt = (f'{_label} validation FAILED due to critical issues in: {failed_areas}. '
               f'Core user journeys are blocked — do not promote to staging until resolved.')
         vi = '🔴'
     elif fail_count > 0 and pass_rate >= 60:
         vc, vb, vbrd = '#b45309', HexColor('#fffbeb'), ORANGE
-        vt = (f'Smoke validation passed with {fail_count} medium-priority issue(s) detected. '
+        vt = (f'{_label} validation passed with {fail_count} medium-priority issue(s) detected. '
               f'Performance and UX improvements are recommended before production release.')
         vi = '🟡'
     elif pass_rate == 100:
         vc, vb, vbrd = '#059669', HexColor('#f0fdf4'), GREEN
-        vt = ('Smoke validation passed successfully with no critical UI issues detected. '
+        vt = (f'{_label} validation passed successfully with no critical UI issues detected. '
               + ('Performance optimization is recommended to improve load time.' if load_time > 3000
                  else 'Application is stable and ready for functional testing.'))
         vi = '🟢'
     else:
         vc, vb, vbrd = '#b45309', HexColor('#fffbeb'), ORANGE
-        vt = (f'Smoke validation completed with a {pass_rate}% pass rate. '
+        vt = (f'{_label} validation completed with a {pass_rate}% pass rate. '
               f'Review skipped tests and confirm selector health before proceeding.')
         vi = '🟡'
 
@@ -1486,7 +1492,7 @@ def build_test_plan(elements, test_cases: list, page_type: str, framework: str, 
         [Paragraph('<font color="#64748b">Coverage</font>',
                    ParagraphStyle('PL4', fontSize=8, fontName='Helvetica-Bold')),
          Paragraph(
-             f'<font color="#10b981"><b>{positive_count} positive smoke validation{"s" if positive_count != 1 else ""}</b></font>'
+             f'<font color="#10b981"><b>{positive_count} positive {"regression" if scraped.get("_is_regression") else "smoke"} validation{"s" if positive_count != 1 else ""}</b></font>'
              f'  <font color="#94a3b8">|</font>  '
              f'<font color="#ef4444"><b>{negative_count} negative validation{"s" if negative_count != 1 else ""}</b></font>',
              ParagraphStyle('PV4', fontSize=8, fontName='Helvetica'))],
@@ -1559,8 +1565,557 @@ def build_test_plan(elements, test_cases: list, page_type: str, framework: str, 
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN generate_pdf
 # ─────────────────────────────────────────────────────────────────────────────
+def generate_regression_pdf(generation_data: dict) -> bytes:
+    """Template PDF dédié pour le Regression Test"""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from io import BytesIO
 
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=20*mm, leftMargin=22*mm,
+                            topMargin=20*mm, bottomMargin=20*mm)
+
+    tests    = generation_data.get('execution_results') or generation_data.get('test_cases') or []
+    url      = generation_data.get('url', '')
+    framework = generation_data.get('framework', 'Playwright')
+    pass_count = generation_data.get('pass_count', sum(1 for t in tests if t.get('status') == 'pass'))
+    fail_count = generation_data.get('fail_count', sum(1 for t in tests if t.get('status') == 'fail'))
+    skip_count = generation_data.get('skip_count', sum(1 for t in tests if t.get('status') == 'skip'))
+    total      = len(tests) or 1
+    pass_rate  = generation_data.get('pass_rate', round(pass_count / total * 100))
+
+    rate_color = '#10b981' if pass_rate >= 80 else '#f59e0b' if pass_rate >= 50 else '#ef4444'
+    elements   = []
+
+    def on_page(canvas, doc):
+        W, H = A4
+        canvas.saveState()
+        canvas.setFillColor(HexColor('#0a0f1e'))
+        canvas.rect(0, H - 40*mm, W, 40*mm, fill=1, stroke=0)
+        canvas.setFillColor(HexColor('#f97316'))
+        canvas.rect(0, H - 42*mm, W, 2*mm, fill=1, stroke=0)
+        canvas.setFillColor(HexColor('#f8fafc'))
+        canvas.rect(0, 0, W, 12*mm, fill=1, stroke=0)
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(HexColor('#94a3b8'))
+        canvas.drawString(20*mm, 4*mm, 'Generated by NexTest — Regression Test Report')
+        canvas.drawRightString(W - 20*mm, 4*mm, f'Page {doc.page}  •  {datetime.now().strftime("%Y-%m-%d")}')
+        canvas.restoreState()
+
+    # ── HEADER ──
+    elements.append(Spacer(1, -20*mm))
+    elements.append(Paragraph(
+        '<font color="#f97316"><b>NEX</b></font><font color="#ffffff">TEST</font>',
+        ParagraphStyle('Logo', fontSize=22, fontName='Helvetica-Bold')))
+    elements.append(Spacer(1, 2*mm))
+    elements.append(Paragraph(
+        '<font color="#ffffff">Regression Test Report</font>',
+        ParagraphStyle('Title', fontSize=18, fontName='Helvetica-Bold')))
+    elements.append(Spacer(1, 12*mm))
+
+    # ── INFO BOX ──
+    info_data = [
+        [Paragraph('<font color="#64748b">URL</font>', ParagraphStyle('IL', fontSize=8, fontName='Helvetica-Bold')),
+         Paragraph(f'<font color="#1e293b">{url}</font>', ParagraphStyle('IV', fontSize=8))],
+        [Paragraph('<font color="#64748b">Framework</font>', ParagraphStyle('IL2', fontSize=8, fontName='Helvetica-Bold')),
+         Paragraph(f'<font color="#f97316"><b>{framework}</b></font>', ParagraphStyle('IV2', fontSize=8))],
+        [Paragraph('<font color="#64748b">Test Type</font>', ParagraphStyle('IL3', fontSize=8, fontName='Helvetica-Bold')),
+         Paragraph('<font color="#f97316"><b>Regression Test</b></font>', ParagraphStyle('IV3', fontSize=8))],
+        [Paragraph('<font color="#64748b">Generated</font>', ParagraphStyle('IL4', fontSize=8, fontName='Helvetica-Bold')),
+         Paragraph(f'<font color="#1e293b">{datetime.now().strftime("%Y-%m-%d  %H:%M")}</font>', ParagraphStyle('IV4', fontSize=8))],
+    ]
+    info_tbl = Table(info_data, colWidths=[32*mm, 136*mm])
+    info_tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (0,-1), HexColor('#f8fafc')),
+        ('PADDING', (0,0), (-1,-1), 7),
+        ('LINEBELOW', (0,0), (-1,-2), 0.4, HexColor('#e2e8f0')),
+        ('BOX', (0,0), (-1,-1), 0.8, HexColor('#e2e8f0')),
+        ('ROWBACKGROUNDS', (0,0), (-1,-1), [white, HexColor('#f8fafc')]),
+    ]))
+    elements.append(info_tbl)
+    elements.append(Spacer(1, 16))
+
+    # ── STATS ──
+    elements.append(Paragraph(
+        '<font color="#f97316">📊</font>  <b>Test Summary</b>',
+        ParagraphStyle('SH', fontSize=11, fontName='Helvetica-Bold', textColor=HexColor('#1e293b'))))
+    elements.append(HRFlowable(width='100%', thickness=1.5, color=HexColor('#f97316'), spaceAfter=8))
+
+    stats_data = [[
+        Table([[Paragraph(f'<font color="#10b981"><b>{pass_count}</b></font><br/><font color="#94a3b8" size="7"><b>PASSED</b></font>',
+            ParagraphStyle('SC', fontSize=18, fontName='Helvetica-Bold', alignment=1, leading=26))]],
+            colWidths=[35*mm], style=[('BACKGROUND',(0,0),(-1,-1),HexColor('#d1fae5')),('BOX',(0,0),(-1,-1),1,HexColor('#a7f3d0')),('TOPPADDING',(0,0),(-1,-1),12),('BOTTOMPADDING',(0,0),(-1,-1),12),('ALIGN',(0,0),(-1,-1),'CENTER')]),
+        Table([[Paragraph(f'<font color="#ef4444"><b>{fail_count}</b></font><br/><font color="#94a3b8" size="7"><b>FAILED</b></font>',
+            ParagraphStyle('SC2', fontSize=18, fontName='Helvetica-Bold', alignment=1, leading=26))]],
+            colWidths=[35*mm], style=[('BACKGROUND',(0,0),(-1,-1),HexColor('#fee2e2')),('BOX',(0,0),(-1,-1),1,HexColor('#fca5a5')),('TOPPADDING',(0,0),(-1,-1),12),('BOTTOMPADDING',(0,0),(-1,-1),12),('ALIGN',(0,0),(-1,-1),'CENTER')]),
+        Table([[Paragraph(f'<font color="#f59e0b"><b>{skip_count}</b></font><br/><font color="#94a3b8" size="7"><b>SKIPPED</b></font>',
+            ParagraphStyle('SC3', fontSize=18, fontName='Helvetica-Bold', alignment=1, leading=26))]],
+            colWidths=[35*mm], style=[('BACKGROUND',(0,0),(-1,-1),HexColor('#fef3c7')),('BOX',(0,0),(-1,-1),1,HexColor('#fde68a')),('TOPPADDING',(0,0),(-1,-1),12),('BOTTOMPADDING',(0,0),(-1,-1),12),('ALIGN',(0,0),(-1,-1),'CENTER')]),
+        Table([[Paragraph(f'<font color="{rate_color}"><b>{pass_rate}%</b></font><br/><font color="#94a3b8" size="7"><b>PASS RATE</b></font>',
+            ParagraphStyle('SC4', fontSize=18, fontName='Helvetica-Bold', alignment=1, leading=26))]],
+            colWidths=[35*mm], style=[('BACKGROUND',(0,0),(-1,-1),HexColor('#f0fdf4') if pass_rate>=80 else HexColor('#fff7ed')),('BOX',(0,0),(-1,-1),1,HexColor('#f97316')),('TOPPADDING',(0,0),(-1,-1),12),('BOTTOMPADDING',(0,0),(-1,-1),12),('ALIGN',(0,0),(-1,-1),'CENTER')]),
+        Table([[Paragraph(f'<font color="#3b82f6"><b>{total}</b></font><br/><font color="#94a3b8" size="7"><b>TOTAL</b></font>',
+            ParagraphStyle('SC5', fontSize=18, fontName='Helvetica-Bold', alignment=1, leading=26))]],
+            colWidths=[28*mm], style=[('BACKGROUND',(0,0),(-1,-1),HexColor('#dbeafe')),('BOX',(0,0),(-1,-1),1,HexColor('#93c5fd')),('TOPPADDING',(0,0),(-1,-1),12),('BOTTOMPADDING',(0,0),(-1,-1),12),('ALIGN',(0,0),(-1,-1),'CENTER')]),
+    ]]
+    outer = Table(stats_data, colWidths=[35*mm, 35*mm, 35*mm, 35*mm, 28*mm])
+    outer.setStyle(TableStyle([('ALIGN',(0,0),(-1,-1),'CENTER'),('VALIGN',(0,0),(-1,-1),'MIDDLE'),('PADDING',(0,0),(-1,-1),2)]))
+    elements.append(outer)
+    elements.append(Spacer(1, 20))
+
+    # ── TEST RESULTS TABLE ──
+    elements.append(Paragraph(
+        '<font color="#f97316">🔄</font>  <b>Regression Test Results</b>',
+        ParagraphStyle('SH2', fontSize=11, fontName='Helvetica-Bold', textColor=HexColor('#1e293b'))))
+    elements.append(HRFlowable(width='100%', thickness=1.5, color=HexColor('#f97316'), spaceAfter=8))
+
+    # Category colors
+    cat_colors = {
+        'authentication': '#6366f1',
+        'navigation':     '#10b981',
+        'content':        '#3b82f6',
+        'functionality':  '#8b5cf6',
+    }
+
+    hdr = [
+        Paragraph('<font color="#ffffff"><b>#</b></font>', ParagraphStyle('TH', fontSize=8, fontName='Helvetica-Bold', alignment=1)),
+        Paragraph('<font color="#ffffff"><b>Test Name</b></font>', ParagraphStyle('TH2', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Category</b></font>', ParagraphStyle('TH3', fontSize=8, fontName='Helvetica-Bold', alignment=1)),
+        Paragraph('<font color="#ffffff"><b>Status</b></font>', ParagraphStyle('TH4', fontSize=8, fontName='Helvetica-Bold', alignment=1)),
+        Paragraph('<font color="#ffffff"><b>Result / Reason</b></font>', ParagraphStyle('TH5', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Duration</b></font>', ParagraphStyle('TH6', fontSize=8, fontName='Helvetica-Bold', alignment=1)),
+    ]
+    rows = [hdr]
+    row_styles = []
+
+    for i, t in enumerate(tests):
+        status   = t.get('status', 'skip')
+        sc       = '#10b981' if status == 'pass' else '#ef4444' if status == 'fail' else '#f59e0b'
+        s_label  = '✓  PASS' if status == 'pass' else '✗  FAIL' if status == 'fail' else '■  SKIP'
+        s_bg     = HexColor('#f0fdf4') if status == 'pass' else HexColor('#fef2f2') if status == 'fail' else HexColor('#fffbeb')
+        cat      = t.get('category', 'navigation')
+        cat_c    = cat_colors.get(cat, '#64748b')
+        reason   = t.get('reason') or t.get('suite') or t.get('reason_pass') or ''
+        duration = t.get('duration', '—')
+        name     = t.get('name', '')
+        sev      = t.get('severity', t.get('priority', 'medium'))
+
+        rows.append([
+            Paragraph(f'<font color="#64748b"><b>{i+1}</b></font>',
+                ParagraphStyle('ID', fontSize=8, fontName='Helvetica-Bold', alignment=1)),
+            Paragraph(
+                f'<b><font color="#1e293b" size="8">{name}</font></b><br/>'
+                f'<font color="#94a3b8" size="6.5">{sev.upper()}</font>',
+                ParagraphStyle('N', fontSize=8, fontName='Helvetica', leading=11)),
+            Paragraph(f'<font color="{cat_c}"><b>{cat.upper()}</b></font>',
+                ParagraphStyle('C', fontSize=7, fontName='Helvetica-Bold', alignment=1)),
+            Paragraph(f'<font color="{sc}"><b>{s_label}</b></font>',
+                ParagraphStyle('S', fontSize=7.5, fontName='Helvetica-Bold', alignment=1)),
+            Paragraph(f'<font color="#475569" size="7">{reason[:80]}</font>',
+                ParagraphStyle('R', fontSize=7, fontName='Helvetica', leading=10)),
+            Paragraph(f'<font color="#64748b" size="7">{duration}</font>',
+                ParagraphStyle('D', fontSize=7, fontName='Helvetica', alignment=1)),
+        ])
+        row_styles.append(('BACKGROUND', (3, i+1), (3, i+1), s_bg))
+
+    tbl = Table(rows, colWidths=[8*mm, 52*mm, 26*mm, 20*mm, 56*mm, 18*mm], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), HexColor('#0a0f1e')),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [white, HexColor('#f8fafc')]),
+        ('PADDING', (0,0), (-1,-1), 7),
+        ('LINEBELOW', (0,0), (-1,-1), 0.4, HexColor('#e2e8f0')),
+        ('BOX', (0,0), (-1,-1), 0.8, HexColor('#f97316')),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('ALIGN', (0,0), (0,-1), 'CENTER'),
+        ('ALIGN', (2,0), (3,-1), 'CENTER'),
+        ('ALIGN', (5,0), (5,-1), 'CENTER'),
+    ] + row_styles))
+    elements.append(tbl)
+    elements.append(Spacer(1, 20))
+
+    # ── VERDICT ──
+    vc = '#ef4444' if fail_count > 0 else '#10b981'
+    vb = HexColor('#fef2f2') if fail_count > 0 else HexColor('#f0fdf4')
+    vi = '🔴' if fail_count > 0 else '🟢'
+    vt = (f'Regression Test FAILED — {fail_count} page(s) cassée(s) détectée(s). '
+          f'Les pages défaillantes doivent être corrigées avant le prochain déploiement.')  if fail_count > 0 else \
+         (f'Regression Test PASSED — Toutes les {pass_count} pages fonctionnent correctement. '
+          f"L'application est stable après les dernières modifications.")
+
+    verdict_tbl = Table([[Paragraph(
+        f'<font color="{vc}"><b>{vi}  Verdict Final: </b></font>'
+        f'<font color="{vc}" size="8">{vt}</font>',
+        ParagraphStyle('V', fontSize=8, fontName='Helvetica', leading=12))
+    ]], colWidths=[168*mm])
+    verdict_tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), vb),
+        ('BOX', (0,0), (-1,-1), 1.5, HexColor(vc)),
+        ('LEFTPADDING', (0,0), (-1,-1), 12),
+        ('RIGHTPADDING', (0,0), (-1,-1), 12),
+        ('TOPPADDING', (0,0), (-1,-1), 10),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+    ]))
+    elements.append(verdict_tbl)
+
+    doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
+    return buffer.getvalue()
+
+def _call_groq_for_plan(tests: list, url: str) -> list:
+    try:
+        import requests, os, json
+
+        api_key = os.getenv('GROQ_API_KEY')
+        print(f"[Groq Plan] API Key found: {bool(api_key)}")
+        print(f"[Groq Plan] Tests count: {len(tests)}")
+
+        failed = [t for t in tests if t.get('status') == 'fail']
+        passed = [t for t in tests if t.get('status') == 'pass']
+
+        def _safe_duration(t):
+            try:
+                return int(str(t.get('duration', '0')).replace('ms', '') or 0)
+            except:
+                return 0
+
+        slow = [t for t in tests if _safe_duration(t) > 3000]
+
+        passed_list = [t.get('name') for t in passed]
+        failed_list = [{'name': t.get('name'), 'reason': t.get('reason', '')} for t in failed]
+        slow_list   = [{'name': t.get('name'), 'duration': t.get('duration')} for t in slow]
+
+        print(f"[Groq Plan] Failed: {len(failed)}, Passed: {len(passed)}, Slow: {len(slow)}")
+
+        prompt = f"""You are a QA engineer analyzing regression test results for {url}.
+
+Results:
+- PASSED ({len(passed)}): {passed_list}
+- FAILED ({len(failed)}): {failed_list}
+- SLOW (>3000ms) ({len(slow)}): {slow_list}
+
+Generate a detailed action plan as a JSON array. Each item must have:
+- scenario: string (what to fix/verify)
+- category: string (Bug Fix / Performance / Monitoring / Security)
+- priority: string (HIGH / MEDIUM / LOW)
+- action: string (concrete step to take)
+- responsible: string (Frontend / Backend / DevOps / QA)
+- deadline: string (Immediate / This Sprint / Next Sprint)
+- status: string (To Do)
+
+Return ONLY the JSON array, no markdown, no explanation.
+Maximum 8 items. Focus on real issues found."""
+
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1000,
+                "temperature": 0.3
+            },
+            timeout=30
+        )
+        print(f"[Groq Plan] Response status: {response.status_code}")
+
+        content = response.json()['choices'][0]['message']['content']
+        print(f"[Groq Plan] Content preview: {content[:200]}")
+
+        content = content.strip().strip('```json').strip('```').strip()
+        result = json.loads(content)
+        print(f"[Groq Plan] Items generated: {len(result)}")
+        return result
+
+    except Exception as e:
+        import traceback
+        print(f"[Groq Plan] Error: {e}")
+        print(traceback.format_exc())
+        return []
+def build_regression_action_plan(elements, plan_items: list):
+    if not plan_items:
+        return
+
+    elements.append(Spacer(1, 18))
+    elements.append(section_header('📋', 'AI-Generated Action Plan', GOLD))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(
+        '<font color="#64748b" size="7.5"><i>'
+        'Action plan generated by Groq AI based on real regression results. '
+        'Each scenario is derived from actual test execution evidence.'
+        '</i></font>',
+        ParagraphStyle('APInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
+    elements.append(Spacer(1, 8))
+
+    hdr = [
+        Paragraph('<font color="#ffffff"><b>#</b></font>',
+                  ParagraphStyle('APH0', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Scenario</b></font>',
+                  ParagraphStyle('APH1', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Category</b></font>',
+                  ParagraphStyle('APH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Priority</b></font>',
+                  ParagraphStyle('APH3', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Action</b></font>',
+                  ParagraphStyle('APH4', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Responsible</b></font>',
+                  ParagraphStyle('APH5', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Deadline</b></font>',
+                  ParagraphStyle('APH6', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Status</b></font>',
+                  ParagraphStyle('APH7', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+    ]
+    rows = [hdr]
+    row_styles = []
+
+    cat_colors = {
+        'Bug Fix':      '#ef4444',
+        'Performance':  '#f59e0b',
+        'Monitoring':   '#3b82f6',
+        'Security':     '#8b5cf6',
+    }
+    pri_colors = {
+        'HIGH':   '#ef4444',
+        'MEDIUM': '#f59e0b',
+        'LOW':    '#10b981',
+    }
+    pri_bgs = {
+        'HIGH':   HexColor('#fef2f2'),
+        'MEDIUM': HexColor('#fffbeb'),
+        'LOW':    HexColor('#f0fdf4'),
+    }
+    resp_colors = {
+        'Frontend': '#6366f1',
+        'Backend':  '#10b981',
+        'DevOps':   '#f97316',
+        'QA':       '#3b82f6',
+    }
+    dead_colors = {
+        'Immediate':    '#ef4444',
+        'This Sprint':  '#f59e0b',
+        'Next Sprint':  '#10b981',
+    }
+
+    for i, item in enumerate(plan_items):
+        priority    = item.get('priority', 'MEDIUM')
+        category    = item.get('category', 'Bug Fix')
+        responsible = item.get('responsible', 'QA')
+        deadline    = item.get('deadline', 'This Sprint')
+        scenario    = item.get('scenario', '')
+        action      = item.get('action', '')
+        status      = item.get('status', 'To Do')
+
+        pc  = pri_colors.get(priority, '#f59e0b')
+        pbg = pri_bgs.get(priority, HexColor('#fffbeb'))
+        cc  = cat_colors.get(category, '#64748b')
+        rc  = resp_colors.get(responsible, '#64748b')
+        dc  = dead_colors.get(deadline, '#f59e0b')
+
+        rows.append([
+            Paragraph(f'<font color="#64748b"><b>{i+1}</b></font>',
+                      ParagraphStyle('APID', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#1e293b" size="7.5">{scenario[:70]}</font>',
+                      ParagraphStyle('APS', fontSize=7.5, fontName='Helvetica', leading=10)),
+            Paragraph(f'<font color="{cc}"><b>{category}</b></font>',
+                      ParagraphStyle('APC', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{pc}"><b>{priority}</b></font>',
+                      ParagraphStyle('APP', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#475569" size="7">{action[:70]}</font>',
+                      ParagraphStyle('APA', fontSize=7, fontName='Helvetica', leading=10)),
+            Paragraph(f'<font color="{rc}"><b>{responsible}</b></font>',
+                      ParagraphStyle('APR', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{dc}" size="7"><b>{deadline}</b></font>',
+                      ParagraphStyle('APD', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#64748b" size="7">⏳ {status}</font>',
+                      ParagraphStyle('APST', fontSize=7, fontName='Helvetica', alignment=TA_CENTER)),
+        ])
+        row_styles.append(('BACKGROUND', (3, i+1), (3, i+1), pbg))
+
+    tbl = Table(rows, colWidths=[7*mm, 38*mm, 22*mm, 16*mm, 38*mm, 20*mm, 20*mm, 17*mm], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,0), NAVY),
+        ('ROWBACKGROUNDS',(0,1), (-1,-1), [WHITE, LIGHT_BG]),
+        ('PADDING',       (0,0), (-1,-1), 6),
+        ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
+        ('BOX',           (0,0), (-1,-1), 0.8, GOLD),
+        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
+        ('ALIGN',         (0,0), (0,-1), 'CENTER'),
+        ('ALIGN',         (2,0), (2,-1), 'CENTER'),
+        ('ALIGN',         (3,0), (3,-1), 'CENTER'),
+        ('ALIGN',         (5,0), (5,-1), 'CENTER'),
+        ('ALIGN',         (6,0), (6,-1), 'CENTER'),
+        ('ALIGN',         (7,0), (7,-1), 'CENTER'),
+    ] + row_styles))
+    elements.append(tbl)
+    elements.append(Spacer(1, 16))
+    
+    
+    
+def build_regression_scenarios(elements, tests: list, url: str):
+    """Section affichée AVANT les résultats — scénarios planifiés basés sur les vrais tests."""
+    elements.append(section_header('📋', 'Regression Test Scenarios', INDIGO))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(
+        '<font color="#64748b" size="7.5"><i>'
+        f'Regression test plan for <b>{url}</b> — '
+        f'{len(tests)} scenarios executed by Playwright against the live application.'
+        '</i></font>',
+        ParagraphStyle('RSInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
+    elements.append(Spacer(1, 8))
+
+    cat_colors = {
+        'authentication': '#6366f1',
+        'navigation':     '#10b981',
+        'content':        '#3b82f6',
+        'functionality':  '#8b5cf6',
+    }
+    pri_colors = {
+        'high':     '#ef4444',
+        'medium':   '#f59e0b',
+        'low':      '#10b981',
+        'critical': '#ef4444',
+    }
+
+    hdr = [
+        Paragraph('<font color="#ffffff"><b>#</b></font>',
+                  ParagraphStyle('RSH0', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Test Scenario</b></font>',
+                  ParagraphStyle('RSH1', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Category</b></font>',
+                  ParagraphStyle('RSH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Priority</b></font>',
+                  ParagraphStyle('RSH3', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Expected Result</b></font>',
+                  ParagraphStyle('RSH4', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Type</b></font>',
+                  ParagraphStyle('RSH5', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+    ]
+    rows = [hdr]
+    row_styles = []
+
+    for i, t in enumerate(tests):
+        name     = t.get('name', '')
+        cat      = t.get('category', 'navigation')
+        priority = t.get('priority', t.get('severity', 'medium')).lower()
+        cc       = cat_colors.get(cat, '#64748b')
+        pc       = pri_colors.get(priority, '#f59e0b')
+
+        # Deviner le expected result depuis le nom
+        if 'page loads' in name.lower():
+            expected = 'Page loads successfully with HTTP 200'
+        elif 'exists' in name.lower() or 'visible' in name.lower():
+            expected = 'Element is visible and accessible in DOM'
+        elif 'clickable' in name.lower():
+            expected = 'Element responds to click interaction'
+        elif 'form works' in name.lower():
+            expected = 'Form submits and processes correctly'
+        else:
+            expected = t.get('description', 'Test executes without errors')
+
+        # Type de test
+        if 'login' in name.lower() or 'auth' in name.lower():
+            test_type = 'AUTH'
+            type_color = '#6366f1'
+        elif 'page loads' in name.lower():
+            test_type = 'NAV'
+            type_color = '#10b981'
+        elif 'exists' in name.lower() or 'visible' in name.lower():
+            test_type = 'UI'
+            type_color = '#3b82f6'
+        elif 'clickable' in name.lower():
+            test_type = 'FUNC'
+            type_color = '#8b5cf6'
+        else:
+            test_type = 'E2E'
+            type_color = '#64748b'
+
+        rows.append([
+            Paragraph(f'<font color="#64748b"><b>{i+1}</b></font>',
+                      ParagraphStyle('RSID', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<b><font color="#1e293b" size="8">{name}</font></b>',
+                      ParagraphStyle('RSN', fontSize=8, fontName='Helvetica', leading=11)),
+            Paragraph(f'<font color="{cc}"><b>{cat.upper()}</b></font>',
+                      ParagraphStyle('RSC', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{pc}"><b>{priority.upper()}</b></font>',
+                      ParagraphStyle('RSP', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#475569" size="7">{expected}</font>',
+                      ParagraphStyle('RSE', fontSize=7, fontName='Helvetica', leading=10)),
+            Paragraph(f'<font color="{type_color}"><b>{test_type}</b></font>',
+                      ParagraphStyle('RST', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        ])
+
+        # Alterner couleur de fond
+        if i % 2 == 1:
+            row_styles.append(('BACKGROUND', (0, i+1), (-1, i+1), LIGHT_BG))
+
+    tbl = Table(rows, colWidths=[8*mm, 58*mm, 24*mm, 18*mm, 46*mm, 14*mm], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,0), NAVY),
+        ('PADDING',       (0,0), (-1,-1), 7),
+        ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
+        ('BOX',           (0,0), (-1,-1), 0.8, INDIGO),
+        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
+        ('ALIGN',         (0,0), (0,-1), 'CENTER'),
+        ('ALIGN',         (2,0), (2,-1), 'CENTER'),
+        ('ALIGN',         (3,0), (3,-1), 'CENTER'),
+        ('ALIGN',         (5,0), (5,-1), 'CENTER'),
+        ('LINEBEFORE',    (2,1), (2,-1), 1, BORDER),
+        ('LINEBEFORE',    (4,1), (4,-1), 1, BORDER),
+    ] + row_styles))
+    elements.append(tbl)
+    elements.append(Spacer(1, 16))
 def generate_pdf(generation_data: dict) -> bytes:
+    test_type = generation_data.get('test_type') or \
+                generation_data.get('result', {}).get('test_type', 'smoke')
+
+    # ── Regression → adapter pour réutiliser le template smoke ─────────────
+    if test_type == 'regression':
+        tests = (
+            generation_data.get('execution_results') or
+            generation_data.get('test_cases') or
+            []
+        )
+        if 'result' not in generation_data:
+            generation_data['result'] = {}
+
+        generation_data['result']['test_cases']        = tests
+        generation_data['result']['execution_results'] = tests
+        generation_data['result']['page_type']         = 'general'
+        generation_data['result']['test_type']         = 'regression'
+        generation_data['result']['script']            = ''
+
+        if not generation_data.get('scraped') or generation_data.get('scraped') == {}:
+            generation_data['scraped'] = {
+                'inputs': [], 'buttons': [], 'nav_links': [],
+                'forms':  [], 'images':  [], 'alerts':   [],
+                'is_spa': False, 'load_time_ms': 0,
+            }
+
+        generation_data['execution_results'] = tests
+        generation_data['scraped']['_is_regression'] = True
+        # Appel Groq pour le plan
+        generation_data['_action_plan'] = _call_groq_for_plan(
+            tests, generation_data.get('url', '')
+        )
+
+        # Enrichir les tests regression avec les champs attendus par le template
+        for t in tests:
+            if 'selector_used' not in t:
+                t['selector_used'] = t.get('selector', t.get('suite', ''))
+            if 'reason_pass' not in t and t.get('status') == 'pass':
+                t['reason_pass'] = t.get('reason', t.get('suite', ''))
+            if 'visibility' not in t:
+                t['visibility'] = 'visible' if t.get('status') == 'pass' else 'detached'
+            if 'found' not in t:
+                t['found'] = t.get('status') == 'pass'
+            if 'action' not in t:
+                t['action'] = 'page_load' if 'page loads' in t.get('name', '').lower() else 'check_visible'
+    # ── fin patch ───────────────────────────────────────────────────────────
+    
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
                             rightMargin=20*mm, leftMargin=22*mm,
@@ -1577,14 +2132,27 @@ def generate_pdf(generation_data: dict) -> bytes:
     })
 
     result              = generation_data.get('result', generation_data)
-    test_cases          = result.get('test_cases',          generation_data.get('test_cases', []))
+    test_cases          = (
+    generation_data.get('execution_results') or
+    generation_data.get('test_cases') or
+    result.get('test_cases') or
+    result.get('execution_results') or
+    []
+)
+
     test_cases_selenium = result.get('test_cases_selenium', generation_data.get('test_cases_selenium', []))
     test_cases_cypress  = result.get('test_cases_cypress',  generation_data.get('test_cases_cypress', []))
     script              = result.get('script',              generation_data.get('script', ''))
     script_selenium     = result.get('script_selenium',     generation_data.get('script_selenium', ''))
     script_cypress      = result.get('script_cypress',      generation_data.get('script_cypress', ''))
     page_type           = result.get('page_type',           generation_data.get('page_type', 'general'))
-    execution_results   = generation_data.get('execution_results', [])
+    execution_results   = (
+    generation_data.get('execution_results') or
+    generation_data.get('test_cases') or
+    result.get('execution_results') or
+    result.get('test_cases') or
+    []
+)
 
     elements = []
 
@@ -1663,11 +2231,8 @@ def generate_pdf(generation_data: dict) -> bytes:
         ParagraphStyle('Legend', fontSize=7, fontName='Helvetica', leading=10, textColor=HexColor('#64748b'))))
     elements.append(Spacer(1, 10))
 
-    # ── Page Analysis + Test Plan + Planned UI Elements ───────
     active_tcs = test_cases_selenium if framework == 'Both' else test_cases
-    build_page_analysis(elements, scraped, page_type)
-    build_test_plan(elements, active_tcs, page_type, framework, scraped)
-    build_planned_ui_elements(elements, active_tcs)
+
 
     # ── Main test sections ────────────────────────────────────
     if framework == 'Both':
@@ -1701,7 +2266,15 @@ def generate_pdf(generation_data: dict) -> bytes:
         build_script_section(elements, script_cypress, 'Cypress', test_cases_cypress)
 
     else:
-        elements.append(section_header('📊', 'Test Summary'))
+        is_reg = generation_data.get('scraped', {}).get('_is_regression', False)
+
+        if not is_reg:
+            build_page_analysis(elements, scraped, page_type)
+            build_test_plan(elements, active_tcs, page_type, framework, scraped)
+            build_planned_ui_elements(elements, active_tcs)
+
+        if is_reg:
+            build_regression_scenarios(elements, test_cases, url)
         elements.append(Spacer(1, 8))
         build_stats_section(elements, test_cases, execution_results)
         build_execution_verdict_summary(elements, test_cases, execution_results, scraped)
@@ -1713,9 +2286,14 @@ def generate_pdf(generation_data: dict) -> bytes:
             elements.append(Spacer(1, 20))
             build_execution_evidence(elements, test_cases, execution_results)
             build_real_page_evidence(elements, test_cases, execution_results, scraped)
+            if is_reg and generation_data.get('_action_plan'):
+                build_regression_action_plan(elements, generation_data['_action_plan'])
             build_ai_recommendations(elements, test_cases, execution_results, scraped)
-        build_script_section(elements, script, framework, test_cases)
+        if not is_reg:
+            build_script_section(elements, script, framework, test_cases)
 
     elements.append(Spacer(1, 20))
     doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
+
+    
     return buffer.getvalue()

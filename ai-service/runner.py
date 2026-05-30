@@ -71,6 +71,28 @@ def _run_steps(steps: list) -> dict:
     start_total = time.time()
     base_url    = _extract_base_url(steps)
 
+    # ── AJOUT ICI : injecter les steps pré-calculés sans Playwright ──────────
+    PRE_CALC_TYPES = {"http_status", "ssl", "performance"}
+    pre_calculated = [s for s in steps if s.get("type") in PRE_CALC_TYPES and "status" in s]
+    to_run         = [s for s in steps if s.get("type") not in PRE_CALC_TYPES]
+
+    for step in pre_calculated:
+        results.append({
+        "name":             step.get("name", ""),
+        "status":           step.get("status", "fail"),  # ← garder le vrai status
+        "duration":         "0s",
+        "error":            None if step.get("status") == "pass" else step.get("suite"),
+        "reason":           step.get("suite"),
+        "reason_pass":      step.get("suite") if step.get("status") == "pass" else None,
+        "reason_skip":      None,
+        "assertion_result": None,
+        "step_meta":        None,
+        "priority":         step.get("priority", "high"),
+        "category":         step.get("category", "smoke"),
+        "section":          step.get("section", "smoke"),
+        "screenshot":       None,
+    })
+
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -99,8 +121,77 @@ def _run_steps(steps: list) -> dict:
             except Exception as e:
                 browser.close()
                 return _fatal_result(f"Cannot load '{base_url}': {e}", len(steps))
+            
+        _CACHED_TOKEN= "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJhMGRmOWI3My01MzZmLTQxZmUtOGM1Ny01MTUwOGQ2NDE0NjQiLCJqdGkiOiI3YTkwYWI0OTMwNjU0YmQ1ZjE2ZTc3NmFhYjA4MGY1Y2FhNGViOTY1YTgzNWE4MzRkYjZhZjY4OGNlMzRhMmFlNjFmZDYyODBjNTQ3MWE4NCIsImlhdCI6MTc3OTYyMDQ5NC41NzE0NzUsIm5iZiI6MTc3OTYyMDQ5NC41NzE0NzYsImV4cCI6MTc5NTUxODA5NC41NzAyMzYsInN1YiI6ImEwMWVhMDA0LTUwNzQtNDUxMi05ZTBkLWE2Nzk4NDVmNWRjZSIsInNjb3BlcyI6W119.HNkxvxfwsyaEfWBdzWbB1n_gInONCt_xmcMqmgyZP-gCkMpQj8k5c_M4VckhJlFxVIwS85aNNuJLNp1n0FTJUoPWfmQ-9KqgdzlD_iCrMB9HECrAvTVPCzX-Y62STjPM423EsSpqbNRW6nCWvRg0JwPEPohxxc-GxgNcyDbRBSMMQhi4nU9sc8-IZswwvu8tnrFYC8ZQPf5FU-Ag_-NIh91sr7_jKh5khOD-KFiD44ZinMvkWLDudzt9ugsAhGaDKY_-GZufIqjDa4w-tnX6ECLJf7gupZSV7zTn3mbYsQtoHJBOXy_Mg26-WKRCKsWm6E7Bdsm6IFMjia22isXViEteKUu5SR_xlids6zJwjS-3MYwbnlrnNE-BSoFoscMsKRU0f15Wq5ugnnwuhWkjGBoANhbw73mvCc4wVZGXqtRGfvV2vawv7z_ZXE-GYv8moFwFrBvCowW4mBYc8YkoVSK7K7XhQEQQ_THuUNwErZd4Trrw2qD5O1DhMBrCvB6OhNKxnev7SJYKSZjDAPPERu8iPg9foSODbXjrU_UFPQRKJ8C_ens-Jyvx_xspDIHmrpb4j8M68X-WcfEGKhpoDUeDV81dfKGOI7MLm6QzKVjpomGX8wYEa5T2jwemMf1RuKZ3p_Yw_z3O7s6THqqVRmYOFmvttZ8MT1hYq04diHk"
 
-        for step in steps:
+
+        # Initial page load
+        if base_url:
+            try:
+                INTERNAL_URLS = ["dashboard", "statistiques", "reception", "gestion_commission", 
+                  "reunions", "visites", "traitement_dossier", "outbox", "unauthorized"]
+
+                if any(u in base_url for u in INTERNAL_URLS):
+                
+                    # Étape 1 — charge la page pour initialiser le domaine
+                    page.goto("https://anpe.demopro.tn:10443/dashboard", timeout=_NAV_TIMEOUT, wait_until="domcontentloaded")
+
+                    page.wait_for_timeout(1000)
+                    # Étape 2 — injecte le token JWT
+                    page.evaluate("""() => {
+                        localStorage.setItem('token', '""" + _CACHED_TOKEN + """');
+                        localStorage.setItem('refreshToken', 'b72e3bfac0af120fb4c55ade2c2d1ba6d8579302d1d37988be39d193acf9a113af6a1bcefee0a018');
+                        localStorage.setItem('i18nextLng', 'fr');
+                        localStorage.setItem('user', JSON.stringify({
+                            "id": "a01ea004-5074-4512-9e0d-a679845f5dce",
+                            "fullName": "Super Admin",
+                            "email": "admin@admin.com",
+                            "is_super": true,
+                            "status": "active",
+                            "roles": [{"id": "a01ea004-0189-40e7-8dca-5f3e21a96630", "name": "super_admin"}],
+                            "permissions": [{"id": "31d71f0e-b76d-4417-902a-4ad1ac898917", "name": "view_dashboard", "type_code": "dashboard"}]
+                        }));
+                        localStorage.setItem('roles', JSON.stringify([{"id": "a01ea004-0189-40e7-8dca-5f3e21a96630", "name": "super_admin"}]));
+                        localStorage.setItem('permissions', JSON.stringify([
+                            {"id": "31d71f0e-b76d-4417-902a-4ad1ac898917", "name": "view_dashboard", "type_code": "dashboard"},
+                            {"id": "a57fcffd-165c-4eda-a419-32370bc5a7ea", "name": "view_statistiques", "type_code": "statistiques"},
+                            {"id": "629569f8-cdbf-4f4f-b0c7-99e4dc89ab58", "name": "view_audit", "type_code": "audits"},
+                            {"id": "465b2adf-f586-489a-abda-09bc4a8fd9d1", "name": "read_dossiers", "type_code": "reception"},
+                            {"id": "bc41cdae-c3dd-40ae-b47d-89def93fd1d7", "name": "read_commission", "type_code": "commissions"},
+                            {"id": "93f27077-e2b1-40bc-9895-3da7fa16c99b", "name": "read_dossier_eie", "type_code": "eie"},
+                            {"id": "0bca0396-b649-462f-b955-513d4fa2a222", "name": "read_dossier_ed", "type_code": "ed"},
+                            {"id": "c20749b9-aa2c-4004-9a1c-1f3e6421a0fd", "name": "read_dossier_af", "type_code": "af"},
+                            {"id": "1c7bdc43-904c-4caf-9fc9-11d97346b591", "name": "read_role", "type_code": "role"},
+                            {"id": "700e4a75-2f10-42d5-a3ef-7d1a7d77e15f", "name": "read_user", "type_code": "user"},
+                            {"id": "7ecb6362-67fe-4693-8057-15d3d1e53377", "name": "refuse_visite", "type_code": "visite"},
+                            {"id": "b1b1d205-3b60-4f26-a236-409820452dd8", "name": "update_visite", "type_code": "visite"},
+                            {"id": "b4287f83-af63-4f9b-a42d-9a1747556561", "name": "accept_visite", "type_code": "visite"},
+                            {"id": "9b2c3d4e-5f6a-7890-bcde-f01234567890", "name": "read_reunion", "type_code": "reunions"}
+                        ]));
+                        localStorage.setItem('lastActivityTimestamp', Date.now().toString());
+                    }""")
+                    # Étape 3 — recharge avec le token
+                    page.goto(base_url, timeout=_NAV_TIMEOUT, wait_until="networkidle")
+                    page.wait_for_timeout(4000)
+                    try:
+                            page.wait_for_function(
+                                "() => document.querySelectorAll('.ant-menu-item').length > 0",
+                                timeout=15000
+                            )
+                            print(f"[RUNNER] React rendered ✅")
+                    except Exception:
+                            pass
+                    print(f"[RUNNER] url après injection = {page.url}")
+                    print(f"[RUNNER] title = {page.title()}")
+                    print(f"[RUNNER] JWT token injecté ✅ | url={page.url}")
+                    print(f"[RUNNER] JWT token injecté ✅ | url={page.url}")
+                else:
+                    _goto(page, base_url)
+            except Exception as e:
+                browser.close()
+                return _fatal_result(f"Cannot load '{base_url}': {e}", len(steps))
+        
+        for step in to_run:
             result = _run_one_step(page, step, base_url)
             results.append(result)
 
@@ -524,7 +615,7 @@ def _validate_assertion(page, assertion: dict,
 
             # Wait for page to settle
             try:
-                page.wait_for_load_state("networkidle", timeout=8_000)
+                page.wait_for_load_state("networkidle", timeout=3_000)
             except PWTimeout:
                 pass
 
@@ -701,10 +792,6 @@ def _is_invalid_selector(selector: str) -> bool:
 
 
 def _find_visible_with_fallback(page, primary_selector: str) -> tuple[bool, str]:
-    """
-    Tries primary selector, then heading fallbacks if it's a heading-type selector.
-    Returns (found: bool, matched_selector: str)
-    """
     candidates = [primary_selector]
 
     is_heading = any(h in primary_selector for h in ["h1", "h2", "h3", "h4", "heading", "title"])
@@ -717,7 +804,7 @@ def _find_visible_with_fallback(page, primary_selector: str) -> tuple[bool, str]
         if _is_invalid_selector(sel):
             continue
         try:
-            page.wait_for_selector(sel, state="visible", timeout=3_000)
+            page.wait_for_selector(sel, state="visible", timeout=1_500)  # ← nouveau
             return True, sel
         except PWTimeout:
             try:

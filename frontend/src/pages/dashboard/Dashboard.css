@@ -3898,3 +3898,67 @@
   -webkit-box-shadow: 0 0 0px 1000px var(--bg2) inset !important;
   transition: background-color 5000s ease-in-out 0s !important;
 }
+
+/* E — E2E — Cyan Sky */
+.dash-root .gp4-letter-e2e {
+  background: rgba(14, 165, 233, 0.12);
+  border: 1.5px solid rgba(14, 165, 233, 0.3);
+  color: #0EA5E9;
+}
+.dash-root .gp4-type-card.selected .gp4-letter-e2e {
+  background: rgba(14, 165, 233, 0.22);
+  border-color: rgba(14, 165, 233, 0.5);
+  color: #7DD3FC;
+}
+
+/* A — API — Emerald Green */
+.dash-root .gp4-letter-api {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1.5px solid rgba(16, 185, 129, 0.3);
+  color: #10B981;
+}
+.dash-root .gp4-type-card.selected .gp4-letter-api {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #6EE7B7;
+}
+
+/* N — Negative — Pink */
+.dash-root .gp4-letter-neg {
+  background: rgba(236, 72, 153, 0.12);
+  border: 1.5px solid rgba(236, 72, 153, 0.3);
+  color: #EC4899;
+}
+.dash-root .gp4-type-card.selected .gp4-letter-neg {
+  background: rgba(236, 72, 153, 0.22);
+  border-color: rgba(236, 72, 153, 0.5);
+  color: #F9A8D4;
+}
+
+.dash-root .gp4-letter-pytest {
+  background: rgba(55,118,171,0.12);
+  border: 1.5px solid rgba(55,118,171,0.3);
+  color: #3776AB;
+}
+.dash-root .gp4-fw-card.selected .gp4-letter-pytest {
+  background: rgba(55,118,171,0.22);
+  border-color: rgba(55,118,171,0.5);
+  box-shadow: 0 0 16px rgba(55,118,171,0.2);
+}
+
+.dash-root .gp4-letter-postman {
+  background: rgba(255,108,55,0.12);
+  border: 1.5px solid rgba(255,108,55,0.3);
+  color: #FF6C37;
+}
+.dash-root .gp4-fw-card.selected .gp4-letter-postman {
+  background: rgba(255,108,55,0.22);
+  border-color: rgba(255,108,55,0.5);
+  box-shadow: 0 0 16px rgba(255,108,55,0.2);
+}
+
+.dash-root .ep-status-badge--warn {
+  background: var(--amber-bg); 
+  color: var(--amber); 
+  border: 1px solid var(--amber-border);
+}

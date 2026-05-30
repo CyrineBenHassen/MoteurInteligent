@@ -22,16 +22,9 @@ public function update(Request $request)
         'email' => $request->email,
     ]);
 
-    if ($user->avatar) {
-        $user->avatar = asset('storage/' . $user->avatar);
-    }
-
     return response()->json([
         'message' => 'Profile updated successfully',
-        'user'    => array_merge($user->toArray(), [
-            'generations_count' => $user->generations()->count(),
-            'projects_count'    => $user->projects()->count(),
-        ])
+        'user'    => $this->formatUser($user),
     ]);
 }
 
@@ -89,7 +82,16 @@ public function deleteAccount(Request $request)
     $user->delete();
     return response()->json(['message' => 'Account deleted successfully']);
 }
-
+private function formatUser($user): array
+{
+    $data = $user->fresh()->toArray();
+    if (!empty($data['avatar']) && !str_starts_with($data['avatar'], 'http')) {
+        $data['avatar'] = asset('storage/' . $data['avatar']);
+    }
+    $data['generations_count'] = $user->generations()->count();
+    $data['projects_count']    = $user->projects()->count();
+    return $data;
+}
 public function show(Request $request)
 {
     $user = $request->user();

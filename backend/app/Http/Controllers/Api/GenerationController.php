@@ -21,7 +21,7 @@ class GenerationController extends Controller
         $request->validate([
             'url'       => 'required|url',
             'framework' => 'required|in:Selenium,Cypress,Playwright,k6',
-            'test_type' => 'nullable|in:smoke,functional,regression,performance',
+            'test_type' => 'nullable|in:smoke,functional,regression,performance,api',
         ]);
 
         $url       = $request->url;
@@ -90,21 +90,7 @@ class GenerationController extends Controller
             $testCases = $result['test_cases'] ?? [];
 
 // Fallback vers smoke si LLaMA n'a rien généré
-if (empty($testCases) && $testType !== 'smoke') {
-    Log::warning('[NEXTEST] No test cases generated, falling back to smoke', [
-        'url' => $url, 'test_type' => $testType
-    ]);
-    $smokeResponse = Http::timeout(120)->post('http://127.0.0.1:8001/generate', [
-        'url'       => $url,
-        'framework' => $framework,
-        'test_type' => 'smoke',
-    ]);
-    if ($smokeResponse->successful()) {
-        $smokeData  = $smokeResponse->json();
-        $result     = $smokeData['result'] ?? $result;
-        $testCases  = $result['test_cases'] ?? [];
-    }
-}
+
             $testCasesSelenium = $result['test_cases_selenium'] ?? [];
             $testCasesCypress  = $result['test_cases_cypress']  ?? [];
             $script            = $result['script']              ?? '';
@@ -157,7 +143,10 @@ if (empty($testCases) && $testType !== 'smoke') {
                     
 $executionResultsForDb = array_map(function($r) {
     $copy = $r;
-    unset($copy['screenshot']); // trop lourd pour la DB
+    // Garder screenshot seulement si test failed
+    if (isset($copy['screenshot']) && $copy['status'] !== 'fail') {
+        unset($copy['screenshot']);
+    }
     return $copy;
 }, $executionResults);
                 }
@@ -178,7 +167,7 @@ $executionResultsForDb = array_map(function($r) {
                 'script_selenium'     => $scriptSelenium,
                 'script_playwright'   => $scriptPlaywright,
                 'script_cypress'      => $scriptCypress,
-                'execution_results' => $executionResultsForDb,
+                'execution_results' => $executionResults,
                 'load_time_ms'        => $scraped['load_time_ms'] ?? 0,
                 'is_spa'              => $scraped['is_spa']       ?? false,
                 'pass_count'          => $pass,
@@ -385,41 +374,57 @@ public function index()
         }
     }
 
-    public function downloadPdf($id)
-    {
-        set_time_limit(60);
-
-        $generation = Generation::where('user_id', auth()->id())
-            ->findOrFail($id);
-
-        try {
-            $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-pdf', [
-                'url'                 => $generation->url,
-                'framework'           => $generation->framework,
-                'test_cases'          => $generation->test_cases          ?? [],
-                'test_cases_selenium' => $generation->test_cases_selenium ?? [],
-                'test_cases_cypress'  => $generation->test_cases_cypress  ?? [],
-                'script'              => $generation->script              ?? '',
-                'script_selenium'     => $generation->script_selenium     ?? '',
-                'script_playwright'   => $generation->script_playwright   ?? '',
-                'script_cypress'      => $generation->script_cypress      ?? '',
-                'execution_results'   => $generation->execution_results   ?? [],
-                'load_time_ms'        => $generation->load_time_ms,
-                'is_spa'              => $generation->is_spa,
-                'created_at'          => $generation->created_at,
-                'scraped'             => $generation->scraped   ?? [],
-                'page_type'           => $generation->page_type ?? 'general',
-            ]);
-
-            return response($response->body(), 200, [
-                'Content-Type'        => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="nextest_report.pdf"',
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+ public function downloadPdf($id)
+{
+    $generation = Generation::where('user_id', auth()->id())->findOrFail($id);
+    
+    $testType = $generation->test_type ?? 'smoke';
+    
+    // Construire les données selon le type
+    $scraped = $generation->scraped ?? [];
+    if (empty($scraped)) {
+        $scraped = [
+            'inputs' => [], 'buttons' => [], 'nav_links' => [],
+            'forms'  => [], 'images'  => [], 'alerts'   => [],
+            'is_spa' => false, 'load_time_ms' => $generation->load_time_ms ?? 0,
+        ];
     }
+
+    $testCases        = $generation->test_cases        ?? [];
+    $executionResults = $generation->execution_results ?? $testCases;
+
+    try {
+        $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-pdf', [
+            'url'               => $generation->url,
+            'framework'         => $generation->framework,
+            'test_type'         => $testType,
+            'test_cases'        => $testCases,
+            'execution_results' => $executionResults,
+            'load_time_ms'      => $generation->load_time_ms ?? 0,
+            'scraped'           => $scraped,
+            'page_type'         => $generation->page_type ?? 'general',
+            'pass_count'        => $generation->pass_count ?? 0,
+            'fail_count'        => $generation->fail_count ?? 0,
+            'skip_count'        => $generation->skip_count ?? 0,
+            'pass_rate'         => $generation->pass_rate  ?? 0,
+        ]);
+
+        if ($response->failed()) {
+            return response()->json(['error' => 'PDF generation failed', 'detail' => $response->body()], 500);
+        }
+
+        $pdfBytes = $response->body();
+
+        return response($pdfBytes, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"{$testType}_report_{$id}.pdf\"",
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('[PDF] downloadPdf error', ['error' => $e->getMessage()]);
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
 
 
     // ── À ajouter AVANT le dernier } de la classe ──────────────────
@@ -440,11 +445,11 @@ private function notifyN8n(
         \Illuminate\Support\Facades\Mail::send([], [], function($message) use ($generation, $pdfBytes, $pass, $fail, $skip, $rate) {
             $id     = $generation->id;
             $rc     = $rate >= 80 ? '#10b981' : ($rate >= 50 ? '#f59e0b' : '#ef4444');
-            $si     = $fail === 0 ? '✅' : '❌';
-            $status = $fail === 0 ? 'Tests Passed' : 'Tests Failed';
-            $sbg    = $fail === 0 ? '#d1fae5' : '#fee2e2';
-            $sc     = $fail === 0 ? '#059669' : '#dc2626';
-            $sbd    = $fail === 0 ? '#10b981' : '#ef4444';
+            $si     = $rate >= 80 ? '✅' : '❌';
+            $status = $rate >= 80 ? 'Tests Passed' : 'Tests Failed';
+            $sbg    = $rate >= 80 ? '#d1fae5' : '#fee2e2';
+            $sc     = $rate >= 80 ? '#059669' : '#dc2626';
+            $sbd    = $rate >= 80 ? '#10b981' : '#ef4444';
             $date   = now()->format('d/m/Y H:i');
 
             $html = "
@@ -522,8 +527,14 @@ private function notifyN8n(
               </div>
             </body>
             </html>";
-
-            $subject = ($fail === 0 ? '✅ NexTest Passed' : '❌ NexTest Failed') . " — {$generation->url} — {$date}";
+                
+            $subject = ($rate >= 80 ? '✅' : '❌')
+         . " [NexTest] "
+         . ucfirst($generation->test_type)
+         . " | " . $generation->framework
+         . " | {$rate}% Pass Rate"
+         . " | {$pass}P · {$fail}F · {$skip}S"
+         . " | {$date}";
 
             $message->to('syrinebenhassen09@gmail.com')
                     ->subject($subject)
@@ -612,5 +623,375 @@ private function generateCsvBytes(Generation $generation): string
         fn($r) => implode(',', $r),
         $rows
     ));
+}
+
+
+#internel test
+public function generateInternal(Request $request)
+{
+    set_time_limit(600);
+
+    $request->validate([
+        'url'          => 'required|url',
+        'framework'    => 'required|in:Selenium,Playwright,Cypress',
+        'test_type'    => 'nullable|string',
+        'scrape_login' => 'nullable|boolean',
+        'cookies'      => 'nullable|array',
+        'username'     => 'nullable|string',
+        'password'     => 'nullable|string',
+        'login_url'    => 'nullable|url',
+        'token'        => 'nullable|string',
+        'project_id'   => 'nullable|integer',
+    ]);
+
+    $url         = $request->url;
+    $framework   = $request->framework   ?? 'Playwright';
+    $testType    = $request->test_type   ?? 'smoke';
+    $scrapeLogin = $request->scrape_login ?? false;
+    $cookies     = $request->cookies     ?? null;
+    $username    = $request->username    ?? null;
+    $password    = $request->password    ?? null;
+    $loginUrl    = $request->login_url   ?? null;
+
+    Log::info('[NEXTEST] generateInternal()', [
+        'url'          => $url,
+        'framework'    => $framework,
+        'test_type'    => $testType,
+        'scrape_login' => $scrapeLogin,
+        'has_cookies'  => !empty($cookies),
+        'has_username' => !empty($username),
+    ]);
+
+    try {
+        $timeout = match($testType) {
+            'security'    => 180,
+            'e2e'         => 180,
+            'performance' => 180,
+            default       => 120,
+        };
+
+        $response = Http::timeout($timeout)->post('http://127.0.0.1:8001/generate-internal', [
+            'url'          => $url,
+            'framework'    => $framework,
+            'test_type'    => $testType,
+            'scrape_login' => $scrapeLogin,
+            'cookies'      => $cookies,
+            'username'     => $username,
+            'password'     => $password,
+            'login_url'    => $loginUrl,
+        ]);
+
+        if ($response->failed()) {
+            return response()->json([
+                'error'  => 'AI service error',
+                'detail' => $response->body(),
+            ], 500);
+        }
+
+        $data   = $response->json();
+        $result = $data['result'] ?? [];
+
+        $testCases = $result['test_cases'] ?? [];
+        $pass = $result['pass_count'] ?? 0;
+        $fail = $result['fail_count'] ?? 0;
+        $skip = 0;
+        $rate = $result['pass_rate']  ?? 0;
+
+        // Run tests with existing runner
+        $executionResults = [];
+        if (!empty($testCases)) {
+            $runResponse = Http::timeout(300)->post('http://127.0.0.1:8001/run', [
+                'script'     => $result['script'] ?? '',
+                'framework'  => $framework,
+                'test_cases' => $testCases,
+                'test_type'  => $testType,
+            ]);
+
+            if ($runResponse->successful()) {
+                $runData          = $runResponse->json();
+                $pass             = $runData['pass_count'] ?? $pass;
+                $fail             = $runData['fail_count'] ?? $fail;
+                $skip             = $runData['skip_count'] ?? 0;
+                $rate             = $runData['pass_rate']  ?? $rate;
+                $executionResults = $runData['results']    ?? [];
+            }
+        }
+
+        $scraped = $data['scraped'] ?? [];
+
+        $generation = Generation::create([
+            'user_id'             => auth()->id(),
+            'project_id'          => $request->project_id ?? null,
+            'url'                 => $url,
+            'framework'           => $framework,
+            'test_type'           => $testType,
+            'status'              => 'completed',
+            'test_cases'          => $testCases,
+            'test_cases_selenium' => $testCases,
+            'test_cases_cypress'  => $testCases,
+            'script'              => $result['script']            ?? '',
+            'script_selenium'     => $result['script_selenium']   ?? '',
+            'script_playwright'   => $result['script_playwright'] ?? '',
+            'script_cypress'      => $result['script_cypress']    ?? '',
+            'execution_results'   => $executionResults,
+            'load_time_ms'        => $scraped['load_time_ms']     ?? 0,
+            'is_spa'              => $scraped['is_spa']           ?? false,
+            'pass_count'          => $pass,
+            'fail_count'          => $fail,
+            'skip_count'          => $skip,
+            'pass_rate'           => $rate,
+            'page_type' => ($scraped['is_login_page'] ?? false) ? 'login' : 'dashboard',
+            'scraped'             => $scraped,
+        ]);
+
+        $this->notifyN8n($generation, $pass, $fail, $skip, $rate, $url, $framework, $testType);
+
+        return response()->json([
+            'message'    => 'Internal tests generated successfully',
+            'generation' => $generation,
+            'result'     => array_merge($result, [
+                'execution_results' => $executionResults,
+                'test_type'         => $testType,
+            ]),
+            'scraped'    => $scraped,
+            'test_type'  => $testType,
+            'framework'  => $framework,
+            'url'        => $url,
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('[NEXTEST] generateInternal() exception', ['error' => $e->getMessage()]);
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
+
+
+public function generateApi(Request $request)
+{
+    set_time_limit(600);
+
+    $request->validate([
+        'url'        => 'required|url',
+        'framework'  => 'required|in:Pytest,Postman',
+        'test_type'  => 'nullable|string',
+        'username'   => 'nullable|string',
+        'password'   => 'nullable|string',
+        'anpe_token' => 'nullable|string',  // ← AJOUTE
+        'project_id' => 'nullable|integer',
+    ]);
+    // ← AJOUTE ICI
+    \Log::info('[GENERATE-API] anpe_token received', [
+        'anpe_token_preview' => substr($request->anpe_token ?? '', 0, 50),
+        'anpe_token_length'  => strlen($request->anpe_token ?? ''),
+    ]);
+
+    $url       = $request->url;
+    $framework = $request->framework ?? 'Pytest';
+
+    try {
+        $response = Http::timeout(180)->post('http://127.0.0.1:8001/generate-api', [
+            'url'       => $url,
+            'framework' => $framework,
+            'username'  => $request->username ?? null,
+            'password'  => $request->password ?? null,
+            'token'     => $request->anpe_token ?? '',  // ← CHANGE
+
+        ]);
+
+        if ($response->failed()) {
+            return response()->json(['error' => 'AI service error', 'detail' => $response->body()], 500);
+        }
+
+        $data   = $response->json();
+        $result = $data['result'] ?? [];
+
+        $generation = Generation::create([
+            'user_id'           => auth()->id(),
+            'project_id'        => $request->project_id ?? null,
+            'url'               => $url,
+            'framework'         => $framework,
+            'test_type'         => 'api',
+            'status'            => 'completed',
+            'test_cases'        => $result['test_cases']        ?? [],
+            'execution_results' => $result['execution_results'] ?? [],
+            'pass_count'        => $result['pass_count']        ?? 0,
+            'fail_count'        => $result['fail_count']        ?? 0,
+            'skip_count'        => $result['skip_count']        ?? 0,
+            'pass_rate'         => $result['pass_rate']         ?? 0,
+            'page_type'         => 'api',
+            'scraped'           => [],
+        ]);
+
+        return response()->json([
+            'message'    => 'API tests generated successfully',
+            'generation' => $generation,
+            'result'     => $result,
+            'test_type'  => 'api',
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
+
+public function generateSecurity(Request $request)
+{
+    set_time_limit(600);
+
+    $request->validate([
+        'url'        => 'required|url',
+        'project_id' => 'nullable|integer',
+        'categories' => 'nullable|array',
+    ]);
+
+    $url = $request->url;
+
+    Log::info('[NEXTEST] generateSecurity()', ['url' => $url]);
+
+    try {
+        $response = Http::timeout(180)->post('http://127.0.0.1:8001/generate-security', [
+            'url'        => $url,
+            'token'      => $request->anpe_token ?? '',
+            'categories' => $request->categories ?? null,
+        ]);
+
+        if ($response->failed()) {
+            return response()->json(['error' => 'AI service error', 'detail' => $response->body()], 500);
+        }
+
+        $data   = $response->json();
+        $result = $data['result'] ?? [];
+
+        $testCases = $result['test_cases'] ?? [];
+
+        // Run security tests
+        $runResponse = Http::timeout(180)->post('http://127.0.0.1:8001/run-security', [
+            'test_cases' => $testCases,
+            'token'      => $request->anpe_token ?? '',
+        ]);
+
+        $pass = 0; $fail = 0; $warn = 0;
+        $executionResults = [];
+
+        if ($runResponse->successful()) {
+            $runData          = $runResponse->json();
+            $pass             = $runData['pass_count'] ?? 0;
+            $fail             = $runData['fail_count'] ?? 0;
+            $warn             = $runData['warn_count'] ?? 0;
+            $executionResults = $runData['results']    ?? [];
+        }
+
+        $rate = ($pass + $fail + $warn) > 0
+            ? round($pass / ($pass + $fail + $warn) * 100)
+            : 0;
+
+        $generation = Generation::create([
+            'user_id'           => auth()->id(),
+            'project_id'        => $request->project_id ?? null,
+            'url'               => $url,
+            'framework'         => 'Pytest',
+            'test_type'         => 'security',
+            'status'            => 'completed',
+            'test_cases'        => $testCases,
+            'execution_results' => $executionResults,
+            'pass_count'        => $pass,
+            'fail_count'        => $fail,
+            'skip_count'        => $warn,   // warn stocké comme skip
+            'pass_rate'         => $rate,
+            'page_type'         => 'api',
+            'scraped'           => [],
+        ]);
+
+        $this->notifyN8n($generation, $pass, $fail, $warn, $rate, $url, 'Pytest', 'security');
+
+        return response()->json([
+            'message'    => 'Security tests completed',
+            'generation' => $generation,
+            'result'     => array_merge($result, [
+                'test_cases'        => $executionResults,
+                'execution_results' => $executionResults,
+                'pass_count'        => $pass,
+                'fail_count'        => $fail,
+                'warn_count'        => $warn,
+                'pass_rate'         => $rate,
+                'test_type'         => 'security',
+            ]),
+            'test_type'  => 'security',
+            'url'        => $url,
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('[NEXTEST] generateSecurity() exception', ['error' => $e->getMessage()]);
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
+
+public function generateRegression(Request $request)
+{
+    $validated = $request->validate([
+        'url'        => 'required|string',
+        'framework'  => 'nullable|string',
+        'project_id' => 'nullable|integer',
+    ]);
+
+    $url       = $validated['url'];
+    $framework = $validated['framework'] ?? 'Playwright';
+    $projectId = $validated['project_id'] ?? null;
+
+    try {
+        $response = Http::timeout(300)->post('http://127.0.0.1:8001/generate-regression', [
+            'url'        => $url,
+            'framework'  => $framework,
+            'project_id' => $projectId,
+        ]);
+
+        $data = $response->json();
+
+        if (!$data || isset($data['error'])) {
+            return response()->json(['error' => $data['error'] ?? 'Generation failed'], 500);
+        }
+
+        $result     = $data['result'] ?? [];
+        $testCases  = $result['execution_results'] ?? $result['test_cases'] ?? [];
+        $passCount  = $result['pass_count'] ?? 0;
+        $failCount  = $result['fail_count'] ?? 0;
+        $skipCount  = $result['skip_count'] ?? 0;
+        $passRate   = $result['pass_rate'] ?? 0;
+
+     $generation = Generation::create([
+    'user_id'           => auth()->id(),
+    'project_id'        => $projectId,
+    'url'               => $url,
+    'framework'         => $framework,
+    'test_type'         => 'regression',
+    'status'            => 'completed',
+    'test_cases'        => $testCases,
+    'execution_results' => $testCases,
+    'pass_count'        => $passCount,
+    'fail_count'        => $failCount,
+    'skip_count'        => $skipCount,
+    'pass_rate'         => $passRate,
+    'load_time_ms'      => 0,
+    'is_spa'            => false,
+    'page_type'         => 'general',
+    'scraped'           => [],
+]);
+
+        return response()->json([
+            'id'         => $generation->id,
+            'url'        => $url,
+            'framework'  => $framework,
+            'test_type'  => 'regression',
+            'result'     => $result,
+            'pass_count' => $passCount,
+            'fail_count' => $failCount,
+            'skip_count' => $skipCount,
+            'pass_rate'  => $passRate,
+            'test_cases' => $testCases,
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
 }
 }

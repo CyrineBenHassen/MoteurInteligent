@@ -37,34 +37,38 @@ class AuthController extends Controller
     }
 
     # Login
-    public function login(Request $request)
-    {
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required',
-        ]);
+    # Login
+public function login(Request $request)
+{
+    $request->validate([
+        'email'    => 'required|email',
+        'password' => 'required',
+    ]);
 
-        $user = User::where('email', $request->email)->first();
+    $user = User::where('email', $request->email)->first();
 
-        # Vérification user et le  mot de passe
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Identifiants incorrects.'],
-            ]);
-        }
-
-        # Supprimer les anciens tokens 
-        $user->tokens()->delete();
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'message'      => 'Connexion réussie',
-            'user'         => $user,
-            'access_token' => $token,
-            'token_type'   => 'Bearer',
+    if (!$user || !Hash::check($request->password, $user->password)) {
+        throw ValidationException::withMessages([
+            'email' => ['Identifiants incorrects.'],
         ]);
     }
+
+    $user->tokens()->delete();
+    $token = $user->createToken('auth_token')->plainTextToken;
+
+    // ← fix avatar
+    $userData = $user->toArray();
+    if (!empty($userData['avatar']) && !str_starts_with($userData['avatar'], 'http')) {
+        $userData['avatar'] = asset('storage/' . $userData['avatar']);
+    }
+
+    return response()->json([
+        'message'      => 'Connexion réussie',
+        'user'         => $userData,  // ← pas $user direct
+        'access_token' => $token,
+        'token_type'   => 'Bearer',
+    ]);
+}
 
     # Logout
     public function logout(Request $request)
@@ -78,15 +82,16 @@ class AuthController extends Controller
     }
 
     # PROFIL (route protégée)
-   public function me(Request $request)
+public function me(Request $request)
 {
     $user = $request->user();
+    $data = $user->toArray();
     
-    // Ajouter l'URL complète de l'avatar
-    if ($user->avatar) {
-        $user->avatar = asset('storage/' . $user->avatar);
+    // Ajoute cette conversion
+    if (!empty($data['avatar']) && !str_starts_with($data['avatar'], 'http')) {
+        $data['avatar'] = asset('storage/' . $data['avatar']);
     }
     
-    return response()->json($user);
+    return response()->json($data);
 }
 }
