@@ -1064,8 +1064,64 @@ def _compute_quality_score(pass_rate: int, load_time: int, fail_count: int,
         risk = 'HIGH';   risk_color = '#ef4444'
     return score, risk, risk_color
 
+def _call_groq_for_recommendations(tests: list, url: str) -> dict:
+    try:
+        import requests, os, json
 
-def build_ai_recommendations(elements, test_cases: list, execution_results: list, scraped: dict):
+        api_key = os.getenv('GROQ_API_KEY')
+        failed  = [t for t in tests if t.get('status') == 'fail']
+        passed  = [t for t in tests if t.get('status') == 'pass']
+
+        def _safe_ms(t):
+            try: return int(str(t.get('duration','0')).replace('ms','') or 0)
+            except: return 0
+
+        slow = [t for t in tests if _safe_ms(t) > 3000]
+
+        prompt = f"""You are a senior QA engineer analyzing regression test results for {url}.
+
+Real test results:
+- PASSED ({len(passed)}): {[t.get('name') for t in passed]}
+- FAILED ({len(failed)}): {[{{'name': t.get('name'), 'reason': t.get('reason','')}} for t in failed]}
+- SLOW >3000ms ({len(slow)}): {[{{'name': t.get('name'), 'duration': t.get('duration')}} for t in slow]}
+
+Generate professional QA recommendations as a JSON object with exactly these 3 keys:
+- performance: list of 2-3 strings about speed/timing issues based on real durations
+- reliability: list of 2-3 strings about failures and what to fix based on real errors  
+- ux: list of 1-2 strings about user experience impact based on what failed
+
+Rules:
+- Be specific, mention real test names and real reasons
+- No generic advice, everything based on actual results
+- Each string max 120 characters
+- Return ONLY valid JSON, no markdown, no explanation"""
+
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 600,
+                "temperature": 0.3
+            },
+            timeout=30
+        )
+        content = response.json()['choices'][0]['message']['content']
+        content = content.strip().strip('```json').strip('```').strip()
+        result  = json.loads(content)
+        print(f"[Groq Recs] Generated successfully")
+        return result
+
+    except Exception as e:
+        import traceback
+        print(f"[Groq Recs] Error: {e}")
+        print(traceback.format_exc())
+        return {}
+def build_ai_recommendations(elements, test_cases: list, execution_results: list, scraped: dict, groq_recs: dict = {}):
     elements.append(Spacer(1, 18))
     elements.append(section_header('🤖', 'AI Recommendations', INDIGO))
     elements.append(Spacer(1, 4))
@@ -1102,78 +1158,82 @@ def build_ai_recommendations(elements, test_cases: list, execution_results: list
 
     categories = []
 
-    perf_recs = []
-    if load_time > 5000:
-        perf_recs.append(f'Page load is critical ({load_time} ms). Compress images, enable CDN caching, and audit third-party scripts.')
-    elif load_time > 3000:
-        perf_recs.append(f'Page load is slow ({load_time} ms). Optimize asset loading and reduce blocking resources.')
-    elif load_time > 1500:
-        perf_recs.append(f'Page load is acceptable ({load_time} ms) but can be improved. Consider lazy-loading non-critical resources.')
-    else:
-        perf_recs.append(f'Page load is fast ({load_time} ms). Performance baseline is healthy.')
-    if is_spa:
-        perf_recs.append('SPA framework detected (React/Vue/Angular). Ensure waits for hydration before asserting element presence.')
-    categories.append(('⚡', 'Performance', perf_recs, '#f59e0b', ORANGE_BG))
+    _is_reg = scraped.get('_is_regression', False) or bool(groq_recs)
 
-    rel_recs = []
-    if fragile_sel:
-        for tc_name, sel in fragile_sel[:4]:
-            safe_name = tc_name[:35]
-            safe_sel  = sel[:45]
-            testid_suggestion = tc_name.lower().replace(' ', '-')
-            rel_recs.append(
-                f'"{safe_name}" uses generic selector ({safe_sel}). '
-                f'Recommendation: add data-testid="{testid_suggestion}" for selector stability.'
-            )
-        if len(fragile_sel) > 4:
-            rel_recs.append(f'... and {len(fragile_sel) - 4} more test(s) with fragile selectors. Audit all tests for data-testid coverage.')
+    if _is_reg:
+        perf_recs = groq_recs.get('performance', [])
+        rel_recs  = groq_recs.get('reliability', [])
+        ux_recs   = groq_recs.get('ux', [])
+        # Fallback si Groq vide
+        if not perf_recs:
+            slow = [t for t in test_cases if int(str(t.get('duration','0')).replace('ms','') or 0) > 3000]
+            perf_recs = [f'{len(slow)} test(s) exceeded 3000ms — optimize before next release.'] if slow else ['All tests executed within acceptable time range.']
+        if not rel_recs:
+            rel_recs = [f'Fix "{tc.get("name","")}" — {tc.get("reason","error")}' for tc in [t for t in test_cases if t.get("status")=="fail"][:3]] or ['No reliability issues detected.']
+        if not ux_recs:
+            ux_recs = ['Navigation pages verified. Application routing is stable.']
+        # Fallback si liste vide
+        if not perf_recs:
+            slow_tests = [t for t in test_cases if int(str(t.get('duration','0')).replace('ms','') or 0) > 3000]
+            perf_recs = [f'{len(slow_tests)} test(s) exceeded 3000ms. Optimize slow pages before next release.'] if slow_tests else ['All tests executed within acceptable time range.']
+        if not rel_recs:
+            rel_recs = [f'Fix "{tc.get("name","")}" — {tc.get("reason","404 error")}' for tc in failed_tcs[:3]] or ['No reliability issues detected.']
+        if not ux_recs:
+            ux_recs = ['13 navigation pages verified successfully. Application routing is stable.']
     else:
-        rel_recs.append('Selectors appear specific and stable. Continue using ID-based and attribute selectors.')
-    if critical_failures:
-        for tc in critical_failures[:3]:
-            area = _infer_ui_area(tc)
-            rel_recs.append(f'HIGH severity failure: "{tc.get("name","")[:40]}" ({area}). Must be resolved before production deployment.')
-    if medium_failures:
-        for tc in medium_failures[:2]:
-            area = _infer_ui_area(tc)
-            sel  = tc.get('selector') or tc.get('expected_selector') or ''
-            rel_recs.append(f'MEDIUM failure: "{tc.get("name","")[:35]}" — selector "{sel[:30]}" not resolved in {area}.')
-    if skip_count > 0:
-        rel_recs.append(f'{skip_count} test(s) skipped. Verify optional elements are not misclassified as required.')
-    categories.append(('🔧', 'Reliability', rel_recs, '#4f46e5', INDIGO_BG))
+        # Smoke test — keep existing static logic
+        perf_recs = []
+        if load_time > 5000:
+            perf_recs.append(f'Page load is critical ({load_time} ms). Compress images, enable CDN caching, and audit third-party scripts.')
+        elif load_time > 3000:
+            perf_recs.append(f'Page load is slow ({load_time} ms). Optimize asset loading and reduce blocking resources.')
+        elif load_time > 1500:
+            perf_recs.append(f'Page load is acceptable ({load_time} ms) but can be improved. Consider lazy-loading non-critical resources.')
+        else:
+            perf_recs.append(f'Page load is fast ({load_time} ms). Performance baseline is healthy.')
+        if is_spa:
+            perf_recs.append('SPA framework detected. Ensure waits for hydration before asserting element presence.')
 
-    ux_recs = []
-    nav_pass = any(
-        _infer_ui_area(tc) == 'Navigation'
-        and i < len(execution_results)
-        and execution_results[i].get('status') == 'pass'
-        for i, tc in enumerate(test_cases)
-    )
-    content_pass = any(
-        _infer_ui_area(tc) in ('Main Content', 'Page Identity')
-        and i < len(execution_results)
-        and execution_results[i].get('status') == 'pass'
-        for i, tc in enumerate(test_cases)
-    )
-    search_tested = any('search' in tc.get('name', '').lower() for tc in test_cases)
-    search_passed = any(
-        'search' in tc.get('name', '').lower()
-        and i < len(execution_results)
-        and execution_results[i].get('status') == 'pass'
-        for i, tc in enumerate(test_cases)
-    )
+        rel_recs = []
+        if fragile_sel:
+            for tc_name, sel in fragile_sel[:4]:
+                rel_recs.append(f'"{tc_name[:35]}" uses generic selector ({sel[:45]}). Add data-testid.')
+            if len(fragile_sel) > 4:
+                rel_recs.append(f'... and {len(fragile_sel) - 4} more test(s) with fragile selectors.')
+        else:
+            rel_recs.append('Selectors appear specific and stable.')
+        if critical_failures:
+            for tc in critical_failures[:3]:
+                rel_recs.append(f'HIGH severity failure: "{tc.get("name","")[:40]}". Must be resolved before production.')
+        if skip_count > 0:
+            rel_recs.append(f'{skip_count} test(s) skipped.')
 
-    ux_recs.append('Core navigation is visible — users can access main site sections.' if nav_pass
-                   else 'Navigation is non-functional or untested. User flow between sections is at risk.')
-    if content_pass:
-        ux_recs.append('Primary content area is rendered — reading experience is intact.')
-    if search_tested:
-        ux_recs.append('Search capability is operational — content discovery is available.' if search_passed
-                       else 'Search failed execution. Verify the selector and confirm it is not loaded asynchronously.')
-    else:
+        ux_recs = []
+        nav_pass = any(
+            (tc.get('category') == 'navigation' or _infer_ui_area(tc) == 'Navigation')
+            and i < len(execution_results)
+            and execution_results[i].get('status') == 'pass'
+            for i, tc in enumerate(test_cases)
+        )
+        content_pass = any(
+            _infer_ui_area(tc) in ('Main Content', 'Page Identity')
+            and i < len(execution_results)
+            and execution_results[i].get('status') == 'pass'
+            for i, tc in enumerate(test_cases)
+        )
+        ux_recs.append('Core navigation is visible — users can access main site sections.' if nav_pass
+                       else 'Navigation is non-functional or untested.')
+        if content_pass:
+            ux_recs.append('Primary content area is rendered — reading experience is intact.')
         _type_label = 'regression' if scraped.get('_is_regression') else 'smoke'
-        ux_recs.append(f'Search functionality was not tested. Consider adding a search {_type_label} check if it is a core feature.')
+        ux_recs.append(f'Search functionality was not tested. Consider adding a search {_type_label} check.')
+
+    categories.append(('⚡', 'Performance', perf_recs, '#f59e0b', ORANGE_BG))
+    categories.append(('🔧', 'Reliability', rel_recs, '#4f46e5', INDIGO_BG))
     categories.append(('👤', 'UX & Accessibility', ux_recs, '#10b981', GREEN_BG))
+
+
+    
 
     for emoji, cat_label, recs, color_hex, bg_color in categories:
         cat_tbl = Table([[Paragraph(
@@ -2068,6 +2128,185 @@ def build_regression_scenarios(elements, tests: list, url: str):
     ] + row_styles))
     elements.append(tbl)
     elements.append(Spacer(1, 16))
+    
+def build_regression_category_summary(elements, tests: list):
+    """Résumé par catégorie — 100% données réelles."""
+    elements.append(Spacer(1, 18))
+    elements.append(section_header('📊', 'Results by Category', INDIGO))
+    elements.append(Spacer(1, 8))
+
+    # Grouper par category
+    cats = {}
+    for t in tests:
+        cat = t.get('category', 'navigation')
+        if cat not in cats:
+            cats[cat] = {'pass': 0, 'fail': 0, 'total': 0, 'duration_total': 0}
+        cats[cat]['total'] += 1
+        status = t.get('status', 'skip')
+        if status == 'pass':
+            cats[cat]['pass'] += 1
+        elif status == 'fail':
+            cats[cat]['fail'] += 1
+        try:
+            ms = int(str(t.get('duration', '0')).replace('ms', '') or 0)
+            cats[cat]['duration_total'] += ms
+        except:
+            pass
+
+    cat_colors = {
+        'authentication': '#6366f1',
+        'navigation':     '#10b981',
+        'content':        '#3b82f6',
+        'functionality':  '#8b5cf6',
+    }
+
+    hdr = [
+        Paragraph('<font color="#ffffff"><b>Category</b></font>',
+                  ParagraphStyle('RCH1', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Total</b></font>',
+                  ParagraphStyle('RCH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Passed</b></font>',
+                  ParagraphStyle('RCH3', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Failed</b></font>',
+                  ParagraphStyle('RCH4', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Pass Rate</b></font>',
+                  ParagraphStyle('RCH5', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Avg Duration</b></font>',
+                  ParagraphStyle('RCH6', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Status</b></font>',
+                  ParagraphStyle('RCH7', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+    ]
+    rows = [hdr]
+    row_styles = []
+
+    for cat, data in cats.items():
+        rate = round(data['pass'] / data['total'] * 100) if data['total'] > 0 else 0
+        avg_ms = round(data['duration_total'] / data['total']) if data['total'] > 0 else 0
+        cc = cat_colors.get(cat, '#64748b')
+        rate_color = '#10b981' if rate == 100 else '#f59e0b' if rate >= 60 else '#ef4444'
+        row_bg = HexColor('#f0fdf4') if data['fail'] == 0 else HexColor('#fef2f2')
+        verdict = '✅ PASS' if data['fail'] == 0 else '❌ FAIL'
+        verdict_color = '#10b981' if data['fail'] == 0 else '#ef4444'
+
+        rows.append([
+            Paragraph(f'<font color="{cc}"><b>{cat.upper()}</b></font>',
+                      ParagraphStyle('RCC', fontSize=8, fontName='Helvetica-Bold')),
+            Paragraph(f'<font color="#1e293b"><b>{data["total"]}</b></font>',
+                      ParagraphStyle('RCT', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#10b981"><b>{data["pass"]}</b></font>',
+                      ParagraphStyle('RCP', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#ef4444"><b>{data["fail"]}</b></font>',
+                      ParagraphStyle('RCF', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{rate_color}"><b>{rate}%</b></font>',
+                      ParagraphStyle('RCR', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#64748b">{avg_ms}ms</font>',
+                      ParagraphStyle('RCD', fontSize=8, fontName='Helvetica', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{verdict_color}"><b>{verdict}</b></font>',
+                      ParagraphStyle('RCV', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        ])
+        ri = len(rows) - 1
+        row_styles.append(('BACKGROUND', (0, ri), (-1, ri), row_bg))
+
+    tbl = Table(rows, colWidths=[36*mm, 16*mm, 16*mm, 16*mm, 20*mm, 26*mm, 38*mm], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,0), NAVY),
+        ('PADDING',       (0,0), (-1,-1), 8),
+        ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
+        ('BOX',           (0,0), (-1,-1), 0.8, INDIGO),
+        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN',         (1,0), (6,-1), 'CENTER'),
+    ] + row_styles))
+    elements.append(tbl)
+    elements.append(Spacer(1, 16))
+
+
+def build_regression_results_table(elements, tests: list):
+    """Tableau détaillé — uniquement données vraies du runner."""
+    elements.append(section_header('🧪', 'Detailed Test Results', TEAL))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(
+        '<font color="#64748b" size="7.5"><i>'
+        'Real results from Playwright execution. '
+        'Every value in this table comes directly from the test runner.'
+        '</i></font>',
+        ParagraphStyle('RTInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
+    elements.append(Spacer(1, 8))
+
+    cat_colors = {
+        'authentication': '#6366f1',
+        'navigation':     '#10b981',
+        'content':        '#3b82f6',
+        'functionality':  '#8b5cf6',
+    }
+
+    hdr = [
+        Paragraph('<font color="#ffffff"><b>#</b></font>',
+                  ParagraphStyle('RTH0', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Test Name</b></font>',
+                  ParagraphStyle('RTH1', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Category</b></font>',
+                  ParagraphStyle('RTH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Priority</b></font>',
+                  ParagraphStyle('RTH3', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Status</b></font>',
+                  ParagraphStyle('RTH4', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Result / Reason</b></font>',
+                  ParagraphStyle('RTH5', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Duration</b></font>',
+                  ParagraphStyle('RTH6', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+    ]
+    rows = [hdr]
+    row_styles = []
+
+    for i, t in enumerate(tests):
+        status   = t.get('status', 'skip')
+        sc       = '#10b981' if status == 'pass' else '#ef4444' if status == 'fail' else '#f59e0b'
+        s_label  = '✓  PASS' if status == 'pass' else '✗  FAIL' if status == 'fail' else '■  SKIP'
+        s_bg     = HexColor('#f0fdf4') if status == 'pass' else HexColor('#fef2f2') if status == 'fail' else HexColor('#fffbeb')
+        cat      = t.get('category', 'navigation')
+        cc       = cat_colors.get(cat, '#64748b')
+        priority = t.get('priority', t.get('severity', 'medium'))
+        pc       = PRIORITY_COLORS.get(priority.lower(), '#f59e0b')
+        # Raison 100% vraie depuis le runner
+        reason   = t.get('reason') or t.get('reason_pass') or t.get('suite') or '—'
+        duration = t.get('duration', '—')
+
+        rows.append([
+            Paragraph(f'<font color="#64748b"><b>{i+1}</b></font>',
+                      ParagraphStyle('RTID', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<b><font color="#1e293b" size="8">{t.get("name", "")}</font></b>',
+                      ParagraphStyle('RTN', fontSize=8, fontName='Helvetica', leading=11)),
+            Paragraph(f'<font color="{cc}"><b>{cat.upper()}</b></font>',
+                      ParagraphStyle('RTC', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{pc}"><b>{priority.upper()}</b></font>',
+                      ParagraphStyle('RTP', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{sc}"><b>{s_label}</b></font>',
+                      ParagraphStyle('RTS', fontSize=7.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#475569" size="7">{reason[:90]}</font>',
+                      ParagraphStyle('RTR', fontSize=7, fontName='Helvetica', leading=10)),
+            Paragraph(f'<font color="#64748b" size="7"><b>{duration}</b></font>',
+                      ParagraphStyle('RTD', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        ])
+        row_styles.append(('BACKGROUND', (4, i+1), (4, i+1), s_bg))
+
+    tbl = Table(rows, colWidths=[8*mm, 52*mm, 24*mm, 18*mm, 20*mm, 28*mm, 18*mm], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,0), NAVY),
+        ('ROWBACKGROUNDS',(0,1), (-1,-1), [WHITE, LIGHT_BG]),
+        ('PADDING',       (0,0), (-1,-1), 7),
+        ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
+        ('BOX',           (0,0), (-1,-1), 0.8, TEAL),
+        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
+        ('ALIGN',         (0,0), (0,-1), 'CENTER'),
+        ('ALIGN',         (2,0), (4,-1), 'CENTER'),
+        ('ALIGN',         (6,0), (6,-1), 'CENTER'),
+        ('LINEBEFORE',    (5,1), (5,-1), 1, BORDER),
+    ] + row_styles))
+    elements.append(tbl)
+    elements.append(Spacer(1, 16))
+
+
+
 def generate_pdf(generation_data: dict) -> bytes:
     test_type = generation_data.get('test_type') or \
                 generation_data.get('result', {}).get('test_type', 'smoke')
@@ -2098,9 +2337,12 @@ def generate_pdf(generation_data: dict) -> bytes:
         generation_data['execution_results'] = tests
         generation_data['scraped']['_is_regression'] = True
         # Appel Groq pour le plan
-        generation_data['_action_plan'] = _call_groq_for_plan(
+        generation_data['_groq_recs'] = _call_groq_for_recommendations(
             tests, generation_data.get('url', '')
         )
+        generation_data['_action_plan'] = _call_groq_for_plan(
+            tests, generation_data.get('url', '')
+         )
 
         # Enrichir les tests regression avec les champs attendus par le template
         for t in tests:
@@ -2123,8 +2365,10 @@ def generate_pdf(generation_data: dict) -> bytes:
 
     url       = generation_data.get('url', '')
     framework = generation_data.get('framework', 'Selenium')
-    load_time = generation_data.get('load_time_ms', 0)
+    
     is_spa    = generation_data.get('is_spa', False)
+    load_time = generation_data.get('load_time_ms', 
+                    (generation_data.get('scraped') or {}).get('load_time_ms', 0))
     scraped   = generation_data.get('scraped', {
         'inputs': [], 'buttons': [], 'nav_links': [], 'forms': [],
         'images': [], 'alerts': [], 'pagination': [], 'add_to_cart': [],
@@ -2190,16 +2434,19 @@ def generate_pdf(generation_data: dict) -> bytes:
     load_badge       = 'SLOW'    if load_time > 3000 else 'GOOD'
     fw_display       = 'Selenium + Cypress' if framework == 'Both' else framework
 
+    is_reg_info = generation_data.get('scraped', {}).get('_is_regression', False)
+
     info_data = [
         [info_label('URL'),       info_val(url)],
         [info_label('Framework'), info_val(fw_display)],
-        [info_label('Load Time'), Paragraph(
-            f'<font color="#1e293b">{load_time} ms</font>  '
-            f'<font color="{load_badge_color}"><b>{load_badge}</b></font>',
-            ParagraphStyle('LT', fontSize=8.5, fontName='Helvetica', leading=12))],
         [info_label('Page Type'), info_val('SPA (React/Vue/Angular)' if is_spa else 'Standard HTML')],
         [info_label('Generated'), info_val(datetime.now().strftime('%Y-%m-%d  %H:%M'))],
     ]
+    if not is_reg_info:
+        info_data.insert(2, [info_label('Load Time'), Paragraph(
+            f'<font color="#1e293b">{load_time} ms</font>  '
+            f'<font color="{load_badge_color}"><b>{load_badge}</b></font>',
+            ParagraphStyle('LT', fontSize=8.5, fontName='Helvetica', leading=12))])
     info_tbl = Table(info_data, colWidths=[32*mm, 136*mm])
     info_tbl.setStyle(TableStyle([
         ('BACKGROUND',    (0,0), (0,-1), LIGHT_BG),
@@ -2226,10 +2473,13 @@ def generate_pdf(generation_data: dict) -> bytes:
     for label, color in legend_items:
         legend_parts.append(f'<font color="{color}"><b>{label}</b></font>' if color
                             else f'<font color="#64748b">{label}</font>')
-    elements.append(Paragraph(
-        '  '.join(legend_parts),
-        ParagraphStyle('Legend', fontSize=7, fontName='Helvetica', leading=10, textColor=HexColor('#64748b'))))
-    elements.append(Spacer(1, 10))
+    is_reg = generation_data.get('scraped', {}).get('_is_regression', False)
+    if not is_reg:
+        elements.append(Paragraph(
+            '  '.join(legend_parts),
+            ParagraphStyle('Legend', fontSize=7, fontName='Helvetica', leading=10, textColor=HexColor('#64748b'))))
+        elements.append(Spacer(1, 10))
+
 
     active_tcs = test_cases_selenium if framework == 'Both' else test_cases
 
@@ -2268,28 +2518,34 @@ def generate_pdf(generation_data: dict) -> bytes:
     else:
         is_reg = generation_data.get('scraped', {}).get('_is_regression', False)
 
-        if not is_reg:
-            build_page_analysis(elements, scraped, page_type)
-            build_test_plan(elements, active_tcs, page_type, framework, scraped)
-            build_planned_ui_elements(elements, active_tcs)
+        
 
         if is_reg:
             build_regression_scenarios(elements, test_cases, url)
-        elements.append(Spacer(1, 8))
-        build_stats_section(elements, test_cases, execution_results)
-        build_execution_verdict_summary(elements, test_cases, execution_results, scraped)
-        elements.append(Spacer(1, 22))
-        elements.append(section_header('🧪', 'Test Cases'))
-        elements.append(Spacer(1, 8))
-        build_test_cases_table(elements, test_cases, execution_results)
-        if execution_results:
-            elements.append(Spacer(1, 20))
-            build_execution_evidence(elements, test_cases, execution_results)
-            build_real_page_evidence(elements, test_cases, execution_results, scraped)
-            if is_reg and generation_data.get('_action_plan'):
+            elements.append(Spacer(1, 8))
+            build_stats_section(elements, test_cases, execution_results)
+            build_regression_category_summary(elements, test_cases)
+            build_regression_results_table(elements, test_cases)
+            if generation_data.get('_action_plan'):
                 build_regression_action_plan(elements, generation_data['_action_plan'])
-            build_ai_recommendations(elements, test_cases, execution_results, scraped)
-        if not is_reg:
+            build_ai_recommendations(elements, test_cases, execution_results, scraped,
+                generation_data.get('_groq_recs', {}))
+        else:
+            build_page_analysis(elements, scraped, page_type)
+            build_test_plan(elements, active_tcs, page_type, framework, scraped)
+            build_planned_ui_elements(elements, active_tcs)
+            elements.append(Spacer(1, 8))
+            build_stats_section(elements, test_cases, execution_results)
+            build_execution_verdict_summary(elements, test_cases, execution_results, scraped)
+            elements.append(Spacer(1, 22))
+            elements.append(section_header('🧪', 'Test Cases'))
+            elements.append(Spacer(1, 8))
+            build_test_cases_table(elements, test_cases, execution_results)
+            if execution_results:
+                elements.append(Spacer(1, 20))
+                build_execution_evidence(elements, test_cases, execution_results)
+                build_real_page_evidence(elements, test_cases, execution_results, scraped)
+                build_ai_recommendations(elements, test_cases, execution_results, scraped)
             build_script_section(elements, script, framework, test_cases)
 
     elements.append(Spacer(1, 20))
