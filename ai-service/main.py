@@ -27,6 +27,9 @@ from security_runner import run_security_tests
 from regression_generator import generate_regression_tests
 from regression_runner import run_regression_tests
 
+from functional_generator import generate_functional_tests
+from functional_runner import run_functional_tests
+
 _api_lock = threading.Lock()
 
 
@@ -461,38 +464,79 @@ def generate_api(data: dict):
 def generate_security(data: dict):
     url        = data.get("url", "")
     token      = data.get("token", "")
-    categories = data.get("categories", None)  # None = all
+    categories = data.get("categories", None)
+    framework  = data.get("framework", "Pytest")
 
     if not url:
         return {"error": "URL is required"}
 
-    from urllib.parse import urlparse
-    base_api_url = data.get("base_api_url", "")
-    if not base_api_url:
-        if "demopro.tn" in url:
-            base_api_url = "https://anpe.back.demopro.tn:10443"
-        else:
-            parsed = urlparse(url)
-            base_api_url = f"{parsed.scheme}://{parsed.netloc}"
+    # ── Extraire le frontend URL proprement ──────────────────────────────────
+    frontend_url = url
+    for suffix in ["/admin-anpe/login", "/admin-anpe", "/dashboard",
+                   "/reception", "/statistiques", "/outbox"]:
+        if suffix in frontend_url:
+            frontend_url = frontend_url.split(suffix)[0]
+            break
 
-    print(f"[SECURITY] base_api_url={base_api_url} | categories={categories}")
+    # S'assurer qu'on teste bien le frontend et pas le backend
+    if "back.demopro" in frontend_url:
+        frontend_url = frontend_url.replace("anpe.back.demopro", "anpe.demopro")
 
-    result = generate_security_tests(
-        base_url   = base_api_url,
+    print(f"[SECURITY] frontend_url={frontend_url} | framework={framework} | categories={categories}")
+
+    # ── 1. Générer les tests cases via Groq ──────────────────────────────────
+    gen_result = generate_security_tests(
+        base_url   = frontend_url,
         categories = categories,
     )
 
+    test_cases = gen_result.get("test_cases", [])
+    print(f"[SECURITY] Generated {len(test_cases)} test cases")
+
+    if not test_cases:
+        return {"error": "No security test cases generated"}
+
+    # ── 2. Exécuter les tests avec le token ──────────────────────────────────
+    from security_runner import _CACHED_TOKEN
+    jwt_token = token if token else _CACHED_TOKEN
+
+    run_result = run_security_tests(test_cases, jwt_token)
+    execution_results = run_result.get("results", [])
+
+    pass_count = run_result["pass_count"]
+    fail_count = run_result["fail_count"]
+    warn_count = run_result.get("warn_count", 0)
+    skip_count = warn_count   # warn → affiché comme skip dans le frontend
+    pass_rate  = run_result["pass_rate"]
+
+    print(f"[SECURITY] DONE | {pass_count} pass / {warn_count} warn / {fail_count} fail | {pass_rate}%")
+
     return {
         "url":       url,
-        "framework": "security",
+        "framework": framework,   # "Pytest" — cohérent avec le frontend
         "test_type": "security",
-        "scraped":   {"url": url, "load_time_ms": 0},
-        "result":    result,
+        "scraped":   {
+            "url":          frontend_url,
+            "load_time_ms": 0,
+            "_is_security": True,
+        },
+        "result": {
+            **gen_result,
+            "test_cases":        execution_results,
+            "execution_results": execution_results,
+            "pass_count":        pass_count,
+            "fail_count":        fail_count,
+            "skip_count":        skip_count,
+            "pass_rate":         pass_rate,
+            "test_type":         "security",
+            "framework":         framework,
+        },
     }
 
 
 @app.post("/run-security")
 def run_security(data: dict):
+    """Endpoint séparé si le frontend veut re-runner les tests manuellement"""
     test_cases = data.get("test_cases", [])
     token      = data.get("token", "")
 
@@ -501,7 +545,10 @@ def run_security(data: dict):
 
     print(f"[RUN-SECURITY] Running {len(test_cases)} security tests")
 
-    run_result = run_security_tests(test_cases, token)
+    from security_runner import _CACHED_TOKEN
+    jwt_token = token if token else _CACHED_TOKEN
+
+    run_result = run_security_tests(test_cases, jwt_token)
 
     return {
         "results":    run_result["results"],
@@ -556,3 +603,59 @@ def generate_regression(data: dict):
             "test_type":         "regression",
         },
     }
+@app.post("/generate-functional")
+def generate_functional(data: dict):
+    url = data.get("url", "")
+ 
+    if not url:
+        return {"error": "URL is required"}
+ 
+    # ── Extraire base_url (scheme + host + port) ──────────────────────────────
+    from urllib.parse import urlparse
+    parsed   = urlparse(url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+ 
+    print(f"[FUNCTIONAL] target_url={url} | base_url={base_url}")
+ 
+    # ── 1. LLaMA génère les tests pour CETTE page uniquement ─────────────────
+    gen_result = generate_functional_tests(
+        base_url   = base_url,
+        target_url = url,        # ← la page exacte à tester
+    )
+ 
+    test_cases = gen_result.get("test_cases", [])
+ 
+    if not test_cases:
+        return {"error": "No functional test cases generated"}
+ 
+    print(f"[FUNCTIONAL] {len(test_cases)} tests generated for {gen_result.get('page')} — running...")
+ 
+    # ── 2. Playwright exécute les tests ───────────────────────────────────────
+    run_result        = run_functional_tests(test_cases=test_cases, base_url=base_url)
+    execution_results = run_result.get("results", [])
+ 
+    pass_count = run_result["pass_count"]
+    fail_count = run_result["fail_count"]
+    skip_count = run_result["skip_count"]
+    pass_rate  = run_result["pass_rate"]
+ 
+    print(f"[FUNCTIONAL] DONE | {pass_count} pass / {fail_count} fail | {pass_rate}%")
+ 
+    return {
+        "url":       url,
+        "framework": "Playwright",
+        "test_type": "functional",
+        "scraped":   {"url": url, "load_time_ms": 0},
+        "result": {
+            **gen_result,
+            "test_cases":        execution_results,
+            "execution_results": execution_results,
+            "pass_count":        pass_count,
+            "fail_count":        fail_count,
+            "skip_count":        skip_count,
+            "pass_rate":         pass_rate,
+            "test_type":         "functional",
+            "category_stats":    run_result.get("category_stats", {}),
+        },
+    }
+ 

@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/generations/generate-api', [GenerationController::class, 'generateApi']);
     Route::post('/generations/generate-security', [GenerationController::class, 'generateSecurity']);
     Route::post('/generations/generate-regression', [GenerationController::class, 'generateRegression']);
+    Route::post('/generations/generate-functional', [GenerationController::class, 'generateFunctional']);
     Route::get('/generations/{id}',      [GenerationController::class, 'show']);
     Route::delete('/generations/{id}',   [GenerationController::class, 'destroy']);
     Route::get('/generations/{id}/pdf',  [GenerationController::class, 'downloadPdf']);

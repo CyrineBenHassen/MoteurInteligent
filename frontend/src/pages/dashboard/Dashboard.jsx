@@ -1410,8 +1410,9 @@ const REGRESSION_FRAMEWORKS = [
     // ← ICI : choisir la route selon le type de projet
  const endpoint = testType === 'api'
   ? '/generations/generate-api'
-  : testType === 'security' ? '/generations/generate-security' 
-  : testType === 'regression' ? '/generations/generate-regression' 
+  : testType === 'security'    ? '/generations/generate-security' 
+  : testType === 'regression'  ? '/generations/generate-regression'
+  : testType === 'functional' && isInternal ? '/generations/generate-functional'
   : isInternal ? '/generate-internal' : '/generate';
 
 const anpeToken = localStorage.getItem('token') || '';
@@ -1436,6 +1437,15 @@ const payload = testType === 'api'
       project_name: project?.name,
       project_type: project?.type,
     }
+    : testType === 'functional' && isInternal
+? {
+    url,
+    framework:    fw,
+    test_type:    'functional',
+    project_id:   project?.id,
+    project_name: project?.name,
+    project_type: project?.type,
+  }
   : isInternal
   ? {
       url,
@@ -3083,6 +3093,8 @@ return execution_results.map((r, i) => ({
   };
   const ttBadge = TEST_TYPE_BADGE[testType] || TEST_TYPE_BADGE.smoke;
   const isRegression = testType === 'regression';
+  const isSecurity = testType === 'security';
+  const isFunctional = testType === 'functional';
 
   const EP_FW = {
   Selenium:   { letters: 'Se', color: '#43B02A' },
@@ -3162,7 +3174,808 @@ const rows = isRegression
     setDropdownOpen(false);
   };
 
+const downloadHtml_Security = () => {
+  const now     = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const genId   = generation?.generation?.id || 'nextest';
+  const allTests = tests;
+  const pass  = allTests.filter(t => t.status === 'pass').length;
+  const fail  = allTests.filter(t => t.status === 'fail').length;
+  const warn  = allTests.filter(t => t.status === 'warn').length;
+  const total = allTests.length || 1;
+  const rate  = Math.round(pass / total * 100);
+  const rateColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
 
+  const CAT_COLORS = {
+    auth: '#6366f1', xss: '#ef4444', session: '#f59e0b',
+    navigation: '#10b981', headers: '#3b82f6', info_exposure: '#8b5cf6',
+  };
+  const SEV_COLORS = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#10b981' };
+
+  const secHdr = (emoji, title, color = '#ef4444') => `
+    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;
+      padding-bottom:8px;border-bottom:2.5px solid ${color}">
+      <span style="font-size:18px">${emoji}</span>
+      <span style="font-size:20px;font-weight:700;color:#e2e8f0">${title}</span>
+    </div>`;
+
+  const tblWrap = (inner, border = '#ef4444') => `
+    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;
+      overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">
+      ${inner}
+    </div>`;
+
+  const tblHdr = (cols) => `
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#040914">
+        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};
+          font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+          color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
+      </tr></thead>`;
+
+  // ── SCENARIOS TABLE ──
+  const scenarioRows = allTests.map((t, i) => {
+    const cc  = CAT_COLORS[t.category] || '#64748b';
+    const sc  = SEV_COLORS[t.severity] || '#f59e0b';
+    const TYPE_MAP = {
+      no_token: ['AUTH','#6366f1'], xss_input: ['XSS','#ef4444'],
+      dom_inspect: ['SESSION','#f59e0b'], header_check: ['HEADERS','#3b82f6'],
+      direct_nav: ['NAV','#10b981'], logout: ['SESSION','#f59e0b'],
+    };
+    const [typeLabel, typeColor] = TYPE_MAP[t.test_type] || ['SEC','#64748b'];
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${(t.category||'').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${sc};font-weight:700;font-size:10px">${(t.severity||'medium').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${t.suite || 'Security check'}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${typeColor};font-weight:700;font-size:10px">${typeLabel}</span></td>
+    </tr>`;
+  }).join('');
+
+  // ── CATEGORY SUMMARY ──
+  const cats = {};
+  allTests.forEach(t => {
+    const c = t.category || 'auth';
+    if (!cats[c]) cats[c] = {pass:0, fail:0, warn:0, total:0};
+    cats[c].total++;
+    if (t.status==='pass') cats[c].pass++;
+    else if (t.status==='fail') cats[c].fail++;
+    else cats[c].warn++;
+  });
+  const catRows = Object.entries(cats).map(([cat, d]) => {
+    const cc = CAT_COLORS[cat] || '#64748b';
+    const vc = d.fail===0 ? '#10b981' : '#ef4444';
+    const vt = d.fail===0 ? '✅ PASS' : '❌ FAIL';
+    const bg = d.fail===0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
+    return `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
+      <td style="padding:10px 12px;text-align:center;color:#e2e8f0;font-weight:700">${d.total}</td>
+      <td style="padding:10px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
+      <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
+      <td style="padding:10px 12px;text-align:center;color:#f59e0b;font-weight:700">${d.warn}</td>
+      <td style="padding:10px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${vt}</span></td>
+    </tr>`;
+  }).join('');
+
+  // ── DETAILED RESULTS ──
+  const detailRows = allTests.map((t, i) => {
+    const sc = t.status==='pass'?'#10b981':t.status==='fail'?'#ef4444':'#f59e0b';
+    const sl = t.status==='pass'?'✓ PASS':t.status==='fail'?'✗ FAIL':'⚠ WARN';
+    const sb = t.status==='pass'?'rgba(16,185,129,.06)':t.status==='fail'?'rgba(239,68,68,.06)':'rgba(245,158,11,.06)';
+    const cc = CAT_COLORS[t.category] || '#64748b';
+    const sevc = SEV_COLORS[t.severity] || '#f59e0b';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${(t.category||'').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${sevc};font-weight:700;font-size:10px">${(t.severity||'medium').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center;background:${sb}"><span style="color:${sc};font-weight:800;font-size:11px">${sl}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${t.suite||'—'}</td>
+      <td style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b;font-weight:700">${t.duration||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // ── AI RECOMMENDATIONS ──
+  const perfItems = allTests.filter(t => {
+    try { return parseInt((t.duration||'0').replace('ms','')) > 5000; } catch { return false; }
+  });
+  const recsHtml = `
+    <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#f59e0b">⚡ Performance</div>
+    ${perfItems.length > 0
+      ? perfItems.slice(0,3).map(t => `<div style="background:#0d1526;border-left:3px solid #f59e0b;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05)">• "${t.name}" took ${t.duration} — optimize redirect response time.</div>`).join('')
+      : '<div style="background:#0d1526;border-left:3px solid #f59e0b;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8">• All security tests executed within acceptable time range.</div>'
+    }
+    <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 14px;margin:10px 0 4px;font-weight:700;color:#818cf8">🔧 Reliability</div>
+    <div style="background:#0d1526;border-left:3px solid #818cf8;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05)">• ${fail > 0 ? `${fail} security check(s) failed — review authentication and XSS protection.` : 'All security checks passed — continue monitoring auth and XSS vectors.'}</div>
+    <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 14px;margin:10px 0 4px;font-weight:700;color:#10b981">👤 UX & Security</div>
+    <div style="background:#0d1526;border-left:3px solid #10b981;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8">• Auth routes correctly redirect unauthenticated users — session management is secure.</div>`;
+
+  // ── FINAL VERDICT ──
+  const vc = fail > 0 ? '#ef4444' : '#059669';
+  const vb = fail > 0 ? 'rgba(239,68,68,.08)' : 'rgba(16,185,129,.08)';
+  const vi = fail > 0 ? '🔴' : '🟢';
+  const vt = fail > 0
+    ? `Security Test FAILED — ${fail} vulnerability/vulnerabilities detected. Fix before production.`
+    : `Security Test PASSED — All ${pass} security checks passed. No critical vulnerabilities detected.`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NexTest Security Report #${genId}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#070e1c;color:#e2e8f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+  .page{max-width:1100px;margin:0 auto;padding:48px 32px 80px}
+  table{width:100%;border-collapse:collapse}
+  @media print{body{background:#fff;color:#000}.no-print{display:none}.page{padding:10mm}@page{margin:15mm;size:A4}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#1a0a0a 50%,#0a0f1e 100%);
+    border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;
+      background:linear-gradient(90deg,transparent,#ef4444,transparent)"></div>
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#ef4444"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
+      <div>
+        <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px">
+          <span style="color:#ef4444">NEX</span>TEST
+        </div>
+        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">Security Test Report</div>
+        <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${timeStr}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px">
+      ${[
+        {l:'URL', v:`<span style="color:#ef9494;font-size:11px;word-break:break-all">${url}</span>`},
+        {l:'Framework', v:`<span style="color:#fff;font-weight:700">${framework}</span>`},
+        {l:'Test Type', v:`<span style="color:#ef4444;font-weight:700">Security Test</span>`},
+        {l:'Generated', v:`<span style="color:#fff">${dateStr}</span>`},
+      ].map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
+        <div style="font-size:12px">${r.v}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+
+  <!-- PRINT BUTTON -->
+  <div class="no-print" style="margin-bottom:28px">
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,#ef4444,#dc2626);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+      🖨 Print / Save as PDF
+    </button>
+  </div>
+
+  ${secHdr('🔒', 'Security Test Scenarios', '#ef4444')}
+  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Scenario'},{l:'Category',align:'center'},{l:'Severity',align:'center'},{l:'Expected Result'},{l:'Type',align:'center'}])}
+    <tbody>${scenarioRows}</tbody></table>`)}
+
+  ${secHdr('📊', 'Test Summary', '#ef4444')}
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px">
+    ${[
+      {icon:'✅',val:pass,lbl:'PASSED',c:'#10b981',bg:'rgba(16,185,129,.08)',bd:'rgba(16,185,129,.25)'},
+      {icon:'❌',val:fail,lbl:'FAILED',c:'#ef4444',bg:'rgba(239,68,68,.08)',bd:'rgba(239,68,68,.25)'},
+      {icon:'⚠️',val:warn,lbl:'WARN',c:'#f59e0b',bg:'rgba(245,158,11,.08)',bd:'rgba(245,158,11,.25)'},
+      {icon:'🎯',val:`${rate}%`,lbl:'PASS RATE',c:rateColor,bg:`${rateColor}12`,bd:`${rateColor}33`},
+      {icon:'🔢',val:total,lbl:'TOTAL',c:'#3b82f6',bg:'rgba(59,130,246,.08)',bd:'rgba(59,130,246,.25)'},
+    ].map(s => `<div style="background:${s.bg};border:1px solid ${s.bd};border-radius:14px;padding:20px;text-align:center">
+      <div style="font-size:20px;margin-bottom:8px">${s.icon}</div>
+      <div style="font-size:36px;font-weight:700;color:${s.c};line-height:1;margin-bottom:4px">${s.val}</div>
+      <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
+    </div>`).join('')}
+  </div>
+
+  ${secHdr('📊', 'Results by Category', '#ef4444')}
+  ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Warn',align:'center'},{l:'Status',align:'center'}])}
+    <tbody>${catRows}</tbody></table>`)}
+
+  ${secHdr('🧪', 'Detailed Security Test Results', '#0d9488')}
+  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Category',align:'center'},{l:'Severity',align:'center'},{l:'Status',align:'center'},{l:'Result / Reason'},{l:'Duration',align:'center'}])}
+    <tbody>${detailRows}</tbody></table>`, '#0d9488')}
+
+  ${secHdr('🤖', 'AI Recommendations', '#6366f1')}
+  ${recsHtml}
+
+  <!-- FINAL VERDICT -->
+  <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:16px 20px;margin-top:24px;display:flex;gap:12px;align-items:flex-start">
+    <span style="font-size:24px">${vi}</span>
+    <div>
+      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:6px">Final Security Verdict</div>
+      <p style="font-size:13px;color:${vc};margin:0;line-height:1.6">${vt}</p>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="margin-top:48px;padding:20px 28px;background:rgba(239,68,68,.04);border-radius:12px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid rgba(239,68,68,.15)">
+    <div style="font-size:14px;font-weight:700;color:#64748b">
+      <span style="color:#ef4444">NEX</span>TEST · Security Test Report
+    </div>
+    <div style="font-size:11px;color:#94a3b8">
+      Generated ${dateStr} · ${framework} · ${total} tests · ${rate}% pass rate
+    </div>
+  </div>
+
+</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `security_report_${genId}.html`;
+  link.click();
+  setDropdownOpen(false);
+};
+const downloadHtml_Functional = () => {
+  const now     = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const genId   = generation?.generation?.id || 'nextest';
+  const allTests = tests;
+ 
+  const pass  = allTests.filter(t => t.status === 'pass').length;
+  const fail  = allTests.filter(t => t.status === 'fail').length;
+  const skip  = allTests.filter(t => t.status === 'skip').length;
+  const total = allTests.length || 1;
+  const rate  = Math.round(pass / total * 100);
+  const rateColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+ 
+  // ── Action type colors ──────────────────────────────────────────────────
+  const ACTION_COLORS = {
+    navigate:      '#10b981',
+    check_visible: '#3b82f6',
+    fill:          '#8b5cf6',
+    click:         '#f97316',
+    auth_success:  '#10b981',
+    auth_fail:     '#ef4444',
+    check_text:    '#0d9488',
+    select:        '#6366f1',
+    hover:         '#ec4899',
+    logout:        '#f59e0b',
+  };
+  const CAT_COLORS = {
+    navigation:     '#10b981',
+    form:           '#8b5cf6',
+    action:         '#f97316',
+    authentication: '#6366f1',
+    ui:             '#3b82f6',
+  };
+ 
+  const getAction = (t) => t.action || t.step_meta?.action || 'check_visible';
+  const getSelector = (t) => t.selector || t.step_meta?.selector || t.step_meta?.value || '—';
+  const getReason = (t) => t.reason || t.reason_pass || t.suite || t.error || '—';
+ 
+  // ── Section helpers ─────────────────────────────────────────────────────
+  const secHdr = (emoji, title, color = '#6366f1') => `
+    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;
+      padding-bottom:8px;border-bottom:2.5px solid ${color}">
+      <span style="font-size:18px">${emoji}</span>
+      <span style="font-size:20px;font-weight:700;color:#e2e8f0">${title}</span>
+    </div>`;
+ 
+  const tblWrap = (inner, border = '#6366f1') => `
+    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;
+      overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">
+      ${inner}
+    </div>`;
+ 
+  const tblHdr = (cols) => `
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#040914">
+        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};
+          font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+          color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
+      </tr></thead>`;
+ 
+  // ── 1. SCENARIOS ────────────────────────────────────────────────────────
+  const scenarioRows = allTests.map((t, i) => {
+    const action   = getAction(t);
+    const category = t.category || 'action';
+    const priority = t.priority || 'medium';
+    const ac  = ACTION_COLORS[action]   || '#64748b';
+    const cc  = CAT_COLORS[category]   || '#64748b';
+    const pc  = priority === 'high' ? '#ef4444' : priority === 'medium' ? '#f59e0b' : '#10b981';
+    const expectedMap = {
+      navigate:      'Page loads and DOM is ready',
+      check_visible: 'Element is visible in the DOM',
+      fill:          'Field accepts and retains the input value',
+      click:         'Element responds to click — action triggered',
+      auth_success:  'Login succeeds — redirected to dashboard',
+      auth_fail:     'Login rejected — error message displayed',
+      check_text:    'Expected text found in page content',
+      select:        'Option selected in dropdown',
+      hover:         'Hover state applied to element',
+      logout:        'Session cleared — redirected to login',
+    };
+    const expected = t.expected || expectedMap[action] || 'Step completes without error';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${ac};font-weight:700;font-size:10px">${action.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${category.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${priority.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${expected.substring(0,60)}</td>
+    </tr>`;
+  }).join('');
+ 
+  // ── 2. CATEGORY SUMMARY ─────────────────────────────────────────────────
+  const cats = {};
+  allTests.forEach(t => {
+    const c = t.category || 'action';
+    if (!cats[c]) cats[c] = { pass: 0, fail: 0, skip: 0, total: 0, dur: 0 };
+    cats[c].total++;
+    if (t.status === 'pass') cats[c].pass++;
+    else if (t.status === 'fail') cats[c].fail++;
+    else cats[c].skip++;
+    try { cats[c].dur += parseInt((t.duration || '0').replace('ms', '') || 0); } catch {}
+  });
+ 
+  const catRows = Object.entries(cats).map(([cat, d]) => {
+    const cc     = CAT_COLORS[cat] || '#64748b';
+    const r      = Math.round(d.pass / d.total * 100);
+    const rc     = r === 100 ? '#10b981' : r >= 60 ? '#f59e0b' : '#ef4444';
+    const avg    = Math.round(d.dur / d.total);
+    const vc     = d.fail === 0 ? '#10b981' : '#ef4444';
+    const row_bg = d.fail === 0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
+    return `<tr style="background:${row_bg};border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
+      <td style="padding:10px 12px;text-align:center;color:#e2e8f0;font-weight:700">${d.total}</td>
+      <td style="padding:10px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
+      <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
+      <td style="padding:10px 12px;text-align:center;color:#f59e0b;font-weight:700">${d.skip}</td>
+      <td style="padding:10px 12px;text-align:center;color:${rc};font-weight:700">${r}%</td>
+      <td style="padding:10px 12px;text-align:center;color:#64748b">${avg}ms</td>
+      <td style="padding:10px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${d.fail===0?'✅ PASS':'❌ FAIL'}</span></td>
+    </tr>`;
+  }).join('');
+ 
+  // ── 3. DETAILED RESULTS ──────────────────────────────────────────────────
+  const detailRows = allTests.map((t, i) => {
+    const sc  = t.status === 'pass' ? '#10b981' : t.status === 'fail' ? '#ef4444' : '#f59e0b';
+    const sl  = t.status === 'pass' ? '✓ PASS'  : t.status === 'fail' ? '✗ FAIL'  : '■ SKIP';
+    const sb  = t.status === 'pass' ? 'rgba(16,185,129,.06)' : t.status === 'fail' ? 'rgba(239,68,68,.06)' : 'rgba(245,158,11,.06)';
+    const action   = getAction(t);
+    const selector = getSelector(t);
+    const reason   = getReason(t);
+    const ac       = ACTION_COLORS[action] || '#64748b';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${ac};font-weight:700;font-size:10px">${action.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:10px;color:#818cf8;font-family:monospace">${selector.substring(0,35)}</td>
+      <td style="padding:9px 12px;text-align:center;background:${sb}"><span style="color:${sc};font-weight:800;font-size:11px">${sl}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${reason.substring(0,70)}</td>
+      <td style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b;font-weight:700">${t.duration||'—'}</td>
+    </tr>`;
+  }).join('');
+ 
+  // ── 4. VERDICT SUMMARY ───────────────────────────────────────────────────
+  const PASS_MSG = {
+    navigation:     'Page loads correctly — routing and URL resolution confirmed',
+    form:           'Form interactions work — fill and input fields respond correctly',
+    action:         'Button/click actions execute — UI interactions are operational',
+    authentication: 'Auth flows validated — login success and failure handled correctly',
+    ui:             'UI elements visible — DOM renders correctly',
+  };
+  const FAIL_MSG = {
+    navigation:     'Critical: page failed to load or selector timed out',
+    form:           'Moderate: form fields unreachable or fill action failed',
+    action:         'Moderate: click target not found or action not triggered',
+    authentication: 'Critical: authentication flow broken — login/logout not working',
+    ui:             'Minor: element not visible or not rendered in DOM',
+  };
+  const verdictRows = Object.entries(cats).map(([cat, d]) => {
+    const cc = CAT_COLORS[cat] || '#64748b';
+    const vc = d.fail > 0 ? '#ef4444' : '#10b981';
+    const vt = d.fail > 0 ? 'FAIL' : 'PASS';
+    const bg = d.fail > 0 ? 'rgba(239,68,68,.06)' : 'rgba(16,185,129,.06)';
+    const interp = d.fail > 0
+      ? (FAIL_MSG[cat] || `Interaction failure in ${cat}`)
+      : (PASS_MSG[cat] || `${cat} steps completed successfully`);
+    return `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
+      <td style="padding:10px 12px;text-align:center"><span style="font-size:9px;font-weight:800;padding:3px 10px;border-radius:12px;color:${vc};background:${vc}18;border:1px solid ${vc}44">${vt}</span></td>
+      <td style="padding:10px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
+      <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
+      <td style="padding:10px 12px;text-align:center;color:#f59e0b;font-weight:700">${d.skip}</td>
+      <td style="padding:10px 12px;font-size:11px;color:#94a3b8">${interp}</td>
+    </tr>`;
+  }).join('');
+ 
+  const authFail = (cats['authentication']?.fail || 0) > 0;
+  const navFail  = (cats['navigation']?.fail || 0) > 0;
+  const vc   = authFail || navFail ? '#ef4444' : fail > 0 ? '#b45309' : '#059669';
+  const vb   = authFail || navFail ? 'rgba(239,68,68,.08)' : fail > 0 ? 'rgba(245,158,11,.08)' : 'rgba(16,185,129,.08)';
+  const vi   = authFail || navFail ? '🔴' : fail > 0 ? '🟡' : '🟢';
+  const vt_v = authFail || navFail
+    ? 'Functional validation FAILED — critical auth or navigation steps are broken.'
+    : fail > 0
+    ? `Functional validation passed with ${fail} non-critical step(s) failing. Core flows are operational.`
+    : `All ${pass} functional steps passed (${rate}%). Fill, click, navigate, and auth flows are fully operational.`;
+ 
+  // ── 5. AI RECOMMENDATIONS ────────────────────────────────────────────────
+  const slow = allTests.filter(t => { try { return parseInt((t.duration||'0').replace('ms','')) > 10000; } catch { return false; } });
+  const failed = allTests.filter(t => t.status === 'fail');
+ 
+  const recsHtml = `
+    <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#f59e0b">⚡ Interaction Quality</div>
+    ${slow.length > 0
+      ? slow.slice(0,3).map(t => `<div style="background:#0d1526;border-left:3px solid #f59e0b;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05)">• "${t.name}" took ${t.duration} — add explicit Playwright wait.</div>`).join('')
+      : '<div style="background:#0d1526;border-left:3px solid #f59e0b;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8">• All interactions completed within acceptable time range.</div>'
+    }
+    <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 14px;margin:10px 0 4px;font-weight:700;color:#818cf8">🔧 Reliability</div>
+    <div style="background:#0d1526;border-left:3px solid #818cf8;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05)">
+      ${failed.length > 0
+        ? `• Fix "${failed[0]?.name}" — ${getReason(failed[0]).substring(0,80)}`
+        : '• No interaction failures — all selectors resolved correctly.'}
+    </div>
+    <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 14px;margin:10px 0 4px;font-weight:700;color:#10b981">👤 Auth & UX Flows</div>
+    <div style="background:#0d1526;border-left:3px solid #10b981;padding:8px 14px 8px 16px;font-size:12px;color:#94a3b8">
+      ${(cats['authentication']?.pass || 0) > 0
+        ? '• Auth flow validated — login success and failure paths both tested.'
+        : (cats['authentication']?.fail || 0) > 0
+        ? '• Auth failure detected — check token injection and credentials.'
+        : '• No auth tests found — consider adding auth_success / auth_fail steps.'}
+    </div>`;
+ 
+  // ── FULL HTML ─────────────────────────────────────────────────────────────
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NexTest Functional Report #${genId}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#070e1c;color:#e2e8f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+  .page{max-width:1100px;margin:0 auto;padding:48px 32px 80px}
+  table{width:100%;border-collapse:collapse}
+  @media print{body{background:#fff;color:#000}.no-print{display:none}.page{padding:10mm}@page{margin:15mm;size:A4}}
+</style>
+</head>
+<body>
+<div class="page">
+ 
+  <!-- HEADER -->
+  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#0a0f2e 50%,#0a0f1e 100%);
+    border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;
+      background:linear-gradient(90deg,transparent,#6366f1,transparent)"></div>
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#6366f1"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
+      <div>
+        <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px">
+          <span style="color:#6366f1">NEX</span>TEST
+        </div>
+        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">Functional Test Report</div>
+        <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${timeStr}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px">
+      ${[
+        {l:'URL',      v:`<span style="color:#a5b4fc;font-size:11px;word-break:break-all">${url}</span>`},
+        {l:'Framework',v:`<span style="color:#E2574C;font-weight:700">${framework}</span>`},
+        {l:'Test Type',v:`<span style="color:#6366f1;font-weight:700">Functional Test — Playwright Interactions</span>`},
+        {l:'Steps',    v:`<span style="color:#fff">${total} steps · ${pass} passed · ${fail} failed</span>`},
+      ].map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
+        <div style="font-size:12px">${r.v}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+ 
+  <!-- PRINT BUTTON -->
+  <div class="no-print" style="margin-bottom:28px">
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;
+      background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;
+      font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+      🖨 Print / Save as PDF
+    </button>
+  </div>
+ 
+  <!-- STAT CARDS -->
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px">
+    ${[
+      {icon:'✅',val:pass,      lbl:'PASSED',    c:'#10b981',bg:'rgba(16,185,129,.08)',bd:'rgba(16,185,129,.25)'},
+      {icon:'❌',val:fail,      lbl:'FAILED',    c:'#ef4444',bg:'rgba(239,68,68,.08)', bd:'rgba(239,68,68,.25)'},
+      {icon:'⏭️',val:skip,      lbl:'SKIPPED',   c:'#f59e0b',bg:'rgba(245,158,11,.08)',bd:'rgba(245,158,11,.25)'},
+      {icon:'🎯',val:`${rate}%`,lbl:'PASS RATE', c:rateColor,bg:`${rateColor}12`,     bd:`${rateColor}33`},
+      {icon:'🔢',val:total,     lbl:'TOTAL',     c:'#3b82f6',bg:'rgba(59,130,246,.08)',bd:'rgba(59,130,246,.25)'},
+    ].map(s => `<div style="background:${s.bg};border:1px solid ${s.bd};border-radius:14px;padding:20px;text-align:center">
+      <div style="font-size:20px;margin-bottom:8px">${s.icon}</div>
+      <div style="font-size:36px;font-weight:700;color:${s.c};line-height:1;margin-bottom:4px">${s.val}</div>
+      <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
+    </div>`).join('')}
+  </div>
+ 
+  ${secHdr('⚙️', 'Functional Test Scenarios', '#6366f1')}
+  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Scenario'},{l:'Action',align:'center'},{l:'Category',align:'center'},{l:'Priority',align:'center'},{l:'Expected Result'}])}
+    <tbody>${scenarioRows}</tbody></table>`)}
+ 
+  ${secHdr('📊', 'Results by Category', '#6366f1')}
+  ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Skipped',align:'center'},{l:'Pass Rate',align:'center'},{l:'Avg Duration',align:'center'},{l:'Status',align:'center'}])}
+    <tbody>${catRows}</tbody></table>`)}
+ 
+  ${secHdr('🧪', 'Detailed Functional Results', '#0d9488')}
+  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Action',align:'center'},{l:'Selector / Value'},{l:'Status',align:'center'},{l:'Reason / Evidence'},{l:'Duration',align:'center'}])}
+    <tbody>${detailRows}</tbody></table>`, '#0d9488')}
+ 
+  ${secHdr('🏁', 'Execution Verdict Summary', '#c9a227')}
+  <p style="font-size:11px;color:#64748b;font-style:italic;margin-bottom:12px">
+    Functional interpretation — maps each interaction category to a pass/fail verdict with user-impact context.
+  </p>
+  ${tblWrap(`${tblHdr([{l:'Category'},{l:'Verdict',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Skipped',align:'center'},{l:'Interpretation'}])}
+    <tbody>${verdictRows}</tbody></table>`, '#c9a227')}
+  <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:16px 20px;display:flex;gap:12px;align-items:flex-start;margin-bottom:28px">
+    <span style="font-size:24px">${vi}</span>
+    <div>
+      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:6px">Overall Functional Verdict</div>
+      <p style="font-size:13px;color:${vc};margin:0;line-height:1.6">${vt_v}</p>
+    </div>
+  </div>
+ 
+  ${secHdr('🤖', 'AI Recommendations', '#6366f1')}
+  ${recsHtml}
+ 
+  <!-- FOOTER -->
+  <div style="margin-top:48px;padding:20px 28px;background:rgba(99,102,241,.04);border-radius:12px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+    border:1px solid rgba(99,102,241,.15)">
+    <div style="font-size:14px;font-weight:700;color:#64748b">
+      <span style="color:#6366f1">NEX</span>TEST · Functional Test Report
+    </div>
+    <div style="font-size:11px;color:#94a3b8">
+      Generated ${dateStr} · ${framework} · ${total} steps · ${rate}% pass rate
+    </div>
+  </div>
+ 
+</div>
+</body>
+</html>`;
+ 
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `functional_report_${genId}.html`;
+  link.click();
+  setDropdownOpen(false);
+};
+const downloadHtml_Regression = () => {
+  const now     = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const genId   = generation?.generation?.id || 'nextest';
+  const allTests = tests;
+  const pass  = allTests.filter(t => t.status === 'pass').length;
+  const fail  = allTests.filter(t => t.status === 'fail').length;
+  const skip  = allTests.filter(t => t.status === 'skip').length;
+  const total = allTests.length || 1;
+  const rate  = Math.round(pass / total * 100);
+  const rateColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+
+  const CAT_COLORS = {
+    authentication:'#6366f1', navigation:'#10b981', content:'#3b82f6', functionality:'#8b5cf6',
+  };
+
+  const secHdr = (emoji, title, color = '#f97316') => `
+    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;
+      padding-bottom:8px;border-bottom:2.5px solid ${color}">
+      <span style="font-size:18px">${emoji}</span>
+      <span style="font-size:20px;font-weight:700;color:#e2e8f0">${title}</span>
+    </div>`;
+
+  const tblWrap = (inner, border = '#f97316') => `
+    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;
+      overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">
+      ${inner}
+    </div>`;
+
+  const tblHdr = (cols) => `
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#040914">
+        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};
+          font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+          color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
+      </tr></thead>`;
+
+  // ── SCENARIOS ──
+  const scenarioRows = allTests.map((t, i) => {
+    const cc  = CAT_COLORS[t.category] || '#64748b';
+    const pc  = t.priority==='high'?'#ef4444':t.priority==='medium'?'#f59e0b':'#10b981';
+    let expected = 'Test executes without errors';
+    if (/page loads/i.test(t.name)) expected = 'Page loads successfully with HTTP 200';
+    else if (/exists|visible/i.test(t.name)) expected = 'Element is visible and accessible in DOM';
+    else if (/clickable/i.test(t.name)) expected = 'Element responds to click interaction';
+    let typeLabel = 'E2E'; let typeColor = '#64748b';
+    if (/login|auth/i.test(t.name)) { typeLabel='AUTH'; typeColor='#6366f1'; }
+    else if (/page loads/i.test(t.name)) { typeLabel='NAV'; typeColor='#10b981'; }
+    else if (/exists|visible/i.test(t.name)) { typeLabel='UI'; typeColor='#3b82f6'; }
+    else if (/clickable/i.test(t.name)) { typeLabel='FUNC'; typeColor='#8b5cf6'; }
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${(t.category||'navigation').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${(t.priority||'medium').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${expected}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${typeColor};font-weight:700;font-size:10px">${typeLabel}</span></td>
+    </tr>`;
+  }).join('');
+
+  // ── CATEGORY SUMMARY ──
+  const cats = {};
+  allTests.forEach(t => {
+    const c = t.category || 'navigation';
+    if (!cats[c]) cats[c] = {pass:0,fail:0,total:0,dur:0};
+    cats[c].total++;
+    if (t.status==='pass') cats[c].pass++;
+    else if (t.status==='fail') cats[c].fail++;
+    try { cats[c].dur += parseInt((t.duration||'0').replace('ms','')); } catch {}
+  });
+  const catRows = Object.entries(cats).map(([cat, d]) => {
+    const cc = CAT_COLORS[cat] || '#64748b';
+    const r  = Math.round(d.pass/d.total*100);
+    const rc = r===100?'#10b981':r>=60?'#f59e0b':'#ef4444';
+    const vc = d.fail===0?'#10b981':'#ef4444';
+    const bg = d.fail===0?'rgba(16,185,129,.06)':'rgba(239,68,68,.06)';
+    const avg = Math.round(d.dur/d.total);
+    return `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
+      <td style="padding:10px 12px;text-align:center;color:#e2e8f0;font-weight:700">${d.total}</td>
+      <td style="padding:10px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
+      <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
+      <td style="padding:10px 12px;text-align:center;color:${rc};font-weight:700">${r}%</td>
+      <td style="padding:10px 12px;text-align:center;color:#64748b">${avg}ms</td>
+      <td style="padding:10px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${d.fail===0?'✅ PASS':'❌ FAIL'}</span></td>
+    </tr>`;
+  }).join('');
+
+  // ── DETAILED RESULTS ──
+  const detailRows = allTests.map((t, i) => {
+    const sc = t.status==='pass'?'#10b981':t.status==='fail'?'#ef4444':'#f59e0b';
+    const sl = t.status==='pass'?'✓ PASS':t.status==='fail'?'✗ FAIL':'■ SKIP';
+    const sb = t.status==='pass'?'rgba(16,185,129,.06)':t.status==='fail'?'rgba(239,68,68,.06)':'rgba(245,158,11,.06)';
+    const cc = CAT_COLORS[t.category] || '#64748b';
+    const pc = t.priority==='high'?'#ef4444':t.priority==='medium'?'#f59e0b':'#10b981';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${(t.category||'').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${(t.priority||'medium').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center;background:${sb}"><span style="color:${sc};font-weight:800;font-size:11px">${sl}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${t.suite||'—'}</td>
+      <td style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b;font-weight:700">${t.duration||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // ── AI RECS ──
+  const slow = allTests.filter(t => { try { return parseInt((t.duration||'0').replace('ms','')) > 3000; } catch { return false; } });
+  const failed = allTests.filter(t => t.status === 'fail');
+  const recsHtml = `
+    <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#f59e0b">⚡ Performance</div>
+    <div style="background:#0d1526;border-left:3px solid #f59e0b;padding:8px 14px 8px 16px;margin-bottom:10px;font-size:12px;color:#94a3b8">${slow.length > 0 ? `• ${slow.length} test(s) exceeded 3000ms — optimize before next release.` : '• All tests executed within acceptable time range.'}</div>
+    <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#818cf8">🔧 Reliability</div>
+    <div style="background:#0d1526;border-left:3px solid #818cf8;padding:8px 14px 8px 16px;margin-bottom:10px;font-size:12px;color:#94a3b8">${failed.length > 0 ? `• Fix "${failed[0]?.name}" — ${failed[0]?.suite||'error detected'}.` : '• No reliability issues detected.'}</div>
+    <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#10b981">👤 UX & Accessibility</div>
+    <div style="background:#0d1526;border-left:3px solid #10b981;padding:8px 14px 8px 16px;font-size:12px;color:#94a3b8">• Navigation pages verified. Application routing is stable.</div>`;
+
+  const vc = fail>0?'#ef4444':'#059669';
+  const vb = fail>0?'rgba(239,68,68,.08)':'rgba(16,185,129,.08)';
+  const vi = fail>0?'🔴':'🟢';
+  const vt = fail>0
+    ? `Regression Test FAILED — ${fail} page(s) failed. Fix before next deployment.`
+    : `Regression Test PASSED — All ${pass} tests passed. Application is stable.`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NexTest Regression Report #${genId}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#070e1c;color:#e2e8f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+  .page{max-width:1100px;margin:0 auto;padding:48px 32px 80px}
+  table{width:100%;border-collapse:collapse}
+  @media print{body{background:#fff;color:#000}.no-print{display:none}.page{padding:10mm}@page{margin:15mm;size:A4}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#1a0f05 50%,#0a0f1e 100%);
+    border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,#f97316,transparent)"></div>
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#f97316"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
+      <div>
+        <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px">
+          <span style="color:#f97316">NEX</span>TEST
+        </div>
+        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">Regression Test Report</div>
+        <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${timeStr}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px">
+      ${[
+        {l:'URL',v:`<span style="color:#fda47a;font-size:11px;word-break:break-all">${url}</span>`},
+        {l:'Framework',v:`<span style="color:#f97316;font-weight:700">${framework}</span>`},
+        {l:'Test Type',v:`<span style="color:#f97316;font-weight:700">Regression Test</span>`},
+        {l:'Generated',v:`<span style="color:#fff">${dateStr}</span>`},
+      ].map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
+        <div style="font-size:12px">${r.v}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+
+  <div class="no-print" style="margin-bottom:28px">
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,#f97316,#ea580c);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨 Print / Save as PDF</button>
+  </div>
+
+  ${secHdr('📋', 'Regression Test Scenarios', '#6366f1')}
+  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Scenario'},{l:'Category',align:'center'},{l:'Priority',align:'center'},{l:'Expected Result'},{l:'Type',align:'center'}])}
+    <tbody>${scenarioRows}</tbody></table>`, '#6366f1')}
+
+  ${secHdr('📊', 'Test Summary', '#f97316')}
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px">
+    ${[
+      {icon:'✅',val:pass,lbl:'PASSED',c:'#10b981',bg:'rgba(16,185,129,.08)',bd:'rgba(16,185,129,.25)'},
+      {icon:'❌',val:fail,lbl:'FAILED',c:'#ef4444',bg:'rgba(239,68,68,.08)',bd:'rgba(239,68,68,.25)'},
+      {icon:'⏭️',val:skip,lbl:'SKIPPED',c:'#f59e0b',bg:'rgba(245,158,11,.08)',bd:'rgba(245,158,11,.25)'},
+      {icon:'🎯',val:`${rate}%`,lbl:'PASS RATE',c:rateColor,bg:`${rateColor}12`,bd:`${rateColor}33`},
+      {icon:'🔢',val:total,lbl:'TOTAL',c:'#3b82f6',bg:'rgba(59,130,246,.08)',bd:'rgba(59,130,246,.25)'},
+    ].map(s => `<div style="background:${s.bg};border:1px solid ${s.bd};border-radius:14px;padding:20px;text-align:center">
+      <div style="font-size:20px;margin-bottom:8px">${s.icon}</div>
+      <div style="font-size:36px;font-weight:700;color:${s.c};line-height:1;margin-bottom:4px">${s.val}</div>
+      <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
+    </div>`).join('')}
+  </div>
+
+  ${secHdr('📊', 'Results by Category', '#6366f1')}
+  ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Pass Rate',align:'center'},{l:'Avg Duration',align:'center'},{l:'Status',align:'center'}])}
+    <tbody>${catRows}</tbody></table>`, '#6366f1')}
+
+  ${secHdr('🧪', 'Detailed Test Results', '#0d9488')}
+  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Category',align:'center'},{l:'Priority',align:'center'},{l:'Status',align:'center'},{l:'Result / Reason'},{l:'Duration',align:'center'}])}
+    <tbody>${detailRows}</tbody></table>`, '#0d9488')}
+
+  ${secHdr('🤖', 'AI Recommendations', '#6366f1')}
+  ${recsHtml}
+
+  <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:16px 20px;margin-top:24px;display:flex;gap:12px;align-items:flex-start">
+    <span style="font-size:24px">${vi}</span>
+    <div>
+      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:6px">Final Verdict</div>
+      <p style="font-size:13px;color:${vc};margin:0;line-height:1.6">${vt}</p>
+    </div>
+  </div>
+
+  <div style="margin-top:48px;padding:20px 28px;background:rgba(249,115,22,.04);border-radius:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid rgba(249,115,22,.15)">
+    <div style="font-size:14px;font-weight:700;color:#64748b"><span style="color:#f97316">NEX</span>TEST · Regression Test Report</div>
+    <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${framework} · ${total} tests · ${rate}% pass rate</div>
+  </div>
+
+</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `regression_report_${genId}.html`;
+  link.click();
+  setDropdownOpen(false);
+};
 const downloadHtml = () => {
   const now     = new Date();
   const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -3926,7 +4739,7 @@ const downloadPdf = async () => {
                   <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#10b981', letterSpacing: .5 }}>CSV</span>
                   <div><div style={{ fontSize: 12, fontWeight: 700 }}>rapport.csv</div><div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>Données tabulaires</div></div>
                 </button>
-                <button onClick={downloadHtml} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
+                <button onClick={isSecurity ? downloadHtml_Security : isRegression ? downloadHtml_Regression : isFunctional ? downloadHtml_Functional : downloadHtml} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'var(--indigo-bg)'; e.currentTarget.style.color = 'var(--indigo3)'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--sub)'; }}>
                   <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'var(--indigo-dim)', border: '1px solid var(--indigo-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: 'var(--indigo2)', letterSpacing: .5 }}>HTML</span>
@@ -3976,13 +4789,18 @@ const downloadPdf = async () => {
       <div className="ep-progress-card">
         <div className="ep-progress-top">
           <div className="ep-progress-info">
-            {running ? (<><span className="spinner" style={{ marginRight: 8 }} /><span style={{ color: 'var(--indigo2)' }}>Running tests...</span></>) : (<><svg width="14" height="14" fill="none" stroke="var(--green)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span>{tests.length} tests executed</span><span className="ep-progress-sep">·</span><span style={{ color: 'var(--muted)' }}>{loadTimeMs}ms load time</span></>)}
+            {running ? (<><span className="spinner" style={{ marginRight: 8 }} /><span style={{ color: 'var(--indigo2)' }}>Running tests...</span></>) : (<><svg width="14" height="14" fill="none" stroke="var(--green)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span>{tests.length} tests executed</span><span className="ep-progress-sep">·</span><span style={{ color: 'var(--muted)' }}>{loadTimeMs > 0 && (
+  <>
+    <span className="ep-progress-sep">·</span>
+    <span style={{ color: 'var(--muted)' }}>{loadTimeMs}ms load time</span>
+  </>
+)}</span></>)}
           </div>
           <div className="ep-progress-rate" style={{ color: rateColor }}>{rate}% pass rate</div>
         </div>
         <div className="ep-progress-track">
           <div className="ep-progress-fill" style={{ width: `${running ? 100 : rate}%`, background: running ? 'linear-gradient(90deg,var(--indigo),var(--indigo2))' : rateGrad }} />
-          {!running && rate > 0 && (<div className="ep-progress-label-inside" style={{ left: `${Math.min(rate, 92)}%` }}>{rate}%</div>)}
+          {loadTimeMs > 0 && (<>{loadTimeMs > 0 && (<><span className="ep-progress-sep">·</span><span style={{ color: 'var(--muted)' }}>{loadTimeMs}ms load time</span></>)}{loadTimeMs > 0 && (<><span className="ep-progress-sep">·</span><span style={{ color: 'var(--muted)' }}>{loadTimeMs}ms load time</span></>)}</>)}
         </div>
       </div>
 

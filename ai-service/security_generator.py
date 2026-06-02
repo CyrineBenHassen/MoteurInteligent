@@ -1,13 +1,12 @@
-# security_generator.py — NexTest Security Test Generator (LLaMA + endpoint discovery)
+# security_generator.py — NexTest Security Test Generator
+# Tests the FRONTEND via Playwright using JWT token from localStorage
+# Target: https://anpe.demopro.tn:10443
 
 import json
 import os
-import requests
-import urllib3
 from openai import OpenAI
 from dotenv import load_dotenv
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 load_dotenv()
 
 groq_client = OpenAI(
@@ -15,147 +14,110 @@ groq_client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY"),
 )
 
-# ── Common API paths to probe ────────────────────────────────────────────────
-COMMON_PATHS = [
-    # Auth
-    "/api/v1/auth/login",
-    "/api/v1/auth/me",
-    "/api/v1/auth/logout",
-    # Real endpoints discovered
-    "/api/v1/users",
-    "/api/v1/roles",
-    "/api/v1/dossiers",
-    "/api/v1/commissions",
-    "/api/v1/auditing",
+# ── Pages disponibles après login ────────────────────────────────────────────
+FRONTEND_PAGES = [
+    "/dashboard",
+    "/statistiques",
+    "/reception",
+    "/outbox",
+    "/traitement_dossier_eie",
+    "/traitement_dossier_ed",
+    "/traitement_dossier_avis",
+    "/traitement_dossier_transaction",
+    "/gestion_commission",
+    "/reunions",
+    "/traitement_dossier_cc",
+    "/visites",
+    "/traitement_dossier_af",
 ]
 
-
-def _discover_endpoints(base_url: str) -> list:
-    """
-    Probe common paths and return those that respond (not 404).
-    """
-    discovered = []
-
-    print(f"[SECURITY_GENERATOR] Probing endpoints on {base_url}...")
-
-    for path in COMMON_PATHS:
-        url = f"{base_url}{path}"
-        try:
-            resp = requests.get(
-                url,
-                headers={},
-                verify=False,
-                timeout=5,
-                allow_redirects=False,
-            )
-            # Any response except 404 means endpoint exists
-            if resp.status_code != 404:
-                discovered.append({
-                    "path":   path,
-                    "url":    url,
-                    "status": resp.status_code,
-                    "method": "GET",
-                })
-                print(f"[SECURITY_GENERATOR]   ✓ {path} → {resp.status_code}")
-            else:
-                print(f"[SECURITY_GENERATOR]   ✗ {path} → 404")
-
-        except Exception as e:
-            print(f"[SECURITY_GENERATOR]   ✗ {path} → error: {e}")
-            continue
-
-    print(f"[SECURITY_GENERATOR] Discovered {len(discovered)} endpoints")
-    return discovered
+# ── Login page selectors ─────────────────────────────────────────────────────
+LOGIN_URL        = "/admin-anpe/login"
+EMAIL_SELECTOR   = "input[type='email'], #basic_email, input[name='email']"
+PASSWORD_SELECTOR= "input[type='password'], #basic_password, input[name='password']"
+SUBMIT_SELECTOR  = "button[type='submit'], .btn-primary, button:has-text('Connexion')"
+CAPTCHA_SELECTOR = "#basic_captcha, input[name='captcha']"
 
 
 def generate_security_tests(base_url: str, categories: list = None) -> dict:
     """
-    1. Discover available endpoints
-    2. LLaMA generates security tests for those endpoints
+    Generate frontend security tests for ANPE using Playwright + JWT token.
+    Tests: auth, xss, session, navigation, headers, info_exposure
     """
 
     if categories is None:
-        categories = ["auth", "input_validation", "rate_limiting", "headers"]
+        categories = ["auth", "xss", "session", "navigation", "headers", "info_exposure"]
 
-    # ── Step 1: Discover endpoints ───────────────────────────────────────────
-    discovered = _discover_endpoints(base_url)
+    frontend_url = base_url
+    # Normalise URL — utilise le frontend pas le backend
+    if "back.demopro" in base_url:
+        frontend_url = base_url.replace("back.demopro", "demopro").replace(
+            "anpe.back", "anpe"
+        )
 
-    if not discovered:
-        print(f"[SECURITY_GENERATOR] No endpoints discovered — using defaults")
-        discovered = [
-            {"path": "/api/v1/auth/login", "url": f"{base_url}/api/v1/auth/login", "status": 200, "method": "POST"},
-            {"path": "/api/v1/auth/me",    "url": f"{base_url}/api/v1/auth/me",    "status": 401, "method": "GET"},
-        ]
+    print(f"[SECURITY_GENERATOR] Frontend URL: {frontend_url}")
+    print(f"[SECURITY_GENERATOR] Generating tests for categories: {categories}")
 
-    # Format for LLaMA
-    endpoints_str = "\n".join([
-        f"  - {e['method']} {e['path']} (responded with {e['status']})"
-        for e in discovered
-    ])
+    # ── Générer les tests via Groq ────────────────────────────────────────────
+    prompt = f"""You are a security testing expert for web applications.
 
-    print(f"[SECURITY_GENERATOR] LLaMA generating tests for {len(discovered)} endpoints...")
+Target frontend URL: {frontend_url}
+Login page: {frontend_url}{LOGIN_URL}
+After login, user lands on: {frontend_url}/dashboard
 
-    # ── Step 2: LLaMA generates tests ────────────────────────────────────────
-    prompt = f"""You are a security testing expert.
+Available pages after login:
+{json.dumps(FRONTEND_PAGES, indent=2)}
 
-API Base URL: {base_url}
-Login endpoint: POST {base_url}/api/v1/auth/login
-Body: {{"email": "user@example.com", "password": "password"}}
+The app uses JWT stored in localStorage key "token".
+Testing framework: Playwright (Python async)
+Testing approach: Use stored JWT token to authenticate, then test pages.
 
-Available endpoints (confirmed working):
-- GET  {base_url}/api/v1/auth/me       → requires token (returns 500 without token)
-- GET  {base_url}/api/v1/users         → requires token (returns 500 without token)
-- GET  {base_url}/api/v1/roles         → requires token (returns 500 without token)
-- GET  {base_url}/api/v1/dossiers      → requires token (returns 500 without token)
-- GET  {base_url}/api/v1/commissions   → requires token (returns 500 without token)
-- GET  {base_url}/api/v1/auditing      → requires token (returns 500 without token)
-- POST {base_url}/api/v1/auth/login    → public endpoint (returns 422 for invalid input)
-
-Categories to test: {', '.join(categories)}
-
-Return ONLY a valid JSON array. No markdown. No explanation.
+Generate exactly 12 security test cases as a JSON array.
 
 Each test case structure:
 {{
   "id": 1,
-  "name": "Descriptive test name",
-  "category": "auth|input_validation|rate_limiting|headers",
+  "name": "Clear descriptive name",
+  "category": "auth|xss|session|navigation|headers|info_exposure",
   "severity": "critical|high|medium|low",
-  "method": "GET|POST",
-  "path": "/api/v1/endpoint",
-  "url": "{base_url}/api/v1/endpoint",
-  "headers": {{}},
-  "body": null,
-  "expect_status": 401,
+  "test_type": "no_token|expired_token|xss_input|direct_nav|header_check|dom_inspect|brute_force|logout",
+  "url": "{frontend_url}/page",
+  "inject_field": null,
+  "inject_value": null,
+  "expect": "redirect_to_login|blocked|xss_not_executed|page_loaded|header_present|no_sensitive_data",
   "description": "What this test verifies",
-  "repeat": 1,
-  "expect_blocked": false,
+  "check_localStorage": false,
   "check_headers": [],
-  "forbidden_in_response": []
+  "forbidden_in_dom": []
 }}
 
-STRICT RULES — follow exactly:
+Generate EXACTLY these 12 tests:
 
-category=auth (generate 4 tests):
-  test 1: GET {base_url}/api/v1/auth/me, no headers, expect_status=401, severity=critical
-  test 2: GET {base_url}/api/v1/users, no headers, expect_status=401, severity=critical
-  test 3: GET {base_url}/api/v1/roles, no headers, expect_status=401, severity=high
-  test 4: GET {base_url}/api/v1/dossiers, no headers, expect_status=401, severity=high
+category=auth (3 tests):
+  1. Access /dashboard WITHOUT token → expect redirect_to_login, severity=critical
+  2. Access /reception WITHOUT token → expect redirect_to_login, severity=critical  
+  3. Access /dashboard with INVALID token (fake JWT) → expect redirect_to_login, severity=high
 
-category=input_validation (generate 3 tests):
-  test 5: POST {base_url}/api/v1/auth/login, body={{"email":"' OR '1'='1","password":"x"}}, expect_status=422, severity=critical
-  test 6: POST {base_url}/api/v1/auth/login, body={{"email":"<script>alert(1)</script>@x.com","password":"x"}}, expect_status=422, severity=high
-  test 7: POST {base_url}/api/v1/auth/login, body={{}}, expect_status=422, severity=medium
+category=xss (2 tests):
+  4. Inject <script>alert('XSS')</script> in search field "Rechercher par référence" on /reception → expect xss_not_executed, severity=high
+  5. Inject <img src=x onerror=alert(1)> in search field on /dashboard → expect xss_not_executed, severity=high
 
-category=rate_limiting (generate 1 test ONLY):
-  test 8: POST {base_url}/api/v1/auth/login, body={{"email":"hacker@evil.com","password":"wrongpass"}}, repeat=10, expect_blocked=true, expect_status=[422,429], severity=high
+category=session (2 tests):
+  6. Check localStorage doesn't expose sensitive user data beyond token → check_localStorage=true, forbidden_in_dom=["password","secret","private_key"], severity=medium
+  7. After logout, verify token is cleared from localStorage → expect no_token_after_logout, severity=high
 
-category=headers (generate 2 tests ONLY):
-  test 9: GET {base_url}/api/v1/auth/me, no headers, expect_status=[401,500], check_headers=["X-Content-Type-Options","X-Frame-Options"], severity=medium
-  test 10: POST {base_url}/api/v1/auth/login, body={{"email":"test@test.com","password":"test"}}, expect_status=[422,401,500], forbidden_in_response=["sql","password","secret","private_key"], severity=medium
+category=navigation (2 tests):
+  8. Direct URL access to /reception without being logged in → expect redirect_to_login, severity=high
+  9. Direct URL access to /gestion_commission without being logged in → expect redirect_to_login, severity=medium
 
-Generate exactly these 10 tests in this exact order.
-Return ONLY the JSON array."""
+category=headers (2 tests):
+  10. Check /dashboard for security headers X-Content-Type-Options, X-Frame-Options → check_headers=["X-Content-Type-Options","X-Frame-Options"], severity=medium
+  11. Check login page {frontend_url}{LOGIN_URL} for security headers → check_headers=["X-Content-Type-Options","Strict-Transport-Security"], severity=medium
+
+category=info_exposure (1 test):
+  12. Verify dashboard DOM doesn't expose passwords, API keys, or secrets → forbidden_in_dom=["password","api_key","secret","private_key","token_secret"], severity=high
+
+Return ONLY the JSON array. No markdown. No explanation."""
 
     try:
         resp = groq_client.chat.completions.create(
@@ -163,20 +125,17 @@ Return ONLY the JSON array."""
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a security testing expert. Return only valid JSON arrays. No markdown, no explanation, no code blocks."
+                    "content": "You are a security testing expert. Return only valid JSON arrays. No markdown, no explanation.",
                 },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
+                {"role": "user", "content": prompt},
             ],
-            temperature=0.2,
+            temperature=0.1,
             max_tokens=3000,
         )
 
         raw = resp.choices[0].message.content.strip()
 
-        # Clean markdown if present
+        # Clean markdown
         if "```" in raw:
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -185,115 +144,128 @@ Return ONLY the JSON array."""
 
         test_cases = json.loads(raw)
 
-        # Clean and fix URLs
+        # Normalize and clean
         cleaned = []
         for i, tc in enumerate(test_cases, 1):
-            path = tc.get("path", "/api/v1/auth/me")
             cleaned.append({
-                "id":                    i,
-                "name":                  tc.get("name", f"Security Test {i}"),
-                "category":              tc.get("category", "auth"),
-                "severity":              tc.get("severity", "medium"),
-                "method":                tc.get("method", "GET"),
-                "path":                  path,
-                "url":                   f"{base_url}{path}",
-                "headers":               tc.get("headers", {}),
-                "body":                  tc.get("body", None),
-                "expect_status":         tc.get("expect_status", 401),
-                "description":           tc.get("description", ""),
-                "repeat":                tc.get("repeat", 1),
-                "expect_blocked":        tc.get("expect_blocked", False),
-                "check_headers":         tc.get("check_headers", []),
-                "forbidden_in_response": tc.get("forbidden_in_response", []),
+                "id":               i,
+                "name":             tc.get("name", f"Security Test {i}"),
+                "category":         tc.get("category", "auth"),
+                "severity":         tc.get("severity", "medium"),
+                "test_type":        tc.get("test_type", "no_token"),
+                "url":              tc.get("url", f"{frontend_url}/dashboard"),
+                "inject_field":     tc.get("inject_field"),
+                "inject_value":     tc.get("inject_value"),
+                "expect":           tc.get("expect", "redirect_to_login"),
+                "description":      tc.get("description", ""),
+                "check_localStorage": tc.get("check_localStorage", False),
+                "check_headers":    tc.get("check_headers", []),
+                "forbidden_in_dom": tc.get("forbidden_in_dom", []),
+                "frontend_url":     frontend_url,
             })
 
-        print(f"[SECURITY_GENERATOR] ✓ {len(cleaned)} security tests generated by LLaMA")
-
+        print(f"[SECURITY_GENERATOR] ✓ {len(cleaned)} security tests generated")
         return {
-            "test_cases":          cleaned,
-            "total":               len(cleaned),
-            "categories":          categories,
-            "base_url":            base_url,
-            "discovered_endpoints": discovered,
+            "test_cases":   cleaned,
+            "total":        len(cleaned),
+            "categories":   categories,
+            "base_url":     frontend_url,
+            "test_target":  "frontend",
+            "framework":    "Playwright",
         }
 
     except json.JSONDecodeError as e:
-        print(f"[SECURITY_GENERATOR] JSON parse error: {e} — fallback")
-        return _fallback_static_tests(base_url, categories, discovered)
+        print(f"[SECURITY_GENERATOR] JSON error: {e} — using fallback")
+        return _fallback_tests(frontend_url, categories)
 
     except Exception as e:
-        print(f"[SECURITY_GENERATOR] LLaMA error: {e} — fallback")
-        return _fallback_static_tests(base_url, categories, discovered)
+        print(f"[SECURITY_GENERATOR] Error: {e} — using fallback")
+        return _fallback_tests(frontend_url, categories)
 
 
-def _fallback_static_tests(base_url: str, categories: list, discovered: list = None) -> dict:
-    """Fallback to static tests if LLaMA fails"""
+def _fallback_tests(frontend_url: str, categories: list) -> dict:
+    """Fallback static tests if Groq fails"""
 
-    # Use first discovered login endpoint or default
-    login_path = "/api/v1/auth/login"
-    me_path    = "/api/v1/auth/me"
-
-    if discovered:
-        for e in discovered:
-            if "login" in e["path"]:
-                login_path = e["path"]
-            if "/me" in e["path"]:
-                me_path = e["path"]
-
-    static = [
+    tests = [
         {
-            "id": 1, "name": "Access protected endpoint — no token",
+            "id": 1, "name": "Access dashboard without token",
             "category": "auth", "severity": "critical",
-            "method": "GET", "path": me_path,
-            "url": f"{base_url}{me_path}",
-            "headers": {}, "body": None, "expect_status": 401,
-            "description": "Protected endpoint must reject requests with no token",
-            "repeat": 1, "expect_blocked": False,
-            "check_headers": [], "forbidden_in_response": [],
+            "test_type": "no_token",
+            "url": f"{frontend_url}/dashboard",
+            "inject_field": None, "inject_value": None,
+            "expect": "redirect_to_login",
+            "description": "Dashboard must redirect unauthenticated users to login",
+            "check_localStorage": False, "check_headers": [], "forbidden_in_dom": [],
+            "frontend_url": frontend_url,
         },
         {
-            "id": 2, "name": "SQL Injection — login",
-            "category": "input_validation", "severity": "critical",
-            "method": "POST", "path": login_path,
-            "url": f"{base_url}{login_path}",
-            "headers": {"Content-Type": "application/json"},
-            "body": {"email": "' OR '1'='1", "password": "anything"},
-            "expect_status": 422,
-            "description": "SQL injection must be blocked",
-            "repeat": 1, "expect_blocked": False,
-            "check_headers": [], "forbidden_in_response": [],
+            "id": 2, "name": "Access reception without token",
+            "category": "auth", "severity": "critical",
+            "test_type": "no_token",
+            "url": f"{frontend_url}/reception",
+            "inject_field": None, "inject_value": None,
+            "expect": "redirect_to_login",
+            "description": "Reception page must redirect unauthenticated users",
+            "check_localStorage": False, "check_headers": [], "forbidden_in_dom": [],
+            "frontend_url": frontend_url,
         },
         {
-            "id": 3, "name": "Brute force — 10 requests",
-            "category": "rate_limiting", "severity": "high",
-            "method": "POST", "path": login_path,
-            "url": f"{base_url}{login_path}",
-            "headers": {"Content-Type": "application/json"},
-            "body": {"email": "admin@test.com", "password": "wrong"},
-            "expect_status": [422, 429],
-            "description": "Rate limiting should block brute force",
-            "repeat": 10, "expect_blocked": True,
-            "check_headers": [], "forbidden_in_response": [],
+            "id": 3, "name": "XSS in search field",
+            "category": "xss", "severity": "high",
+            "test_type": "xss_input",
+            "url": f"{frontend_url}/reception",
+            "inject_field": "input[placeholder*='Rechercher'], input[type='text']",
+            "inject_value": "<script>alert('XSS')</script>",
+            "expect": "xss_not_executed",
+            "description": "Search field must sanitize XSS input",
+            "check_localStorage": False, "check_headers": [], "forbidden_in_dom": [],
+            "frontend_url": frontend_url,
         },
         {
-            "id": 4, "name": "Security headers check",
+            "id": 4, "name": "Session token exposure check",
+            "category": "session", "severity": "medium",
+            "test_type": "dom_inspect",
+            "url": f"{frontend_url}/dashboard",
+            "inject_field": None, "inject_value": None,
+            "expect": "no_sensitive_data",
+            "description": "localStorage must not expose passwords or secrets",
+            "check_localStorage": True, "check_headers": [],
+            "forbidden_in_dom": ["password", "secret", "private_key"],
+            "frontend_url": frontend_url,
+        },
+        {
+            "id": 5, "name": "Security headers on dashboard",
             "category": "headers", "severity": "medium",
-            "method": "GET", "path": me_path,
-            "url": f"{base_url}{me_path}",
-            "headers": {}, "body": None, "expect_status": 401,
-            "description": "API should return security headers",
-            "repeat": 1, "expect_blocked": False,
+            "test_type": "header_check",
+            "url": f"{frontend_url}/dashboard",
+            "inject_field": None, "inject_value": None,
+            "expect": "header_present",
+            "description": "Dashboard must return security headers",
+            "check_localStorage": False,
             "check_headers": ["X-Content-Type-Options", "X-Frame-Options"],
-            "forbidden_in_response": [],
+            "forbidden_in_dom": [],
+            "frontend_url": frontend_url,
+        },
+        {
+            "id": 6, "name": "Direct URL access without login",
+            "category": "navigation", "severity": "high",
+            "test_type": "direct_nav",
+            "url": f"{frontend_url}/gestion_commission",
+            "inject_field": None, "inject_value": None,
+            "expect": "redirect_to_login",
+            "description": "Protected routes must redirect to login when not authenticated",
+            "check_localStorage": False, "check_headers": [], "forbidden_in_dom": [],
+            "frontend_url": frontend_url,
         },
     ]
 
-    filtered = [t for t in static if t["category"] in categories]
+    filtered = [t for t in tests if t["category"] in categories]
 
     return {
-        "test_cases":           filtered,
-        "total":                len(filtered),
-        "categories":           categories,
-        "base_url":             base_url,
-        "discovered_endpoints": discovered or [],
+        "test_cases":   filtered,
+        "total":        len(filtered),
+        "categories":   categories,
+        "base_url":     frontend_url,
+        "test_target":  "frontend",
+        "framework":    "Playwright",
     }

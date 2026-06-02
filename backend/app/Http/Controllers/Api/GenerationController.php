@@ -994,4 +994,76 @@ public function generateRegression(Request $request)
         return response()->json(['error' => $e->getMessage()], 500);
     }
 }
+
+public function generateFunctional(Request $request)
+{
+    $validated = $request->validate([
+        'url'        => 'required|string',
+        'framework'  => 'nullable|string',
+        'project_id' => 'nullable|integer',
+    ]);
+
+    $url       = $validated['url'];
+    $framework = $validated['framework'] ?? 'Playwright';
+    $projectId = $validated['project_id'] ?? null;
+
+    try {
+        $response = Http::timeout(300)->post('http://127.0.0.1:8001/generate-functional', [
+            'url'        => $url,
+            'framework'  => $framework,
+            'project_id' => $projectId,
+        ]);
+
+        $data = $response->json();
+
+        if (!$data || isset($data['error'])) {
+            return response()->json(['error' => $data['error'] ?? 'Generation failed'], 500);
+        }
+
+        $result    = $data['result'] ?? [];
+        $testCases = $result['execution_results'] ?? $result['test_cases'] ?? [];
+        $passCount = $result['pass_count'] ?? 0;
+        $failCount = $result['fail_count'] ?? 0;
+        $skipCount = $result['skip_count'] ?? 0;
+        $passRate  = $result['pass_rate']  ?? 0;
+
+        $generation = Generation::create([
+            'user_id'           => auth()->id(),
+            'project_id'        => $projectId,
+            'url'               => $url,
+            'framework'         => $framework,
+            'test_type'         => 'functional',
+            'status'            => 'completed',
+            'test_cases'        => $testCases,
+            'execution_results' => $testCases,
+            'pass_count'        => $passCount,
+            'fail_count'        => $failCount,
+            'skip_count'        => $skipCount,
+            'pass_rate'         => $passRate,
+            'load_time_ms'      => 0,
+            'is_spa'            => false,
+            'page_type'         => 'general',
+            'scraped'           => [],
+        ]);
+
+        $this->notifyN8n($generation, $passCount, $failCount, $skipCount, $passRate, $url, $framework, 'functional');
+
+        return response()->json([
+            'id'         => $generation->id,
+            'url'        => $url,
+            'framework'  => $framework,
+            'test_type'  => 'functional',
+            'result'     => $result,
+            'pass_count' => $passCount,
+            'fail_count' => $failCount,
+            'skip_count' => $skipCount,
+            'pass_rate'  => $passRate,
+            'test_cases' => $testCases,
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('[NEXTEST] generateFunctional() exception', ['error' => $e->getMessage()]);
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
 }
