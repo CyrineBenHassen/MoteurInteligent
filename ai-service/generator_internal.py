@@ -1,20 +1,9 @@
-# generator_internal.py — Internal Back Office Test Generator
-# SMOKE TEST ONLY
-#
-# ARCHITECTURE:
-#   - Designed for back office pages (login + dashboard)
-#   -  LLM calls  smoke checks only
-#   - Two modes:
-#       1. is_login_page=True  → test login page elements
-#       2. is_dashboard=True   → test dashboard elements after auth
-#   - Generates scripts for Selenium / Playwright / Cypress
 
 import re
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
 # ─────────────────────────────────────────────────────────────────────────────
-
 SMOKE_MAX_STEPS = 50
 SMOKE_MIN_STEPS = 3
 
@@ -113,7 +102,7 @@ def _build_infra_steps(scraped: dict) -> list:
         "suite":  "Pass — HTTPS valid" if ssl_ok else "FAIL — URL does not use HTTPS",
     })
 
-    # ── Load Time ─────────────────────────────────────────────────────────
+    # ── Load Time
     load_ms  = scraped.get("load_time_ms", 0)
     load_ok  = 0 < load_ms < LOAD_THRESHOLD_MS
     load_status = (

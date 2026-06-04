@@ -13,6 +13,7 @@ class Generation extends Model
         'framework',
         'test_type',
         'status',
+        'result',
         'test_cases',
         'test_cases_selenium',
         'test_cases_cypress',
@@ -33,6 +34,7 @@ class Generation extends Model
     ];
 
     protected $casts = [
+        'result'              => 'array',
         'test_cases'          => 'array',
         'test_cases_selenium' => 'array',
         'test_cases_cypress'  => 'array',

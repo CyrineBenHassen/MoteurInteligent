@@ -880,6 +880,19 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
   };
 
 const handleView = (item) => {
+  const parsedResult = typeof item.result === 'string' 
+    ? JSON.parse(item.result || '{}') 
+    : (item.result || {});
+
+  console.log('[handleView] item:', item);
+  console.log('[handleView] parsedResult:', parsedResult);
+  console.log('[K6] item.summary:', JSON.stringify(item.summary, null, 2));
+  console.log('[K6] item.test_cases:', item.test_cases);
+  console.log('[K6] item keys:', Object.keys(item));
+console.log('[K6] item.scripts:', item.scripts);
+console.log('[K6] item.execution_results:', item.execution_results);
+console.log('[K6] item.performance_data:', item.performance_data);
+console.log('[K6] first test_case:', JSON.stringify(item.test_cases?.[0], null, 2));
   setGeneration({
     url: item.url, framework: item.framework, test_type: item.test_type,
     generation: { 
@@ -889,29 +902,64 @@ const handleView = (item) => {
       load_time_ms: item.load_time_ms, 
       test_type: item.test_type 
     },
-  result: {
+    result: {
       test_type: item.test_type || 'smoke',
-      test_cases: item.test_cases || [],
-      test_cases_selenium: item.test_cases_selenium || [],
-      test_cases_cypress: item.test_cases_cypress || [],
-      script: item.script || '',
-      script_selenium: item.script_selenium || '',
-      script_playwright: item.script_playwright || '',
-      script_cypress: item.script_cypress || '',
-      script_postman: item.script_postman || '',
-      script_pytest: item.script_pytest || '',
-      domains: item.domains || [],
-      base_url: item.base_url || item.url || '',
+      test_cases: item.test_cases || parsedResult.test_cases || [],
+      test_cases_selenium: item.test_cases_selenium || parsedResult.test_cases_selenium || [],
+      test_cases_cypress: item.test_cases_cypress || parsedResult.test_cases_cypress || [],
+      script: item.script || parsedResult.script || '',
+      script_selenium: item.script_selenium || parsedResult.script_selenium || '',
+      script_playwright: item.script_playwright || parsedResult.script_playwright || '',
+      script_cypress: item.script_cypress || parsedResult.script_cypress || '',
+      script_postman: item.script_postman || parsedResult.script_postman || '',
+      script_pytest: item.script_pytest || parsedResult.script_pytest || '',
+      domains: item.domains || parsedResult.domains || [],
+      base_url: item.base_url || parsedResult.base_url || item.url || '',
       pass_count: item.pass_count || 0,
       fail_count: item.fail_count || 0,
       skip_count: item.skip_count || 0,
       pass_rate: item.pass_rate || 0,
-      // ← ICI : on mappe pour s'assurer que screenshot est inclus
-      execution_results: (item.execution_results || []).map(r => ({
+   summary: (() => {
+  const raw = item.summary && !Array.isArray(item.summary) ? item.summary
+    : parsedResult.summary && !Array.isArray(parsedResult.summary) ? parsedResult.summary
+    : null;
+  if (raw && Object.keys(raw).length > 0) return raw;
+  const cases = item.test_cases || [];
+  const built = {};
+  ['load', 'stress', 'spike', 'soak'].forEach(type => {
+    const label = type.charAt(0).toUpperCase() + type.slice(1);
+    const matching = cases.filter(tc =>
+      tc.name?.toLowerCase().includes(`[${type} test]`) ||
+      tc.name?.toLowerCase().includes(`[${label} test]`)
+    );
+    if (matching.length > 0) {
+  const thresholds = matching.filter(tc => tc.section === 'Thresholds');
+  const nonSkipped = matching.filter(t => t.status !== 'skip');
+  
+  let status;
+  if (thresholds.length > 0) {
+    status = thresholds.some(t => t.status === 'fail') ? 'fail' : 'pass';
+  } else {
+    status = nonSkipped.some(t => t.status === 'fail') ? 'fail' : 'pass';
+  }
+
+  built[type] = {
+    status,
+    metrics: {},
+    threshold_passes: matching.filter(t => t.status === 'pass').map(t => t.suite || t.name),
+    threshold_failures: matching.filter(t => t.status === 'fail').map(t => t.suite || t.name),
+    duration_seconds: null,
+  };
+}
+  });
+  return Object.keys(built).length > 0 ? built : {};
+})(),
+      scripts: item.scripts || parsedResult.scripts || {},
+      execution_results: (item.execution_results || parsedResult.execution_results || []).map(r => ({
         ...r,
         screenshot: r.screenshot ?? null,
       })),
-      performance: item.performance_data || item.performance || null,
+      performance: item.performance_data || item.performance || parsedResult.performance || null,
     },
   });
   goTo('execution');
@@ -1389,7 +1437,7 @@ const REGRESSION_FRAMEWORKS = [
 
   const TEST_TYPES = isInternal ? INTERNAL_TEST_TYPES : PUBLIC_TEST_TYPES;
   const FRAMEWORKS = testType === 'performance'
-  ? (isInternal ? [...PERFORMANCE_FRAMEWORKS, ...BACKEND_FRAMEWORKS] : PERFORMANCE_FRAMEWORKS)
+  ? (isInternal ? BACKEND_FRAMEWORKS : PERFORMANCE_FRAMEWORKS)
   : testType === 'api'
   ? API_FRAMEWORKS
   : testType === 'security'  ? SECURITY_FRAMEWORKS 
@@ -1408,10 +1456,11 @@ const REGRESSION_FRAMEWORKS = [
   setLoad(true); setError('');
   try {
     // ← ICI : choisir la route selon le type de projet
- const endpoint = testType === 'api'
+const endpoint = testType === 'api'
   ? '/generations/generate-api'
-  : testType === 'security'    ? '/generations/generate-security' 
+  : testType === 'security'    ? '/generations/generate-security'
   : testType === 'regression'  ? '/generations/generate-regression'
+  : testType === 'performance' && fw === 'k6' ? '/generations/generate-performance'
   : testType === 'functional' && isInternal ? '/generations/generate-functional'
   : isInternal ? '/generate-internal' : '/generate';
 
@@ -1445,6 +1494,17 @@ const payload = testType === 'api'
     project_id:   project?.id,
     project_name: project?.name,
     project_type: project?.type,
+  }
+
+  : testType === 'performance' && fw === 'k6'
+? {
+    url,
+    framework:   'k6',
+    test_type:   'performance',
+    project_id:  project?.id,
+    project_name: project?.name,
+    project_type: project?.type,
+    test_types: ['load', 'stress', 'spike', 'soak'],
   }
   : isInternal
   ? {
@@ -2987,7 +3047,1002 @@ const sectionDetailedMetrics = `
     </div>
   );
 }
+function K6MetricCard({ label, value, unit, good, threshold, color, icon }) {
+  const numVal = parseFloat(value);
+  const isOk   = !isNaN(numVal) && threshold ? numVal <= threshold : true;
+  const sc     = value == null || value === 'N/A' ? '#64748b' : isOk ? '#10b981' : '#ef4444';
+ 
+  return (
+    <div style={{
+      background: 'var(--card)', border: `1px solid ${sc}33`,
+      borderTop: `3px solid ${sc}`, borderRadius: 12, padding: '16px',
+    }}>
+      <div style={{ fontSize: 20, marginBottom: 8 }}>{icon}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: sc, fontFamily: 'var(--C)', lineHeight: 1 }}>
+        {value ?? 'N/A'}{value != null && unit ? unit : ''}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{label}</div>
+      {good && <div style={{ fontSize: 10, color: '#64748b', marginTop: 3 }}>Good ≤ {good}{unit}</div>}
+    </div>
+  );
+}
+ 
+function K6TestTypeCard({ typeKey, data, active, onClick }) {
+  const TYPE_CONFIG = {
+    load:   { label: 'Load Test',   icon: '📈', color: '#6366f1', desc: 'Normal expected traffic' },
+    stress: { label: 'Stress Test', icon: '🔥', color: '#ef4444', desc: 'Beyond capacity — breaking point' },
+    spike:  { label: 'Spike Test',  icon: '⚡', color: '#f59e0b', desc: 'Sudden traffic burst' },
+    soak:   { label: 'Soak Test',   icon: '🌊', color: '#0ea5e9', desc: 'Extended load — memory leaks' },
+  };
+  const cfg    = TYPE_CONFIG[typeKey] || { label: typeKey, icon: '📊', color: '#6366f1', desc: '' };
+  const status = data?.status || 'unknown';
+  const sc     = status === 'pass' ? '#10b981' : status === 'fail' ? '#ef4444' : status === 'error' ? '#f59e0b' : '#64748b';
+  const metrics = data?.metrics || {};
+  const p95    = metrics.http_req_duration_p95;
+  const errRate = metrics.http_req_failed_rate;
+ 
+  return (
+    <div onClick={onClick} style={{
+      background: active ? `${cfg.color}12` : 'var(--card)',
+      border: `1.5px solid ${active ? cfg.color : 'var(--border)'}`,
+      borderRadius: 14, padding: '28px 24px', cursor: 'pointer',
+      transition: 'all .2s', position: 'relative', overflow: 'hidden',
+    }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = cfg.color; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = 'var(--border)'; }}
+    >
+      {active && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,transparent,${cfg.color},transparent)` }} />}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 22 }}>{cfg.icon}</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: active ? cfg.color : 'var(--text)' }}>{cfg.label}</div>
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{cfg.desc}</div>
+          </div>
+        </div>
+        <span style={{
+          fontSize: 9, fontWeight: 800, padding: '3px 10px', borderRadius: 20, textTransform: 'uppercase',
+          color: sc, background: `${sc}15`, border: `1px solid ${sc}33`,
+        }}>
+          {status === 'pass' ? '✓ PASS' : status === 'fail' ? '✗ FAIL' : status === 'error' ? '⚠ ERROR' : '— N/A'}
+        </span>
+      </div>
+      
+      {data?.duration_seconds && (
+        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 10 }}>
+          ⏱ Duration: {data.duration_seconds}s
+        </div>
+      )}
+    </div>
+  );
+}
 
+
+function formatK6TestCase(rawName, suite, category) {
+  const name  = (rawName || '').trim();
+  const info  = (suite  || '').trim();
+  const lower = name.toLowerCase();
+ 
+  // ── 1. RESPONSE TIME p95 ──────────────────────────────────────────────────
+  if (/response time p95/i.test(name)) {
+    const thresholdMatch = name.match(/[\d.]+ms$/);
+    const threshold      = thresholdMatch ? thresholdMatch[0] : null;
+    const measuredMatch  = info.match(/p95=([\d.]+ms)/);
+    const measured       = measuredMatch ? measuredMatch[1] : null;
+    const limitMatch     = info.match(/threshold:\s*([\d]+ms)/);
+    const limit          = limitMatch ? limitMatch[1] : threshold;
+ 
+    return {
+      title: '95th Percentile Response Time',
+      description: measured && limit
+        ? `95% of requests responded in ${measured} — limit is ${limit} for this test`
+        : limit
+        ? `Response time threshold: must stay below ${limit}`
+        : 'Measures the 95th percentile of all request durations',
+    };
+  }
+ 
+  // ── 2. AVERAGE RESPONSE TIME ──────────────────────────────────────────────
+  if (/average response time/i.test(name)) {
+    const avgMatch = info.match(/avg=([\d.]+ms)/);
+    const avg      = avgMatch ? avgMatch[1] : null;
+    return {
+      title: 'Average Response Time',
+      description: avg
+        ? `Mean response time across all requests: ${avg}`
+        : 'Arithmetic mean of all HTTP request durations',
+    };
+  }
+ 
+  // ── 3. MAX RESPONSE TIME ──────────────────────────────────────────────────
+  if (/max response time/i.test(name)) {
+    const maxMatch = info.match(/max=([\d.smµ]+)/);
+    const max      = maxMatch ? maxMatch[1] : null;
+    return {
+      title: 'Maximum Response Time',
+      description: max
+        ? `Slowest single request recorded: ${max}`
+        : 'Worst-case response time observed during the test',
+    };
+  }
+ 
+  // ── 4. ERROR RATE ─────────────────────────────────────────────────────────
+  if (/error rate/i.test(name)) {
+    const rateMatch    = info.match(/error_rate=([\d.]+%)/);
+    const rate         = rateMatch ? rateMatch[1] : null;
+    const limitMatch   = name.match(/< ([\d]+%)/);
+    const limit        = limitMatch ? limitMatch[1] : null;
+    return {
+      title: 'HTTP Error Rate',
+      description: rate && limit
+        ? `${rate} of requests returned errors — target: below ${limit}`
+        : rate
+        ? `${rate} of requests failed during this test`
+        : limit
+        ? `Error rate must remain below ${limit}`
+        : 'Percentage of HTTP requests that returned an error',
+    };
+  }
+ 
+  // ── 5. THROUGHPUT ─────────────────────────────────────────────────────────
+  if (/throughput/i.test(name)) {
+    const rpsMatch = info.match(/([\d.]+)\s*req\/s/);
+    const rps      = rpsMatch ? rpsMatch[1] : null;
+    return {
+      title: 'Request Throughput',
+      description: rps
+        ? `${rps} requests/second sustained during this test`
+        : info === 'N/A'
+        ? 'Throughput data was not captured (no HTTP requests completed)'
+        : 'Number of HTTP requests handled per second',
+    };
+  }
+ 
+  // ── 6. MAX VIRTUAL USERS ──────────────────────────────────────────────────
+  if (/max virtual users/i.test(name)) {
+    const vusMatch = info.match(/max_vus=(\d+)/);
+    const vus      = vusMatch ? vusMatch[1] : null;
+    return {
+      title: 'Peak Virtual Users',
+      description: vus
+        ? `Maximum concurrent users reached: ${vus} VUs`
+        : 'Highest number of simultaneous virtual users during the test',
+    };
+  }
+ 
+  // ── 7. K6 CHECKS PASS RATE ───────────────────────────────────────────────
+  if (/checks pass rate/i.test(name)) {
+    const checkMatch = info.match(/checks=([\d.]+%)/);
+    const checkRate  = checkMatch ? checkMatch[1] : null;
+    const limitMatch = name.match(/> ([\d]+%)/);
+    const limit      = limitMatch ? limitMatch[1] : '95%';
+    return {
+      title: 'k6 Assertions Pass Rate',
+      description: checkRate
+        ? `${checkRate} of check() assertions passed — target: above ${limit}`
+        : info === 'N/A'
+        ? `No check() assertions in script — metric unavailable (target: above ${limit})`
+        : `Percentage of explicit check() assertions that passed`,
+    };
+  }
+ 
+  // ── 8. THRESHOLDS ─────────────────────────────────────────────────────────
+  if (/threshold:/i.test(name)) {
+    // p95 threshold
+    if (/p\(95\)/i.test(name) || /p\(95\)/i.test(info)) {
+      const p95Match   = info.match(/p\(95\)=([\d.]+[smµ]+)/);
+      const p95        = p95Match ? p95Match[1] : null;
+      const limitMatch = name.match(/p\(95\)<([\d]+)/);
+      const limit      = limitMatch ? `${limitMatch[1]}ms` : null;
+      return {
+        title: 'Threshold: p95 Response Time',
+        description: p95 && limit
+          ? `p(95)=${p95} — ${info.includes('Passed') ? 'passed' : 'failed'} (limit: ${limit})`
+          : info.includes('Passed')
+          ? 'Threshold condition was met ✓'
+          : 'Threshold condition was not met',
+      };
+    }
+ 
+    // error rate threshold
+    if (/rate</i.test(name) || /rate=/i.test(info)) {
+      const rateMatch  = info.match(/rate=([\d.]+%)/);
+      const rate       = rateMatch ? rateMatch[1] : null;
+      const limitMatch = name.match(/rate<([\d.]+)/);
+      const limit      = limitMatch ? `${parseFloat(limitMatch[1]) * 100}%` : null;
+      return {
+        title: 'Threshold: Error Rate',
+        description: rate && limit
+          ? `error_rate=${rate} — ${info.includes('Passed') ? 'passed' : 'failed'} (limit: below ${limit})`
+          : info.includes('Passed')
+          ? 'Error rate is within acceptable limits ✓'
+          : 'Error rate exceeded the allowed threshold',
+      };
+    }
+ 
+    // status 200/302 threshold
+    if (/status is 200/i.test(name) || /302/i.test(name)) {
+      return {
+        title: 'Threshold: HTTP Status Codes',
+        description: info.includes('Passed')
+          ? 'All responses returned HTTP 200 or 302 (redirect) ✓'
+          : 'Some responses returned unexpected HTTP status codes',
+      };
+    }
+ 
+    // VU duration threshold  e.g. "00/10 VUs 1m45s"
+    const vuMatch = name.match(/(\d+)\/(\d+)\s*VUs?\s+([\d]+[ms]+[\d]*[s]*)/i)
+                 || info.match(/(\d+)\/(\d+)\s*VUs?\s+([\d]+[ms]+[\d]*[s]*)/i);
+    if (vuMatch || /VUs?/i.test(name)) {
+      const durationMatch = (name + ' ' + info).match(/(\d+m\d+s|\d+s|\d+ms)/);
+      const duration      = durationMatch ? durationMatch[1] : null;
+      const vuCountMatch  = (name + ' ' + info).match(/\/(\d+)\s*VUs?/i);
+      const vuCount       = vuCountMatch ? vuCountMatch[1] : null;
+      return {
+        title: 'Threshold: Test Duration & VUs',
+        description: duration && vuCount
+          ? `Test ran for ${duration} with up to ${vuCount} virtual users ✓`
+          : duration
+          ? `Test completed within the ${duration} time limit ✓`
+          : info.includes('Passed')
+          ? 'Duration and VU count threshold was met ✓'
+          : 'Test duration or VU threshold condition',
+      };
+    }
+ 
+    // numeric threshold (e.g. "105", "2785 / ✗ 105")
+    if (/^\d+$/.test(info.trim()) || /\d+\s*\//.test(info)) {
+      return {
+        title: 'Threshold: Request Count',
+        description: info.includes('Passed')
+          ? `Request count condition met: ${info.replace('✓ Passed', '').trim()}`
+          : `Request count threshold failed: ${info.replace('✗ Failed', '').trim()}`,
+      };
+    }
+ 
+    // Fallback threshold
+    return {
+      title: 'k6 Threshold Check',
+      description: info.includes('Passed')
+        ? `Condition: "${name.replace(/^Threshold:\s*/i, '')}" — passed ✓`
+        : info.includes('Failed')
+        ? `Condition: "${name.replace(/^Threshold:\s*/i, '')}" — failed ✗`
+        : `k6 threshold: ${name.replace(/^Threshold:\s*/i, '')}`,
+    };
+  }
+ 
+  // ── FALLBACK ──────────────────────────────────────────────────────────────
+  return {
+    title: name.split('\n')[0].trim() || name,
+    description: info || 'k6 performance metric',
+  };
+}
+function K6ExecutionPanel({ generation }) {
+  const [activeType,   setActiveType]   = useState(null);
+  const [activeTab,    setActiveTab]    = useState('results');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [pdfLoading,   setPdfLoading]   = useState(false);
+  const dropdownRef = useRef(null);
+ 
+  const result  = generation?.result || {};
+  const summary = result?.summary   || {};
+  console.log('[K6] summary keys:', Object.keys(summary));
+console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
+  const tests   = result?.test_cases || result?.execution_results || [];
+  const url     = generation?.generation?.url || generation?.url || '';
+  const framework = generation?.framework || generation?.generation?.framework || 'k6';
+ 
+  // Détecte les types disponibles
+  const availableTypes = Object.keys(summary).filter(k => summary[k]);
+  const activeKey = activeType || availableTypes[0] || null;
+  const activeData = activeKey ? summary[activeKey] : null;
+  const activeMetrics = activeData?.metrics || {};
+ 
+  // Stats globales
+  const pass     = tests.filter(t => t.status === 'pass').length;
+  const fail     = tests.filter(t => t.status === 'fail').length;
+  const skip     = tests.filter(t => t.status === 'skip' || t.status === 'warn').length;
+  const total    = tests.length || 1;
+  const passRate = Math.round((pass / total) * 100);
+  const rateColor = passRate >= 80 ? '#10b981' : passRate >= 50 ? '#f59e0b' : '#ef4444';
+ 
+  useEffect(() => {
+    if (availableTypes.length > 0 && !activeType) setActiveType(availableTypes[0]);
+  }, [availableTypes.length]);
+ 
+  useEffect(() => {
+    const handler = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+ 
+  // ── Download CSV ──────────────────────────────────────────────────────────
+  const downloadCsv = () => {
+    const headers = ['Type', 'Status', 'p95 (ms)', 'Error Rate (%)', 'Req/s', 'Max VUs', 'Duration (s)'];
+    const rows = availableTypes.map(t => {
+      const d = summary[t] || {};
+      const m = d.metrics || {};
+      return [t, d.status || 'N/A', m.http_req_duration_p95 || 'N/A', m.http_req_failed_rate ?? 'N/A', m.http_reqs_per_second ?? 'N/A', m.vus_max ?? 'N/A', d.duration_seconds ?? 'N/A'];
+    });
+    const csv  = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `k6_performance_${generation?.generation?.id || 'nextest'}.csv`;
+    link.click();
+    setDropdownOpen(false);
+  };
+ 
+  // ── Download HTML ─────────────────────────────────────────────────────────
+  const downloadHtml = () => {
+    const now     = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const genId   = generation?.generation?.id || 'nextest';
+ 
+    const TYPE_CONFIG = {
+      load:   { label: 'Load Test',   icon: '📈', color: '#6366f1' },
+      stress: { label: 'Stress Test', icon: '🔥', color: '#ef4444' },
+      spike:  { label: 'Spike Test',  icon: '⚡', color: '#f59e0b' },
+      soak:   { label: 'Soak Test',   icon: '🌊', color: '#0ea5e9' },
+    };
+ 
+    const typeRows = availableTypes.map(t => {
+      const d   = summary[t] || {};
+      const m   = d.metrics || {};
+      const cfg = TYPE_CONFIG[t] || { label: t, icon: '📊', color: '#6366f1' };
+      const sc  = d.status === 'pass' ? '#10b981' : d.status === 'fail' ? '#ef4444' : '#64748b';
+      const thPasses = (d.threshold_passes || []).map(p => `<div style="color:#10b981;font-size:11px">✓ ${p}</div>`).join('');
+      const thFails  = (d.threshold_failures || []).map(p => `<div style="color:#ef4444;font-size:11px">✗ ${p}</div>`).join('');
+      return `
+        <div style="background:#0d1526;border:1px solid ${cfg.color}33;border-radius:14px;
+          padding:20px 24px;margin-bottom:16px;position:relative;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;right:0;height:3px;
+            background:linear-gradient(90deg,transparent,${cfg.color},transparent)"></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <span style="font-size:24px">${cfg.icon}</span>
+            <div style="flex:1">
+              <div style="font-size:16px;font-weight:700;color:${cfg.color}">${cfg.label}</div>
+              <div style="font-size:11px;color:#64748b;margin-top:2px">Duration: ${d.duration_seconds || 'N/A'}s</div>
+            </div>
+            <span style="font-size:10px;font-weight:800;padding:4px 12px;border-radius:20px;
+              color:${sc};background:${sc}18;border:1px solid ${sc}33;text-transform:uppercase">
+              ${d.status === 'pass' ? '✓ PASS' : d.status === 'fail' ? '✗ FAIL' : '— N/A'}
+            </span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">
+            ${[
+              { l: 'p95 Response', v: m.http_req_duration_p95 || 'N/A' },
+              { l: 'Avg Response', v: m.http_req_duration_avg || 'N/A' },
+              { l: 'Error Rate',   v: m.http_req_failed_rate != null ? `${m.http_req_failed_rate.toFixed(1)}%` : 'N/A' },
+              { l: 'Throughput',   v: m.http_reqs_per_second != null ? `${m.http_reqs_per_second.toFixed(1)}/s` : 'N/A' },
+              { l: 'Max VUs',      v: m.vus_max ?? 'N/A' },
+              { l: 'Iterations',   v: m.iterations ?? 'N/A' },
+              { l: 'Data Received', v: m.data_received || 'N/A' },
+              { l: 'Checks Rate',  v: m.checks_rate != null ? `${m.checks_rate.toFixed(1)}%` : 'N/A' },
+            ].map(item => `
+              <div style="background:#040914;border-radius:8px;padding:10px 12px">
+                <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${item.l}</div>
+                <div style="font-size:14px;font-weight:700;color:#e2e8f0">${item.v}</div>
+              </div>`).join('')}
+          </div>
+          ${thPasses || thFails ? `
+            <div style="background:#040914;border-radius:8px;padding:10px 12px">
+              <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Thresholds</div>
+              ${thPasses}${thFails}
+            </div>` : ''}
+        </div>`;
+    }).join('');
+ 
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NexTest k6 Performance Report #${genId}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#070e1c;color:#e2e8f0;font-family:'DM Sans',sans-serif;min-height:100vh}.page{max-width:1100px;margin:0 auto;padding:48px 32px 80px}@media print{body{background:#fff;color:#000}.no-print{display:none}.page{padding:10mm}@page{margin:15mm;size:A4}}</style>
+</head>
+<body>
+<div class="page">
+ 
+  <!-- HEADER -->
+  <div style="background:linear-gradient(135deg,#040914 0%,#0a1035 50%,#040914 100%);
+    border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
+    <div style="position:absolute;bottom:0;left:0;right:0;height:3px;
+      background:linear-gradient(90deg,transparent,#7D64FF,transparent)"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:26px;font-weight:700;color:#fff;letter-spacing:3px;margin-bottom:4px">
+          NEX<span style="color:#c9a227">TEST</span>
+        </div>
+        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">
+          k6 Performance Test Report
+        </div>
+        <div style="font-size:11px;color:#64748b">${dateStr} · ${timeStr}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:#64748b;margin-bottom:6px">
+          <span style="color:#7D64FF;font-weight:700">k6</span> · Load Testing
+        </div>
+        <div style="font-size:11px;color:#64748b;word-break:break-all;max-width:320px">${url}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px">
+      ${[
+        { l: 'URL',        v: `<span style="color:#a5b4fc;font-size:11px;word-break:break-all">${url}</span>` },
+        { l: 'Framework',  v: `<span style="color:#7D64FF;font-weight:700">k6 Load Testing</span>` },
+        { l: 'Test Types', v: `<span style="color:#e2e8f0">${availableTypes.map(t => t.charAt(0).toUpperCase()+t.slice(1)).join(', ')}</span>` },
+        { l: 'Pass Rate',  v: `<span style="font-size:18px;font-weight:700;color:${rateColor}">${passRate}%</span>` },
+      ].map(r => `
+        <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
+          <div style="font-size:12px">${r.v}</div>
+        </div>`).join('')}
+    </div>
+  </div>
+ 
+  <div class="no-print" style="margin-bottom:28px">
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;
+      background:linear-gradient(135deg,#7D64FF,#5b43cc);border:none;color:#fff;
+      font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+      🖨 Print / Save as PDF
+    </button>
+  </div>
+ 
+  <!-- GLOBAL STATS -->
+  <div style="margin:0 0 24px;padding-bottom:10px;border-bottom:2.5px solid #7D64FF;
+    display:flex;align-items:center;gap:10px">
+    <span style="font-size:18px">📊</span>
+    <span style="font-size:20px;font-weight:700;color:#e2e8f0">Global Summary</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:32px">
+    ${[
+      { icon: '✅', val: pass,       lbl: 'PASSED',    c: '#10b981', bg: 'rgba(16,185,129,.08)',  bd: 'rgba(16,185,129,.25)'  },
+      { icon: '❌', val: fail,       lbl: 'FAILED',    c: '#ef4444', bg: 'rgba(239,68,68,.08)',   bd: 'rgba(239,68,68,.25)'   },
+      { icon: '⏭️', val: skip,       lbl: 'WARN/SKIP', c: '#f59e0b', bg: 'rgba(245,158,11,.08)',  bd: 'rgba(245,158,11,.25)'  },
+      { icon: '🎯', val: `${passRate}%`, lbl: 'PASS RATE', c: rateColor, bg: `${rateColor}12`, bd: `${rateColor}33` },
+      { icon: '🔢', val: tests.length, lbl: 'TOTAL',   c: '#3b82f6', bg: 'rgba(59,130,246,.08)', bd: 'rgba(59,130,246,.25)'  },
+    ].map(s => `
+      <div style="background:${s.bg};border:1px solid ${s.bd};border-radius:14px;padding:20px;text-align:center">
+        <div style="font-size:20px;margin-bottom:8px">${s.icon}</div>
+        <div style="font-size:36px;font-weight:700;color:${s.c};line-height:1;margin-bottom:4px">${s.val}</div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
+      </div>`).join('')}
+  </div>
+ 
+  <!-- TEST TYPE RESULTS -->
+  <div style="margin:0 0 14px;padding-bottom:10px;border-bottom:2.5px solid #7D64FF;
+    display:flex;align-items:center;gap:10px">
+    <span style="font-size:18px">🚀</span>
+    <span style="font-size:20px;font-weight:700;color:#e2e8f0">Test Type Results</span>
+  </div>
+  ${typeRows}
+ 
+  <!-- DETAILED METRICS TABLE -->
+  <div style="margin:32px 0 14px;padding-bottom:10px;border-bottom:2.5px solid #0d9488;
+    display:flex;align-items:center;gap:10px">
+    <span style="font-size:18px">🔬</span>
+    <span style="font-size:20px;font-weight:700;color:#e2e8f0">Detailed Test Cases</span>
+  </div>
+  <div style="background:#0d1526;border:1px solid rgba(13,148,136,.3);border-radius:12px;overflow:hidden;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#040914">
+        ${['#','Test Name','Category','Section','Status','Value / Reason','Duration'].map(h =>
+          `<th style="padding:10px 12px;text-align:left;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#64748b;font-weight:700">${h}</th>`
+        ).join('')}
+      </tr></thead>
+      <tbody>
+        ${tests.map((t, i) => {
+          const sc = t.status==='pass'?'#10b981':t.status==='fail'?'#ef4444':'#f59e0b';
+          const sl = t.status==='pass'?'✓ PASS':t.status==='fail'?'✗ FAIL':'— SKIP';
+          return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);background:${i%2===0?'#0d1526':'#080f1e'}">
+            <td style="padding:9px 12px;color:#64748b;font-weight:700">${i+1}</td>
+            <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:12px">${t.name||'—'}</td>
+            <td style="padding:9px 12px;font-size:10px;color:#818cf8;font-weight:700">${(t.category||'performance').toUpperCase()}</td>
+            <td style="padding:9px 12px;font-size:10px;color:#64748b">${t.section||'—'}</td>
+            <td style="padding:9px 12px;text-align:center">
+              <span style="font-size:9px;font-weight:800;padding:3px 10px;border-radius:12px;color:${sc};background:${sc}18;border:1px solid ${sc}33">${sl}</span>
+            </td>
+            <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${t.suite||'—'}</td>
+            <td style="padding:9px 12px;font-size:11px;color:#64748b;text-align:center">${t.duration||'—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+ 
+  <!-- FOOTER -->
+  <div style="margin-top:48px;padding:20px 28px;background:rgba(125,100,255,.04);border-radius:12px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+    border:1px solid rgba(125,100,255,.15)">
+    <div style="font-size:14px;font-weight:700;color:#64748b">
+      NEX<span style="color:#c9a227">TEST</span> · k6 Performance Report
+    </div>
+    <div style="font-size:11px;color:#94a3b8">
+      ${dateStr} · k6 · ${availableTypes.length} test type(s) · ${passRate}% pass rate
+    </div>
+  </div>
+ 
+</div>
+</body>
+</html>`;
+ 
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `k6_performance_report_${genId}.html`;
+    link.click();
+    setDropdownOpen(false);
+  };
+ 
+  // ── Render ────────────────────────────────────────────────────────────────
+  return (
+    <div className="panel">
+ 
+      {/* ── HEADER ── */}
+      <div className="ep-header">
+        <div className="ep-header-left">
+          <div className="gp-tag" style={{ marginBottom: 8, background: 'rgba(125,100,255,.08)', border: '1px solid rgba(125,100,255,.2)' }}>
+            <span className="gp-tag-dot" style={{ background: '#7D64FF' }} />
+            k6 Performance Test
+          </div>
+          <h1 className="p-title">Performance <span className="g">k6</span></h1>
+          <div className="ep-info-bar">
+  <div className="ep-info-chip">
+    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+    <span>{url}</span>
+  </div>
+  <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(125,100,255,.15)', color: '#7D64FF', border: '1px solid rgba(125,100,255,.35)' }}>
+    <span style={{ fontWeight: 800 }}>k6</span> · Performance
+  </span>
+</div>
+        </div>
+ 
+        {/* Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 16 }}>
+
+  <div className="ep-actions">
+    {/* Bouton download script — toujours visible pour k6 */}
+    <button onClick={() => {
+      const content = result?.scripts
+        ? Object.values(result.scripts)[0] || ''
+        : result?.script || '';
+      const blob = new Blob([content], { type: 'text/javascript' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'k6_performance.js';
+      link.click();
+    }} className="ep-dl-btn">
+      <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span className="ep-dl-letters" style={{ color: '#7D64FF' }}>k6</span> .js
+    </button>
+
+    {/* Download Report dropdown */}
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
+      <button className="ep-pdf-btn" onClick={() => setDropdownOpen(o => !o)} disabled={pdfLoading}>
+        {pdfLoading ? (<><span className="spinner" /> Generating...</>) : (<>
+          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Download Report
+          <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" style={{ marginLeft: 2, transition: 'transform .2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}><path d="M6 9l6 6 6-6"/></svg>
+        </>)}
+      </button>
+      {dropdownOpen && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 6, boxShadow: '0 8px 32px rgba(0,0,0,.5)', zIndex: 200, minWidth: 190, animation: 'dFadeUp .18s var(--ease) both' }}>
+          {/* CSV */}
+          <button onClick={downloadCsv} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--green-bg)'; e.currentTarget.style.color = 'var(--green)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--sub)'; }}>
+            <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#10b981' }}>CSV</span>
+            <div><div style={{ fontSize: 12, fontWeight: 700 }}>rapport.csv</div><div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>Métriques tabulaires</div></div>
+          </button>
+          {/* HTML */}
+          <button onClick={downloadHtml} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--indigo-bg)'; e.currentTarget.style.color = 'var(--indigo3)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--sub)'; }}>
+            <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'var(--indigo-dim)', border: '1px solid var(--indigo-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: 'var(--indigo2)' }}>HTML</span>
+            <div><div style={{ fontSize: 12, fontWeight: 700 }}>rapport.html</div><div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>Rapport visuel</div></div>
+          </button>
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 6px' }} />
+          {/* PDF */}
+          <button onClick={async () => {
+            try {
+              setPdfLoading(true); setDropdownOpen(false);
+              const id = generation?.generation?.id;
+              if (!id) return;
+              const res = await api.get(`/generations/${id}/pdf`, { responseType: 'blob' });
+              const blob = new Blob([res.data], { type: 'application/pdf' });
+              const link = document.createElement('a');
+              link.href = URL.createObjectURL(blob);
+              link.download = `k6_performance_report_${id}.pdf`;
+              link.click();
+            } catch (err) { console.error(err); }
+            finally { setPdfLoading(false); }
+          }} disabled={pdfLoading}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left', opacity: pdfLoading ? .5 : 1 }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,.08)'; e.currentTarget.style.color = '#ef4444'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--sub)'; }}>
+            <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#ef4444' }}>PDF</span>
+            <div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>rapport.pdf</div><div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>Rapport complet</div></div>
+            {pdfLoading && <span className="spinner" />}
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+            <PerformanceScoreRing score={passRate} label={`${passRate}%`} color={rateColor} />
+
+        </div>
+      </div>
+ 
+      {/* ── GLOBAL STATS ── */}
+      <div className="ep-stats" style={{ marginBottom: 24 }}>
+        {[
+          { label: 'Passed',    val: pass,         color: '#10B981', bg: 'rgba(16,185,129,.08)',  border: 'rgba(16,185,129,.2)'  },
+          { label: 'Failed',    val: fail,         color: '#EF4444', bg: 'rgba(239,68,68,.08)',   border: 'rgba(239,68,68,.2)'   },
+          { label: 'Warn/Skip', val: skip,         color: '#F59E0B', bg: 'rgba(245,158,11,.08)',  border: 'rgba(245,158,11,.2)'  },
+          { label: 'Pass Rate', val: `${passRate}%`, color: rateColor, bg: `${rateColor}12`, border: `${rateColor}33` },
+        ].map((s, i) => (
+          <div key={s.label} className="ep-stat" style={{ '--sc': s.color, '--sb': s.bg, '--sbo': s.border, '--i': i }}>
+            <div className="ep-stat-body"><div className="ep-stat-val" style={{ color: s.color }}>{s.val}</div><div className="ep-stat-lbl">{s.label}</div></div>
+          </div>
+        ))}
+      </div>
+ 
+      {/* ── TEST TYPE SELECTOR ── */}
+      {availableTypes.length > 0 && (
+        <>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>
+            🚀 Test Type Results
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+            {availableTypes.map(typeKey => (
+              <K6TestTypeCard
+                key={typeKey}
+                typeKey={typeKey}
+                data={summary[typeKey]}
+                active={activeKey === typeKey}
+                onClick={() => setActiveType(typeKey)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+ 
+      {/* ── ACTIVE TYPE DETAIL ── */}
+      
+{/* ── TABS ── */}
+<div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+  {[
+    { key: 'results',         label: '📋 Test Cases',     count: tests.length },
+    { key: 'scenarios',       label: '🎯 Scenarios',       count: tests.length },
+    { key: 'recommendations', label: '💡 Recommendations', count: availableTypes.length },
+  ].map(tab => (
+    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+      style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 700, color: activeTab === tab.key ? 'var(--indigo2)' : 'var(--muted)', borderBottom: activeTab === tab.key ? '2px solid var(--indigo2)' : '2px solid transparent', marginBottom: -1, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: 8 }}>
+      {tab.label}
+      <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: activeTab === tab.key ? 'var(--indigo-bg)' : 'var(--bg2)', color: activeTab === tab.key ? 'var(--indigo2)' : 'var(--muted)' }}>{tab.count}</span>
+    </button>
+  ))}
+</div>
+ 
+      {/* ── TEST CASES LIST ── */}
+ {activeTab === 'results' && tests.length > 0 && (() => {
+ 
+  const TYPE_CONFIG = {
+    load:   { label: 'Load Test',   icon: '📈', color: '#6366f1', bg: 'rgba(99,102,241,.08)',  border: 'rgba(99,102,241,.25)',  desc: 'Normal expected traffic'   },
+    stress: { label: 'Stress Test', icon: '🔥', color: '#ef4444', bg: 'rgba(239,68,68,.08)',   border: 'rgba(239,68,68,.25)',   desc: 'Beyond capacity — breaking point' },
+    spike:  { label: 'Spike Test',  icon: '⚡', color: '#f59e0b', bg: 'rgba(245,158,11,.08)',  border: 'rgba(245,158,11,.25)',  desc: 'Sudden traffic burst'      },
+    soak:   { label: 'Soak Test',   icon: '🌊', color: '#0ea5e9', bg: 'rgba(14,165,233,.08)',  border: 'rgba(14,165,233,.25)',  desc: 'Extended load — memory leaks' },
+  };
+ 
+  const getType = (test) => {
+    const n = (test.name || '').toLowerCase();
+    if (n.includes('[load'))   return 'load';
+    if (n.includes('[stress')) return 'stress';
+    if (n.includes('[spike'))  return 'spike';
+    if (n.includes('[soak'))   return 'soak';
+    return 'load';
+  };
+ 
+  const catColor = (catLabel) =>
+    catLabel === 'RESPONSE TIME' ? '#6366f1'
+    : catLabel === 'ERROR RATE'  ? '#ef4444'
+    : catLabel === 'THROUGHPUT'  ? '#10b981'
+    : catLabel === 'SCALABILITY' ? '#0ea5e9'
+    : catLabel === 'RELIABILITY' ? '#8b5cf6'
+    : catLabel === 'THRESHOLDS'  ? '#c9a227'
+    : '#7D64FF';
+ 
+  const timeVal = (test) => {
+    if (test.duration && test.duration !== 0 && test.duration !== '0')
+      return `${test.duration}ms`;
+    const m = (test.name || test.suite || '').match(/(\d+m\d+s|\d+s|\d+ms)/);
+    return m ? m[0] : '—';
+  };
+ 
+  // Group tests by type
+  const groups = {};
+  tests.forEach(test => {
+    const type = getType(test);
+    if (!groups[type]) groups[type] = [];
+    groups[type].push(test);
+  });
+ 
+  const typeOrder = ['load', 'stress', 'spike', 'soak'];
+ 
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {typeOrder.filter(t => groups[t]?.length).map(typeKey => {
+        const cfg       = TYPE_CONFIG[typeKey];
+        const groupTests = groups[typeKey];
+        const pass      = groupTests.filter(t => t.status === 'pass').length;
+        const fail      = groupTests.filter(t => t.status === 'fail').length;
+        const skip      = groupTests.filter(t => t.status === 'skip' || t.status === 'warn').length;
+        const groupStatus = fail > 0 ? 'fail' : skip === groupTests.length ? 'skip' : 'pass';
+        const statusColor = groupStatus === 'pass' ? '#10b981' : groupStatus === 'fail' ? '#ef4444' : '#f59e0b';
+ 
+        // Get duration from last threshold row
+        const durationTest = groupTests.find(t =>
+          (t.name || '').match(/\d+m\d+s|\d+VUs/i) ||
+          (t.suite || '').match(/\d+m\d+s|\d+VUs/i)
+        );
+        const durationMatch = durationTest
+          ? (durationTest.name + ' ' + (durationTest.suite || '')).match(/(\d+m\d+s|\d+s)/)
+          : null;
+        const duration = durationMatch ? durationMatch[1] : null;
+ 
+        // VU count
+        const vuTest = groupTests.find(t => /max_vus=\d+/i.test(t.suite || ''));
+        const vuMatch = vuTest ? (vuTest.suite || '').match(/max_vus=(\d+)/) : null;
+        const vus = vuMatch ? vuMatch[1] : null;
+ 
+        return (
+          <div key={typeKey} style={{
+            background: 'var(--card)',
+            border: `1px solid ${cfg.border}`,
+            borderRadius: 16,
+            overflow: 'hidden',
+            boxShadow: `0 4px 20px ${cfg.color}10`,
+          }}>
+ 
+            {/* ── GROUP HEADER ── */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 16,
+              padding: '16px 24px',
+              background: cfg.bg,
+              borderBottom: `1px solid ${cfg.border}`,
+              position: 'relative', overflow: 'hidden',
+            }}>
+              {/* Left accent bar */}
+              <div style={{
+                position: 'absolute', left: 0, top: 0, bottom: 0,
+                width: 4, background: cfg.color, borderRadius: '0 4px 4px 0',
+              }} />
+ 
+              <span style={{ fontSize: 24, marginLeft: 4 }}>{cfg.icon}</span>
+ 
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 3 }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: cfg.color }}>
+                    {cfg.label}
+                  </span>
+                  {duration && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                      color: cfg.color, background: `${cfg.color}15`,
+                      border: `1px solid ${cfg.color}30`,
+                    }}>
+                      ⏱ {duration}
+                    </span>
+                  )}
+                  {vus && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                      color: cfg.color, background: `${cfg.color}15`,
+                      border: `1px solid ${cfg.color}30`,
+                    }}>
+                      👥 {vus} VUs
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{cfg.desc}</div>
+              </div>
+ 
+              {/* Stats */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
+                  <span style={{ color: '#10b981', fontWeight: 700 }}>{pass} pass</span>
+                  {fail > 0 && <span style={{ color: '#ef4444', fontWeight: 700 }}>{fail} fail</span>}
+                  {skip > 0 && <span style={{ color: '#f59e0b', fontWeight: 700 }}>{skip} skip</span>}
+                </div>
+                <span style={{
+                  fontSize: 10, fontWeight: 800, padding: '4px 12px', borderRadius: 20,
+                  color: statusColor, background: `${statusColor}15`,
+                  border: `1px solid ${statusColor}33`,
+                }}>
+                  {groupStatus === 'pass' ? '✓ PASS' : groupStatus === 'fail' ? '✗ FAIL' : '— SKIP'}
+                </span>
+              </div>
+            </div>
+ 
+            {/* ── COLUMN HEADERS ── */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '28px 1fr 160px 90px 70px',
+              gap: 12, padding: '10px 20px',
+              background: 'var(--bg)',
+              borderBottom: '1px solid var(--border)',
+            }}>
+              {['', 'Test Name', 'Category', 'Status', 'Time'].map(h => (
+                <div key={h} style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: 1.5,
+                  textTransform: 'uppercase', color: 'var(--muted)',
+                }}>{h}</div>
+              ))}
+            </div>
+ 
+            {/* ── TEST ROWS ── */}
+            {groupTests.map((test, i) => {
+              const sc  = test.status === 'pass' ? '#10b981'
+                        : test.status === 'fail' ? '#ef4444'
+                        : '#f59e0b';
+              const cat     = (test.section || test.category || 'performance').toUpperCase();
+              const catC    = catColor(cat);
+              const tv      = timeVal(test);
+              const { title, description } = formatK6TestCase(test.name, test.suite, test.section);
+ 
+              return (
+                <div key={i} style={{
+                  display: 'grid',
+                  gridTemplateColumns: '28px 1fr 160px 90px 70px',
+                  gap: 12, padding: '13px 20px',
+                  borderBottom: i < groupTests.length - 1 ? '1px solid var(--border)' : 'none',
+                  alignItems: 'center',
+                  background: test.status === 'fail' ? 'rgba(239,68,68,.02)' : 'transparent',
+                  animation: `dFadeUp .25s var(--ease) ${i * 0.03}s both`,
+                  transition: 'background .15s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = test.status === 'fail' ? 'rgba(239,68,68,.04)' : 'var(--bg)'}
+                  onMouseLeave={e => e.currentTarget.style.background = test.status === 'fail' ? 'rgba(239,68,68,.02)' : 'transparent'}
+                >
+                  {/* Status icon */}
+                  <div><StatusIcon s={test.status} /></div>
+ 
+                  {/* Title + description */}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 13, fontWeight: 600, color: 'var(--text)',
+                      marginBottom: 2, overflow: 'hidden',
+                      textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {title}
+                    </div>
+                    <div style={{
+                      fontSize: 11, color: 'var(--muted)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      lineHeight: 1.4,
+                    }}>
+                      {description}
+                    </div>
+                  </div>
+ 
+                  {/* Category */}
+                  <div>
+                    <span style={{
+                      fontSize: 9, fontWeight: 800, padding: '3px 10px',
+                      borderRadius: 20, letterSpacing: .8, textTransform: 'uppercase',
+                      color: catC, background: `${catC}18`,
+                      border: `1px solid ${catC}44`, whiteSpace: 'nowrap',
+                    }}>
+                      {cat}
+                    </span>
+                  </div>
+ 
+                  {/* Status */}
+                  <div>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      fontSize: 10, fontWeight: 800, padding: '3px 10px',
+                      borderRadius: 20,
+                      color: sc, background: `${sc}18`, border: `1px solid ${sc}44`,
+                    }}>
+                      {test.status === 'pass' ? '✓ PASS' : test.status === 'fail' ? '✗ FAIL' : '— SKIP'}
+                    </span>
+                  </div>
+ 
+                  {/* Time */}
+                  <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'monospace', textAlign: 'right' }}>
+                    {tv}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+})()}
+ 
+  
+
+      {activeTab === 'scenarios' && tests.length > 0 && (
+  <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 100px 100px', gap: 12, padding: '12px 20px', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+      {['#', 'Scenario', 'Category', 'Type', 'Status'].map(h => (
+        <div key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
+      ))}
+    </div>
+    {tests.map((test, i) => (
+      <div key={i} style={{
+  display: 'flex', alignItems: 'center', gap: 16,
+  padding: '14px 20px', borderBottom: i < tests.length - 1 ? '1px solid var(--border)' : 'none',
+  animation: `dFadeUp .25s var(--ease) ${i * 0.04}s both`,
+}}>
+  {/* Nom du test */}
+  <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{test.name?.replace(/^\[.*?\]\s*/, '')}</div>
+    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{test.suite || '—'}</div>
+  </div>
+
+  {/* CATEGORY */}
+  <span style={{
+    fontSize: 10, fontWeight: 700, padding: '4px 12px', borderRadius: 20,
+    color: '#7D64FF', background: 'rgba(125,100,255,.1)', border: '1px solid rgba(125,100,255,.25)',
+    textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0,
+  }}>
+    {test.category || 'performance'}
+  </span>
+
+  {/* TYPE (section) */}
+  <span style={{
+    fontSize: 10, fontWeight: 700, padding: '4px 12px', borderRadius: 20,
+    color: '#0ea5e9', background: 'rgba(14,165,233,.1)', border: '1px solid rgba(14,165,233,.25)',
+    textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0,
+  }}>
+    {test.section || 'k6'}
+  </span>
+
+  {/* STATUS */}
+  <span style={{
+    fontSize: 10, fontWeight: 800, padding: '4px 12px', borderRadius: 20, flexShrink: 0,
+    color: test.status === 'pass' ? '#10b981' : test.status === 'fail' ? '#ef4444' : '#f59e0b',
+    background: test.status === 'pass' ? 'rgba(16,185,129,.1)' : test.status === 'fail' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)',
+    border: `1px solid ${test.status === 'pass' ? 'rgba(16,185,129,.25)' : test.status === 'fail' ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)'}`,
+  }}>
+    {test.status === 'pass' ? '✓ PASS' : test.status === 'fail' ? '✗ FAIL' : '— SKIP'}
+  </span>
+
+  {/* DURATION */}
+  <span style={{ fontSize: 11, color: 'var(--muted)', minWidth: 50, textAlign: 'right', fontFamily: 'monospace', flexShrink: 0 }}>
+    {test.duration != null && test.duration !== 0 ? `${test.duration}ms` : '—'}
+  </span>
+</div>
+    ))}
+  </div>
+)}
+
+{activeTab === 'recommendations' && tests.length > 0 && (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    {(() => {
+      const recs = [];
+      if (fail > 0) recs.push({ priority: 'high', category: 'server', title: `${fail} Test(s) Failed`, description: 'Review failed test cases — thresholds exceeded or k6 script errors detected.', impact: 'Fix failures to ensure performance targets are met' });
+      if (skip > 0) recs.push({ priority: 'medium', category: 'network', title: `${skip} Test(s) Skipped`, description: 'Some metrics could not be parsed — check k6 output format.', impact: 'Better metric coverage' });
+      if (summary['stress']?.status === 'fail') recs.push({ priority: 'critical', category: 'server', title: 'Stress Test Failed', description: 'Server breaks under high load. Consider horizontal scaling or optimizing backend response time.', impact: 'Improved resilience under traffic spikes' });
+      if (pass === tests.length && tests.length > 0) recs.push({ priority: 'low', category: 'caching', title: 'All Threshold Tests Passed 🎉', description: 'All k6 threshold checks passed. Application handles expected load well.', impact: 'Continue monitoring with each release' });
+      if (recs.length === 0) recs.push({ priority: 'low', category: 'caching', title: 'Performance Looks Good', description: 'No critical issues detected. Keep monitoring load and stress scenarios.', impact: 'Sustained performance' });
+      return recs;
+    })().map((rec, i) => (
+      <RecommendationCard key={i} rec={rec} index={i} />
+    ))}
+  </div>
+)}
+    </div>
+  );
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // ExecutionPanel
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3012,11 +4067,12 @@ function ExecutionPanel({ generation }) {
   const framework = generation?.generation?.framework || generation?.framework || 'Selenium';
   const testType  = generation?.result?.test_type     || generation?.test_type  || 'smoke';
 
-  if (testType === 'performance') {
-
-    
-    return <PerformanceExecutionPanel generation={generation} />;
-  }
+  if (testType === 'performance' && framework === 'k6') {
+  return <K6ExecutionPanel generation={generation} />;
+}
+if (testType === 'performance') {
+  return <PerformanceExecutionPanel generation={generation} />;
+}
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
 useEffect(() => {
@@ -5400,28 +6456,84 @@ useEffect(() => {
   const toggleSort = (key) => { if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { setSortKey(key); setSortDir('desc'); } };
 
  const handleView = (item) => {
-    setGeneration({
-      url: item.url, framework: item.framework, test_type: item.test_type,
-      generation: { id: item.id, url: item.url, framework: item.framework, load_time_ms: item.load_time_ms, test_type: item.test_type },
-      result: {
-        test_type: item.test_type||'smoke', test_cases: item.test_cases||[],
-        test_cases_selenium: item.test_cases_selenium||[], test_cases_cypress: item.test_cases_cypress||[],
-        script: item.script||'', script_selenium: item.script_selenium||'',
-        script_playwright: item.script_playwright||'', script_cypress: item.script_cypress||'',
-        script_postman: item.script_postman || '',
-        script_pytest:  item.script_pytest  || '',
-        domains:        item.domains        || [],
-        base_url:       item.base_url       || item.url || '',
-        pass_count:     item.pass_count     || 0,
-        fail_count:     item.fail_count     || 0,
-        skip_count:     item.skip_count     || 0,
-        pass_rate:      item.pass_rate      || 0,
-        execution_results: item.execution_results||[],
-        performance: item.performance_data || item.performance || null,
-      },
-    });
-    goTo('execution');
+  const parsedResult = typeof item.result === 'string' 
+    ? JSON.parse(item.result || '{}') 
+    : (item.result || {});
+    console.log('[HistoryPanel handleView] item.summary:', item.summary);
+  console.log('[HistoryPanel handleView] item.test_cases length:', item.test_cases?.length);
+  console.log('[HistoryPanel handleView] parsedResult:', parsedResult);
+  setGeneration({
+    url: item.url, framework: item.framework, test_type: item.test_type,
+    generation: { 
+      id: item.id, 
+      url: item.url, 
+      framework: item.framework, 
+      load_time_ms: item.load_time_ms, 
+      test_type: item.test_type 
+    },
+    result: {
+      test_type: item.test_type || 'smoke',
+      test_cases: item.test_cases || parsedResult.test_cases || [],
+      test_cases_selenium: item.test_cases_selenium || parsedResult.test_cases_selenium || [],
+      test_cases_cypress: item.test_cases_cypress || parsedResult.test_cases_cypress || [],
+      script: item.script || parsedResult.script || '',
+      script_selenium: item.script_selenium || parsedResult.script_selenium || '',
+      script_playwright: item.script_playwright || parsedResult.script_playwright || '',
+      script_cypress: item.script_cypress || parsedResult.script_cypress || '',
+      script_postman: item.script_postman || parsedResult.script_postman || '',
+      script_pytest: item.script_pytest || parsedResult.script_pytest || '',
+      domains: item.domains || parsedResult.domains || [],
+      base_url: item.base_url || parsedResult.base_url || item.url || '',
+      pass_count: item.pass_count || 0,
+      fail_count: item.fail_count || 0,
+      skip_count: item.skip_count || 0,
+      pass_rate: item.pass_rate || 0,
+      summary: (() => {
+  const raw = item.summary && !Array.isArray(item.summary) ? item.summary
+    : parsedResult.summary && !Array.isArray(parsedResult.summary) ? parsedResult.summary
+    : null;
+  if (raw && Object.keys(raw).length > 0) return raw;
+  const cases = item.test_cases || [];
+  const built = {};
+  ['load', 'stress', 'spike', 'soak'].forEach(type => {
+    const label = type.charAt(0).toUpperCase() + type.slice(1);
+    const matching = cases.filter(tc =>
+      tc.name?.toLowerCase().includes(`[${type} test]`) ||
+      tc.name?.toLowerCase().includes(`[${label} test]`)
+    );
+    if (matching.length > 0) {
+  const thresholds = matching.filter(tc => tc.section === 'Thresholds');
+  const nonSkipped = matching.filter(t => t.status !== 'skip');
+  
+  let status;
+  if (thresholds.length > 0) {
+    status = thresholds.some(t => t.status === 'fail') ? 'fail' : 'pass';
+  } else {
+    status = nonSkipped.some(t => t.status === 'fail') ? 'fail' : 'pass';
+  }
+
+  built[type] = {
+    status,
+    metrics: {},
+    threshold_passes: matching.filter(t => t.status === 'pass').map(t => t.suite || t.name),
+    threshold_failures: matching.filter(t => t.status === 'fail').map(t => t.suite || t.name),
+    duration_seconds: null,
   };
+}
+  });
+  return Object.keys(built).length > 0 ? built : {};
+})(),
+
+      scripts: item.scripts || parsedResult.scripts || {},
+      execution_results: (item.execution_results || parsedResult.execution_results || []).map(r => ({
+        ...r,
+        screenshot: r.screenshot ?? null,
+      })),
+      performance: item.performance_data || item.performance || parsedResult.performance || null,
+    },
+  });
+  goTo('execution');
+};
 
   const handleDelete = async (id) => {
     setDeleting(id);

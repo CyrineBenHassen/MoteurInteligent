@@ -3,8 +3,7 @@ from unittest import result
 from fastapi import FastAPI
 from scraper import scrape_page
 from generator import generate_tests
-from generator_performance import generate_performance_tests
-from runner_performance import run_performance
+
 from analyzer import analyze_error
 from runner import run_selenium_script
 from runner_selenium import run_selenium_real
@@ -29,6 +28,9 @@ from regression_runner import run_regression_tests
 
 from functional_generator import generate_functional_tests
 from functional_runner import run_functional_tests
+
+from performance_generator import generate_performance_tests
+from performance_runner import run_performance_tests
 
 _api_lock = threading.Lock()
 
@@ -658,4 +660,70 @@ def generate_functional(data: dict):
             "category_stats":    run_result.get("category_stats", {}),
         },
     }
+    # ── Performance Test Endpoint
+@app.post("/generate-performance")
+def generate_performance(data: dict):
+    url        = data.get("url", "")
+    test_types = data.get("test_types", ["load", "stress", "spike", "soak"])
  
+    if not url:
+        return {"error": "URL is required"}
+ 
+    from urllib.parse import urlparse
+    parsed   = urlparse(url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+ 
+    print(f"[PERFORMANCE] base_url={base_url} | types={test_types}")
+ 
+    # Step 1 — Generate k6 scripts with LLaMA
+    gen_result = generate_performance_tests(
+        base_url=base_url,
+        test_types=test_types,
+    )
+    scripts = gen_result.get("scripts", {})
+ 
+    if not scripts:
+        return {"error": "Failed to generate k6 scripts"}
+ 
+    # Step 2 — Run k6 scripts
+    run_result = run_performance_tests(
+        scripts=scripts,
+        base_url=base_url,
+    )
+ 
+    execution_results = run_result.get("results", [])
+    pass_count = run_result["pass_count"]
+    fail_count = run_result["fail_count"]
+    skip_count = run_result["skip_count"]
+    pass_rate  = run_result["pass_rate"]
+ 
+    # Build summary per test type
+    summary = {}
+    for test_type, rr in run_result.get("run_results", {}).items():
+        summary[test_type] = {
+            "name":             scripts[test_type]["name"],
+            "status":           rr["status"],
+            "duration_seconds": rr.get("duration_seconds", 0),
+            "metrics":          rr.get("metrics", {}),
+            "threshold_passes": rr.get("threshold_passes", []),
+            "threshold_failures": rr.get("threshold_failures", []),
+        }
+ 
+    return {
+        "url":       url,
+        "framework": "k6",
+        "test_type": "performance",
+        "scraped":   {"url": url, "load_time_ms": 0},
+        "result": {
+            "test_cases":        execution_results,
+            "execution_results": execution_results,
+            "pass_count":        pass_count,
+            "fail_count":        fail_count,
+            "skip_count":        skip_count,
+            "pass_rate":         pass_rate,
+            "test_type":         "performance",
+            "summary":           summary,
+            "scripts":           {k: v["script"] for k, v in scripts.items()},
+        },
+    }
+  

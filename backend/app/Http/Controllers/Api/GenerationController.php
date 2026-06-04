@@ -323,7 +323,21 @@ public function index()
 {
     $generations = Generation::where('user_id', auth()->id())
         ->orderBy('created_at', 'desc')
-        ->get();
+        ->get()
+        ->map(function ($g) {
+            $arr = $g->toArray();
+           if ($g->test_type === 'performance' && $g->framework === 'k6') {
+    $parsed = [];
+    if ($g->result) {
+        $parsed = is_string($g->result) ? json_decode($g->result, true) : $g->result;
+    }
+    $arr['test_cases']        = $g->test_cases ?? $parsed['test_cases'] ?? $parsed['execution_results'] ?? [];
+    $arr['execution_results'] = $arr['test_cases'];
+    $arr['summary']           = $parsed['summary'] ?? [];
+    $arr['scripts']           = $parsed['scripts'] ?? [];
+}
+            return $arr;
+        });
 
     return response()->json($generations);
 }
@@ -407,6 +421,7 @@ public function index()
             'fail_count'        => $generation->fail_count ?? 0,
             'skip_count'        => $generation->skip_count ?? 0,
             'pass_rate'         => $generation->pass_rate  ?? 0,
+            'summary'           => $generation->result ? (is_string($generation->result) ? json_decode($generation->result, true)['summary'] ?? [] : ($generation->result['summary'] ?? [])) : [],
         ]);
 
         if ($response->failed()) {
@@ -952,7 +967,8 @@ public function generateRegression(Request $request)
         }
 
         $result     = $data['result'] ?? [];
-        $testCases  = $result['execution_results'] ?? $result['test_cases'] ?? [];
+
+     $testCases  = $result['execution_results'] ?? $result['test_cases'] ?? [];
         $passCount  = $result['pass_count'] ?? 0;
         $failCount  = $result['fail_count'] ?? 0;
         $skipCount  = $result['skip_count'] ?? 0;
@@ -1063,6 +1079,79 @@ public function generateFunctional(Request $request)
 
     } catch (\Exception $e) {
         Log::error('[NEXTEST] generateFunctional() exception', ['error' => $e->getMessage()]);
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
+
+public function generatePerformance(Request $request)
+{
+    set_time_limit(1000);
+    $validated = $request->validate([
+        'url'        => 'required|string',
+        'framework'  => 'nullable|string',
+        'project_id' => 'nullable|integer',
+        'test_types' => 'nullable|array',
+    ]);
+ 
+    $url        = $validated['url'];
+    $framework  = $validated['framework'] ?? 'k6';
+    $projectId  = $validated['project_id'] ?? null;
+    $testTypes  = $validated['test_types'] ?? ['load', 'stress', 'spike', 'soak'];
+ 
+    try {
+        // Performance tests take longer — timeout 600s
+        $response = Http::timeout(900)->post('http://127.0.0.1:8001/generate-performance', [
+            'url'        => $url,
+            'framework'  => $framework,
+            'project_id' => $projectId,
+            'test_types' => $testTypes,
+        ]);
+ 
+        $data = $response->json();
+ 
+        if (!$data || isset($data['error'])) {
+            return response()->json(['error' => $data['error'] ?? 'Generation failed'], 500);
+        }
+ 
+        $result = $data['result'] ?? $data ?? [];
+        $testCases  = $result['execution_results'] ?? $result['test_cases'] ?? [];
+        $passCount  = $result['pass_count'] ?? 0;
+        $failCount  = $result['fail_count'] ?? 0;
+        $skipCount  = $result['skip_count'] ?? 0;
+        $passRate   = $result['pass_rate'] ?? 0;
+ \Log::info('[K6 SAVE] result keys: ' . implode(', ', array_keys($result)));
+\Log::info('[K6 SAVE] summary keys: ' . implode(', ', array_keys($result['summary'] ?? [])));
+        $generation = Generation::create([
+    'user_id'     => auth()->id(),
+    'project_id'  => $projectId,
+    'url'         => $url,
+    'framework'   => $framework,
+    'test_type'   => 'performance',
+    'status'      => 'completed',
+    'result'      => $result,
+    'test_cases'        => $testCases,       
+    'execution_results' => $testCases,
+    'pass_count'  => $passCount,
+    'fail_count'  => $failCount,
+    'skip_count'  => $skipCount,
+    'pass_rate'   => (int) round($passRate),
+]);
+ 
+        return response()->json([
+            'id'         => $generation->id,
+            'url'        => $url,
+            'framework'  => $framework,
+            'test_type'  => 'performance',
+            'result'     => $result,
+            'pass_count' => $passCount,
+            'fail_count' => $failCount,
+            'skip_count' => $skipCount,
+            'pass_rate'  => $passRate,
+            'test_cases' => $testCases,
+            'summary'    => $result['summary'] ?? [],
+        ]);
+ 
+    } catch (\Exception $e) {
         return response()->json(['error' => $e->getMessage()], 500);
     }
 }

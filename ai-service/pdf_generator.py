@@ -2407,7 +2407,7 @@ def _generate_security_pdf(generation_data: dict, tests: list) -> bytes:
     build_stats_section(elements, tests, tests)
     elements.append(Spacer(1, 16))
 
-    # ── CATEGORY SUMMARY ─────────────────────────────────────
+     # ── CATEGORY SUMMARY ─────────────────────────────────────
     build_security_category_summary(elements, tests)
 
     # ── DETAILED RESULTS ─────────────────────────────────────
@@ -3572,10 +3572,660 @@ def _generate_functional_pdf(generation_data: dict, tests: list) -> bytes:
     build_functional_recommendations(elements, tests, url)
  
     doc.build(elements, onFirstPage=on_page_func, onLaterPages=on_page_func)
-    return buffer.getvalue()    
+    return buffer.getvalue()  
+def build_k6_scenarios(elements, tests: list, url: str):
+    """Planned k6 scenarios — Load/Stress/Spike/Soak test cases."""
+    elements.append(section_header('📋', 'k6 Performance Test Scenarios', HexColor('#7D64FF')))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(
+        f'<font color="#64748b" size="7.5"><i>'
+        f'Performance test plan for <b>{url}</b> — '
+        f'{len(tests)} test cases across Load, Stress, Spike and Soak scenarios.</i></font>',
+        ParagraphStyle('K6ScInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
+    elements.append(Spacer(1, 8))
+
+    TYPE_COLORS = {
+        'load':   '#6366f1',
+        'stress': '#ef4444',
+        'spike':  '#f59e0b',
+        'soak':   '#0ea5e9',
+    }
+    SECTION_COLORS = {
+        'Response Time': '#6366f1',
+        'Error Rate':    '#ef4444',
+        'Throughput':    '#10b981',
+        'Scalability':   '#f97316',
+        'Reliability':   '#8b5cf6',
+        'Thresholds':    '#0ea5e9',
+    }
+
+    hdr = [
+        Paragraph('<font color="#ffffff"><b>#</b></font>',
+                  ParagraphStyle('K6SH0', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Test Scenario</b></font>',
+                  ParagraphStyle('K6SH1', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Test Type</b></font>',
+                  ParagraphStyle('K6SH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Section</b></font>',
+                  ParagraphStyle('K6SH3', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Expected Result</b></font>',
+                  ParagraphStyle('K6SH4', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Category</b></font>',
+                  ParagraphStyle('K6SH5', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+    ]
+    rows = [hdr]
+    row_styles = []
+
+    for i, t in enumerate(tests):
+        name    = t.get('name', f'Test {i+1}')
+        suite   = t.get('suite', '')
+        section = t.get('section', '—')
+        cat     = t.get('category', 'performance')
+
+        # Detect test type from name
+        type_key = 'load'
+        if 'Stress' in name:    type_key = 'stress'
+        elif 'Spike' in name:   type_key = 'spike'
+        elif 'Soak' in name:    type_key = 'soak'
+        tc  = TYPE_COLORS.get(type_key, '#6366f1')
+        sc  = SECTION_COLORS.get(section, '#64748b')
+
+        # Infer expected result from section
+        expected_map = {
+            'Response Time': 'Response time within threshold',
+            'Error Rate':    'Error rate below threshold limit',
+            'Throughput':    'Requests/sec meets minimum target',
+            'Scalability':   'VU count reaches target',
+            'Reliability':   'Check pass rate > 95%',
+            'Thresholds':    'k6 threshold condition satisfied',
+        }
+        expected = expected_map.get(section, suite[:50] if suite else 'Test executes successfully')
+
+        rows.append([
+            Paragraph(f'<font color="#64748b"><b>{i+1}</b></font>',
+                      ParagraphStyle('K6SID', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<b><font color="#1e293b" size="8">{name}</font></b>',
+                      ParagraphStyle('K6SN', fontSize=8, fontName='Helvetica', leading=11)),
+            Paragraph(f'<font color="{tc}"><b>{type_key.upper()}</b></font>',
+                      ParagraphStyle('K6ST', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{sc}"><b>{section}</b></font>',
+                      ParagraphStyle('K6SS', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#475569" size="7">{expected}</font>',
+                      ParagraphStyle('K6SE', fontSize=7, fontName='Helvetica', leading=10)),
+            Paragraph(f'<font color="#7D64FF"><b>{cat.upper()}</b></font>',
+                      ParagraphStyle('K6SC', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        ])
+        if i % 2 == 1:
+            row_styles.append(('BACKGROUND', (0, i+1), (-1, i+1), LIGHT_BG))
+
+    tbl = Table(rows, colWidths=[8*mm, 54*mm, 20*mm, 24*mm, 44*mm, 18*mm], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,0), NAVY),
+        ('PADDING',       (0,0), (-1,-1), 7),
+        ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
+        ('BOX',           (0,0), (-1,-1), 0.8, HexColor('#7D64FF')),
+        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
+        ('ALIGN',         (0,0), (0,-1), 'CENTER'),
+        ('ALIGN',         (2,0), (2,-1), 'CENTER'),
+        ('ALIGN',         (3,0), (3,-1), 'CENTER'),
+        ('ALIGN',         (5,0), (5,-1), 'CENTER'),
+        ('LINEBEFORE',    (2,1), (2,-1), 1, BORDER),
+        ('LINEBEFORE',    (4,1), (4,-1), 1, BORDER),
+    ] + row_styles))
+    elements.append(tbl)
+    elements.append(Spacer(1, 16))
+
+
+def build_k6_category_summary(elements, tests: list, summary: dict):
+    """Results by test type (Load/Stress/Spike/Soak) — k6 equivalent of regression category summary."""
+    elements.append(Spacer(1, 18))
+    elements.append(section_header('📊', 'Results by Test Type', HexColor('#7D64FF')))
+    elements.append(Spacer(1, 8))
+
+    TYPE_CONFIG = {
+        'load':   {'label': 'Load Test',   'color': '#6366f1', 'icon': '📈'},
+        'stress': {'label': 'Stress Test', 'color': '#ef4444', 'icon': '🔥'},
+        'spike':  {'label': 'Spike Test',  'color': '#f59e0b', 'icon': '⚡'},
+        'soak':   {'label': 'Soak Test',   'color': '#0ea5e9', 'icon': '🌊'},
+    }
+
+    # Count per type from tests list
+    type_stats = {}
+    for t in tests:
+        name = t.get('name', '')
+        type_key = 'load'
+        if 'Stress' in name:  type_key = 'stress'
+        elif 'Spike' in name: type_key = 'spike'
+        elif 'Soak' in name:  type_key = 'soak'
+
+        if type_key not in type_stats:
+            type_stats[type_key] = {'pass': 0, 'fail': 0, 'skip': 0, 'total': 0}
+        type_stats[type_key]['total'] += 1
+        s = t.get('status', 'skip')
+        if s == 'pass':   type_stats[type_key]['pass'] += 1
+        elif s == 'fail': type_stats[type_key]['fail'] += 1
+        else:             type_stats[type_key]['skip'] += 1
+
+    hdr = [
+        Paragraph('<font color="#ffffff"><b>Test Type</b></font>',
+                  ParagraphStyle('K6CH1', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Total</b></font>',
+                  ParagraphStyle('K6CH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Passed</b></font>',
+                  ParagraphStyle('K6CH3', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Failed</b></font>',
+                  ParagraphStyle('K6CH4', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Warn/Skip</b></font>',
+                  ParagraphStyle('K6CH5', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Pass Rate</b></font>',
+                  ParagraphStyle('K6CH6', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Duration</b></font>',
+                  ParagraphStyle('K6CH7', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Status</b></font>',
+                  ParagraphStyle('K6CH8', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+    ]
+    rows = [hdr]
+    row_styles = []
+
+    for type_key, cfg in TYPE_CONFIG.items():
+        if type_key not in type_stats and type_key not in summary:
+            continue
+        data      = type_stats.get(type_key, {'pass': 0, 'fail': 0, 'skip': 0, 'total': 0})
+        sum_data  = summary.get(type_key, {})
+        duration  = sum_data.get('duration_seconds', '—')
+        sum_status = sum_data.get('status', 'pass' if data['fail'] == 0 and data['total'] > 0 else 'fail')
+
+        rate    = round(data['pass'] / data['total'] * 100) if data['total'] > 0 else 0
+        rc      = '#10b981' if rate == 100 else '#f59e0b' if rate >= 60 else '#ef4444'
+        verdict = '✅ PASS' if sum_status == 'pass' else '❌ FAIL'
+        vc      = '#10b981' if sum_status == 'pass' else '#ef4444'
+        row_bg  = HexColor('#f0fdf4') if sum_status == 'pass' else HexColor('#fef2f2')
+
+        rows.append([
+            Paragraph(
+                f'<font color="{cfg["color"]}">{cfg["icon"]}  <b>{cfg["label"]}</b></font>',
+                ParagraphStyle('K6CL', fontSize=8, fontName='Helvetica-Bold')),
+            Paragraph(f'<font color="#1e293b"><b>{data["total"]}</b></font>',
+                      ParagraphStyle('K6CT', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#10b981"><b>{data["pass"]}</b></font>',
+                      ParagraphStyle('K6CP', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#ef4444"><b>{data["fail"]}</b></font>',
+                      ParagraphStyle('K6CF', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#f59e0b"><b>{data["skip"]}</b></font>',
+                      ParagraphStyle('K6CSK', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{rc}"><b>{rate}%</b></font>',
+                      ParagraphStyle('K6CR', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#64748b">{duration}s</font>',
+                      ParagraphStyle('K6CD', fontSize=8, fontName='Helvetica', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{vc}"><b>{verdict}</b></font>',
+                      ParagraphStyle('K6CV', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        ])
+        ri = len(rows) - 1
+        row_styles.append(('BACKGROUND', (0, ri), (-1, ri), row_bg))
+
+    tbl = Table(rows, colWidths=[36*mm, 14*mm, 14*mm, 14*mm, 18*mm, 18*mm, 18*mm, 36*mm], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), NAVY),
+        ('PADDING',    (0,0), (-1,-1), 8),
+        ('LINEBELOW',  (0,0), (-1,-1), 0.4, BORDER),
+        ('BOX',        (0,0), (-1,-1), 0.8, HexColor('#7D64FF')),
+        ('VALIGN',     (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN',      (1,0), (7,-1), 'CENTER'),
+    ] + row_styles))
+    elements.append(tbl)
+    elements.append(Spacer(1, 16))
+
+
+def _call_groq_k6_plan(tests: list, url: str, summary: dict) -> list:
+    """Groq action plan for k6 — same pattern as regression."""
+    try:
+        import requests as req_lib, os, json
+
+        api_key = os.getenv('GROQ_API_KEY')
+        failed  = [t for t in tests if t.get('status') == 'fail']
+        passed  = [t for t in tests if t.get('status') == 'pass']
+
+        # Get summary info
+        type_info = []
+        for type_key, data in summary.items():
+            type_info.append({
+                'type': type_key,
+                'status': data.get('status'),
+                'duration': data.get('duration_seconds'),
+                'p95': data.get('metrics', {}).get('http_req_duration_p95'),
+            })
+
+        prompt = f"""You are a performance engineer analyzing k6 load test results for {url}.
+
+Test type results: {json.dumps(type_info)}
+Failed test cases ({len(failed)}): {[{{'name': t.get('name'), 'suite': t.get('suite','')}} for t in failed[:10]]}
+Passed test cases ({len(passed)}): {len(passed)} tests passed
+
+Generate a k6 performance action plan as a JSON array. Each item must have:
+- scenario: string (what to fix/optimize)
+- category: string (Performance / Scalability / Monitoring / Infrastructure)
+- priority: string (HIGH / MEDIUM / LOW)
+- action: string (concrete step)
+- responsible: string (Backend / DevOps / QA / Frontend)
+- deadline: string (Immediate / This Sprint / Next Sprint)
+- status: string (To Do)
+
+Return ONLY the JSON array, no markdown, no explanation. Maximum 6 items."""
+
+        response = req_lib.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 800,
+                "temperature": 0.3
+            },
+            timeout=30
+        )
+        content = response.json()['choices'][0]['message']['content']
+        content = content.strip().strip('```json').strip('```').strip()
+        result  = json.loads(content)
+        print(f"[Groq K6 Plan] Generated: {len(result)} items")
+        return result
+    except Exception as e:
+        print(f"[Groq K6 Plan] Error: {e}")
+        return []
+
+def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes:
+    buffer    = BytesIO()
+    url       = generation_data.get('url', '')
+    framework = generation_data.get('framework', 'k6')
+
+    pass_count = sum(1 for t in tests if t.get('status') == 'pass')
+    fail_count = sum(1 for t in tests if t.get('status') == 'fail')
+    skip_count = sum(1 for t in tests if t.get('status') == 'skip' or t.get('status') == 'warn')
+    total      = len(tests) or 1
+    pass_rate  = round(pass_count / total * 100)
+    rate_color = '#10b981' if pass_rate >= 80 else '#f59e0b' if pass_rate >= 50 else '#ef4444'
+
+    TYPE_CONFIG = {
+        'load':   {'label': 'Load Test',   'icon': '📈', 'color': '#6366f1'},
+        'stress': {'label': 'Stress Test', 'icon': '🔥', 'color': '#ef4444'},
+        'spike':  {'label': 'Spike Test',  'icon': '⚡', 'color': '#f59e0b'},
+        'soak':   {'label': 'Soak Test',   'icon': '🌊', 'color': '#0ea5e9'},
+    }
+
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=20*mm, leftMargin=22*mm,
+                            topMargin=58*mm, bottomMargin=20*mm)
+
+    def on_page_k6(canvas, doc):
+        W, H = A4
+        canvas.saveState()
+        canvas.setFillColor(NAVY)
+        canvas.rect(0, H - 52*mm, W, 52*mm, fill=1, stroke=0)
+        canvas.setFillColor(HexColor('#7D64FF'))
+        canvas.rect(0, H - 54*mm, W, 2*mm, fill=1, stroke=0)
+        canvas.setFillColor(HexColor('#7D64FF'))
+        canvas.rect(0, 0, 3, H - 54*mm, fill=1, stroke=0)
+        canvas.setFillColor(LIGHT_BG)
+        canvas.rect(0, 0, W, 14*mm, fill=1, stroke=0)
+        canvas.setFillColor(BORDER)
+        canvas.rect(0, 14*mm, W, 0.5, fill=1, stroke=0)
+        canvas.setFont('Helvetica', 7.5)
+        canvas.setFillColor(MUTED)
+        canvas.drawString(20*mm, 5*mm, 'Generated by NexTest — k6 Performance Test Report')
+        canvas.drawRightString(W - 20*mm, 5*mm,
+            f'Page {doc.page}  •  {datetime.now().strftime("%Y-%m-%d")}')
+        canvas.restoreState()
+
+    elements = []
+
+    # ── HEADER ────────────────────────────────────────────────────────────────
+    header_data = [[
+        Paragraph('<font color="#7D64FF"><b>NEX</b></font><font color="#ffffff">TEST</font>',
+                  ParagraphStyle('K6Logo', fontSize=24, fontName='Helvetica-Bold')),
+        Paragraph(f'<font color="#64748b">Generated</font><br/>'
+                  f'<font color="#94a3b8">{datetime.now().strftime("%B %d, %Y  •  %H:%M")}</font>',
+                  ParagraphStyle('K6Date', fontSize=8.5, fontName='Helvetica',
+                                 alignment=TA_RIGHT, leading=13)),
+    ]]
+    header_tbl = Table(header_data, colWidths=[90*mm, 78*mm])
+    header_tbl.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+    ]))
+    elements.append(Spacer(1, -38*mm))
+    elements.append(header_tbl)
+    elements.append(Spacer(1, 6*mm))
+    elements.append(Paragraph('k6 Performance Test Report',
+                               ParagraphStyle('K6Title', fontSize=22, textColor=WHITE,
+                                              fontName='Helvetica-Bold', spaceAfter=2)))
+    elements.append(Spacer(1, 14*mm))
+
+    # ── INFO BOX ──────────────────────────────────────────────────────────────
+    info_tbl = Table([
+        [Paragraph('<font color="#64748b">URL</font>',
+                   ParagraphStyle('K6IL', fontSize=8, fontName='Helvetica-Bold', leading=12)),
+         Paragraph(f'<font color="#1e293b">{url}</font>',
+                   ParagraphStyle('K6IV', fontSize=8.5, fontName='Helvetica', leading=12))],
+        [Paragraph('<font color="#64748b">Framework</font>',
+                   ParagraphStyle('K6IL2', fontSize=8, fontName='Helvetica-Bold', leading=12)),
+         Paragraph('<font color="#7D64FF"><b>k6 Load Testing</b></font>',
+                   ParagraphStyle('K6IV2', fontSize=8.5, fontName='Helvetica', leading=12))],
+        [Paragraph('<font color="#64748b">Test Types</font>',
+                   ParagraphStyle('K6IL3', fontSize=8, fontName='Helvetica-Bold', leading=12)),
+         Paragraph(f'<font color="#1e293b">{", ".join(summary.keys()) or "load, stress, spike, soak"}</font>',
+                   ParagraphStyle('K6IV3', fontSize=8.5, fontName='Helvetica', leading=12))],
+        [Paragraph('<font color="#64748b">Generated</font>',
+                   ParagraphStyle('K6IL4', fontSize=8, fontName='Helvetica-Bold', leading=12)),
+         Paragraph(f'<font color="#1e293b">{datetime.now().strftime("%Y-%m-%d  %H:%M")}</font>',
+                   ParagraphStyle('K6IV4', fontSize=8.5, fontName='Helvetica', leading=12))],
+    ], colWidths=[32*mm, 136*mm])
+    info_tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (0,-1), LIGHT_BG),
+        ('PADDING',       (0,0), (-1,-1), 7),
+        ('LINEBELOW',     (0,0), (-1,-2), 0.4, BORDER),
+        ('BOX',           (0,0), (-1,-1), 0.8, BORDER_DARK),
+        ('ROWBACKGROUNDS',(0,0), (-1,-1), [WHITE, LIGHT_BG]),
+        ('LEFTPADDING',   (0,0), (0,-1), 10),
+        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(info_tbl)
+    elements.append(Spacer(1, 20))
+    
+    # ── SCENARIOS ─────────────────────────────────────────────────────────────
+    build_k6_scenarios(elements, tests, url)
+    
+    
+
+    # ── STAT CARDS ────────────────────────────────────────────────────────────
+    stats_data = [[
+        stat_card(pass_count,      'PASSED',    '#10b981', GREEN_BG),
+        stat_card(fail_count,      'FAILED',    '#ef4444', RED_BG),
+        stat_card(skip_count,      'WARN/SKIP', '#f59e0b', ORANGE_BG),
+        stat_card(f'{pass_rate}%', 'PASS RATE', rate_color,
+                  GREEN_BG if pass_rate >= 80 else ORANGE_BG if pass_rate >= 50 else RED_BG),
+        stat_card(total,           'TOTAL',     '#3b82f6', BLUE_BG),
+    ]]
+    outer = Table(stats_data, colWidths=[33.6*mm]*5)
+    outer.setStyle(TableStyle([
+        ('ALIGN',  (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('PADDING',(0,0), (-1,-1), 2),
+    ]))
+    elements.append(outer)
+    elements.append(Spacer(1, 20))
+    
+    
+    # ── CATEGORY SUMMARY ──────────────────────────────────────────────────────
+    build_k6_category_summary(elements, tests, summary)
+
+    # ── TEST TYPE RESULTS ─────────────────────────────────────────────────────
+    if summary:
+        elements.append(section_header('🚀', 'Test Type Results', HexColor('#7D64FF')))
+        elements.append(Spacer(1, 8))
+
+        for type_key, type_data in summary.items():
+            cfg    = TYPE_CONFIG.get(type_key, {'label': type_key, 'icon': '📊', 'color': '#6366f1'})
+            status = type_data.get('status', 'unknown')
+            sc     = '#10b981' if status == 'pass' else '#ef4444' if status == 'fail' else '#64748b'
+            s_label = '✓ PASS' if status == 'pass' else '✗ FAIL' if status == 'fail' else '— N/A'
+            metrics = type_data.get('metrics') or {}
+            duration = type_data.get('duration_seconds', '—')
+
+            th_passes   = type_data.get('threshold_passes', [])
+            th_failures = type_data.get('threshold_failures', [])
+
+            # Card header
+            card_hdr = Table([[
+                Paragraph(
+                    f'<font color="{cfg["color"]}">{cfg["icon"]}  <b>{cfg["label"]}</b></font>'
+                    f'  <font color="{sc}"><b>[{s_label}]</b></font>'
+                    f'  <font color="#64748b" size="8">⏱ {duration}s</font>',
+                    ParagraphStyle('K6CH', fontSize=11, fontName='Helvetica-Bold', leading=14)),
+            ]], colWidths=[168*mm])
+            card_hdr.setStyle(TableStyle([
+                ('BACKGROUND',    (0,0), (-1,-1), HexColor(f'{cfg["color"]}12')),
+                ('BOX',           (0,0), (-1,-1), 1, HexColor(cfg['color'])),
+                ('LEFTPADDING',   (0,0), (-1,-1), 12),
+                ('TOPPADDING',    (0,0), (-1,-1), 10),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+            ]))
+            elements.append(card_hdr)
+
+            # Metrics grid
+            metric_items = [
+                ('p95 Response',  metrics.get('http_req_duration_p95', 'N/A')),
+                ('Avg Response',  metrics.get('http_req_duration_avg', 'N/A')),
+                ('Error Rate',    f"{metrics['http_req_failed_rate']:.1f}%" if metrics.get('http_req_failed_rate') is not None else 'N/A'),
+                ('Throughput',    f"{metrics['http_reqs_per_second']:.1f}/s" if metrics.get('http_reqs_per_second') is not None else 'N/A'),
+                ('Max VUs',       str(metrics.get('vus_max', 'N/A'))),
+                ('Iterations',    str(metrics.get('iterations', 'N/A'))),
+                ('Data Received', metrics.get('data_received', 'N/A')),
+                ('Checks Rate',   f"{metrics['checks_rate']:.1f}%" if metrics.get('checks_rate') is not None else 'N/A'),
+            ]
+            metric_cells = []
+            for label, value in metric_items:
+                cell = Table([[
+                    Paragraph(
+                        f'<font color="#64748b" size="7">{label}</font><br/>'
+                        f'<font color="#1e293b" size="11"><b>{value}</b></font>',
+                        ParagraphStyle('K6MC', fontSize=9, fontName='Helvetica', leading=14, alignment=TA_CENTER))
+                ]], colWidths=[21*mm])
+                cell.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,-1), HexColor('#040914')),
+                    ('BOX',        (0,0), (-1,-1), 0.5, BORDER),
+                    ('TOPPADDING', (0,0), (-1,-1), 8),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+                    ('ALIGN',      (0,0), (-1,-1), 'CENTER'),
+                ]))
+                metric_cells.append(cell)
+
+            metrics_row = Table([metric_cells], colWidths=[21*mm]*8)
+            metrics_row.setStyle(TableStyle([
+                ('ALIGN',  (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('PADDING',(0,0), (-1,-1), 1),
+            ]))
+            elements.append(metrics_row)
+
+            # Thresholds
+            if th_passes or th_failures:
+                th_rows = []
+                for th in th_passes:
+                    th_rows.append([Paragraph(
+                        f'<font color="#10b981"><b>✓</b></font>  '
+                        f'<font color="#64748b" size="8">{th}</font>',
+                        ParagraphStyle('K6THP', fontSize=8, fontName='Helvetica', leading=11))])
+                for th in th_failures:
+                    th_rows.append([Paragraph(
+                        f'<font color="#ef4444"><b>✗</b></font>  '
+                        f'<font color="#ef4444" size="8">{th}</font>',
+                        ParagraphStyle('K6THF', fontSize=8, fontName='Helvetica', leading=11))])
+                th_tbl = Table(th_rows, colWidths=[168*mm])
+                th_tbl.setStyle(TableStyle([
+                    ('BACKGROUND',  (0,0), (-1,-1), HexColor('#040914')),
+                    ('LEFTPADDING', (0,0), (-1,-1), 12),
+                    ('TOPPADDING',  (0,0), (-1,-1), 5),
+                    ('BOTTOMPADDING',(0,0),(-1,-1), 5),
+                    ('LINEBELOW',   (0,0), (-1,-1), 0.3, BORDER),
+                    ('BOX',         (0,0), (-1,-1), 0.5, BORDER),
+                ]))
+                elements.append(th_tbl)
+
+            elements.append(Spacer(1, 12))
+
+    # ── TEST CASES TABLE ──────────────────────────────────────────────────────
+    elements.append(section_header('📋', 'Test Cases', TEAL))
+    elements.append(Spacer(1, 8))
+
+    hdr = [
+        Paragraph('<font color="#ffffff"><b>#</b></font>',
+                  ParagraphStyle('K6TH0', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Test Name</b></font>',
+                  ParagraphStyle('K6TH1', fontSize=8, fontName='Helvetica-Bold')),
+        Paragraph('<font color="#ffffff"><b>Category</b></font>',
+                  ParagraphStyle('K6TH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Section</b></font>',
+                  ParagraphStyle('K6TH3', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Status</b></font>',
+                  ParagraphStyle('K6TH4', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+        Paragraph('<font color="#ffffff"><b>Result / Value</b></font>',
+                  ParagraphStyle('K6TH5', fontSize=8, fontName='Helvetica-Bold')),
+    ]
+    rows = [hdr]
+    row_styles = []
+
+    SECTION_COLORS = {
+        'Response Time': '#6366f1',
+        'Error Rate':    '#ef4444',
+        'Throughput':    '#10b981',
+        'Scalability':   '#f97316',
+        'Reliability':   '#8b5cf6',
+        'Thresholds':    '#0ea5e9',
+    }
+
+    for i, t in enumerate(tests):
+        status  = t.get('status', 'skip')
+        sc      = '#10b981' if status == 'pass' else '#ef4444' if status == 'fail' else '#f59e0b'
+        s_label = '✓ PASS' if status == 'pass' else '✗ FAIL' if status == 'fail' else '— SKIP'
+        s_bg    = HexColor('#f0fdf4') if status == 'pass' else \
+                  HexColor('#fef2f2') if status == 'fail' else HexColor('#fffbeb')
+        cat     = t.get('category', 'performance')
+        section = t.get('section', '—')
+        sec_c   = SECTION_COLORS.get(section, '#64748b')
+        suite   = t.get('suite', '—')
+
+        rows.append([
+            Paragraph(f'<font color="#64748b"><b>{i+1}</b></font>',
+                      ParagraphStyle('K6ID', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<b><font color="#1e293b" size="8">{t.get("name","")}</font></b>',
+                      ParagraphStyle('K6TN', fontSize=8, fontName='Helvetica', leading=11)),
+            Paragraph(f'<font color="#7D64FF"><b>{cat.upper()}</b></font>',
+                      ParagraphStyle('K6TC', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{sec_c}"><b>{section}</b></font>',
+                      ParagraphStyle('K6TS', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="{sc}"><b>{s_label}</b></font>',
+                      ParagraphStyle('K6TST', fontSize=7.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
+            Paragraph(f'<font color="#475569" size="7">{suite[:80]}</font>',
+                      ParagraphStyle('K6TR', fontSize=7, fontName='Helvetica', leading=10)),
+        ])
+        row_styles.append(('BACKGROUND', (4, i+1), (4, i+1), s_bg))
+
+    tbl = Table(rows, colWidths=[8*mm, 52*mm, 24*mm, 26*mm, 18*mm, 40*mm], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,0), NAVY),
+        ('ROWBACKGROUNDS',(0,1), (-1,-1), [WHITE, LIGHT_BG]),
+        ('PADDING',       (0,0), (-1,-1), 7),
+        ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
+        ('BOX',           (0,0), (-1,-1), 0.8, HexColor('#7D64FF')),
+        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
+        ('ALIGN',         (0,0), (0,-1), 'CENTER'),
+        ('ALIGN',         (2,0), (4,-1), 'CENTER'),
+        ('LINEBEFORE',    (5,1), (5,-1), 1, BORDER),
+    ] + row_styles))
+    elements.append(tbl)
+    elements.append(Spacer(1, 20))
+
+   # ── ACTION PLAN via Groq ───────────────────────────────────────────────────
+    action_plan = _call_groq_k6_plan(tests, url, summary)
+    if action_plan:
+        build_regression_action_plan(elements, action_plan)  # réutilise la même fonction
+    # ── RECOMMENDATIONS ───────────────────────────────────────────────────────
+    elements.append(section_header('🤖', 'AI Recommendations', INDIGO))
+
+    recs = []
+    if fail_count > 0:
+        recs.append(('high',   'server',  f'{fail_count} Test(s) Failed',
+                     'Review failed test cases — thresholds exceeded or k6 script errors detected.',
+                     'Fix failures to ensure performance targets are met'))
+    if skip_count > 0:
+        recs.append(('medium', 'network', f'{skip_count} Test(s) Warn/Skip',
+                     'Some metrics could not be parsed — check k6 output format.',
+                     'Better metric coverage'))
+    stress_data = summary.get('stress', {})
+    if stress_data.get('status') == 'fail':
+        recs.append(('critical', 'server', 'Stress Test Failed',
+                     'Server breaks under high load. Consider horizontal scaling or optimizing backend.',
+                     'Improved resilience under traffic spikes'))
+    if pass_count == total and total > 0:
+        recs.append(('low', 'caching', 'All Threshold Tests Passed 🎉',
+                     'All k6 threshold checks passed. Application handles expected load well.',
+                     'Continue monitoring with each release'))
+    if not recs:
+        recs.append(('low', 'caching', 'Performance Looks Good',
+                     'No critical issues detected. Keep monitoring load and stress scenarios.',
+                     'Sustained performance'))
+
+    PRIORITY_CFG = {
+        'critical': ('#ef4444', HexColor('#fef2f2'), '🔴'),
+        'high':     ('#f97316', HexColor('#fff7ed'), '🟠'),
+        'medium':   ('#f59e0b', HexColor('#fffbeb'), '🟡'),
+        'low':      ('#10b981', HexColor('#f0fdf4'), '🟢'),
+    }
+    CAT_ICONS = {
+        'server': '🖥', 'network': '🌐', 'caching': '📦', 'images': '🖼'
+    }
+
+    for priority, category, title, description, impact in recs:
+        pc, pb, pi = PRIORITY_CFG.get(priority, PRIORITY_CFG['medium'])
+        cat_icon = CAT_ICONS.get(category, '🔧')
+        rec_tbl = Table([[Paragraph(
+            f'<font size="16">{cat_icon}</font>  '
+            f'<font color="#1e293b"><b>{title}</b></font>  '
+            f'<font color="{pc}" size="8"><b>[{pi} {priority.upper()}]</b></font><br/>'
+            f'<font color="#64748b" size="8">{description}</font><br/>'
+            f'<font color="#10b981" size="8"><b>⚡ Impact: {impact}</b></font>',
+            ParagraphStyle('K6Rec', fontSize=8, fontName='Helvetica', leading=13))
+        ]], colWidths=[168*mm])
+        rec_tbl.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0), (-1,-1), pb),
+            ('BOX',           (0,0), (-1,-1), 1, HexColor(pc)),
+            ('LEFTPADDING',   (0,0), (-1,-1), 12),
+            ('TOPPADDING',    (0,0), (-1,-1), 10),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+        ]))
+        elements.append(rec_tbl)
+        elements.append(Spacer(1, 6))
+
+    # ── FINAL VERDICT ─────────────────────────────────────────────────────────
+    elements.append(Spacer(1, 10))
+    vc  = '#ef4444' if fail_count > 0 else '#059669'
+    vb  = HexColor('#fef2f2') if fail_count > 0 else HexColor('#f0fdf4')
+    vbrd = RED if fail_count > 0 else GREEN
+    vi  = '🔴' if fail_count > 0 else '🟢'
+    vt  = (f'k6 Performance Test FAILED — {fail_count} threshold(s) exceeded. '
+           f'Optimize server response time before production.') if fail_count > 0 else \
+          (f'k6 Performance Test PASSED — All {pass_count} threshold checks passed. '
+           f'Application handles expected load well.')
+
+    verdict_tbl = Table([[Paragraph(
+        f'<font color="{vc}"><b>{vi}  Final Verdict: </b></font>'
+        f'<font color="{vc}" size="8">{vt}</font>',
+        ParagraphStyle('K6V', fontSize=8, fontName='Helvetica', leading=12))
+    ]], colWidths=[168*mm])
+    verdict_tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,-1), vb),
+        ('BOX',           (0,0), (-1,-1), 1.5, vbrd),
+        ('LEFTPADDING',   (0,0), (-1,-1), 12),
+        ('RIGHTPADDING',  (0,0), (-1,-1), 12),
+        ('TOPPADDING',    (0,0), (-1,-1), 10),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+    ]))
+    elements.append(verdict_tbl)
+    elements.append(Spacer(1, 20))
+
+    doc.build(elements, onFirstPage=on_page_k6, onLaterPages=on_page_k6)
+    return buffer.getvalue()  
 def generate_pdf(generation_data: dict) -> bytes:
     test_type = generation_data.get('test_type') or \
                 generation_data.get('result', {}).get('test_type', 'smoke')
+                
+                
+    # ── K6 PERFORMANCE ───────────────────────────────────────────────────────
+    if test_type == 'performance' and generation_data.get('framework') == 'k6':
+        tests   = (generation_data.get('execution_results') or
+                   generation_data.get('test_cases') or [])
+        summary = generation_data.get('summary') or generation_data.get('result', {}).get('summary') or {}
+        return _generate_k6_pdf(generation_data, tests, summary)              
  
     # ── FUNCTIONAL ───────────────────────────────────────────────────────────
     if test_type == 'functional':

@@ -13,10 +13,7 @@ groq_client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY"),
 )
 
-# ─────────────────────────────────────────────────────────────────────────────
 # ENDPOINT DEFINITIONS — Real ANPE back office endpoints
-# ─────────────────────────────────────────────────────────────────────────────
-
 KNOWN_ENDPOINTS = {
     "auth_login": [
         {
@@ -476,13 +473,11 @@ KNOWN_ENDPOINTS = {
     ],
 }
 
-# auth_login = login endpoints only (défini après KNOWN_ENDPOINTS)
+#auth_login = login endpoints only
 KNOWN_ENDPOINTS["auth_login"] = KNOWN_ENDPOINTS["auth"][:3]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GROQ LLaMA3 — Generate smart assertions for each endpoint
-# ─────────────────────────────────────────────────────────────────────────────
 
+# GROQ LLaMA3 — Generate smart assertions for each endpoint
 def _call_groq(system_prompt: str, user_prompt: str) -> str:
     try:
         resp = groq_client.chat.completions.create(
@@ -607,7 +602,7 @@ def _generate_edge_cases(endpoint: dict, base_url: str) -> list:
     import re
     result = []
 
-    # Edge case 1 — missing required fields
+    
     result.append({
         "method":        endpoint["method"],
         "path":          endpoint["path"],
@@ -623,7 +618,7 @@ def _generate_edge_cases(endpoint: dict, base_url: str) -> list:
         "is_edge_case":  True,
     })
 
-    # Edge case 2 — invalid ID (seulement si le path contient un UUID)
+    
     path = endpoint["path"]
     new_path = re.sub(
         r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}',
@@ -648,10 +643,8 @@ def _generate_edge_cases(endpoint: dict, base_url: str) -> list:
 
     return result
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SCRIPT BUILDERS — Pytest and Postman
-# ─────────────────────────────────────────────────────────────────────────────
 
+# SCRIPT BUILDERS — Pytest and Postman
 def _build_pytest_script(test_cases: list, base_url: str, token: str) -> str:
     lines = [
         "# NexTest — API Test Suite (Pytest + requests)",
@@ -715,7 +708,7 @@ def _build_pytest_script(test_cases: list, base_url: str, token: str) -> str:
                 nav = f'{nav}["{part}"]'
             lines.append(f"    assert {nav} is not None, '{field} must be present'")
 
-        # LLaMA3 assertions
+        #LLaMA3 assertions
         for assertion in assertions[:3]:
             atype = assertion.get("type", "")
             if atype == "response_time":
@@ -726,7 +719,7 @@ def _build_pytest_script(test_cases: list, base_url: str, token: str) -> str:
         lines.append("")
         lines.append("")
 
-    # Runner
+    #Runner
     lines += [
         'if __name__ == "__main__":',
         '    tests = [fn for name, fn in globals().items() if name.startswith("test_")]',
@@ -815,10 +808,8 @@ def _build_postman_collection(test_cases: list, base_url: str, token: str) -> di
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN ENTRY POINT
-# ─────────────────────────────────────────────────────────────────────────────
 
+# MAIN ENTRY POINT
 def generate_api_tests(
     base_url:  str,
     framework: str = "Pytest",
@@ -828,7 +819,7 @@ def generate_api_tests(
 ) -> dict:
 
     try:
-        # ── Auto-detect domain from URL ──
+        #Auto-detect domain from URL
         url_lower = (original_url or base_url).lower()
         if domains is None or domains == ["auth"]:
             if "/auth/login" in url_lower:
@@ -874,7 +865,7 @@ def generate_api_tests(
 
         print(f"[API_GEN] base_url={base_url} | framework={framework} | domains={domains}")
 
-        # ── 1. Collect endpoints ──
+        #1Collect endpoints
         all_endpoints = []
         for domain in domains:
             endpoints = KNOWN_ENDPOINTS.get(domain, [])
@@ -884,7 +875,7 @@ def generate_api_tests(
         if not all_endpoints:
             return {"error": f"No endpoints found for domains: {domains}"}
 
-        # ── 2. Enrich with Groq assertions ──
+        #2Enrich with Groq assertions
         test_cases = []
         for i, endpoint in enumerate(all_endpoints, 1):
             print(f"[API_GEN] Generating assertions for: {endpoint['name']}")
@@ -913,7 +904,7 @@ def generate_api_tests(
             
             print(f"[API_GEN] Generated {len(test_cases)} test cases")
 
-            # ── Edge cases LLaMA ──
+            #Edge cases LLaMA
             for ec in _generate_edge_cases(endpoint, base_url):
                 groq_ec = _generate_assertions(ec, base_url)
                 test_cases.append({
@@ -936,7 +927,7 @@ def generate_api_tests(
 
         
 
-        # ── 3. Build scripts ──
+        #3Build scripts
         script_pytest  = _build_pytest_script(test_cases, base_url, token)
         script_postman = json.dumps(
             _build_postman_collection(test_cases, base_url, token),
