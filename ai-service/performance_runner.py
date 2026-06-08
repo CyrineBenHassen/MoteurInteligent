@@ -1,4 +1,3 @@
-# performance_runner.py — NexTest Performance Test Runner (k6)
 
 import subprocess
 import tempfile

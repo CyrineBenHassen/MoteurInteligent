@@ -3962,3 +3962,8 @@
   color: var(--amber); 
   border: 1px solid var(--amber-border);
 }
+.dash-root input::placeholder {
+  color: var(--dimmed) !important;
+  -webkit-text-fill-color: var(--dimmed) !important;
+  opacity: 1;
+}

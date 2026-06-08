@@ -162,7 +162,7 @@ function AssertionBadge({ assertion_result, step_meta }) {
 
 function DashboardPanel({ user, goTo }) {
   const { t } = useLang();
-  const [stats, setStats] = useState({ total: 0, projects: 0, avgRate: 0, avgLoad: 0 });
+  const [stats, setStats] = useState({ total: 0, projects: 0, avgRate: 0, publicCount: 0, internalCount: 0, highPassCount: 0 });
   const [barData, setBarData] = useState([
     { day: 'Mon', count: 0 }, { day: 'Tue', count: 0 }, { day: 'Wed', count: 0 },
     { day: 'Thu', count: 0 }, { day: 'Fri', count: 0 }, { day: 'Sat', count: 0 }, { day: 'Sun', count: 0 },
@@ -174,6 +174,7 @@ function DashboardPanel({ user, goTo }) {
   ]);
   const [topUrls, setTopUrls] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [typeData, setTypeData] = useState([]);
 
   useEffect(() => {
     Promise.all([api.get('/generations'), api.get('/projects')])
@@ -185,9 +186,17 @@ function DashboardPanel({ user, goTo }) {
         const totalFail = gens.reduce((s, g) => s + (g.fail_count || 0), 0);
         const totalSkip = gens.reduce((s, g) => s + (g.skip_count || 0), 0);
         const avgRate   = gens.length ? Math.round(gens.reduce((s, g) => s + (g.pass_rate || 0), 0) / gens.length) : 0;
-        const avgLoad   = gens.length ? Math.round(gens.reduce((s, g) => s + (g.load_time_ms || 0), 0) / gens.length) : 0;
+        
 
-        setStats({ total: gens.length, projects: projs.length, avgRate, avgLoad });
+      setStats({ 
+  total: gens.length, 
+  projects: projs.length, 
+  avgRate,
+  totalPass: gens.reduce((s, g) => s + (g.pass_count || 0), 0),
+  publicCount: projs.filter(p => p.type === 'public').length,
+  internalCount: projs.filter(p => p.type === 'internal').length,
+  highPassCount: gens.filter(g => (g.pass_rate || 0) >= 80).length,
+});
 
         const counts = [0,0,0,0,0,0,0];
         const now = new Date();
@@ -213,17 +222,23 @@ function DashboardPanel({ user, goTo }) {
           urlMap[g.url].date   = g.created_at;
         });
         setTopUrls(Object.values(urlMap).sort((a,b) => b.tests - a.tests).slice(0,3));
+        const typeCount = {};
+        gens.forEach(g => {
+          const t = g.test_type || 'smoke';
+          typeCount[t] = (typeCount[t] || 0) + 1;
+        });
+        setTypeData(Object.entries(typeCount).map(([name, value]) => ({ name, value })));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
   const STATS = [
-    { icon: '🚀', val: String(stats.total),    lbl: t('scriptsGenerated'), accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)' },
-    { icon: '🔬', val: String(stats.projects),  lbl: t('appsAnalyzed'),     accent: 'linear-gradient(90deg,#c9a227,#e8c84a)' },
-    { icon: '🎯', val: `${stats.avgRate}%`,     lbl: t('avgCoverage'),      accent: 'linear-gradient(90deg,#10b981,#34d399)' },
-    { icon: '⚡', val: `${stats.avgLoad}ms`,    lbl: t('avgGenTime'),       accent: 'linear-gradient(90deg,#f97316,#fb923c)' },
-  ];
+  { icon: '🚀', val: String(stats.total),    lbl: t('scriptsGenerated'), accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)' },
+  { icon: '✅', val: String(stats.totalPass), lbl: 'Tests Passed',        accent: 'linear-gradient(90deg,#10b981,#34d399)' },
+  { icon: '📁', val: String(stats.projects),  lbl: 'Projects',            accent: 'linear-gradient(90deg,#8b5cf6,#a78bfa)' },
+  { icon: '🏆', val: String(stats.highPassCount), lbl: 'High Pass Rate ≥80%', accent: 'linear-gradient(90deg,#f59e0b,#fbbf24)' },
+];
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1;
   
   if (loading) return (
@@ -250,53 +265,101 @@ function DashboardPanel({ user, goTo }) {
             <div className="stat-card-top"><div className="stat-icon-wrap">{s.icon}</div></div>
             <span className="stat-val"><AnimatedStat val={s.val} /></span>
             <span className="stat-lbl">{s.lbl}</span>
-            <div className="stat-accent" style={{ background: s.accent }} />
+{s.lbl === 'Projects' && (
+  <div style={{ display: 'flex', gap: 8, marginTop: 6, justifyContent: 'center' }}>
+    <span style={{ fontSize: 10, fontWeight: 700, color: '#4f86e8', background: 'rgba(79,134,232,.1)', border: '1px solid rgba(79,134,232,.2)', padding: '2px 8px', borderRadius: 20 }}>
+      🌐 {stats.publicCount} public
+    </span>
+    <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6', background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.2)', padding: '2px 8px', borderRadius: 20 }}>
+      🔒 {stats.internalCount} internal
+    </span>
+  </div>
+)}
+<div className="stat-accent" style={{ background: s.accent }} />
           </div>
         ))}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-        <div className="section-box">
-          <div className="sb-head"><span className="sb-title">{t('generationsPerWeek') || 'Generations this week'}</span></div>
-          <div style={{ padding: '12px 8px 8px' }}>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={barData} barSize={26}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="day" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={24} />
-                <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--navy)', fontSize: 12 }} cursor={{ fill: 'rgba(201,162,39,0.07)' }} formatter={(val) => [val, 'Generations']} />
-                <Bar dataKey="count" fill="#c9a227" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+  <div className="section-box">
+    <div className="sb-head"><span className="sb-title">📈 Generations this week</span></div>
+    <div style={{ padding: '12px 8px 8px' }}>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={barData} barSize={26} margin={{ top: 0, right: 10, bottom: 0, left: -10 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <XAxis dataKey="day" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={24} />
+          <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--navy)', fontSize: 12 }} cursor={{ fill: 'rgba(201,162,39,0.07)' }} formatter={(val) => [val, 'Generations']} />
+          <Bar dataKey="count" fill="#c9a227" radius={[6, 6, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+
+  <div className="section-box">
+    <div className="sb-head"><span className="sb-title">📊 Test Results</span></div>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 0' }}>
+      <ResponsiveContainer width="100%" height={200}>
+        <PieChart>
+          <Pie data={donutData} cx="50%" cy="50%" innerRadius={65} outerRadius={90} paddingAngle={3} dataKey="value" labelLine={false}>
+            {donutData.map((entry, index) => (<Cell key={index} fill={entry.color} stroke="none" />))}
+          </Pie>
+          <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--navy)', fontSize: 12 }} formatter={(val, name) => [`${val}%`, name]} />
+          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
+            <tspan x="50%" dy="-8" fontSize="22" fontWeight="700" fill="#10b981">{donutData[0]?.value || 0}%</tspan>
+            <tspan x="50%" dy="18" fontSize="10" fill="var(--muted)">pass rate</tspan>
+          </text>
+        </PieChart>
+      </ResponsiveContainer>
+      <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 0, marginBottom: 12, flexWrap: 'wrap' }}>
+        {donutData.map(d => (
+          <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{d.name} <span style={{ color: 'var(--text)' }}>{d.value}%</span></span>
           </div>
-        </div>
-        <div className="section-box">
-          <div className="sb-head"><span className="sb-title">{t('testResults') || 'Test Results'}</span></div>
-          <div style={{ padding: '12px 8px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie data={donutData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value" labelLine={false}>
-                  {donutData.map((entry, index) => (<Cell key={index} fill={entry.color} stroke="none" />))}
-                </Pie>
-                <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--navy)', fontSize: 12 }} formatter={(val, name) => [`${val}%`, name]} />
-                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
-                  <tspan x="50%" dy="-8" fontSize="20" fontWeight="700" fill="#10b981">{donutData[0]?.value || 0}%</tspan>
-                  <tspan x="50%" dy="18" fontSize="10" fill="var(--muted)">pass rate</tspan>
-                </text>
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginTop: 4 }}>
-              {donutData.map(d => (
-                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{d.name} <span style={{ color: 'var(--navy)' }}>{d.value}%</span></span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
+    </div>
+  </div>
+</div>
+
+<div className="section-box" style={{ marginBottom: 24 }}>
+  <div className="sb-head">
+    <span className="sb-title">🧪 Test Type Distribution</span>
+  </div>
+  <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+    {[
+      { key: 'smoke',       label: 'Smoke',       color: '#64748b', icon: '🔍' },
+      { key: 'functional',  label: 'Functional',  color: '#6366f1', icon: '⚙️' },
+      { key: 'regression',  label: 'Regression',  color: '#f97316', icon: '🔄' },
+      { key: 'security',    label: 'Security',    color: '#ef4444', icon: '🔒' },
+      { key: 'performance', label: 'Performance', color: '#8b5cf6', icon: '⚡' },
+    ].map(type => {
+      const count = typeData.find(d => d.name === type.key)?.value || 0;
+      const total = typeData.reduce((s, d) => s + d.value, 0) || 1;
+      const pct = Math.round((count / total) * 100);
+      return (
+        <div key={type.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>{type.icon}</span>
+          <div style={{ width: 90, fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>{type.label}</div>
+          <div style={{ flex: 1, height: 8, borderRadius: 8, background: 'var(--border)', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', borderRadius: 8,
+              width: `${pct}%`,
+              background: type.color,
+              transition: 'width 1s ease',
+            }} />
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 700, color: type.color, width: 32, textAlign: 'right' }}>{count}</span>
+          <span style={{ fontSize: 10, color: 'var(--muted)', width: 36, textAlign: 'right' }}>{pct}%</span>
+        </div>
+      );
+    })}
+  </div>
+</div>
       {/* ── TOP URLs ── */}
-      <div className="section-box" style={{ marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+
+      <div className="section-box" >
         <div className="sb-head">
           <span className="sb-title">🔗 {t('topUrls') || 'Top Tested URLs'}</span>
           <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll') || 'View all'}</span>
@@ -382,7 +445,7 @@ function DashboardPanel({ user, goTo }) {
       </div>
 
       {/* ── RECENT ACTIVITY ── */}
-      <div className="section-box" style={{ marginBottom: 24 }}>
+      <div className="section-box">
         <div className="sb-head">
           <span className="sb-title">{t('recentActivity')}</span>
           <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')}</span>
@@ -446,6 +509,7 @@ function DashboardPanel({ user, goTo }) {
             })}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
@@ -992,6 +1056,7 @@ const paginatedCards = urlCards.slice(
     Playwright: { color: '#E2574C', letters: 'Pl' },
     Pytest:     { color: '#3776AB', letters: 'Py' },
     Postman:    { color: '#FF6C37', letters: 'Po'},
+    k6:         { color: '#7D64FF', letters: 'k6' }, 
   };
 
   return (
@@ -1135,7 +1200,7 @@ const paginatedCards = urlCards.slice(
         {/* ── GROUP ITEMS ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 8 }}>
           {items.map((item, i) => {
-  const fw = FW_CONFIG[item.framework] || FW_CONFIG.Selenium;
+  const fw = FW_CONFIG[item.framework] || { color: '#7D64FF', letters: item.framework || 'k6' };
   const rawRate = item.pass_rate != null ? item.pass_rate : (
     item.pass_count != null && (item.pass_count + item.fail_count + item.skip_count) > 0
       ? Math.round(item.pass_count / (item.pass_count + item.fail_count + item.skip_count) * 100)
@@ -1160,7 +1225,9 @@ const paginatedCards = urlCards.slice(
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 6 }}>{item.url}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: fw.color, background: `${fw.color}15`, border: `1px solid ${fw.color}30` }}>{fw.letters} · {item.framework}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: fw.color, background: `${fw.color}15`, border: `1px solid ${fw.color}30` }}>
+  {fw.letters === item.framework ? fw.letters : `${fw.letters} · ${item.framework}`}
+</span>
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>{total} tests</span>
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>· {timeAgo(item.created_at)}</span>
           </div>
@@ -6680,7 +6747,7 @@ function AccountPanel({ user }) {
   const [msg,        setMsg]        = useState('');
   const [error,      setError]      = useState('');
   const [loading,    setLoading]    = useState(false);
-  const [stats, setStats] = useState({ generations_count: 0, projects_count: 0 });
+  const [stats, setStats] = useState({ total: 0, projects: 0, avgRate: 0,  totalPass: 0, publicCount: 0, internalCount: 0 });
 const [statsLoading, setStatsLoading] = useState(true);
 
 useEffect(() => {
