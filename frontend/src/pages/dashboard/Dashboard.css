@@ -51,6 +51,13 @@
   --amber-bg:    rgba(245,158,11,0.08);
   --amber-border:rgba(245,158,11,0.2);
 
+
+  /* ── Heatmap ── */
+  --heatmap-empty:  rgba(255,255,255,0.05);
+  --heatmap-low:    #14532D;
+  --heatmap-medium: #16A34A;
+  --heatmap-high:   #34D399;
+
   /* ── Shadows ── */
   --shadow:      0 1px 3px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.3);
   --shadow2:     0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.08);
@@ -3480,6 +3487,13 @@
   --shadow:        0 1px 3px rgba(15,23,41,.06), 0 4px 16px rgba(15,23,41,.08);
   --shadow2:       0 8px 32px rgba(15,23,41,.12), 0 0 0 1px rgba(99,102,241,.10);
   --shadow-indigo: 0 8px 32px rgba(99,102,241,.15), 0 0 0 1px rgba(99,102,241,.12);
+
+
+  /* ── Heatmap light ── */
+  --heatmap-empty:  rgba(0,0,0,0.05);
+  --heatmap-low:    #DCFCE7;
+  --heatmap-medium: #86EFAC;
+  --heatmap-high:   #22C55E;
 }
 
 /* Light-mode tweaks that can't use variables alone */
@@ -3966,4 +3980,24 @@
   color: var(--dimmed) !important;
   -webkit-text-fill-color: var(--dimmed) !important;
   opacity: 1;
+}
+
+/* ── Donut chart fix — Tests Results ── */
+.dash-root .section-box {
+  overflow: visible !important;
+  
+}
+
+/* Pour éviter que ça casse les autres section-box,
+   cible uniquement celle du donut via un wrapper */
+.dash-root .donut-section-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: visible;
+  box-shadow: var(--shadow);
+}
+/* ── Equal-height row for Trend / Results / Activity ── */
+.dash-root .section-box {
+  height: 100%;
 }

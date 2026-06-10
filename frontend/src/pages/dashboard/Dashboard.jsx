@@ -8,7 +8,7 @@ import NextestChatbot from '../../pages/Chatboot/Nextestchatbot';
 
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, LineChart, Line, ComposedChart,
 } from 'recharts';
 
 function useCountUp(target, duration = 1200) {
@@ -158,11 +158,483 @@ function AssertionBadge({ assertion_result, step_meta }) {
 // Dashboard Panel
 // ─────────────────────────────────────────────────────────────────────────────
 
+function KPICard({ icon, iconBg, iconBorder, accentColor, title, value, trend, sparkData, sparkColor, circular }) {
+  const [hovered, setHovered] = useState(false);
+  const trendColor = trend.positive === true ? 'var(--green)' : trend.positive === false ? 'var(--red)' : 'var(--muted)';
+  const trendBg    = trend.positive === true ? 'var(--green-bg)' : trend.positive === false ? 'var(--red-bg)' : 'var(--bg2)';
+  const trendBorder= trend.positive === true ? 'var(--green-border)' : trend.positive === false ? 'var(--red-border)' : 'var(--border)';
+  const trendIcon  = trend.positive === true ? '↑' : trend.positive === false ? '↓' : '—';
 
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: 'var(--card)',
+        border: `1px solid ${hovered ? accentColor + '44' : 'var(--border)'}`,
+        borderRadius: 20,
+        padding: '22px 20px 18px',
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: hovered
+          ? `0 16px 40px rgba(0,0,0,0.25), 0 0 0 1px ${accentColor}33`
+          : '0 2px 12px rgba(0,0,0,0.12)',
+        transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
+        transition: 'all 0.28s cubic-bezier(.22,1,.36,1)',
+        cursor: 'default',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0,
+        minHeight: 148,
+      }}
+    >
+      {/* Top accent bar */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+        background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`,
+        opacity: hovered ? 1 : 0.5,
+        transition: 'opacity 0.28s',
+      }} />
 
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{
+          width: 42, height: 42, borderRadius: 12,
+          background: iconBg, border: `1.5px solid ${iconBorder}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 20,
+          boxShadow: `0 4px 12px ${accentColor}22`,
+          transition: 'transform 0.25s cubic-bezier(.34,1.56,.64,1)',
+          transform: hovered ? 'scale(1.1) rotate(-4deg)' : 'scale(1)',
+          flexShrink: 0,
+        }}>
+          {icon}
+        </div>
+
+        {circular ? (
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CircularProgress value={circular.value} size={52} stroke={5} color={circular.color} />
+            <div style={{
+              position: 'absolute',
+              fontSize: 10, fontWeight: 800,
+              color: circular.color,
+              fontFamily: 'var(--C)',
+            }}>
+              {circular.value}
+            </div>
+          </div>
+        ) : sparkData ? (
+          <div style={{ opacity: hovered ? 1 : 0.7, transition: 'opacity 0.2s', paddingTop: 4 }}>
+            <MiniSparkline data={sparkData} color={sparkColor} width={72} height={30} />
+          </div>
+        ) : null}
+      </div>
+
+      {/* Title */}
+      <div style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: '1.5px',
+        textTransform: 'uppercase',
+        color: 'var(--muted)',
+        marginBottom: 6,
+      }}>
+        {title}
+      </div>
+
+      {/* Value */}
+      <div style={{
+        fontFamily: 'var(--C)',
+        fontSize: 42, fontWeight: 700,
+        color: 'var(--text)',
+        lineHeight: 1,
+        marginBottom: 10,
+        letterSpacing: '-1px',
+      }}>
+        <AnimatedStat val={String(value)} />
+      </div>
+
+      {/* Trend badge */}
+      <div style={{ marginTop: 'auto' }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          padding: '3px 10px', borderRadius: 20,
+          fontSize: 10, fontWeight: 700,
+          color: trendColor,
+          background: trendBg,
+          border: `1px solid ${trendBorder}`,
+          letterSpacing: '0.3px',
+        }}>
+          <span style={{ fontSize: 11 }}>{trendIcon}</span>
+          {trend.value}
+        </span>
+      </div>
+
+      {/* Bottom glow */}
+      {hovered && (
+        <div style={{
+          position: 'absolute', bottom: -20, left: '50%',
+          transform: 'translateX(-50%)',
+          width: '60%', height: 40,
+          background: accentColor,
+          filter: 'blur(24px)',
+          opacity: 0.15,
+          borderRadius: '50%',
+          pointerEvents: 'none',
+        }} />
+      )}
+    </div>
+  );
+}
+function MiniSparkline({ data = [], color = '#8b5cf6', width = 80, height = 32 }) {
+  if (!data.length) return null;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((v - min) / range) * (height - 4) - 2;
+    return `${x},${y}`;
+  }).join(' ');
+  const fillPts = `0,${height} ${pts} ${width},${height}`;
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={fillPts} fill={`url(#sg-${color.replace('#','')})`} />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {data.length > 0 && (() => {
+        const last = data.length - 1;
+        const x = (last / (data.length - 1)) * width;
+        const y = height - ((data[last] - min) / range) * (height - 4) - 2;
+        return <circle cx={x} cy={y} r="3" fill={color} />;
+      })()}
+    </svg>
+  );
+}
+
+function CircularProgress({ value = 0, size = 56, stroke = 5, color = '#10b981' }) {
+  const r = (size - stroke * 2) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (value / 100) * circ;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth={stroke} />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+        style={{ transition: 'stroke-dashoffset 1.4s cubic-bezier(.22,1,.36,1)' }} />
+    </svg>
+  );
+}
+function ActivityHeatmap({ gens }) {
+  const today = new Date();
+  
+  // Construire 28 jours de données (4 semaines)
+  const days = Array.from({ length: 28 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (27 - i));
+    return {
+      date: d,
+      dateStr: d.toISOString().split('T')[0],
+      count: 0,
+      tests: 0,
+    };
+  });
+
+  // Remplir avec les vraies données
+  gens.forEach(g => {
+    const dateStr = new Date(g.created_at).toISOString().split('T')[0];
+    const day = days.find(d => d.dateStr === dateStr);
+    if (day) {
+      day.count += 1;
+      day.tests += (g.pass_count || 0) + (g.fail_count || 0) + (g.skip_count || 0);
+    }
+  });
+
+  const maxTests = Math.max(...days.map(d => d.tests), 1);
+
+  const getColor = (tests) => {
+    if (tests === 0) return null;
+    const ratio = tests / maxTests;
+    if (ratio < 0.25) return 'low';
+    if (ratio < 0.6)  return 'medium';
+    return 'high';
+  };
+
+  // Grouper par semaine (4 semaines x 7 jours)
+  const weeks = [
+    days.slice(0, 7),
+    days.slice(7, 14),
+    days.slice(14, 21),
+    days.slice(21, 28),
+  ];
+
+  const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const WEEK_LABELS = ['W1', 'W2', 'W3', 'W4'];
+
+  const [hoveredDay, setHoveredDay] = useState(null);
+
+  const formatDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  return (
+    <div className="section-box" style={{ flex: 1 }}>
+      <div className="sb-head">
+        <span className="sb-title">🔥 Tests Activity</span>
+        <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>Last 4 weeks</span>
+      </div>
+
+      <div style={{ padding: '16px 18px 12px' }}>
+        {/* Description */}
+        <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
+          Visualize test execution activity across weeks and days.
+        </p>
+
+        {/* Day labels */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6, paddingLeft: 28 }}>
+          {DAY_LABELS.map(d => (
+            <div key={d} style={{
+              flex: 1, textAlign: 'center',
+              fontSize: 9, fontWeight: 700,
+              letterSpacing: '0.5px', textTransform: 'uppercase',
+              color: 'var(--muted)',
+            }}>
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* Grid */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {weeks.map((week, wi) => (
+            <div key={wi} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* Week label */}
+              <div style={{
+                width: 22, flexShrink: 0,
+                fontSize: 9, fontWeight: 700,
+                color: 'var(--muted)', textAlign: 'right',
+              }}>
+                {WEEK_LABELS[wi]}
+              </div>
+
+              {/* Day cells */}
+              {week.map((day, di) => {
+                const level = getColor(day.tests);
+                const isHovered = hoveredDay?.dateStr === day.dateStr;
+
+                return (
+                  <div
+                    key={di}
+                    onMouseEnter={() => setHoveredDay(day)}
+                    onMouseLeave={() => setHoveredDay(null)}
+                    style={{
+                      flex: 1,
+                      aspectRatio: '1',
+                      borderRadius: 5,
+                      cursor: day.tests > 0 ? 'pointer' : 'default',
+                      position: 'relative',
+                      transition: 'all 0.18s ease',
+                      transform: isHovered ? 'scale(1.25)' : 'scale(1)',
+                      zIndex: isHovered ? 10 : 1,
+                      // Dark mode colors via CSS variables trick
+                      background: level === null
+                        ? 'var(--heatmap-empty)'
+                        : level === 'low'
+                        ? 'var(--heatmap-low)'
+                        : level === 'medium'
+                        ? 'var(--heatmap-medium)'
+                        : 'var(--heatmap-high)',
+                      boxShadow: isHovered && day.tests > 0
+                        ? '0 4px 12px rgba(34,197,94,0.4)'
+                        : 'none',
+                      border: isHovered
+                        ? '1.5px solid rgba(34,197,94,0.6)'
+                        : '1px solid transparent',
+                    }}
+                  >
+                    {/* Tooltip */}
+                    {isHovered && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: 'calc(100% + 8px)',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: 'var(--card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        padding: '6px 10px',
+                        whiteSpace: 'nowrap',
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: 'var(--text)',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                        zIndex: 100,
+                        pointerEvents: 'none',
+                      }}>
+                        <div style={{ color: 'var(--muted)', marginBottom: 2, fontSize: 9 }}>
+                          {formatDate(day.date)}
+                        </div>
+                        <div>
+                          <span style={{ color: '#22c55e', fontWeight: 800 }}>{day.tests}</span>
+                          {' '}tests · {' '}
+                          <span style={{ color: 'var(--indigo2)' }}>{day.count}</span>
+                          {' '}runs
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Legend */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          marginTop: 14, justifyContent: 'flex-end',
+        }}>
+          <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 600 }}>Less</span>
+          {[null, 'low', 'medium', 'high'].map((level, i) => (
+            <div key={i} style={{
+              width: 12, height: 12, borderRadius: 3,
+              background: level === null
+                ? 'var(--heatmap-empty)'
+                : level === 'low'
+                ? 'var(--heatmap-low)'
+                : level === 'medium'
+                ? 'var(--heatmap-medium)'
+                : 'var(--heatmap-high)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }} />
+          ))}
+          <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 600 }}>More</span>
+        </div>
+
+        {/* Footer stats */}
+        <div style={{
+          display: 'flex', gap: 16, marginTop: 12,
+          paddingTop: 12, borderTop: '1px solid var(--border3)',
+        }}>
+          {[
+            { lbl: 'Active days', val: days.filter(d => d.tests > 0).length, color: '#22c55e' },
+            { lbl: 'Total runs',  val: days.reduce((s, d) => s + d.count, 0), color: 'var(--indigo2)' },
+            { lbl: 'Peak day',    val: `${Math.max(...days.map(d => d.tests))} tests`, color: '#f59e0b' },
+          ].map(s => (
+            <div key={s.lbl} style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: s.color, fontFamily: 'var(--C)' }}>
+                {s.val}
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', marginTop: 2 }}>
+                {s.lbl}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+function AIInsights({ stats, topUrls, typeData }) {
+  const [insights, setInsights] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!stats || stats.total === 0) { setLoading(false); return; }
+
+    const fetchInsights = async () => {
+      setLoading(true);
+      try {
+        const prompt = `You are a QA analytics assistant. Analyze this test automation data and give exactly 3 short actionable insights (max 2 sentences each). Return ONLY a JSON array like: ["insight1","insight2","insight3"]
+
+Data:
+- Total scripts generated: ${stats.total}
+- Tests passed: ${stats.totalPass}
+- Tests failed: ${stats.totalFail}  
+- Tests skipped: ${stats.totalSkip}
+- Average pass rate: ${stats.avgRate}%
+- Active projects: ${stats.projects}
+- Top URLs: ${topUrls.slice(0,3).map(u => `${u.url} (${Math.round((u.pass/u.tests)*100)}% pass rate)`).join(', ')}
+- Test types: ${typeData.map(t => `${t.name}: ${t.value}`).join(', ')}`;
+
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1000,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+
+        const data = await response.json();
+        const text = data.content?.[0]?.text || '[]';
+        const clean = text.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(clean);
+        setInsights(parsed);
+      } catch (err) {
+        console.error('[AIInsights]', err);
+        setInsights([
+          `${stats.avgRate >= 80 ? 'Pass rate is healthy at' : 'Pass rate needs attention:'} ${stats.avgRate}%. ${stats.avgRate < 80 ? 'Review failing tests.' : 'Keep monitoring.'}`,
+          `${stats.totalFail > 0 ? `${stats.totalFail} tests failed across ${stats.total} scripts. Investigate selectors.` : 'No failures detected — great stability!'}`,
+          `${topUrls[0] ? `Most tested URL: ${topUrls[0].url} with ${topUrls[0].tests} tests.` : 'Start generating tests to get insights.'}`,
+        ]);
+      }
+      setLoading(false);
+    };
+
+    fetchInsights();
+  }, [stats.total]);
+
+  const ICONS = ['🔍', '⚡', '📊'];
+  const COLORS = ['#818cf8', '#f59e0b', '#10b981'];
+
+  return (
+    <div className="section-box" style={{ flex: 1 }}>
+      <div className="sb-head">
+        <span className="sb-title">🤖 AI Insights</span>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(99,102,241,.12)', color: 'var(--indigo2)', border: '1px solid rgba(99,102,241,.25)' }}>New</span>
+      </div>
+
+      <div style={{ padding: '8px 20px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--bg)', border: '1px solid var(--border)', opacity: 0.6 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--border)', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ height: 11, borderRadius: 4, background: 'var(--border)', width: '80%', marginBottom: 6 }} />
+                <div style={{ height: 11, borderRadius: 4, background: 'var(--border)', width: '60%' }} />
+              </div>
+            </div>
+          ))
+        ) : insights.map((insight, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--bg)', border: `1px solid ${COLORS[i]}22`, transition: 'all .2s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = `${COLORS[i]}08`; e.currentTarget.style.borderColor = `${COLORS[i]}44`; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg)'; e.currentTarget.style.borderColor = `${COLORS[i]}22`; }}
+          >
+            <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: `${COLORS[i]}15`, border: `1px solid ${COLORS[i]}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
+              {ICONS[i]}
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.6, margin: 0 }}>
+              {insight}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 function DashboardPanel({ user, goTo }) {
   const { t } = useLang();
-  const [stats, setStats] = useState({ total: 0, projects: 0, avgRate: 0, publicCount: 0, internalCount: 0, highPassCount: 0 });
+  const [stats, setStats] = useState({
+  total: 0, projects: 0, avgRate: 0,
+  totalPass: 0, publicCount: 0, internalCount: 0, highPassCount: 0,
+  trendScripts:  { value: '0 vs last week', positive: null },
+  trendPass:     { value: '0 vs last week', positive: null },
+  trendProjects: { value: '0 vs last week', positive: null },
+  trendRate:     { value: '0 vs last week', positive: null },
+});
   const [barData, setBarData] = useState([
     { day: 'Mon', count: 0 }, { day: 'Tue', count: 0 }, { day: 'Wed', count: 0 },
     { day: 'Thu', count: 0 }, { day: 'Fri', count: 0 }, { day: 'Sat', count: 0 }, { day: 'Sun', count: 0 },
@@ -175,70 +647,143 @@ function DashboardPanel({ user, goTo }) {
   const [topUrls, setTopUrls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [typeData, setTypeData] = useState([]);
+  const [allGens,  setAllGens]  = useState([]);
 
   useEffect(() => {
+    if (!user) return;
     Promise.all([api.get('/generations'), api.get('/projects')])
       .then(([genRes, projRes]) => {
-        const gens  = genRes.data;
-        const projs = projRes.data;
+  const gens  = genRes.data;
+  const projs = projRes.data;
+  const now   = new Date();
 
-        const totalPass = gens.reduce((s, g) => s + (g.pass_count || 0), 0);
-        const totalFail = gens.reduce((s, g) => s + (g.fail_count || 0), 0);
-        const totalSkip = gens.reduce((s, g) => s + (g.skip_count || 0), 0);
-        const avgRate   = gens.length ? Math.round(gens.reduce((s, g) => s + (g.pass_rate || 0), 0) / gens.length) : 0;
-        
+  // ── Totaux globaux ──
+  const totalPass = gens.reduce((s, g) => s + (g.pass_count || 0), 0);
+  const totalFail = gens.reduce((s, g) => s + (g.fail_count || 0), 0);
+  const totalSkip = gens.reduce((s, g) => s + (g.skip_count || 0), 0);
+  const avgRate   = gens.length ? Math.round(gens.reduce((s, g) => s + (g.pass_rate || 0), 0) / gens.length) : 0;
 
-      setStats({ 
-  total: gens.length, 
-  projects: projs.length, 
-  avgRate,
-  totalPass: gens.reduce((s, g) => s + (g.pass_count || 0), 0),
-  publicCount: projs.filter(p => p.type === 'public').length,
-  internalCount: projs.filter(p => p.type === 'internal').length,
-  highPassCount: gens.filter(g => (g.pass_rate || 0) >= 80).length,
+  // ── Cette semaine (0-6 jours) ──
+  const thisWeekGens = gens.filter(g => {
+    const diff = Math.floor((now - new Date(g.created_at)) / 86400000);
+    return diff < 7;
+  });
+  const lastWeekGens = gens.filter(g => {
+    const diff = Math.floor((now - new Date(g.created_at)) / 86400000);
+    return diff >= 7 && diff < 14;
+  });
+
+  // ── Trends scripts ──
+  const scriptsThisWeek = thisWeekGens.length;
+  const scriptsLastWeek = lastWeekGens.length;
+  const scriptsDiff     = scriptsThisWeek - scriptsLastWeek;
+
+  // ── Trends tests passés ──
+  const passThisWeek = thisWeekGens.reduce((s, g) => s + (g.pass_count || 0), 0);
+  const passLastWeek = lastWeekGens.reduce((s, g) => s + (g.pass_count || 0), 0);
+  const passDiff     = passThisWeek - passLastWeek;
+  const passPercent  = passLastWeek > 0 ? Math.round(((passThisWeek - passLastWeek) / passLastWeek) * 100) : null;
+
+  // ── Trends projets ──
+  const projsThisWeek = projs.filter(p => {
+    const diff = Math.floor((now - new Date(p.created_at)) / 86400000);
+    return diff < 7;
+  }).length;
+  const projsLastWeek = projs.filter(p => {
+    const diff = Math.floor((now - new Date(p.created_at)) / 86400000);
+    return diff >= 7 && diff < 14;
+  }).length;
+  const projsDiff = projsThisWeek - projsLastWeek;
+
+  // ── Trends success rate ──
+  const rateThisWeek = thisWeekGens.length
+    ? Math.round(thisWeekGens.reduce((s, g) => s + (g.pass_rate || 0), 0) / thisWeekGens.length)
+    : 0;
+  const rateLastWeek = lastWeekGens.length
+    ? Math.round(lastWeekGens.reduce((s, g) => s + (g.pass_rate || 0), 0) / lastWeekGens.length)
+    : 0;
+  const rateDiff = rateThisWeek - rateLastWeek;
+
+  // ── Helper format trend ──
+  const formatTrend = (diff, unit = '', usePercent = false, percentVal = null) => {
+    if (usePercent && percentVal !== null) {
+      return {
+        value: percentVal === 0 ? `0% vs last week` : `${percentVal > 0 ? '+' : ''}${percentVal}% vs last week`,
+        positive: percentVal > 0 ? true : percentVal < 0 ? false : null,
+      };
+    }
+    return {
+      value: diff === 0 ? `0${unit} vs last week` : `${diff > 0 ? '+' : ''}${diff}${unit} vs last week`,
+      positive: diff > 0 ? true : diff < 0 ? false : null,
+    };
+  };
+
+  setStats({
+    total:          gens.length,
+    projects:       projs.length,
+    avgRate,
+    totalPass,
+    totalFail,   // ← ajoute
+    totalSkip,   // ← ajoute
+    publicCount:    projs.filter(p => p.type === 'public').length,
+    internalCount:  projs.filter(p => p.type === 'internal').length,
+    highPassCount:  gens.filter(g => (g.pass_rate || 0) >= 80).length,
+    // ── Trends dynamiques ──
+    trendScripts: formatTrend(scriptsDiff),
+    trendPass:    formatTrend(passDiff, '', true, passPercent),
+    trendProjects: formatTrend(projsDiff),
+    trendRate:    formatTrend(rateDiff, '%'),
+  });
+
+const counts = [0,0,0,0,0,0,0];
+const testsPerDay = [0,0,0,0,0,0,0];
+gens.forEach(g => {
+  const d    = new Date(g.created_at);
+  const diff = Math.floor((now - d) / 86400000);
+  if (diff < 7) {
+    const idx = (d.getDay() + 6) % 7;
+    counts[idx]++;
+    testsPerDay[idx] += (g.pass_count || 0) + (g.fail_count || 0) + (g.skip_count || 0);
+  }
 });
+setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
+  day,
+  count: counts[i],
+  tests: testsPerDay[i],
+})));
 
-        const counts = [0,0,0,0,0,0,0];
-        const now = new Date();
-        gens.forEach(g => {
-          const d    = new Date(g.created_at);
-          const diff = Math.floor((now - d) / 86400000);
-          if (diff < 7) counts[(d.getDay() + 6) % 7]++;
-        });
-        setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({ day, count: counts[i] })));
+  // ── Donut ──
+  const grandTotal = (totalPass + totalFail + totalSkip) || 1;
+  setDonutData([
+    { name: 'Passed',  value: Math.round(totalPass / grandTotal * 100), color: '#10b981' },
+    { name: 'Failed',  value: Math.round(totalFail / grandTotal * 100), color: '#ef4444' },
+    { name: 'Skipped', value: Math.round(totalSkip / grandTotal * 100), color: '#f59e0b' },
+  ]);
 
-        const grandTotal = (totalPass + totalFail + totalSkip) || 1;
-        setDonutData([
-          { name: 'Passed',  value: Math.round(totalPass / grandTotal * 100), color: '#10b981' },
-          { name: 'Failed',  value: Math.round(totalFail / grandTotal * 100), color: '#ef4444' },
-          { name: 'Skipped', value: Math.round(totalSkip / grandTotal * 100), color: '#f59e0b' },
-        ]);
+  // ── Top URLs ──
+  const urlMap = {};
+  gens.forEach(g => {
+    if (!urlMap[g.url]) urlMap[g.url] = { url: g.url, framework: g.framework, tests: 0, pass: 0, date: g.created_at };
+    urlMap[g.url].tests += (g.pass_count||0) + (g.fail_count||0) + (g.skip_count||0);
+    urlMap[g.url].pass  += g.pass_count || 0;
+    urlMap[g.url].date   = g.created_at;
+  });
+  setTopUrls(Object.values(urlMap).sort((a,b) => b.tests - a.tests).slice(0,3));
 
-        const urlMap = {};
-        gens.forEach(g => {
-          if (!urlMap[g.url]) urlMap[g.url] = { url: g.url, framework: g.framework, tests: 0, pass: 0, date: g.created_at };
-          urlMap[g.url].tests += (g.pass_count||0) + (g.fail_count||0) + (g.skip_count||0);
-          urlMap[g.url].pass  += g.pass_count || 0;
-          urlMap[g.url].date   = g.created_at;
-        });
-        setTopUrls(Object.values(urlMap).sort((a,b) => b.tests - a.tests).slice(0,3));
-        const typeCount = {};
-        gens.forEach(g => {
-          const t = g.test_type || 'smoke';
-          typeCount[t] = (typeCount[t] || 0) + 1;
-        });
-        setTypeData(Object.entries(typeCount).map(([name, value]) => ({ name, value })));
-      })
-      .catch(console.error)
+  // ── Type distribution ──
+  const typeCount = {};
+  gens.forEach(g => {
+    const t = g.test_type || 'smoke';
+    typeCount[t] = (typeCount[t] || 0) + 1;
+  });
+  setTypeData(Object.entries(typeCount).map(([name, value]) => ({ name, value })));
+  setAllGens(gens);
+})
+    .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [user]);
 
-  const STATS = [
-  { icon: '🚀', val: String(stats.total),    lbl: t('scriptsGenerated'), accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)' },
-  { icon: '✅', val: String(stats.totalPass), lbl: 'Tests Passed',        accent: 'linear-gradient(90deg,#10b981,#34d399)' },
-  { icon: '📁', val: String(stats.projects),  lbl: 'Projects',            accent: 'linear-gradient(90deg,#8b5cf6,#a78bfa)' },
-  { icon: '🏆', val: String(stats.highPassCount), lbl: 'High Pass Rate ≥80%', accent: 'linear-gradient(90deg,#f59e0b,#fbbf24)' },
-];
+
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1;
   
   if (loading) return (
@@ -246,6 +791,9 @@ function DashboardPanel({ user, goTo }) {
       <span className="spinner" style={{ width:24, height:24 }} />
     </div>
   );
+  const grandTotal = stats.totalPass + stats.totalFail + stats.totalSkip;
+  Math.round(((donutData[1]?.value||0) / 100) * (stats.totalPass / ((donutData[0]?.value||1) / 100))) +
+  Math.round(((donutData[2]?.value||0) / 100) * (stats.totalPass / ((donutData[0]?.value||1) / 100)));
 
   return (
     <div className="panel">
@@ -259,67 +807,150 @@ function DashboardPanel({ user, goTo }) {
           {t('newGeneration')}
         </button>
       </div>
-      <div className="stats-grid">
-        {STATS.map((s, i) => (
-          <div className="stat-card" key={s.lbl} style={{ '--i': i }}>
-            <div className="stat-card-top"><div className="stat-icon-wrap">{s.icon}</div></div>
-            <span className="stat-val"><AnimatedStat val={s.val} /></span>
-            <span className="stat-lbl">{s.lbl}</span>
-{s.lbl === 'Projects' && (
-  <div style={{ display: 'flex', gap: 8, marginTop: 6, justifyContent: 'center' }}>
-    <span style={{ fontSize: 10, fontWeight: 700, color: '#4f86e8', background: 'rgba(79,134,232,.1)', border: '1px solid rgba(79,134,232,.2)', padding: '2px 8px', borderRadius: 20 }}>
-      🌐 {stats.publicCount} public
-    </span>
-    <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6', background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.2)', padding: '2px 8px', borderRadius: 20 }}>
-      🔒 {stats.internalCount} internal
-    </span>
-  </div>
-)}
-<div className="stat-accent" style={{ background: s.accent }} />
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-  <div className="section-box">
-    <div className="sb-head"><span className="sb-title">📈 Generations this week</span></div>
-    <div style={{ padding: '12px 8px 8px' }}>
-      <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={barData} barSize={26} margin={{ top: 0, right: 10, bottom: 0, left: -10 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="day" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={24} />
-          <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--navy)', fontSize: 12 }} cursor={{ fill: 'rgba(201,162,39,0.07)' }} formatter={(val) => [val, 'Generations']} />
-          <Bar dataKey="count" fill="#c9a227" radius={[6, 6, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+      <div style={{
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, 1fr)',
+  gap: 16,
+  marginBottom: 24,
+}}>
+  <KPICard
+    icon="🚀"
+    iconBg="rgba(139,92,246,0.12)"
+    iconBorder="rgba(139,92,246,0.25)"
+    accentColor="#8b5cf6"
+    title={t('scriptsGenerated')}
+    value={stats.total}
+    trend={stats.trendScripts}
+    sparkData={barData.map(d => d.count)}
+    sparkColor="#8b5cf6"
+  />
+  <KPICard
+    icon="✅"
+    iconBg="rgba(16,185,129,0.12)"
+    iconBorder="rgba(16,185,129,0.25)"
+    accentColor="#10b981"
+    title="Tests Passed"
+    value={stats.totalPass}
+    trend={stats.trendPass}
+    sparkData={barData.map(d => d.count)}
+    sparkColor="#10b981"
+  />
+  <KPICard
+    icon="📁"
+    iconBg="rgba(99,102,241,0.12)"
+    iconBorder="rgba(99,102,241,0.25)"
+    accentColor="#6366f1"
+    title="Active Projects"
+    value={stats.projects}
+    trend={stats.trendProjects}
+    sparkData={[stats.publicCount, stats.internalCount, stats.projects, stats.projects, stats.projects, stats.projects, stats.projects]}
+    sparkColor="#6366f1"
+  />
+  <KPICard
+    icon="🏆"
+    iconBg="rgba(201,162,39,0.12)"
+    iconBorder="rgba(201,162,39,0.25)"
+    accentColor="#c9a227"
+    title="Success Rate"
+    value={`${stats.avgRate}%`}
+    trend={stats.trendRate}
+    circular={{
+      value: stats.avgRate,
+      color: stats.avgRate >= 80 ? '#10b981' : stats.avgRate >= 50 ? '#f59e0b' : '#ef4444'
+    }}
+  />
+</div>
+
+
+<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
+
+  {/* ── LINE CHART ── */}
+  <div className="section-box" style={{ display: 'flex', flexDirection: 'column', minHeight: 380 }}>
+    <div className="sb-head" style={{ padding: '16px 20px', flexShrink: 0 }}>
+      <span className="sb-title">📈 Tests & Scripts Trend</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--indigo2)', background: 'var(--indigo-bg)', border: '1px solid var(--indigo-border)', padding: '3px 10px', borderRadius: 20 }}>This Week</span>
+    </div>
+    <div style={{ display: 'flex', gap: 20, padding: '8px 20px 0', flexShrink: 0 }}>
+      {[{ color: '#8b5cf6', label: 'Scripts Generated' }, { color: '#10b981', label: 'Tests Executed' }].map(l => (
+        <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 24, height: 3, borderRadius: 2, background: l.color }} />
+          <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{l.label}</span>
+        </div>
+      ))}
+    </div>
+    <div style={{ flex: 1, padding: '8px 8px 12px', minHeight: 280 }}>
+      <ResponsiveContainer width="100%" height="100%">
+  <LineChart data={barData} margin={{ top: 28, right: 16, bottom: 4, left: -10 }}>
+    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.5} />
+    <XAxis dataKey="day" tick={{ fill: 'var(--muted)', fontSize: 11, fontWeight: 600 }} axisLine={false} tickLine={false} />
+    <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+    <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12, boxShadow: '0 4px 20px rgba(0,0,0,.3)' }} cursor={{ stroke: 'var(--border)', strokeWidth: 1 }} />
+    <Line type="monotone" dataKey="count" name="Scripts Generated" stroke="#8b5cf6" strokeWidth={2.5}
+      dot={{ r: 5, fill: '#8b5cf6', stroke: 'var(--card)', strokeWidth: 2 }}
+      activeDot={{ r: 7, fill: '#8b5cf6' }}
+      label={({ x, y, value }) => value > 0 ? <text x={x} y={y - 12} fill="#8b5cf6" fontSize={11} fontWeight={700} textAnchor="middle">{value}</text> : null}
+    />
+    <Line type="monotone" dataKey="tests" name="Tests Executed" stroke="#10b981" strokeWidth={2.5}
+      dot={{ r: 5, fill: '#10b981', stroke: 'var(--card)', strokeWidth: 2 }}
+      activeDot={{ r: 7, fill: '#10b981' }}
+      label={({ x, y, value }) => value > 0 ? <text x={x} y={y - 12} fill="#10b981" fontSize={11} fontWeight={700} textAnchor="middle">{value}</text> : null}
+    />
+  </LineChart>
+</ResponsiveContainer>
     </div>
   </div>
 
-  <div className="section-box">
-    <div className="sb-head"><span className="sb-title">📊 Test Results</span></div>
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 0' }}>
-      <ResponsiveContainer width="100%" height={200}>
-        <PieChart>
-          <Pie data={donutData} cx="50%" cy="50%" innerRadius={65} outerRadius={90} paddingAngle={3} dataKey="value" labelLine={false}>
-            {donutData.map((entry, index) => (<Cell key={index} fill={entry.color} stroke="none" />))}
-          </Pie>
-          <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--navy)', fontSize: 12 }} formatter={(val, name) => [`${val}%`, name]} />
-          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
-            <tspan x="50%" dy="-8" fontSize="22" fontWeight="700" fill="#10b981">{donutData[0]?.value || 0}%</tspan>
-            <tspan x="50%" dy="18" fontSize="10" fill="var(--muted)">pass rate</tspan>
-          </text>
-        </PieChart>
-      </ResponsiveContainer>
-      <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 0, marginBottom: 12, flexWrap: 'wrap' }}>
-        {donutData.map(d => (
-          <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{d.name} <span style={{ color: 'var(--text)' }}>{d.value}%</span></span>
+  {/* ── DONUT ── */}
+  <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: 380 }}>
+    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', padding: '16px 20px', flexShrink: 0, borderBottom: '1px solid var(--border3)' }}>
+      📊 Tests Results
+    </div>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '24px 20px' }}>
+      {/* Donut */}
+      <div style={{ position: 'relative', width: 180, height: 180, flexShrink: 0 }}>
+        <svg width="180" height="180" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="90" cy="90" r="70" fill="none" stroke="var(--border)" strokeWidth="22" />
+          <circle cx="90" cy="90" r="70" fill="none" stroke="#10b981" strokeWidth="22"
+            strokeDasharray={`${(donutData[0]?.value||0)*4.398} 439.8`} strokeLinecap="butt" />
+          <circle cx="90" cy="90" r="70" fill="none" stroke="#ef4444" strokeWidth="22"
+            strokeDasharray={`${(donutData[1]?.value||0)*4.398} 439.8`}
+            strokeDashoffset={`-${(donutData[0]?.value||0)*4.398}`} strokeLinecap="butt" />
+          <circle cx="90" cy="90" r="70" fill="none" stroke="#f59e0b" strokeWidth="22"
+            strokeDasharray={`${(donutData[2]?.value||0)*4.398} 439.8`}
+            strokeDashoffset={`-${((donutData[0]?.value||0)+(donutData[1]?.value||0))*4.398}`} strokeLinecap="butt" />
+        </svg>
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: '#10b981', lineHeight: 1, fontFamily: 'var(--C)' }}>{donutData[0]?.value||0}%</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>pass rate</div>
+        </div>
+      </div>
+      {/* Stats */}
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {[
+          { name: 'Passed',  color: '#10b981', pct: donutData[0]?.value||0, count: stats.totalPass },
+          { name: 'Failed',  color: '#ef4444', pct: donutData[1]?.value||0, count: stats.totalFail },
+          { name: 'Skipped', color: '#f59e0b', pct: donutData[2]?.value||0, count: stats.totalSkip },
+        ].map((d, i) => (
+          <div key={d.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < 2 ? '1px solid var(--border3)' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 9, height: 9, borderRadius: '50%', background: d.color }} />
+              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>{d.name}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <span style={{ fontSize: 16, fontWeight: 800, color: d.color, fontFamily: 'var(--C)' }}>{d.count}</span>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>({d.pct}%)</span>
+            </div>
           </div>
         ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 2, borderTop: '1.5px solid var(--border)' }}>
+          <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Total</span>
+          <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--C)' }}>{grandTotal} <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>tests</span></span>
+        </div>
       </div>
     </div>
   </div>
+
+  <ActivityHeatmap gens={allGens} />
 </div>
 
 <div className="section-box" style={{ marginBottom: 24 }}>
@@ -356,161 +987,156 @@ function DashboardPanel({ user, goTo }) {
     })}
   </div>
 </div>
-      {/* ── TOP URLs ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-
-      <div className="section-box" >
-        <div className="sb-head">
-          <span className="sb-title">🔗 {t('topUrls') || 'Top Tested URLs'}</span>
-          <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll') || 'View all'}</span>
-        </div>
-        <div style={{ padding: '8px 0' }}>
-          {topUrls.length === 0 ? (
-            <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-              No URLs tested yet — generate your first test!
+<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
+  {/* ── TOP URLs ── */}
+  <div className="section-box">
+    <div className="sb-head">
+      <span className="sb-title">🔗 Top Tested URLs</span>
+      <span className="sb-action" onClick={() => goTo('history')}>View all</span>
+    </div>
+    {/* Column headers */}
+    <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 100px 50px 110px', gap: 8, padding: '8px 20px 6px', borderBottom: '1px solid var(--border3)' }}>
+      {['#', 'URL', 'Tool', 'Tests', 'Pass Rate'].map(h => (
+        <div key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
+      ))}
+    </div>
+    {topUrls.length === 0 ? (
+      <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+        No URLs tested yet!
+      </div>
+    ) : topUrls.map((item, i) => {
+      const rate = Math.round((item.pass / item.tests) * 100) || 0;
+      const rc = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+      const FW_COLORS = { Selenium: '#43B02A', Cypress: '#00BFA5', Playwright: '#E2574C', Both: '#C9A227', k6: '#7D64FF', Pytest: '#3776AB', Postman: '#FF6C37' };
+      const fwColor = FW_COLORS[item.framework] || '#4f86e8';
+      return (
+        <div key={i}
+          style={{ display: 'grid', gridTemplateColumns: '28px 1fr 100px 50px 110px', gap: 8, padding: '11px 20px', borderBottom: i < topUrls.length - 1 ? '1px solid var(--border3)' : 'none', alignItems: 'center', transition: 'background .15s' }}
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{i + 1}</div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--indigo2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}
+              onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
+              {item.url}
             </div>
-          ) : topUrls.map((item, i) => {
-            const rate = Math.round((item.pass / item.tests) * 100) || 0;
-            const statusColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
-            return (
-              <div
-                key={i}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 16,
-                  padding: '12px 20px',
-                  borderBottom: i < topUrls.length - 1 ? '1px solid var(--border)' : 'none',
-                  transition: 'background .15s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                <div style={{
-                  width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
-                  background: 'var(--goldbg)', border: '1px solid rgba(201,162,39,.3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700, color: 'var(--gold)',
-                }}>
-                  {i + 1}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
-                    style={{
-                      fontSize: 13, fontWeight: 600, color: 'var(--indigo2)',
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-                    onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-                  >
-                    {item.url}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                    {item.tests} test{item.tests !== 1 ? 's' : ''} &middot; {(() => {
-                      if (!item.date) return '—';
-                      const diff = (Date.now() - new Date(item.date)) / 1000;
-                      if (isNaN(diff)) return '—';
-                      if (diff < 60) return `${Math.floor(diff)}s ago`;
-                      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-                      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-                      return `${Math.floor(diff / 86400)}d ago`;
-                    })()}
-                  </div>
-                </div>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, letterSpacing: '1px',
-                  padding: '3px 10px', borderRadius: 20, flexShrink: 0,
-                  background: 'rgba(79,134,232,.1)', color: '#4f86e8',
-                  border: '1px solid rgba(79,134,232,.2)',
-                }}>
-                  {item.framework}
-                </span>
-                <div style={{ width: 80, flexShrink: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>pass rate</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{rate}%</span>
-                  </div>
-                  <div style={{ height: 4, borderRadius: 4, background: 'var(--border)', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', borderRadius: 4,
-                      width: `${rate}%`, background: statusColor,
-                      transition: 'width 1s ease',
-                    }} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── RECENT ACTIVITY ── */}
-      <div className="section-box">
-        <div className="sb-head">
-          <span className="sb-title">{t('recentActivity')}</span>
-          <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')}</span>
-        </div>
-        {topUrls.length === 0 ? (
-          <div className="empty-row">{t('noActivity')}</div>
-        ) : (
-          <div style={{ padding: '4px 0' }}>
-            {topUrls.slice(0, 5).map((item, i) => {
-              const rate = Math.round((item.pass / item.tests) * 100) || 0;
-              const rc = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
-              const FW_COLORS = { Selenium: '#43B02A', Cypress: '#00BFA5', Playwright: '#E2574C', Both: '#C9A227' };
-              const fwColor = FW_COLORS[item.framework] || '#4f86e8';
-              return (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '10px 20px',
-                  borderBottom: i < Math.min(topUrls.length, 5) - 1 ? '1px solid var(--border)' : 'none',
-                  transition: 'background .15s',
-                }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <div style={{
-                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                    background: rc, boxShadow: `0 0 6px ${rc}88`,
-                  }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 12, fontWeight: 600, color: 'var(--text)',
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}>
-                      {item.url}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8 }}>
-                      <span style={{ color: fwColor, fontWeight: 700 }}>{item.framework}</span>
-                      <span>·</span>
-                      <span>{item.tests} tests</span>
-                    </div>
-                  </div>
-                  <span style={{
-                    fontSize: 12, fontWeight: 800, color: rc,
-                    background: `${rc}12`, border: `1px solid ${rc}33`,
-                    padding: '3px 10px', borderRadius: 20, flexShrink: 0,
-                  }}>
-                    {rate}%
-                  </span>
-                  <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, minWidth: 60, textAlign: 'right' }}>
-                    {(() => {
-                      if (!item.date) return '—';
-                      const diff = (Date.now() - new Date(item.date)) / 1000;
-                      if (isNaN(diff)) return '—';
-                      if (diff < 60) return `${Math.floor(diff)}s ago`;
-                      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-                      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-                      return `${Math.floor(diff / 86400)}d ago`;
-                    })()}
-                  </span>
-                </div>
-              );
-            })}
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+              {(() => {
+                const diff = (Date.now() - new Date(item.date)) / 1000;
+                if (isNaN(diff)) return '—';
+                if (diff < 60) return `${Math.floor(diff)}s ago`;
+                if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                return `${Math.floor(diff / 86400)}d ago`;
+              })()}
+            </div>
           </div>
-        )}
-      </div>
-      </div>
+          <div>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: fwColor, background: `${fwColor}18`, border: `1px solid ${fwColor}33` }}>
+              {item.framework}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{item.tests}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: rc, minWidth: 34 }}>{rate}%</span>
+            <div style={{ flex: 1, height: 5, borderRadius: 4, background: 'var(--border)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 4, width: `${rate}%`, background: rc, transition: 'width 1s ease' }} />
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+{/* ── RECENT ACTIVITY ── */}
+<div className="section-box">
+  <div className="sb-head">
+    <span className="sb-title">📋 Recent Activity</span>
+    <span className="sb-action" onClick={() => goTo('history')}>View all</span>
+  </div>
+  <div>
+    {topUrls.length === 0 ? (
+      <div className="empty-row">{t('noActivity')}</div>
+    ) : topUrls.slice(0, 3).map((item, i) => {
+      const rate = Math.round((item.pass / item.tests) * 100) || 0;
+      const rc = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+      const isOk = rate >= 80;
+      const FW_COLORS = { Selenium: '#43B02A', Cypress: '#00BFA5', Playwright: '#E2574C', Both: '#C9A227', k6: '#7D64FF', Pytest: '#3776AB', Postman: '#FF6C37' };
+      const fwColor = FW_COLORS[item.framework] || '#4f86e8';
+      const timeStr = (() => {
+        if (!item.date) return '—';
+        const diff = (Date.now() - new Date(item.date)) / 1000;
+        if (isNaN(diff)) return '—';
+        if (diff < 60) return `${Math.floor(diff)}s ago`;
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return `${Math.floor(diff / 86400)}d ago`;
+      })();
+      return (
+        <div key={i}
+          style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 20px', borderBottom: i < Math.min(topUrls.length, 3) - 1 ? '1px solid var(--border3)' : 'none', transition: 'background .15s' }}
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          {/* Circle icon */}
+          <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, marginTop: 1, background: isOk ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)', border: `2px solid ${isOk ? '#10b981' : '#ef4444'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {isOk
+              ? <svg width="10" height="10" fill="none" stroke="#10b981" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+              : <svg width="10" height="10" fill="none" stroke="#ef4444" strokeWidth="3" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            }
+          </div>
+
+          {/* Content */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 4, lineHeight: 1.5 }}>
+              {isOk ? (
+                <>
+                  <span style={{ color: 'var(--muted)' }}>{item.framework} tests completed on </span>
+                  <span style={{ color: 'var(--indigo2)', cursor: 'pointer' }}
+                    onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+                    onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                    onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
+                    {item.url}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span style={{ color: 'var(--muted)' }}>{item.framework} scan failed on </span>
+                  <span style={{ color: 'var(--indigo2)', cursor: 'pointer' }}
+                    onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+                    onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                    onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
+                    {item.url}
+                  </span>
+                </>
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: isOk ? 0 : 4 }}>
+              {item.tests} tests · Pass rate: <span style={{ color: rc, fontWeight: 700 }}>{rate}%</span>
+            </div>
+            {!isOk && (
+              <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>
+                {item.tests - item.pass} critical issue{(item.tests - item.pass) > 1 ? 's' : ''} found
+              </div>
+            )}
+          </div>
+
+          {/* Time */}
+          <div style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+            {timeStr}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
+{/* ── AI INSIGHTS ── */}
+  <AIInsights stats={stats} topUrls={topUrls} typeData={typeData} />
+
+</div>
     </div>
   );
 }
