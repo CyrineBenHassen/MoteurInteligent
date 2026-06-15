@@ -8,7 +8,7 @@ LOGIN_EMAIL    = "admin@admin.com"
 LOGIN_PASSWORD = "password1%Aa"
 
 # ── JWT Token (même approche que regression_runner.py) ───────────────────────
-_CACHED_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJhMGRmOWI3My01MzZmLTQxZmUtOGM1Ny01MTUwOGQ2NDE0NjQiLCJqdGkiOiI4NzA5OTRjZGY4NjY0MTQ4NzlkMzYyY2RiZWI5ZjA1YWQ0ZjUyOTAyMjE1Yzc4YzAyMWJhZGU2NGNmZjIzM2M1NDQ5NDBiNjFjMGEwNzc5NCIsImlhdCI6MTc4MDM5NDQ0Ni4zODA1NTQsIm5iZiI6MTc4MDM5NDQ0Ni4zODA1NTUsImV4cCI6MTc5NjIwNTY0Ni4zNzc3MTYsInN1YiI6ImEwMWVhMDA0LTUwNzQtNDUxMi05ZTBkLWE2Nzk4NDVmNWRjZSIsInNjb3BlcyI6W119.bCdX-wbmldxNYczftqhVPX59WoQRYDj7ES9HmqgRADuuFr55860kuEkInX8NXdIgXVa11WsLP1wZUUtTOU6m4Am3_RbHA-AgFZpnsoGa37MRlVKjqI8XroMOZszq7gXi4Wh6UlQTWXB_De5mRRS3pZ5hjKbDCNtsIY_ANWgqR92lyW82eu_rVh1M2Ag2kG-XIfRkwEFrkBJp7erQwR0OOr1k3sFAAFKoaharzHKAoZR71jTGuwsknT0XDhjN_gK041BJITPTS29QdvOns0jiUSmnzL2nmUorFUoUDZs9x6eZUYU9iw0AqJyx59heVn99hxyO-HuAsWKRbn1syllme8CPuACn78h71cRfPI4d6gTaOuz_m271Vp4MfYWwGmHfKP4P5DF3cN6QAtRECGp73DvA8LGnC1sG-rwvdIz86XYKrVg_UIgi683nRYr_9EqXds_F5RTdMOX46GJHc9NDDD9f1dYlHsPl1uvNlluZgXYOaNCN9Dv2TFVLKOC10BKG5ut3J0uWNs9-rf5SSuXtRWBOU1Dt6PmdNkQXuetJrbCB8kWGpWdZKD0NpD9tMf1zICTJlc1WqVoC62bNhSEGlPW4Lqu2GqAJ2u6BNqkDWUdPIl3FYjYleq97wFrcCrCU6YR04PKwpQR2ObHdTHmXxuuSL0UGu529AYVQ_52SAPo"
+_CACHED_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJhMGRmOWI3My01MzZmLTQxZmUtOGM1Ny01MTUwOGQ2NDE0NjQiLCJqdGkiOiIxZTQzMmU2MTY5NWI4MjgxOGYwZmMxNzI5ZTY4ZTM5ZWM4ZjgwZjM2MmMyMDk4Y2Y5M2ViMGVjODJiYzI0NzUzZDlkMDA0YmNmMTk5MGU3NSIsImlhdCI6MTc4MTMwMTg1Mi40NzQ0MywibmJmIjoxNzgxMzAxODUyLjQ3NDQzMSwiZXhwIjoxNzk3MTEzMDUyLjQ3MjAwMywic3ViIjoiYTAxZWEwMDQtNTA3NC00NTEyLTllMGQtYTY3OTg0NWY1ZGNlIiwic2NvcGVzIjpbXX0.CdVfTqrS8OL7q0uadADPbknBstVExvBDb4cOQ67a187l5qA4Ze380hC1ABhgNypjO2boKcteAM34iAjeI4uJU-VKityh94ZDmt2HZe3SkfOSSklN9GdiuoFOqrkRdpoEEEnmUT1G4IOUeAf9ALcp8IOeWOZpgCLvxCIt49Bvjb5diWD39J2v9hBACc-i19X3VFpsOKoqjmjoaCx4EeyQuKzty2jyxUtjiaK9YIeVVJRHuJSE2DLOG6ij-crGUzYgDdMnEBD9frWLkIgc3QeTE_lYAxCWmY0KeJkSPAds90LN-mnlu2PikkKe5W7K5uI10O9p-lfSg7-du7vaTGXRTixHnrLeCBt9jXy19JrYSinpbU5ggeIcyPr7UolwI0Zv1EGqP740Abipr8EVNi1VJ5V_XutsFgqLQ3XmhjHBXWQUv-QdBOeNRveZLG9lI3w3tq_BRANSmwMTccG_Soh8HSS_Gz0ZWPAWDOeUtHTSrEh0jUIkty7aafNh8dgAcyVhETXIUOKTJBSiLRTUiH3hEiMHwwWDK38F9fyDAAGWglblJBwQuM_e-J8_-qmKj2fBCwvtgWiliIW_84cLUKG4ORfJM6eez7CJus0arsaZyCIrncFjf_qyJdRFT_LYDYTEYiokSbhlJ1brzPePzEC3HJyU6uDR-6SCNgqGAzj6Pzg"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -16,26 +16,39 @@ _CACHED_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJhMGRmOWI3My01Mz
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _inject_token(page, base_url: str) -> bool:
-    """Inject JWT token into browser localStorage"""
+    """Inject JWT token + full localStorage into browser"""
     try:
         print(f"[FUNCTIONAL_RUNNER] Injecting token...")
         page.goto(base_url, wait_until="domcontentloaded", timeout=30000)
         page.wait_for_timeout(2000)
 
-        page.evaluate(f"""
-            () => {{
-                localStorage.setItem('token', '{_CACHED_TOKEN}');
-                localStorage.setItem('access_token', '{_CACHED_TOKEN}');
-                localStorage.setItem('authToken', '{_CACHED_TOKEN}');
-                localStorage.setItem('auth_token', '{_CACHED_TOKEN}');
-            }}
-        """)
+        _PERMISSIONS = '[{"id":"0794c877-c77e-4a97-8b06-cb6a3146fbbe","name":"verify_completeness_ed","type_code":"ed"},{"id":"31d71f0e-b76d-4417-902a-4ad1ac898917","name":"view_dashboard","type_code":"dashboard"},{"id":"a57fcffd-165c-4eda-a419-32370bc5a7ea","name":"view_statistiques","type_code":"statistiques"},{"id":"bc41cdae-c3dd-40ae-b47d-89def93fd1d7","name":"read_commission","type_code":"commissions"},{"id":"7ecb6362-67fe-4693-8057-15d3d1e53377","name":"refuse_visite","type_code":"visite"},{"id":"b4287f83-af63-4f9b-a42d-9a1747556561","name":"accept_visite","type_code":"visite"},{"id":"465b2adf-f586-489a-abda-09bc4a8fd9d1","name":"read_dossiers","type_code":"reception"}]'
+
+        _ROLES = '[{"id":"a01ea004-0189-40e7-8dca-5f3e21a96630","name":"super_admin","permissions":[]}]'
+
+        _USER = '{"id":"a01ea004-5074-4512-9e0d-a679845f5dce","fullName":"Super Admin","email":"admin@admin.com","is_super":true,"status":"active"}'
+
+        _REFRESH = "1e432e61695b82818f0fc1729e68e39ec8f80f362c2098cf93eb0ec82bc24753d9d004bcf1990e75"
+
+        storage_items = {
+            "token":          _CACHED_TOKEN,
+            "access_token":   _CACHED_TOKEN,
+            "authToken":      _CACHED_TOKEN,
+            "auth_token":     _CACHED_TOKEN,
+            "refreshToken":   _REFRESH,
+            "i18nextLng":     "fr",
+            "user":           _USER,
+            "permissions":    _PERMISSIONS,
+            "roles":          _ROLES,
+        }
+
+        for key, value in storage_items.items():
+            page.evaluate(f"localStorage.setItem({repr(key)}, {repr(value)})")
 
         page.goto(f"{base_url}/dashboard", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_timeout(3000)
 
-        current_url = page.url
-        if "login" not in current_url.lower():
+        if "login" not in page.url.lower():
             print(f"[FUNCTIONAL_RUNNER] ✓ Token injection successful")
             return True
         else:
@@ -45,7 +58,6 @@ def _inject_token(page, base_url: str) -> bool:
     except Exception as e:
         print(f"[FUNCTIONAL_RUNNER] Token injection error: {e}")
         return _login_form(page, base_url)
-
 
 def _login_form(page, base_url: str) -> bool:
     """Fallback — login with real credentials via form"""
@@ -422,6 +434,73 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
         reason = f"Erreur: {str(e)[:80]}"
 
     duration_ms = int((time.time() - start) * 1000)
+    
+
+    # ── LLaMA AI analysis pour tous les tests ────────────────────────────
+    ai_analysis = None
+    try:
+        from openai import OpenAI
+        import os, json, re
+        from dotenv import load_dotenv
+        load_dotenv()
+
+        groq_client = OpenAI(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=os.getenv("GROQ_API_KEY"),
+        )
+
+        if final_status == "pass":
+            analysis_type = "passed successfully"
+            fix_label     = "improvement or maintenance suggestion"
+            severity_hint = "low"
+        else:
+            analysis_type = "failed"
+            fix_label     = "concrete fix to resolve this failure"
+            severity_hint = "high"
+
+        prompt = (
+        f"You are a QA expert analyzing a failed functional UI test on a React/Ant Design app.\n\n"
+        f"Test name: {name}\n"
+        f"Action: {action}\n"
+        f"Selector: {selector}\n"
+        f"URL: {url}\n"
+        f"Status: {final_status.upper()}\n"
+        f"Result: {reason}\n\n"
+        f"Context: This is an Ant Design React SPA. Common failure causes:\n"
+        f"- Page loads but components not rendered (JS crash, auth issue)\n"
+        f"- Selector correct but element not yet mounted (need more wait)\n"
+        f"- Page redirects to unauthorized due to missing JWT scopes\n\n"
+        f"The test {analysis_type}.\n\n"
+        f"Respond ONLY with a JSON object, no markdown:\n"
+        f'{{"root_cause": "specific reason for this exact failure", '
+        f'"fix": "specific actionable fix for this exact test", '
+        f'"severity": "{severity_hint}"}}'
+    )
+
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.2,
+        )
+        text = re.sub(r"```json|```", "", resp.choices[0].message.content.strip()).strip()
+        ai_analysis = json.loads(text)
+        print(f"[FUNCTIONAL_RUNNER]   🤖 [{final_status.upper()}] {ai_analysis.get('root_cause','')[:70]}")
+
+    except Exception as e:
+        print(f"[FUNCTIONAL_RUNNER]   ⚠ LLaMA error: {e}")
+        if final_status == "pass":
+            ai_analysis = {
+                "root_cause": f"Element '{selector}' found and action completed successfully",
+                "fix": "Monitor selector stability across app updates",
+                "severity": "low",
+            }
+        else:
+            ai_analysis = {
+                "root_cause": f"Element '{selector}' not found or action timed out",
+                "fix": "Verify selector exists on page and add explicit wait",
+                "severity": "medium",
+            }
 
     return {
         "id":          tc.get("id"),
@@ -430,11 +509,18 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
         "severity":    severity,
         "url":         url,
         "status":      final_status,
+        "suite":       reason,
         "reason":      reason,
         "duration":    f"{duration_ms}ms",
         "description": tc.get("description", ""),
         "priority":    tc.get("priority", "medium"),
+        "ai_analysis": ai_analysis,
+        "selector":    selector,
+        "action":      action,
+        "step_meta":   {"selector": selector, "action": action},
     }
+
+   
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -462,6 +548,9 @@ def run_functional_tests(test_cases: list, base_url: str) -> dict:
             viewport={"width": 1280, "height": 720},
         )
         page = context.new_page()
+        # ── Capture des erreurs JS runtime ────────────────────────────────────
+        js_errors = []
+        page.on("pageerror", lambda err: js_errors.append(str(err)))
 
         # ── Login once for tests that require it ──────────────────────────────
         logged_in    = False
@@ -481,6 +570,9 @@ def run_functional_tests(test_cases: list, base_url: str) -> dict:
             print(f"[FUNCTIONAL_RUNNER] [{i}/{len(test_cases)}] [{cat}] {sev} | {name}")
 
             result = _run_one_functional(page, tc, base_url)
+            if result["status"] == "fail" and js_errors:
+                result["reason"] += f" | ⚠ Erreur JS app: {js_errors[-1][:120]}"
+                js_errors.clear()
             results.append(result)
 
             icon = "✓" if result["status"] == "pass" else "✗"

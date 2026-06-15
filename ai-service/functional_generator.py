@@ -98,9 +98,38 @@ def generate_functional_tests(base_url: str, target_url: str = None) -> dict:
                 "  6. check_visible selector='.sider-primary', wait_after_ms=5000 — sidebar visible\n"
                 "- DO NOT use selectors: header, .ant-menu, .ant-statistic, .ant-layout-content\n"
                 "- DO NOT generate form/search tests for dashboard\n"
-                if page_path == "/dashboard" else ""
+                if page_path == "/dashboard" else
+                "- For /gestion_commission page: ONLY generate these 6 tests, in this exact order:\n"
+                "  1. action=navigate, selector='body' — page se charge\n"
+                "  2. action=check_visible, selector='text=Gestion des commissions', wait_after_ms=4000 — titre de la page visible\n"
+                "  3. action=check_visible, selector='input[placeholder=\"Entrer une valeur\"]' — champ filtre identifiant visible\n"
+                "  4. action=fill, selector='input[placeholder=\"Entrer une valeur\"]', fill_value='TEST-999' — remplir le filtre identifiant\n"
+                "  5. action=check_visible, selector='.ant-table', wait_after_ms=4000 — tableau des commissions visible\n"
+                "  6. action=check_visible, selector='button:has-text(\"Ajouter une commission\")' — bouton ajouter une commission visible\n"
+                "- DO NOT use selectors: .ant-page-header, .ant-form-item .ant-input, generic .ant-btn-primary\n"
+                if page_path == "/gestion_commission" else
+                "- For /visites page: ONLY generate these 6 tests, in this exact order:\n"
+                "  1. action=navigate, selector='body' — page se charge\n"
+                "  2. action=check_visible, selector='text=Gestion des visites planifiées', wait_after_ms=4000 — titre de la page visible\n"
+                "  3. action=check_visible, selector='text=Numéro de dossier', wait_after_ms=4000 — en-tete du tableau visible\n"
+                "  4. action=check_visible, selector='input[placeholder=\"Entrer une valeur\"] >> nth=0' — champ filtre numero de dossier visible\n"
+                "  5. action=fill, selector='input[placeholder=\"Entrer une valeur\"] >> nth=0', fill_value='A26' — remplir le filtre numero de dossier\n"
+                "  6. action=check_visible, selector='.ant-btn-primary' — bouton Filtrer visible\n"
+                "- DO NOT generate 'creation form' tests — there is NO standalone create form on this page\n"
+                "- DO NOT use selectors: .ant-table, .ant-form-item, .ant-input\n"
+                if page_path == "/visites" else
+                "- For /statistiques page: ONLY generate these 6 tests:\n"
+                "  1. action=navigate, selector='body' — page se charge\n"
+                "  2. action=check_visible, selector='text=Statistiques des Dossiers', wait_after_ms=4000 — titre visible\n"
+                "  3. action=check_visible, selector='.ant-card', wait_after_ms=3000 — cartes stats visibles\n"
+                "  4. action=check_visible, selector='button:has-text(\"Exporter Excel\")' — bouton export visible\n"
+                "  5. action=check_visible, selector='.ant-table', wait_after_ms=4000 — tableau promoteurs visible\n"
+                "  6. action=check_visible, selector='input[placeholder*=\"Rechercher\"]' — champ recherche visible\n"
+                "- DO NOT use selectors: .ant-statistic, .ant-layout-content\n"
+                if page_path == "/statistiques" else ""
             )
         )
+        
         
         login_context = (
             "Login URL: " + base + "/admin-anpe/login\n"
@@ -202,6 +231,40 @@ def generate_functional_tests(base_url: str, target_url: str = None) -> dict:
                     tc["action"]   = "check_visible"
                     tc["name"]     = "Layout principal visible"
 
+        elif page_path == "/gestion_commission":
+            for tc in cleaned:
+                sel = tc.get("selector", "")
+                if "page-header" in sel:
+                    tc["selector"]      = "text=Gestion des commissions"
+                    tc["action"]        = "check_visible"
+                    tc["wait_after_ms"] = max(tc.get("wait_after_ms", 2000), 4000)
+                elif ".ant-form-item" in sel or "ant-input" in sel:
+                    tc["selector"] = 'input[placeholder="Entrer une valeur"]'
+                    if tc["action"] == "fill" and not tc.get("fill_value"):
+                        tc["fill_value"] = "TEST-999"
+                elif ".ant-btn-primary" in sel:
+                    tc["selector"] = 'button:has-text("Ajouter une commission")'
+                if ".ant-table" in sel:
+                    tc["wait_after_ms"] = max(tc.get("wait_after_ms", 2000), 4000)
+        elif page_path == "/visites":
+            for tc in cleaned:
+                sel = tc.get("selector", "")
+                if ".ant-table" in sel:
+                    tc["selector"]      = "text=Numéro de dossier"
+                    tc["wait_after_ms"] = max(tc.get("wait_after_ms", 2000), 4000)
+                elif ".ant-form-item" in sel or sel == ".ant-input":
+                    tc["selector"] = 'input[placeholder="Entrer une valeur"] >> nth=0'
+                    if tc["action"] == "fill" and not tc.get("fill_value"):
+                        tc["fill_value"] = "A26"
+        elif page_path == "/statistiques":
+            for tc in cleaned:
+                sel = tc.get("selector", "")
+                if ".ant-statistic" in sel:
+                    tc["selector"] = ".ant-card"
+                    tc["wait_after_ms"] = max(tc.get("wait_after_ms", 2000), 3000)
+                if ".ant-layout-content" in sel:
+                    tc["selector"] = "text=Statistiques des Dossiers"
+                    tc["wait_after_ms"] = max(tc.get("wait_after_ms", 2000), 4000)
         return {
             "test_cases": cleaned,
             "total":      len(cleaned),

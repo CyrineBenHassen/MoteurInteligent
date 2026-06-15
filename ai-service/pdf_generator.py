@@ -2715,7 +2715,9 @@ def _generate_security_pdf(generation_data: dict, tests: list) -> bytes:
         build_regression_action_plan(elements, action_plan)
 
     # ── AI RECOMMENDATIONS via Groq/Llama ────────────────────
-    scraped = generation_data.get('scraped', {})
+    pythonscraped = generation_data.get('scraped', result.get('scraped', {}))
+    if not isinstance(scraped, dict):
+        scraped = {}
     scraped['_is_security'] = True
     scraped['_is_regression'] = False   # ← force le bon label
     build_ai_recommendations(elements, tests, tests, scraped, groq_recs)
@@ -3317,10 +3319,8 @@ def _infer_functional_action(t: dict) -> str:
  
 def _extract_functional_selector(t: dict) -> str:
     reason = t.get('reason', '')
-    print(f"[DEBUG SELECTOR] reason: {repr(reason)}")
     
     matches = re.findall(r"'([^']+)'", reason)
-    print(f"[DEBUG SELECTOR] matches: {matches}")
     
     for m in matches:
         if (m.startswith('#') or 
@@ -3330,6 +3330,12 @@ def _extract_functional_selector(t: dict) -> str:
             m.startswith('body') or
             '[' in m):
             return m
+    
+    # Auth steps — no DOM selector needed
+    action = t.get('action') or _infer_functional_action(t)
+    if action in ('auth_success', 'auth_fail'):
+        return 'Auth via token injection'
+    
     return '—'
 
 def build_functional_results_table(elements, tests: list):
@@ -3373,8 +3379,7 @@ def build_functional_results_table(elements, tests: list):
         action   = t.get('action') or _infer_functional_action(t)
         ac       = FUNC_ACTION_COLORS.get(action, FUNC_ACTION_COLORS['default'])
 
-        selector = t.get('selector') or t.get('selector_used') or _extract_functional_selector(t)
-        sel_short = selector[:38] + '…' if len(selector) > 38 else selector
+        
  
         # Selector — pull from multiple possible keys
         selector = (
@@ -3385,7 +3390,7 @@ def build_functional_results_table(elements, tests: list):
         t.get('step_meta', {}).get('value') or
         t.get('step_meta', {}).get('selector_used') or
         t.get('target') or
-        '—'
+        _extract_functional_selector(t)
         )
         sel_short = selector[:38] + '…' if len(selector) > 38 else selector
  
@@ -6413,7 +6418,7 @@ def generate_pdf(generation_data: dict) -> bytes:
     url       = generation_data.get('url', result.get('url', ''))
     framework = generation_data.get('framework', result.get('framework', 'Playwright'))
     scraped   = generation_data.get('scraped', result.get('scraped', {}))
-    load_time = scraped.get('load_time_ms', 0)
+    load_time = scraped.get('load_time_ms', 0) if isinstance(scraped, dict) else 0
     is_spa    = scraped.get('is_spa', False)
  
     test_cases = (

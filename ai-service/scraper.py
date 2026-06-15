@@ -96,8 +96,72 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
             page.wait_for_timeout(1000)
         except Exception:
             pass
+        
+         # Attendre que les formulaires et tables se chargent
+        try:
+            page.wait_for_selector("form, table, input", timeout=5000)
+        except Exception:
+            pass
 
         title = page.title()
+        # ── RAW FORMS (bypass stableCSS filter) ──────────────────────────────
+        try:
+            raw_forms = page.evaluate("""() => {
+                return Array.from(document.querySelectorAll('form')).map(el => ({
+                    id: el.id||'',
+                    action: el.action||'',
+                    method: el.method||'get',
+                    css_selector: el.id ? '#'+el.id : 'form'
+                }));
+            }""")
+            if raw_forms:
+                forms = raw_forms
+                print(f"[SCRAPER] raw_forms override: {len(forms)}")
+        except Exception as e:
+            print(f"[SCRAPER] raw_forms error: {e}")
+
+        # ── RAW INPUTS (bypass stableCSS filter) ─────────────────────────────
+        try:
+            raw_inputs = page.evaluate("""() => {
+                const skip = ['hidden','submit','button','reset'];
+                return Array.from(document.querySelectorAll('input,textarea,select'))
+                    .filter(el => !skip.includes(el.type||'') && el.offsetParent !== null)
+                    .map(el => ({
+                        type: el.type||'text',
+                        name: el.name||'',
+                        id:   el.id||'',
+                        placeholder: el.placeholder||'',
+                        required: el.required,
+                        css_selector: el.id ? '#'+el.id : 
+                                      el.name ? "[name='"+el.name+"']" : 
+                                      el.type ? "input[type='"+el.type+"']" : 'input'
+                    }));
+            }""")
+            if raw_inputs:
+                inputs = raw_inputs
+                print(f"[SCRAPER] raw_inputs override: {len(inputs)}")
+        except Exception as e:
+            print(f"[SCRAPER] raw_inputs error: {e}")
+
+        # ── RAW BUTTONS ───────────────────────────────────────────────────────
+        try:
+            raw_buttons = page.evaluate("""() => {
+                return Array.from(document.querySelectorAll('button, input[type=submit], input[type=button]'))
+                    .filter(el => el.offsetParent !== null)
+                    .map(el => ({
+                        type: el.type||'button',
+                        text: (el.innerText||el.value||'').trim(),
+                        id:   el.id||'',
+                        name: el.name||'',
+                        css_selector: el.id ? '#'+el.id :
+                                      el.type === 'submit' ? "input[type='submit']" : 'button'
+                    })).filter(b => b.text);
+            }""")
+            if raw_buttons:
+                buttons = raw_buttons
+                print(f"[SCRAPER] raw_buttons override: {len(buttons)}")
+        except Exception as e:
+            print(f"[SCRAPER] raw_buttons error: {e}")
 
         def safe_eval(selector, script):
             try:
@@ -112,7 +176,7 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
                 return []
 
         # ── INPUTS ────────────────────────────────────────────────────────────
-        inputs = safe_eval("input:not([type='hidden'])", _STABLE_CSS_JS + """
+        inputs = safe_eval("input:not([type='hidden']):not([type='submit']):not([type='button'])", _STABLE_CSS_JS + """
         els => els.map(el => {
             const css = stableCSS(el, "input[type='" + (el.type||'text') + "']");
             return {
@@ -147,7 +211,17 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
             "a[href]",
             "els => els.slice(0,15).map(el => ({text:(el.innerText||'').trim(), href:el.href||''}))"
         )
-
+        try:
+            raw_counts = page.evaluate("""() => ({
+                forms:   document.querySelectorAll('form').length,
+                inputs:  document.querySelectorAll('input:not([type=hidden])').length,
+                tables:  document.querySelectorAll('table').length,
+                buttons: document.querySelectorAll('button, input[type=submit]').length,
+                h2:      document.querySelectorAll('h2, h3').length,
+            })""")
+            print(f"[SCRAPER RAW] {raw_counts}")
+        except Exception as e:
+            print(f"[SCRAPER RAW] error: {e}")
         # ── FORMS ─────────────────────────────────────────────────────────────
         forms = safe_eval("form", _STABLE_CSS_JS + """
         els => els.map(el => {
@@ -156,7 +230,7 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
                 id: el.id||'',
                 action: el.action||'',
                 method: el.method||'get',
-                css_selector: css
+                css_selector: css || 'form'
             };
         })""")
 
@@ -457,7 +531,7 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
 
         # ── NEW: CONTENT SECTIONS (Piliers, Cards, Articles) ─────────────────
         content_sections = safe_eval(   
-            "section, article, .elementor-section, .elementor-widget, "
+            "table, .table-responsive, section, article, .elementor-section, .elementor-widget, "
             "[class*='service'], [class*='actualit'], [class*='event'], "
             "[class*='partner'], [class*='partenaire'], [class*='slider'], "
             "div.container > div, div.row > div[class*='col'], "
@@ -583,6 +657,67 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
         except Exception as e:
             print(f"[SCRAPER] page_text error: {e}")
 
+
+
+
+        # ── RAW OVERRIDE (après safe_eval pour ne pas être écrasé) ───────────
+        try:
+            raw_forms_data = page.evaluate("""() => {
+                return Array.from(document.querySelectorAll('form')).map(el => ({
+                    id: el.id||'',
+                    action: el.action||'',
+                    method: el.method||'get',
+                    css_selector: el.id ? '#'+el.id : 'form'
+                }));
+            }""")
+            if raw_forms_data:
+                forms = raw_forms_data
+                print(f"[SCRAPER] raw_forms override: {len(forms)}")
+        except Exception as e:
+            print(f"[SCRAPER] raw_forms error: {e}")
+
+        try:
+            raw_inputs_data = page.evaluate("""() => {
+                const skip = ['hidden','submit','button','reset'];
+                return Array.from(document.querySelectorAll('input,textarea,select'))
+                    .filter(el => !skip.includes(el.type||'') && el.offsetParent !== null)
+                    .map(el => ({
+                        type: el.type||'text',
+                        name: el.name||'',
+                        id:   el.id||'',
+                        placeholder: el.placeholder||'',
+                        required: el.required,
+                        css_selector: el.id ? '#'+el.id : 
+                                      el.name ? "[name='"+el.name+"']" : 
+                                      el.type ? "input[type='"+el.type+"']" : 'input'
+                    }));
+            }""")
+            if raw_inputs_data:
+                inputs = raw_inputs_data
+                input_fields = raw_inputs_data
+                print(f"[SCRAPER] raw_inputs override: {len(inputs)}")
+        except Exception as e:
+            print(f"[SCRAPER] raw_inputs error: {e}")
+
+        try:
+            raw_buttons_data = page.evaluate("""() => {
+                return Array.from(document.querySelectorAll('button, input[type=submit], input[type=button], a.btn, a[class*=btn]'))
+                    .filter(el => el.offsetParent !== null)
+                    .map(el => ({
+                        type: el.type||'button',
+                        text: (el.innerText||el.value||'').trim(),
+                        id:   el.id||'',
+                        name: el.name||'',
+                        css_selector: el.id ? '#'+el.id :
+                                      el.type === 'submit' ? "input[type='submit']" : 
+                                      el.tagName.toLowerCase() === 'a' ? "a.btn" : 'button'
+                    })).filter(b => b.text);
+            }""")
+            if raw_buttons_data:
+                buttons = raw_buttons_data
+                print(f"[SCRAPER] raw_buttons override: {len(buttons)}")
+        except Exception as e:
+            print(f"[SCRAPER] raw_buttons error: {e}")
         browser.close()
 
         return {

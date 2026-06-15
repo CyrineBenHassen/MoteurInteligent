@@ -388,13 +388,12 @@ public function index()
         }
     }
 
- public function downloadPdf($id)
+public function downloadPdf($id)
 {
     $generation = Generation::where('user_id', auth()->id())->findOrFail($id);
     
     $testType = $generation->test_type ?? 'smoke';
     
-    // Construire les données selon le type
     $scraped = $generation->scraped ?? [];
     if (empty($scraped)) {
         $scraped = [
@@ -407,8 +406,14 @@ public function index()
     $testCases        = $generation->test_cases        ?? [];
     $executionResults = $generation->execution_results ?? $testCases;
 
+    // Récupérer result complet (SEO, performance, etc.)
+    $fullResult = $generation->result ?? [];
+    if (is_string($fullResult)) {
+        $fullResult = json_decode($fullResult, true) ?? [];
+    }
+
     try {
-        $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-pdf', [
+        $payload = [
             'url'               => $generation->url,
             'framework'         => $generation->framework,
             'test_type'         => $testType,
@@ -421,8 +426,17 @@ public function index()
             'fail_count'        => $generation->fail_count ?? 0,
             'skip_count'        => $generation->skip_count ?? 0,
             'pass_rate'         => $generation->pass_rate  ?? 0,
-            'summary'           => $generation->result ? (is_string($generation->result) ? json_decode($generation->result, true)['summary'] ?? [] : ($generation->result['summary'] ?? [])) : [],
-        ]);
+            'summary'           => $fullResult['summary'] ?? [],
+        ];
+
+        // SEO : ajouter les champs spécifiques
+        if ($testType === 'seo') {
+            $payload['seo_score'] = $fullResult['seo_score'] ?? 0;
+            $payload['analysis']  = $fullResult['analysis']  ?? [];
+            $payload['ai']        = $fullResult['ai']        ?? [];
+        }
+
+        $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-pdf', $payload);
 
         if ($response->failed()) {
             return response()->json(['error' => 'PDF generation failed', 'detail' => $response->body()], 500);
@@ -440,7 +454,6 @@ public function index()
         return response()->json(['error' => $e->getMessage()], 500);
     }
 }
-
 
     // ── À ajouter AVANT le dernier } de la classe ──────────────────
 
@@ -1082,6 +1095,97 @@ public function generateFunctional(Request $request)
         return response()->json(['error' => $e->getMessage()], 500);
     }
 }
+
+public function generateSeo(Request $request)
+{
+    set_time_limit(300);
+ 
+    $request->validate([
+        'url'        => 'required|url',
+        'project_id' => 'nullable|integer',
+    ]);
+ 
+    $url = $request->url;
+ 
+    // Block localhost
+    if (str_contains($url, 'localhost') || str_contains($url, '127.0.0.1')) {
+        return response()->json([
+            'error' => 'localhost URLs cannot be tested — please use a public URL.',
+        ], 422);
+    }
+ 
+    Log::info('[NEXTEST] generateSeo()', ['url' => $url]);
+ 
+    try {
+        $response = Http::timeout(120)->post('http://127.0.0.1:8001/generate-seo', [
+            'url' => $url,
+        ]);
+ 
+        if ($response->failed()) {
+            return response()->json([
+                'error'  => 'AI service error',
+                'detail' => $response->body(),
+            ], 500);
+        }
+ 
+        $data   = $response->json();
+        $result = $data['result'] ?? $data ?? [];
+ 
+        $testCases = $result['test_cases'] ?? [];
+        $summary   = $result['summary']    ?? [];
+        $passCount = collect($testCases)->where('status', 'pass')->count();
+        $failCount = collect($testCases)->where('status', 'fail')->count();
+        $total     = $passCount + $failCount;
+        $passRate  = $total > 0 ? round($passCount / $total * 100) : 0;
+        $seoScore  = $result['seo_score']  ?? 0;
+ 
+        $generation = Generation::create([
+            'user_id'           => auth()->id(),
+            'project_id'        => $request->project_id ?? null,
+            'url'               => $url,
+            'framework'         => 'Requests',
+            'test_type'         => 'seo',
+            'status'            => 'completed',
+            'test_cases'        => $testCases,
+            'execution_results' => $testCases,
+            'pass_count'        => $passCount,
+            'fail_count'        => $failCount,
+            'skip_count'        => 0,
+            'pass_rate'         => (int) round($passRate),
+            'load_time_ms'      => $result['analysis']['load_time_ms'] ?? 0,
+            'is_spa'            => false,
+            'page_type'         => 'seo',
+            'scraped'           => [],
+            'result'            => $result,   // stocke tout le résultat (seo_score, analysis, ai)
+        ]);
+ 
+        $this->notifyN8n(
+            $generation,
+            $passCount,
+            $failCount,
+            0,
+            (int) round($passRate),
+            $url,
+            'SEO',
+            'seo'
+        );
+ 
+        return response()->json([
+            'message'    => 'SEO analysis completed',
+            'generation' => $generation,
+            'result'     => array_merge($result, [
+            'test_type'  => 'seo',
+            'url'        => $url,
+            'seo_score'  => $seoScore,
+            ]),
+        ]);
+ 
+    } catch (\Exception $e) {
+        Log::error('[NEXTEST] generateSeo() exception', ['error' => $e->getMessage()]);
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
+ 
 
 public function generatePerformance(Request $request)
 {

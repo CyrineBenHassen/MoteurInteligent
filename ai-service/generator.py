@@ -1,24 +1,9 @@
-# generator.py — v13 (FULL PAGE COVERAGE — section-based generation)
-#
-# ARCHITECTURE v13:
-#   - Page is divided into SECTIONS: header, hero, forms, content, footer, search, lang
-#   - Each section is independently analysed and tested
-#   - LLaMA3 generates tests PER SECTION (not one big prompt)
-#   - Negative tests for forms (empty submit, invalid email, etc.)
-#   - Workflow tests (search flow, lang switch, nav→back, form→error)
-#   - Real coverage metric: tested_elements / detected_elements
-#   - No artificial step limit — generates as many as needed
-#   - Smoke test: unchanged (deterministic, no LLM)
 
 import os, json, re, time
-import anthropic
+
 from dotenv import load_dotenv
 
 load_dotenv()
-
-claude_client = anthropic.Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY"),
-)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -467,19 +452,23 @@ class CoverageTracker:
 
 def _call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> str:
     try:
-        resp = claude_client.messages.create(
-            model="claude-sonnet-4-5",
+        from openai import OpenAI
+        groq_client = OpenAI(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=os.getenv("GROQ_API_KEY"),
+        )
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             max_tokens=max_tokens,
+            temperature=0.2,
             messages=[
-                {
-                    "role": "user",
-                    "content": f"{system_prompt}\n\n{user_prompt}"
-                }
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
             ],
         )
-        return resp.content[0].text.strip()
+        return resp.choices[0].message.content.strip()
     except Exception as e:
-        raise ValueError(f"Claude API error: {e}")
+        raise ValueError(f"Groq API error: {e}")
 
 
 def _safe_parse(content: str) -> dict:
@@ -907,8 +896,7 @@ def _build_smoke_steps(scraped: dict) -> list:
     LOAD_CRITICAL  = 8000   # fail
     load_status = (
     "pass" if load_time_ms < LOAD_THRESHOLD
-    else "fail" if load_time_ms > LOAD_CRITICAL
-    else "warn"   # entre 5s et 8s
+    else "fail"  # tout ce qui dépasse le seuil = fail
 )
     load_ok         = 0 < load_time_ms < LOAD_THRESHOLD
 

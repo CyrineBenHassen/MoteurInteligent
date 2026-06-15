@@ -8,8 +8,49 @@ import NextestChatbot from '../../pages/Chatboot/Nextestchatbot';
 
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  PieChart, Pie, Cell, LineChart, Line, ComposedChart,
+  PieChart, Pie, Cell, LineChart, Line, ComposedChart,  AreaChart, Area,
 } from 'recharts';
+
+import {
+  IconRocket,
+  IconCircleCheck,
+  IconFolder,
+  IconTrophy,
+  IconRobot,
+  IconWorld,
+  IconLock,
+  IconFileText,
+  IconCircleX,
+  IconTarget,
+  IconChartArea,
+  IconFileTypePdf,
+  IconFileTypeCsv,
+  IconCode,
+  IconExternalLink,
+  IconTrash,
+  IconEye,
+  IconChevronDown
+} from '@tabler/icons-react';
+
+import { IconTrendingUp } from '@tabler/icons-react';
+
+import { IconChartDonut } from '@tabler/icons-react';
+
+import { IconFlame } from '@tabler/icons-react';
+
+import { IconTestPipe } from '@tabler/icons-react';
+
+import { IconActivity } from '@tabler/icons-react';
+
+import { IconLink } from '@tabler/icons-react';
+
+import { IconSearch, IconBolt, IconChartBar, IconCircleDashed, IconShieldCheck, IconSettings2, IconApi, IconRefresh, IconWorldSearch } from '@tabler/icons-react';
+
+import * as XLSX from 'xlsx';
+
+
+
+
 
 function useCountUp(target, duration = 1200) {
   const ref = useRef(null);
@@ -90,6 +131,7 @@ const IC = {
   dashboard: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
   generate:  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
   execution: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+  reports: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
   history:   <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
   account:   <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
   settings:  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
@@ -196,39 +238,39 @@ function KPICard({ icon, iconBg, iconBorder, accentColor, title, value, trend, s
         transition: 'opacity 0.28s',
       }} />
 
-      {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div style={{
-          width: 42, height: 42, borderRadius: 12,
-          background: iconBg, border: `1.5px solid ${iconBorder}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 20,
-          boxShadow: `0 4px 12px ${accentColor}22`,
-          transition: 'transform 0.25s cubic-bezier(.34,1.56,.64,1)',
-          transform: hovered ? 'scale(1.1) rotate(-4deg)' : 'scale(1)',
-          flexShrink: 0,
-        }}>
-          {icon}
-        </div>
+    {/* Header row */}
+<div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+  <div style={{
+    width: 42, height: 42, borderRadius: 12,
+    background: iconBg, border: `1.5px solid ${iconBorder}`,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: accentColor,
+    boxShadow: `0 4px 12px ${accentColor}22`,
+    transition: 'transform 0.25s cubic-bezier(.34,1.56,.64,1)',
+    transform: hovered ? 'scale(1.1) rotate(-4deg)' : 'scale(1)',
+    flexShrink: 0,
+  }}>
+    {icon}
+  </div>
 
-        {circular ? (
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CircularProgress value={circular.value} size={52} stroke={5} color={circular.color} />
-            <div style={{
-              position: 'absolute',
-              fontSize: 10, fontWeight: 800,
-              color: circular.color,
-              fontFamily: 'var(--C)',
-            }}>
-              {circular.value}
-            </div>
-          </div>
-        ) : sparkData ? (
-          <div style={{ opacity: hovered ? 1 : 0.7, transition: 'opacity 0.2s', paddingTop: 4 }}>
-            <MiniSparkline data={sparkData} color={sparkColor} width={72} height={30} />
-          </div>
-        ) : null}
+          {circular ? (
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <CircularProgress value={circular.value} size={52} stroke={5} color={circular.color} />
+      <div style={{
+        position: 'absolute',
+        fontSize: 10, fontWeight: 800,
+        color: circular.color,
+        fontFamily: 'var(--C)',
+      }}>
+        {circular.value}
       </div>
+    </div>
+  ) : sparkData ? (
+    <div style={{ opacity: hovered ? 1 : 0.7, transition: 'opacity 0.2s', paddingTop: 4 }}>
+      <MiniSparkline data={sparkData} color={sparkColor} width={72} height={30} />
+    </div>
+  ) : null}
+</div>
 
       {/* Title */}
       <div style={{
@@ -381,7 +423,10 @@ function ActivityHeatmap({ gens }) {
   return (
     <div className="section-box" style={{ flex: 1 }}>
       <div className="sb-head">
-        <span className="sb-title">🔥 Tests Activity</span>
+        <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+  <IconFlame size={15} stroke={1.5} style={{ color: '#f97316' }} />
+  Tests Activity
+</span>
         <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>Last 4 weeks</span>
       </div>
 
@@ -587,13 +632,19 @@ Data:
     fetchInsights();
   }, [stats.total]);
 
-  const ICONS = ['🔍', '⚡', '📊'];
-  const COLORS = ['#818cf8', '#f59e0b', '#10b981'];
-
+  const ICONS_COMPONENTS = [
+  <IconSearch size={14} stroke={1.5} />,
+  <IconBolt size={14} stroke={1.5} />,
+  <IconChartBar size={14} stroke={1.5} />,
+];
+const COLORS = ['#818cf8', '#f59e0b', '#10b981'];
   return (
     <div className="section-box" style={{ flex: 1 }}>
       <div className="sb-head">
-        <span className="sb-title">🤖 AI Insights</span>
+        <span className="sb-title">
+  <IconRobot size={16} stroke={1.5} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+  AI Insights
+</span>
         <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(99,102,241,.12)', color: 'var(--indigo2)', border: '1px solid rgba(99,102,241,.25)' }}>New</span>
       </div>
 
@@ -613,8 +664,10 @@ Data:
             onMouseEnter={e => { e.currentTarget.style.background = `${COLORS[i]}08`; e.currentTarget.style.borderColor = `${COLORS[i]}44`; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg)'; e.currentTarget.style.borderColor = `${COLORS[i]}22`; }}
           >
-            <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: `${COLORS[i]}15`, border: `1px solid ${COLORS[i]}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
-              {ICONS[i]}
+            <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: `${COLORS[i]}15`, border: `1px solid ${COLORS[i]}33`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+color: COLORS[i],
+}}>
+              {ICONS_COMPONENTS[i]}
             </div>
             <p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.6, margin: 0 }}>
               {insight}
@@ -787,10 +840,66 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1;
   
   if (loading) return (
-    <div className="panel" style={{ display:'flex', alignItems:'center', justifyContent:'center', height:300 }}>
-      <span className="spinner" style={{ width:24, height:24 }} />
+  <div className="panel" style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'60vh', gap: 32 }}>
+    
+    {/* Logo animé */}
+    <div style={{ position: 'relative', width: 80, height: 80 }}>
+      {/* Outer ring */}
+      <svg width="80" height="80" viewBox="0 0 80 80" style={{ position: 'absolute', top: 0, left: 0, animation: 'spin 2s linear infinite' }}>
+        <circle cx="40" cy="40" r="36" fill="none" stroke="rgba(201,162,39,.15)" strokeWidth="3" />
+        <circle cx="40" cy="40" r="36" fill="none" stroke="#c9a227" strokeWidth="3"
+          strokeDasharray="56 170" strokeLinecap="round" />
+      </svg>
+      {/* Inner ring */}
+      <svg width="80" height="80" viewBox="0 0 80 80" style={{ position: 'absolute', top: 0, left: 0, animation: 'spinReverse 1.5s linear infinite' }}>
+        <circle cx="40" cy="40" r="26" fill="none" stroke="rgba(99,102,241,.15)" strokeWidth="2.5" />
+        <circle cx="40" cy="40" r="26" fill="none" stroke="#6366f1" strokeWidth="2.5"
+          strokeDasharray="30 133" strokeLinecap="round" />
+      </svg>
+      {/* Center gem */}
+      <div style={{
+        position: 'absolute', top: '50%', left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 32, height: 32, borderRadius: 9,
+        background: 'linear-gradient(135deg, #8a6a00, #C9A227, #E8C84A)',
+        boxShadow: '0 4px 20px rgba(201,162,39,0.6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        animation: 'pulse 2s ease-in-out infinite',
+      }}>
+        <svg width="16" height="16" viewBox="0 0 44 44" fill="none">
+          <polyline points="13,22 20,30 32,14" stroke="#060e1e" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
     </div>
-  );
+
+    {/* Text */}
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontFamily: 'var(--C)', fontSize: 22, fontWeight: 700, color: 'var(--text)', marginBottom: 8, letterSpacing: 2 }}>
+        Nex<span style={{ color: '#c9a227', fontStyle: 'italic', fontWeight: 300 }}>Test</span>
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, letterSpacing: 3, textTransform: 'uppercase' }}>
+        Loading Dashboard
+      </div>
+      {/* Dots */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16 }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: '#c9a227',
+            animation: `dotBounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+          }} />
+        ))}
+      </div>
+    </div>
+
+    <style>{`
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      @keyframes spinReverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+      @keyframes pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 4px 20px rgba(201,162,39,0.6); } 50% { transform: translate(-50%, -50%) scale(1.1); box-shadow: 0 4px 32px rgba(201,162,39,0.9); } }
+      @keyframes dotBounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1.2); opacity: 1; } }
+    `}</style>
+  </div>
+);
   const grandTotal = stats.totalPass + stats.totalFail + stats.totalSkip;
   Math.round(((donutData[1]?.value||0) / 100) * (stats.totalPass / ((donutData[0]?.value||1) / 100))) +
   Math.round(((donutData[2]?.value||0) / 100) * (stats.totalPass / ((donutData[0]?.value||1) / 100)));
@@ -814,7 +923,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
   marginBottom: 24,
 }}>
   <KPICard
-    icon="🚀"
+    icon={<IconRocket size={22} stroke={1.5} />}
     iconBg="rgba(139,92,246,0.12)"
     iconBorder="rgba(139,92,246,0.25)"
     accentColor="#8b5cf6"
@@ -825,7 +934,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     sparkColor="#8b5cf6"
   />
   <KPICard
-    icon="✅"
+    icon={<IconCircleCheck size={22} stroke={1.5} />}
     iconBg="rgba(16,185,129,0.12)"
     iconBorder="rgba(16,185,129,0.25)"
     accentColor="#10b981"
@@ -836,7 +945,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     sparkColor="#10b981"
   />
   <KPICard
-    icon="📁"
+    icon={<IconFolder size={22} stroke={1.5} />}
     iconBg="rgba(99,102,241,0.12)"
     iconBorder="rgba(99,102,241,0.25)"
     accentColor="#6366f1"
@@ -847,7 +956,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     sparkColor="#6366f1"
   />
   <KPICard
-    icon="🏆"
+     icon={<IconTrophy size={22} stroke={1.5} />}
     iconBg="rgba(201,162,39,0.12)"
     iconBorder="rgba(201,162,39,0.25)"
     accentColor="#c9a227"
@@ -867,7 +976,10 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
   {/* ── LINE CHART ── */}
   <div className="section-box" style={{ display: 'flex', flexDirection: 'column', minHeight: 380 }}>
     <div className="sb-head" style={{ padding: '16px 20px', flexShrink: 0 }}>
-      <span className="sb-title">📈 Tests & Scripts Trend</span>
+<span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+  <IconTrendingUp size={15} stroke={1.5} style={{ color: '#8b5cf6' }} />
+  Tests & Scripts Trend
+</span>
       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--indigo2)', background: 'var(--indigo-bg)', border: '1px solid var(--indigo-border)', padding: '3px 10px', borderRadius: 20 }}>This Week</span>
     </div>
     <div style={{ display: 'flex', gap: 20, padding: '8px 20px 0', flexShrink: 0 }}>
@@ -902,9 +1014,10 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
 
   {/* ── DONUT ── */}
   <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: 380 }}>
-    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', padding: '16px 20px', flexShrink: 0, borderBottom: '1px solid var(--border3)' }}>
-      📊 Tests Results
-    </div>
+    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', padding: '16px 20px', borderBottom: '1px solid var(--border3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+  <IconChartDonut size={15} stroke={1.5} style={{ color: '#10b981' }} />
+  Tests Results
+</div>
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '24px 20px' }}>
       {/* Donut */}
       <div style={{ position: 'relative', width: 180, height: 180, flexShrink: 0 }}>
@@ -955,7 +1068,10 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
 
 <div className="section-box" style={{ marginBottom: 24 }}>
   <div className="sb-head">
-    <span className="sb-title">🧪 Test Type Distribution</span>
+    <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+  <IconTestPipe size={15} stroke={1.5} style={{ color: '#6366f1' }} />
+  Test Type Distribution
+</span>
   </div>
   <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
     {[
@@ -964,6 +1080,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
       { key: 'regression',  label: 'Regression',  color: '#f97316', icon: '🔄' },
       { key: 'security',    label: 'Security',    color: '#ef4444', icon: '🔒' },
       { key: 'performance', label: 'Performance', color: '#8b5cf6', icon: '⚡' },
+      { key: 'seo', label: 'SEO', color: '#06b6d4', icon: '🔍' },
     ].map(type => {
       const count = typeData.find(d => d.name === type.key)?.value || 0;
       const total = typeData.reduce((s, d) => s + d.value, 0) || 1;
@@ -991,7 +1108,10 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
   {/* ── TOP URLs ── */}
   <div className="section-box">
     <div className="sb-head">
-      <span className="sb-title">🔗 Top Tested URLs</span>
+      <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+  <IconLink size={15} stroke={1.5} style={{ color: '#0ea5e9' }} />
+  Top Tested URLs
+</span>
       <span className="sb-action" onClick={() => goTo('history')}>View all</span>
     </div>
     {/* Column headers */}
@@ -1054,7 +1174,10 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
 {/* ── RECENT ACTIVITY ── */}
 <div className="section-box">
   <div className="sb-head">
-    <span className="sb-title">📋 Recent Activity</span>
+    <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+  <IconActivity size={15} stroke={1.5} style={{ color: '#4f86e8' }} />
+  Recent Activity
+</span>
     <span className="sb-action" onClick={() => goTo('history')}>View all</span>
   </div>
   <div>
@@ -1248,9 +1371,21 @@ const [deleting,   setDeleting]   = useState(null);
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
         {[
-          { icon: '📁', val: projects.length, lbl: 'Total Projects',    accent: 'linear-gradient(90deg,#6366f1,#818cf8)' },
-          { icon: '🌐', val: totalPublic,     lbl: 'Public Projects',   accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)' },
-          { icon: '🔒', val: totalInternal,   lbl: 'Internal Projects', accent: 'linear-gradient(90deg,#8b5cf6,#a78bfa)' },
+          {
+  icon: <IconFolder size={28} stroke={1.5} style={{ color: '#6366f1' }} />,
+  val: projects.length, lbl: 'Total Projects',
+  accent: 'linear-gradient(90deg,#6366f1,#818cf8)'
+},
+{
+  icon: <IconWorld size={28} stroke={1.5} style={{ color: '#4f86e8' }} />,
+  val: totalPublic, lbl: 'Public Projects',
+  accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)'
+},
+{
+  icon: <IconLock size={28} stroke={1.5} style={{ color: '#8b5cf6' }} />,
+  val: totalInternal, lbl: 'Internal Projects',
+  accent: 'linear-gradient(90deg,#8b5cf6,#a78bfa)'
+},
           
         ].map((s, i) => (
           <div key={s.lbl} className="stat-card" style={{ '--i': i, minHeight: 120 }}>
@@ -1301,9 +1436,9 @@ const [deleting,   setDeleting]   = useState(null);
   {/* Type filter buttons */}
   <div style={{ display: 'flex', gap: 6 }}>
     {[
-      { key: 'all',      label: 'All',      icon: '📁' },
-      { key: 'public',   label: 'Public',   icon: '🌐' },
-      { key: 'internal', label: 'Internal', icon: '🔒' },
+{ key: 'all',      label: 'All',      icon: <IconFolder size={14} stroke={1.5} /> },
+{ key: 'public',   label: 'Public',   icon: <IconWorld  size={14} stroke={1.5} /> },
+{ key: 'internal', label: 'Internal', icon: <IconLock   size={14} stroke={1.5} /> },
     ].map(f => (
       <button
         key={f.key}
@@ -1330,7 +1465,7 @@ const [deleting,   setDeleting]   = useState(null);
             : 'var(--muted)',
         }}
       >
-        <span>{f.icon}</span>
+        <span style={{ display: 'flex' }}>{f.icon}</span>
         {f.label}
         <span style={{
           padding: '1px 7px', borderRadius: 20, fontSize: 10,
@@ -1389,7 +1524,17 @@ const [deleting,   setDeleting]   = useState(null);
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: colorBg, border: `1px solid ${colorBd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{isPublic ? '🌐' : '🔒'}</div>
+                   <div style={{
+  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+  background: colorBg, border: `1px solid ${colorBd}`,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+}}>
+  {isPublic
+    ? <IconWorld size={22} stroke={1.5} style={{ color: '#4f86e8' }} />
+    : <IconLock size={22} stroke={1.5} style={{ color: '#8b5cf6' }} />
+  }
+</div>
+
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>{project.name}</div>
                       <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '2px 8px', borderRadius: 20, color, background: colorBg, border: `1px solid ${colorBd}` }}>{isPublic ? 'Public' : 'Internal'}</span>
@@ -1597,6 +1742,8 @@ console.log('[K6] first test_case:', JSON.stringify(item.test_cases?.[0], null, 
       test_cases: item.test_cases || parsedResult.test_cases || [],
       test_cases_selenium: item.test_cases_selenium || parsedResult.test_cases_selenium || [],
       test_cases_cypress: item.test_cases_cypress || parsedResult.test_cases_cypress || [],
+      seo_score: parsedResult.seo_score || item.seo_score || 0,  // ← AJOUTE
+      ai: parsedResult.ai || item.ai || {},                      // ← AJOUTE
       script: item.script || parsedResult.script || '',
       script_selenium: item.script_selenium || parsedResult.script_selenium || '',
       script_playwright: item.script_playwright || parsedResult.script_playwright || '',
@@ -1683,6 +1830,7 @@ const paginatedCards = urlCards.slice(
     Pytest:     { color: '#3776AB', letters: 'Py' },
     Postman:    { color: '#FF6C37', letters: 'Po'},
     k6:         { color: '#7D64FF', letters: 'k6' }, 
+    Requests:   { color: '#06b6d4', letters: 'RQ' },
   };
 
   return (
@@ -1696,9 +1844,12 @@ const paginatedCards = urlCards.slice(
 
       <div className="p-header" style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: colorBg, border: `1px solid ${colorBd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>
-            {isPublic ? '🌐' : '🔒'}
-          </div>
+          <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: colorBg, border: `1px solid ${colorBd}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+  {isPublic
+    ? <IconWorld size={26} stroke={1.5} style={{ color: '#4f86e8' }} />
+    : <IconLock size={26} stroke={1.5} style={{ color: '#8b5cf6' }} />
+  }
+</div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
               <h1 className="p-title" style={{ marginBottom: 0 }}>{project?.name}</h1>
@@ -1707,7 +1858,7 @@ const paginatedCards = urlCards.slice(
             <p className="p-sub" style={{ marginBottom: 0 }}>{project?.description || 'No description'}</p>
           </div>
         </div>
-        <button className="btn-primary" onClick={onNewGeneration}>
+        <button className="btn-primary" onClick={() => onNewGeneration('', '', '')}>
           <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           New Generation
         </button>
@@ -1715,10 +1866,30 @@ const paginatedCards = urlCards.slice(
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
         {[
-         { icon: '🚀', val: totalGen,       lbl: 'Total Generations', accent: `linear-gradient(90deg,${color},${color}88)` },
-{ icon: '✅', val: totalPass,      lbl: 'Total Passed',      accent: 'linear-gradient(90deg,#10b981,#34d399)' },
-{ icon: '❌', val: totalFail,      lbl: 'Total Failed',      accent: 'linear-gradient(90deg,#ef4444,#f87171)' },
-{ icon: '🏆', val: highPassCount,  lbl: 'Pass Rate ≥ 80%',   accent: 'linear-gradient(90deg,#f59e0b,#fbbf24)' },  
+{ icon: (
+    <svg width="22" height="22" fill="none" stroke={color} strokeWidth="1.6" viewBox="0 0 24 24">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+    </svg>
+  ), val: totalGen, lbl: 'Total Generations', accent: `linear-gradient(90deg,${color},${color}88)` },
+{ icon: (
+    <svg width="22" height="22" fill="none" stroke="#10b981" strokeWidth="1.6" viewBox="0 0 24 24">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+      <polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>
+  ), val: totalPass, lbl: 'Total Passed', accent: 'linear-gradient(90deg,#10b981,#34d399)' },
+{ icon: (
+    <svg width="22" height="22" fill="none" stroke="#ef4444" strokeWidth="1.6" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="15" y1="9" x2="9" y2="15"/>
+      <line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+  ), val: totalFail, lbl: 'Total Failed', accent: 'linear-gradient(90deg,#ef4444,#f87171)' },
+{ icon: (
+    <svg width="22" height="22" fill="none" stroke="#f59e0b" strokeWidth="1.6" viewBox="0 0 24 24">
+      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+      <polyline points="17 6 23 6 23 12"/>
+    </svg>
+  ), val: highPassCount, lbl: 'Pass Rate ≥ 80%', accent: 'linear-gradient(90deg,#f59e0b,#fbbf24)' },  
         ].map((s, i) => (
           <div key={s.lbl} className="stat-card" style={{ '--i': i, minHeight: 110 }}>
             <div className="stat-card-top"><div className="stat-icon-wrap">{s.icon}</div></div>
@@ -1768,6 +1939,7 @@ const paginatedCards = urlCards.slice(
     regression:  { label: 'Regression Test',  color: '#f97316', bg: 'rgba(249,115,22,.1)',   border: 'rgba(249,115,22,.25)', letter: 'R', icon: '🔄' },
     security:    { label: 'Security Test',    color: '#ef4444', bg: 'rgba(239,68,68,.1)',    border: 'rgba(239,68,68,.25)',  letter: 'S', icon: '🔒' },
     unit:        { label: 'Unit Tests',        color: '#0ea5e9', bg: 'rgba(14,165,233,.1)',   border: 'rgba(14,165,233,.25)', letter: 'U', icon: '🧪' },
+    seo:         {label: 'SEO Test', color: '#06b6d4', bg: 'rgba(6,182,212,.08)', border: 'rgba(6,182,212,.2)', letter: 'S', icon: '🔍',},
   };
 
   return Object.entries(groups).map(([type, items]) => {
@@ -1869,19 +2041,39 @@ const paginatedCards = urlCards.slice(
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-          <button onClick={() => handleView(item)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, background: `linear-gradient(135deg, ${color}, ${color}cc)`, border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '.5px', boxShadow: `0 3px 10px ${color}44`, transition: 'all .2s' }}
-            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
-            <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            View
-          </button>
-          <button onClick={() => handleDelete(item.id)} disabled={deleting === item.id}
-            style={{ width: '100%', padding: '7px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.borderColor = 'var(--red-border)'; e.currentTarget.style.color = 'var(--red)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
-            {deleting === item.id ? '...' : (<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>)}
-          </button>
-        </div>
+  
+  {/* View + Regenerate sur la même ligne */}
+  <div style={{ display: 'flex', gap: 6 }}>
+    <button onClick={() => handleView(item)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, background: `linear-gradient(135deg, ${color}, ${color}cc)`, border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '.5px', boxShadow: `0 3px 10px ${color}44`, transition: 'all .2s' }}
+      onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+      onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+      <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      View
+    </button>
+
+    <button onClick={() => onNewGeneration(item.url, item.test_type, item.framework)} 
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)', color: '#10b981', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '.5px', transition: 'all .2s' }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,.2)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,.1)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
+      <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.14"/></svg>
+      Regenerate
+    </button>
+  </div>
+
+  {/* Delete seul en dessous — inchangé */}
+ <button onClick={() => handleDelete(item.id)} disabled={deleting === item.id}
+  style={{ padding: '7px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all .18s', width: 'fit-content', alignSelf: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}
+  onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.borderColor = 'var(--red-border)'; e.currentTarget.style.color = 'var(--red)'; }}
+  onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
+  {deleting === item.id ? '...' : (
+    <>
+      <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
+      Delete
+    </>
+  )}
+</button>
+
+</div>
       </div>
     </div>
   );
@@ -2084,11 +2276,10 @@ export function CreateProjectPanel({ onProjectCreated }) {
 // GeneratePanel
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GeneratePanel({ goTo, setGeneration, project, initialUrl = '', onGenerationSaved  }) {
-  const { t } = useLang();
-  const [url,      setUrl]      = useState(initialUrl);
-  const [fw,       setFw]       = useState('');
-  const [testType, setTestType] = useState('');
+function GeneratePanel({ goTo, setGeneration, project, initialUrl = '', initialTestType = '', initialFramework = '', onGenerationSaved }) {  const { t } = useLang();
+  const [url, setUrl] = useState(initialUrl);
+  const [fw, setFw] = useState(initialFramework);
+const [testType, setTestType] = useState(initialTestType);
   const [loading,  setLoad]     = useState(false);
   const [error,    setError]    = useState('');
   const [jwtToken, setJwtToken] = useState('');
@@ -2104,6 +2295,8 @@ function GeneratePanel({ goTo, setGeneration, project, initialUrl = '', onGenera
     { key: 'smoke',       label: 'Smoke Test',       desc: 'Visibility checks — elements present in DOM',                   letter: 'S', letterClass: 'gp4-letter-s', badge: 'Quick',    badgeClass: 'gp-badge-quick', time: '~30s'  },
     { key: 'functional',  label: 'Functional Test',  desc: 'Interactions — click, fill, submit + assertions',              letter: 'F', letterClass: 'gp4-letter-f', badge: 'Medium',   badgeClass: 'gp-badge-mid',   time: '~1min' },
     { key: 'performance', label: 'Performance Test', desc: 'Web Vitals: LCP, FCP, TTI, Load Time, Resource Size',          letter: 'P', letterClass: 'gp4-letter-r', badge: 'Advanced', badgeClass: 'gp-badge-full',  time: '~3min' },
+    {key: 'seo', label: 'SEO Test', desc: 'Meta tags, headings, page speed, robots.txt, sitemap, Open Graph', letter: 'S', letterClass: 'gp4-letter-s', badge: 'Public', badgeClass: 'gp-badge-quick', time: '~1min'},
+ 
   ];
   const INTERNAL_TEST_TYPES = [
     { key: 'smoke',       label: 'Smoke Test',       desc: 'Visibility checks — elements present in DOM',                  letter: 'S', letterClass: 'gp4-letter-s',    badge: 'Quick',    badgeClass: 'gp-badge-quick', time: '~30s'  },
@@ -2126,15 +2319,17 @@ const REGRESSION_FRAMEWORKS = [
   { key: 'Postman',  color: '#FF6C37', letters: 'Po', letterClass: 'gp4-letter-postman', note: 'Newman CLI' },
   ];
   const PERFORMANCE_FRAMEWORKS = [{ key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl', note: 'Web Vitals' }];
-  const BACKEND_FRAMEWORKS     = [{ key: 'k6', color: '#7D64FF', letters: 'k6', letterClass: 'gp4-letter-k6', note: 'Load Test' }];
+  const SEO_FRAMEWORKS = [{ key: 'Requests', color: '#10b981', letters: 'RQ', letterClass: 'gp4-letter-api', note: 'BeautifulSoup' },
+];
 
   const TEST_TYPES = isInternal ? INTERNAL_TEST_TYPES : PUBLIC_TEST_TYPES;
   const FRAMEWORKS = testType === 'performance'
-  ? (isInternal ? BACKEND_FRAMEWORKS : PERFORMANCE_FRAMEWORKS)
+  ? PERFORMANCE_FRAMEWORKS
   : testType === 'api'
   ? API_FRAMEWORKS
   : testType === 'security'  ? SECURITY_FRAMEWORKS 
   : testType === 'regression' ? REGRESSION_FRAMEWORKS 
+  : testType === 'seo' ? SEO_FRAMEWORKS
   : isInternal
   ? INTERNAL_FRAMEWORKS
   : PUBLIC_FRAMEWORKS;
@@ -2147,6 +2342,7 @@ const REGRESSION_FRAMEWORKS = [
   e.preventDefault();
   if (!url) return;
   setLoad(true); setError('');
+   const startTime = Date.now();
   try {
     // ← ICI : choisir la route selon le type de projet
 const endpoint = testType === 'api'
@@ -2155,6 +2351,7 @@ const endpoint = testType === 'api'
   : testType === 'regression'  ? '/generations/generate-regression'
   : testType === 'performance' && fw === 'k6' ? '/generations/generate-performance'
   : testType === 'functional' && isInternal ? '/generations/generate-functional'
+  : testType === 'seo'      ? '/generations/generate-seo'
   : isInternal ? '/generate-internal' : '/generate';
 
 const anpeToken = localStorage.getItem('token') || '';
@@ -2184,6 +2381,23 @@ const payload = testType === 'api'
     url,
     framework:    fw,
     test_type:    'functional',
+    project_id:   project?.id,
+    project_name: project?.name,
+    project_type: project?.type,
+  }
+  : testType === 'functional' && isInternal
+? {
+    url,
+    framework:    fw,
+    test_type:    'functional',
+    project_id:   project?.id,
+    project_name: project?.name,
+    project_type: project?.type,
+  }
+
+: testType === 'seo'
+? {
+    url,
     project_id:   project?.id,
     project_name: project?.name,
     project_type: project?.type,
@@ -2233,7 +2447,7 @@ console.log('[SUBMIT] token:', payload.token?.slice(0, 30));
       genData.result.performance = genData.performance || genData.result?.performance;
       genData.result.test_cases  = genData.result.test_cases || genData.generation?.test_cases || [];
     }
-
+const durationMs = Date.now() - startTime;
     setGeneration(genData);
     const notifData = {
       url:        genData?.generation?.url       || genData?.url       || '',
@@ -2248,6 +2462,7 @@ console.log('[SUBMIT] token:', payload.token?.slice(0, 30));
         : genData?.result?.test_cases || []
       ).filter(t => t.status === 'fail').length,
       timestamp: Date.now(),
+      durationMs,
     };
     localStorage.setItem('nextest-last-notif', JSON.stringify(notifData));
     onGenerationSaved(notifData);
@@ -2491,10 +2706,24 @@ function PerformanceMetricRow({ test, index }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PerformanceExecutionPanel({ generation }) {
-  const [activeSection, setActiveSection] = useState('metrics');
+ const [activeSection, setActiveSection] = useState('metrics');
   const [dropdownOpen,  setDropdownOpen]  = useState(false);
   const [pdfLoading,    setPdfLoading]    = useState(false);
   const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!generation) return;
+    const url = generation?.generation?.url || generation?.url || '';
+    if (!url || tests.length === 0) return;
+    const existing = JSON.parse(localStorage.getItem('nextest-reports') || '[]');
+    const genId = generation?.generation?.id;
+    if (genId && existing.some(r => r.generationData?.generation?.id === genId && r.htmlContent)) return;
+    
+    let htmlContent = null;
+    try { htmlContent = buildHtmlReport({ generation, tests, testType: 'performance', framework: generation?.framework || 'Playwright', url, pass, fail, skip }); } catch(e) {}
+    
+    saveReportToStorage({ url, framework: generation?.framework || 'Playwright', testType: 'performance', passCount: pass, failCount: fail, skipCount: skip, htmlContent, generationData: generation });
+  }, [generation?.generation?.id]);
 
 
 
@@ -3475,8 +3704,18 @@ const sectionDetailedMetrics = `
   link.href = URL.createObjectURL(blob);
   link.download = `performance_report_${genId}.html`;
   link.click();
+  saveReportToStorage({
+    url: generation?.generation?.url || '',
+    framework,
+    testType: 'performance',
+    passCount: pass,
+    failCount: fail,
+    htmlContent: html,
+    generationData: generation,
+  });
   setDropdownOpen(false);
 };
+
 
   useEffect(() => {
     const handleClickOutside = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false); };
@@ -4016,6 +4255,22 @@ function K6ExecutionPanel({ generation }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [pdfLoading,   setPdfLoading]   = useState(false);
   const dropdownRef = useRef(null);
+
+ useEffect(() => {
+    if (!generation) return;
+    const url = generation?.generation?.url || generation?.url || '';
+    if (!url || tests.length === 0) return;
+    const existing = JSON.parse(localStorage.getItem('nextest-reports') || '[]');
+    const genId = generation?.generation?.id;
+    if (genId && existing.some(r => r.generationData?.generation?.id === genId && r.htmlContent)) return;
+    
+    let htmlContent = null;
+    try { htmlContent = buildHtmlReport({ generation, tests, testType: 'performance', framework: 'k6', url, pass, fail, skip }); } catch(e) {}
+    
+    saveReportToStorage({ url, framework: 'k6', testType: 'performance', passCount: pass, failCount: fail, skipCount: skip, htmlContent, generationData: generation });
+  }, [generation?.generation?.id]);
+
+  
  
   const result  = generation?.result || {};
   const summary = result?.summary   || {};
@@ -4063,8 +4318,18 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
     link.href = URL.createObjectURL(blob);
     link.download = `k6_performance_${generation?.generation?.id || 'nextest'}.csv`;
     link.click();
-    setDropdownOpen(false);
-  };
+  saveReportToStorage({
+    url,
+    framework: 'k6',
+    testType: 'performance',
+    passCount: pass,
+    failCount: fail,
+    htmlContent: html,
+    generationData: generation,
+  });
+  setDropdownOpen(false);
+};
+
  
   // ── Download HTML ─────────────────────────────────────────────────────────
   const downloadHtml = () => {
@@ -4265,9 +4530,18 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `k6_performance_report_${genId}.html`;
-    link.click();
-    setDropdownOpen(false);
-  };
+   link.click();
+  saveReportToStorage({
+    url,
+    framework: 'k6',
+    testType: 'performance',
+    passCount: pass,
+    failCount: fail,
+    htmlContent: html,
+    generationData: generation,
+  });
+  setDropdownOpen(false);
+};
  
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -4739,17 +5013,205 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
 // ─────────────────────────────────────────────────────────────────────────────
 // ExecutionPanel
 // ─────────────────────────────────────────────────────────────────────────────
+function buildHtmlReport({ generation, tests, testType, framework, url, pass, fail, skip }) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const genId = generation?.generation?.id || 'nextest';
+  const total = tests.length || 1;
+  const rate = Math.round(pass / total * 100);
+  const rateColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
 
+  const TYPE_COLORS = {
+    smoke: '#64748b', functional: '#6366f1', performance: '#8b5cf6',
+    api: '#10b981', regression: '#f97316', security: '#ef4444', seo: '#06b6d4',
+  };
+  const FW_COLORS = {
+    Selenium: '#43B02A', Cypress: '#00BFA5', Playwright: '#E2574C',
+    Pytest: '#3776AB', Postman: '#FF6C37', k6: '#7D64FF', Requests: '#06b6d4',
+  };
+  const typeColor = TYPE_COLORS[testType] || '#64748b';
+  const fwColor = FW_COLORS[framework] || '#818cf8';
+
+  const rows = tests.map((t, i) => {
+    const sc = t.status === 'pass' ? '#10b981' : t.status === 'fail' ? '#ef4444' : '#f59e0b';
+    const sl = t.status === 'pass' ? '✓ PASS' : t.status === 'fail' ? '✗ FAIL' : '— SKIP';
+    const ai = t.ai_analysis || {};
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:600;color:#e2e8f0;font-size:13px">${t.name||'—'}</td>
+      <td style="padding:9px 12px;text-align:center">
+        <span style="font-size:9px;font-weight:800;padding:3px 10px;border-radius:12px;color:${sc};background:${sc}18;border:1px solid ${sc}33">${sl}</span>
+      </td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${t.suite||t.detail||ai.root_cause||'—'}</td>
+      <td style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b">${t.duration||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const rateGrad = rate >= 80
+    ? 'linear-gradient(90deg,#10b981,#34d399)'
+    : rate >= 50 ? 'linear-gradient(90deg,#f59e0b,#fbbf24)'
+    : 'linear-gradient(90deg,#ef4444,#f87171)';
+
+  const vc = fail === 0 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444';
+  const vi = fail === 0 ? '🟢' : rate >= 60 ? '🟡' : '🔴';
+  const vt = fail === 0
+    ? `All ${pass} tests passed successfully.`
+    : `${fail} test(s) failed out of ${total}. Pass rate: ${rate}%.`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NexTest Report #${genId}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#070e1c;color:#e2e8f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+  .page{max-width:1100px;margin:0 auto;padding:48px 32px 80px}
+  table{width:100%;border-collapse:collapse}
+  @media print{body{background:#fff;color:#000}.no-print{display:none}.page{padding:10mm}@page{margin:15mm;size:A4}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div style="background:linear-gradient(135deg,#040914,#0a1035,#040914);border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,${typeColor},transparent)"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
+      <div>
+        <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px">
+          <span style="color:#c9a227">NEX</span>TEST
+        </div>
+        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;text-transform:capitalize">${testType} Test Report</div>
+        <div style="font-size:11px;color:#94a3b8">${dateStr} · ${timeStr}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:42px;font-weight:800;color:${rateColor};line-height:1">${rate}%</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px">Pass Rate</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px">
+      ${[
+        {l:'URL', v:`<span style="color:#a5b4fc;font-size:11px;word-break:break-all">${url}</span>`},
+        {l:'Framework', v:`<span style="color:${fwColor};font-weight:700">${framework}</span>`},
+        {l:'Test Type', v:`<span style="color:${typeColor};font-weight:700;text-transform:capitalize">${testType}</span>`},
+        {l:'Generated', v:`<span style="color:#e2e8f0">${dateStr}</span>`},
+      ].map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
+        <div style="font-size:12px">${r.v}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+
+  <div class="no-print" style="margin-bottom:28px">
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+      🖨 Print / Save as PDF
+    </button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px">
+    ${[
+      {icon:'✅',val:pass,lbl:'PASSED',c:'#10b981',bg:'rgba(16,185,129,.08)',bd:'rgba(16,185,129,.25)'},
+      {icon:'❌',val:fail,lbl:'FAILED',c:'#ef4444',bg:'rgba(239,68,68,.08)',bd:'rgba(239,68,68,.25)'},
+      {icon:'⏭️',val:skip,lbl:'SKIPPED',c:'#f59e0b',bg:'rgba(245,158,11,.08)',bd:'rgba(245,158,11,.25)'},
+      {icon:'🎯',val:`${rate}%`,lbl:'PASS RATE',c:rateColor,bg:`${rateColor}12`,bd:`${rateColor}33`},
+      {icon:'🔢',val:total,lbl:'TOTAL',c:'#3b82f6',bg:'rgba(59,130,246,.08)',bd:'rgba(59,130,246,.25)'},
+    ].map(s => `<div style="background:${s.bg};border:1px solid ${s.bd};border-radius:14px;padding:20px;text-align:center">
+      <div style="font-size:20px;margin-bottom:8px">${s.icon}</div>
+      <div style="font-size:36px;font-weight:700;color:${s.c};line-height:1;margin-bottom:4px">${s.val}</div>
+      <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
+    </div>`).join('')}
+  </div>
+
+  <div style="margin:0 0 14px;padding-bottom:10px;border-bottom:2.5px solid ${typeColor};display:flex;align-items:center;gap:10px">
+    <span style="font-size:20px;font-weight:700;color:#e2e8f0;text-transform:capitalize">🧪 ${testType} Test Results</span>
+  </div>
+  <div style="background:#0d1526;border:1px solid ${typeColor}44;border-radius:12px;overflow:hidden;margin-bottom:24px">
+    <table>
+      <thead><tr style="background:#040914">
+        <th style="padding:10px 12px;text-align:center;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#64748b;font-weight:700">#</th>
+        <th style="padding:10px 12px;text-align:left;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#64748b;font-weight:700">Test Name</th>
+        <th style="padding:10px 12px;text-align:center;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#64748b;font-weight:700">Status</th>
+        <th style="padding:10px 12px;text-align:left;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#64748b;font-weight:700">Result / Reason</th>
+        <th style="padding:10px 12px;text-align:center;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#64748b;font-weight:700">Duration</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+
+  <div style="background:${vc}12;border:2px solid ${vc}44;border-radius:12px;padding:16px 20px;display:flex;gap:12px;align-items:flex-start">
+    <span style="font-size:24px">${vi}</span>
+    <div>
+      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:6px">Final Verdict</div>
+      <p style="font-size:13px;color:${vc};margin:0;line-height:1.6">${vt}</p>
+    </div>
+  </div>
+
+  <div style="margin-top:48px;padding:20px 28px;background:rgba(201,162,39,.04);border-radius:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid rgba(201,162,39,.15)">
+    <div style="font-size:14px;font-weight:700;color:#64748b"><span style="color:#c9a227">NEX</span>TEST · AI-Powered Test Automation</div>
+    <div style="font-size:11px;color:#94a3b8">${dateStr} · ${framework} · ${total} tests · ${rate}% pass rate</div>
+  </div>
+
+</div>
+</body>
+</html>`;
+}
 function ExecutionPanel({ generation }) {
   const { t } = useLang();
   const [filter,       setFilter]       = useState('all');
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+const [currentPage, setCurrentPage] = useState(1);
   const [activeTab,    setActiveTab]    = useState('results');
   const [pdfLoading,   setPdfLoading]   = useState(false);
   const [runResults,   setRunResults]   = useState(null);
   const [running,      setRunning]      = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [expandedTest, setExpandedTest] = useState(null);
+  const [terminalLines, setTerminalLines] = useState([]);
   const dropdownRef = useRef(null);
+
+useEffect(() => {
+  if (!generation || running) return;
+  if (!runResults?.results?.length) return;
+
+  const url = generation?.generation?.url || generation?.url || '';
+  const fw = generation?.generation?.framework || generation?.framework || '';
+  const testType = generation?.result?.test_type || generation?.test_type || 'smoke';
+  const allTests = runResults.results;
+  const genId = generation?.generation?.id;
+
+  if (!url || !genId) return;
+
+  const existing = JSON.parse(localStorage.getItem('nextest-reports') || '[]');
+  const existingReport = existing.find(r => r.generationData?.generation?.id === genId);
+  if (existingReport?.htmlContent) return; // déjà sauvegardé avec HTML
+
+  const pass = allTests.filter(t => t.status === 'pass').length;
+  const fail = allTests.filter(t => t.status === 'fail').length;
+  const skip = allTests.filter(t => t.status === 'skip').length;
+
+  // Générer HTML silencieusement
+  let htmlContent = null;
+  try {
+    htmlContent = buildHtmlReport({ generation, tests: allTests, testType, framework: fw, url, pass, fail, skip });
+  } catch(e) { console.error('[AutoHtml]', e); }
+
+  saveReportToStorage({
+    url, framework: fw, testType,
+    passCount: pass, failCount: fail, skipCount: skip,
+    htmlContent,
+    generationData: {
+      ...generation,
+      result: { ...generation?.result, execution_results: allTests },
+    },
+    durationMs: generation?.result?.durationMs || 0,
+  });
+}, [running, runResults?.results?.length, generation?.generation?.id]);
+
+
+
 
   useEffect(() => {
     const handleClickOutside = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false); };
@@ -4775,18 +5237,84 @@ useEffect(() => {
     // ← NE PAS re-runner pour les tests API
     if (testType === 'api') return;
     if (!generation?.result?.test_cases?.length) return;
-    const currentFramework = generation?.framework 
-    || generation?.generation?.framework 
+    const currentFramework = generation?.generation?.framework 
+    || generation?.framework 
     || generation?.result?.framework
-    || 'Selenium';
+    || framework;
     const run = async () => {
-      setRunning(true); setRunResults(null);
-      try {
-        const res = await api.post('/run', { script: generation.result.script || '', framework: currentFramework, test_cases: generation.result.test_cases || [] });
-        setRunResults(res.data);
-      } catch (err) { console.error('[RUN ERROR]', err.response?.data || err.message); }
-      finally { setRunning(false); }
-    };
+  setRunning(true); setRunResults(null); setTerminalLines([]);
+
+  const url = generation?.generation?.url || generation?.url || '';
+  const totalTests = generation?.result?.test_cases?.length || 0;
+  const fwLabel = currentFramework === 'Playwright' ? 'Playwright (headless chromium)'
+    : currentFramework === 'Selenium' ? 'Selenium WebDriver'
+    : currentFramework === 'Cypress' ? 'Cypress Test Runner'
+    : currentFramework;
+
+  const addLine = (text, type = 'info', delay = 0) =>
+    new Promise(res => setTimeout(() => {
+      setTerminalLines(prev => [...prev, { text, type, time: new Date().toLocaleTimeString('en-US', { hour12: false }) }]);
+      res();
+    }, delay));
+
+  // Simulate terminal logs
+  await addLine('NexTest AI Engine v2.0 initializing...', 'system', 0);
+  await addLine(`Connecting to ${url}`, 'info', 400);
+  await addLine(`Launching ${fwLabel}...`, 'info', 800);
+  await addLine('Scraping DOM elements and page structure...', 'info', 1200);
+  await addLine(`AI analyzing ${totalTests} test cases...`, 'ai', 1700);
+  await addLine('Injecting authentication token...', 'info', 2100);
+  await addLine('Browser ready — starting test execution...', 'success', 2500);
+  await addLine('─'.repeat(52), 'divider', 2800);
+
+  // Show tests running one by one
+  const testCases = generation?.result?.test_cases || [];
+  for (let i = 0; i < Math.min(testCases.length, 8); i++) {
+    await addLine(`Running [${i + 1}/${totalTests}] ${testCases[i]?.name || `Test ${i + 1}`}...`, 'running', 3000 + i * 300);
+  }
+  if (totalTests > 8) {
+    await addLine(`... and ${totalTests - 8} more tests running in parallel`, 'muted', 3000 + 8 * 300);
+  }
+
+  await addLine('─'.repeat(52), 'divider', 3000 + Math.min(totalTests, 8) * 300 + 200);
+
+  try {
+    const res = await api.post('/run', {
+      script: generation.result.script || '',
+      framework: currentFramework,
+      test_cases: generation.result.test_cases || []
+    });
+
+    const results = res.data?.results || [];
+    const pass = results.filter(r => r.status === 'pass').length;
+    const fail = results.filter(r => r.status === 'fail').length;
+    const skip = results.filter(r => r.status === 'skip').length;
+
+    // Show individual results
+    results.slice(0, 6).forEach((r, i) => {
+      const icon = r.status === 'pass' ? '✓' : r.status === 'fail' ? '✗' : '—';
+      const type = r.status === 'pass' ? 'pass' : r.status === 'fail' ? 'fail' : 'skip';
+      setTerminalLines(prev => [...prev, {
+        text: `${icon} ${r.name || `Test ${i + 1}`}`,
+        type,
+        time: new Date().toLocaleTimeString('en-US', { hour12: false })
+      }]);
+    });
+
+    await addLine('─'.repeat(52), 'divider', 200);
+    await addLine(`Execution complete — ${pass} passed · ${fail} failed · ${skip} skipped`, 'summary', 400);
+    await addLine(`Pass rate: ${results.length > 0 ? Math.round(pass / results.length * 100) : 0}%`, pass / (results.length || 1) >= 0.8 ? 'success' : 'fail', 600);
+    await addLine('Generating AI analysis report...', 'ai', 800);
+    await addLine('Done ✓', 'success', 1000);
+
+    setTimeout(() => setRunResults(res.data), 1200);
+  } catch (err) {
+    console.error('[RUN ERROR]', err.response?.data || err.message);
+    await addLine(`✗ Error: ${err.response?.data?.error || err.message}`, 'fail', 200);
+  } finally {
+    setTimeout(() => setRunning(false), 1200);
+  }
+};
     run();
   }, [generation]);
 
@@ -4797,7 +5325,7 @@ return execution_results.map((r, i) => ({
   name: r.name,
   status: r.status,
   duration: r.duration || '—',
-  suite: r.reason_pass || r.reason || r.error || 'Test',
+  suite: r.suite || r.detail || r.reason_pass || r.reason || r.error || '',
   assertion_result: r.assertion_result || null,
   step_meta: r.step_meta || null,
   category:        r.category || 'api',
@@ -4822,9 +5350,14 @@ return execution_results.map((r, i) => ({
   const fail  = tests.filter(t => t.status === 'fail').length;
   const skip  = tests.filter(t => t.status === 'skip' || t.status === 'warn').length;
   const rate  = tests.length > 0 ? Math.round((pass / tests.length) * 100) : 0;
-  const shown = filter === 'all' ? tests 
+const shown = filter === 'all' ? tests 
   : filter === 'skip' ? tests.filter(t => t.status === 'skip' || t.status === 'warn')
   : tests.filter(t => t.status === filter);
+
+const totalPages = Math.ceil(shown.length / rowsPerPage);
+const paginatedShown = shown.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+
+useEffect(() => { setCurrentPage(1); }, [filter, rowsPerPage]);
 
   const url        = generation?.generation?.url || generation?.url || '';
   const loadTimeMs = generation?.generation?.load_time_ms || generation?.scraped?.load_time_ms || 0;
@@ -4838,12 +5371,14 @@ return execution_results.map((r, i) => ({
     performance: { label: 'Performance', color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',   border: 'rgba(139,92,246,.25)', letter: 'P' },
     api:         { label: 'API',         color: '#10b981', bg: 'rgba(16,185,129,.1)',   border: 'rgba(16,185,129,.25)', letter: 'A' },
     regression:  { label: 'Regression',  color: '#f97316', bg: 'rgba(249,115,22,.1)',   border: 'rgba(249,115,22,.25)', letter: 'R' },
+    seo: { label: 'SEO', color: '#06b6d4', bg: 'rgba(6,182,212,.1)', border: 'rgba(6,182,212,.25)', letter: 'S' },
     security:    { label: 'Security',    color: '#ef4444', bg: 'rgba(239,68,68,.1)',    border: 'rgba(239,68,68,.25)',  letter: 'S' },
   };
   const ttBadge = TEST_TYPE_BADGE[testType] || TEST_TYPE_BADGE.smoke;
   const isRegression = testType === 'regression';
   const isSecurity = testType === 'security';
   const isFunctional = testType === 'functional';
+  const isSeo = testType === 'seo';
 
   const EP_FW = {
   Selenium:   { letters: 'Se', color: '#43B02A' },
@@ -4853,6 +5388,7 @@ return execution_results.map((r, i) => ({
   Postman:    { letters: 'Po', color: '#FF6C37' },
   Pytest:     { letters: 'Py', color: '#3776AB' },
   Newman:     { letters: 'Nw', color: '#FF6C37' },
+  Requests:   { letters: 'RQ', color: '#06b6d4' },
  
 };
   const fwConf = EP_FW[framework] || EP_FW[framework?.charAt(0).toUpperCase() + framework?.slice(1)] || EP_FW.Selenium;
@@ -4874,6 +5410,20 @@ return execution_results.map((r, i) => ({
               || '';
       filename = 'test_api_pytest.py';
     }
+    const blob = new Blob([content || ''], { type: 'text/plain' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    return;
+  }
+
+  // ── SEO test (Requests + BeautifulSoup) ──
+  if (testType === 'seo') {
+    console.log('[SEO SCRIPT] generation.result:', generation?.result);
+  console.log('[SEO SCRIPT] script field:', generation?.result?.script);
+    content  = generation?.result?.script || '';
+    filename = 'seo_test.py';
     const blob = new Blob([content || ''], { type: 'text/plain' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -4920,8 +5470,18 @@ const rows = isRegression
     link.href = URL.createObjectURL(blob);
     link.download = `nextest_report_${generation?.generation?.id || 'export'}.csv`;
     link.click();
-    setDropdownOpen(false);
-  };
+  saveReportToStorage({
+    url,
+    framework,
+    testType,
+    passCount: pass,
+    failCount: fail,
+    htmlContent: html,
+    generationData: generation,
+  });
+  setDropdownOpen(false);
+};
+
 
 const downloadHtml_Security = () => {
   const now     = new Date();
@@ -5161,101 +5721,214 @@ const downloadHtml_Security = () => {
   link.href = URL.createObjectURL(blob);
   link.download = `security_report_${genId}.html`;
   link.click();
+  saveReportToStorage({
+    url,
+    framework,
+    testType: 'security',
+    passCount: pass,
+    failCount: fail,
+    htmlContent: html,
+    generationData: generation,
+  });
   setDropdownOpen(false);
 };
-const downloadHtml_Functional = () => {
+
+const downloadHtml_Functional = async () => {
+  // ── Show loading state ──────────────────────────────────────────────────
+  setDropdownOpen(false);
+  setPdfLoading(true);
+
   const now     = new Date();
   const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const genId   = generation?.generation?.id || 'nextest';
   const allTests = tests;
- 
+
   const pass  = allTests.filter(t => t.status === 'pass').length;
   const fail  = allTests.filter(t => t.status === 'fail').length;
   const skip  = allTests.filter(t => t.status === 'skip').length;
   const total = allTests.length || 1;
   const rate  = Math.round(pass / total * 100);
   const rateColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
- 
-  // ── Action type colors ──────────────────────────────────────────────────
-  const ACTION_COLORS = {
-    navigate:      '#10b981',
-    check_visible: '#3b82f6',
-    fill:          '#8b5cf6',
-    click:         '#f97316',
-    auth_success:  '#10b981',
-    auth_fail:     '#ef4444',
-    check_text:    '#0d9488',
-    select:        '#6366f1',
-    hover:         '#ec4899',
-    logout:        '#f59e0b',
-  };
+
+  // Quality score
+  const failedCritical = allTests.filter(t => t.status === 'fail' && t.ai_analysis?.severity === 'high');
+  let quality = rate;
+  if (failedCritical.length) quality = Math.max(0, quality - failedCritical.length * 10);
+  quality = Math.min(100, Math.max(0, Math.round(quality)));
+  const risk = quality >= 80 ? 'LOW' : quality >= 60 ? 'MEDIUM' : 'HIGH';
+  const riskColor = quality >= 80 ? '#10b981' : quality >= 60 ? '#f59e0b' : '#ef4444';
+
+  // ── ACTION PLAN via LLaMA ───────────────────────────────────────────────
+  const failedTests = allTests.filter(t => t.status === 'fail');
+  let actionPlanItems = [];
+
+  try {
+    const prompt = `You are a QA engineer. Generate an action plan for these failed functional Playwright tests.
+
+Failed tests (${failedTests.length}):
+${JSON.stringify(failedTests.map(t => ({
+  name: t.name,
+  action: t.action || t.step_meta?.action || 'check_visible',
+  selector: t.selector || t.step_meta?.selector || '—',
+  reason: t.reason || t.suite || '—',
+  root_cause: t.ai_analysis?.root_cause || '—',
+  fix: t.ai_analysis?.fix || '—',
+})))}
+
+Return ONLY a JSON array of max 6 items. Each item must have:
+- scenario: string (what failed — be specific with test name)
+- category: one of "Selector Fix" | "Timing/Wait" | "Auth Flow" | "Page Load" | "Assertion" | "Element State"
+- priority: "HIGH" | "MEDIUM" | "LOW"
+- action: string (concrete fix action, max 80 chars)
+- responsible: one of "Frontend" | "QA" | "Backend" | "DevOps"
+- deadline: one of "Immediate" | "This Sprint" | "Next Sprint"
+- status: "To Do"
+
+Return ONLY valid JSON array, no markdown, no explanation.`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const data = await resp.json();
+    const text = (data.content?.[0]?.text || '[]').replace(/```json|```/g, '').trim();
+    actionPlanItems = JSON.parse(text);
+  } catch (e) {
+    console.error('[Action Plan]', e);
+    // Fallback statique si LLaMA échoue
+    actionPlanItems = failedTests.slice(0, 4).map(t => ({
+      scenario: t.name,
+      category: 'Selector Fix',
+      priority: t.ai_analysis?.severity === 'high' ? 'HIGH' : 'MEDIUM',
+      action: t.ai_analysis?.fix || 'Verify selector and add explicit wait',
+      responsible: 'QA',
+      deadline: 'This Sprint',
+      status: 'To Do',
+    }));
+  }
+
+  // ── ACTION PLAN HTML ────────────────────────────────────────────────────
   const CAT_COLORS = {
-    navigation:     '#10b981',
-    form:           '#8b5cf6',
-    action:         '#f97316',
-    authentication: '#6366f1',
-    ui:             '#3b82f6',
+    'Selector Fix':   '#6366f1',
+    'Timing/Wait':    '#f59e0b',
+    'Auth Flow':      '#ef4444',
+    'Page Load':      '#10b981',
+    'Assertion':      '#8b5cf6',
+    'Element State':  '#0ea5e9',
   };
- 
+  const PRI_COLORS = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#10b981' };
+  const PRI_BGS   = { HIGH: 'rgba(239,68,68,.06)', MEDIUM: 'rgba(245,158,11,.06)', LOW: 'rgba(16,185,129,.06)' };
+  const RESP_COLORS = { Frontend: '#6366f1', QA: '#3b82f6', Backend: '#10b981', DevOps: '#f97316' };
+  const DEAD_COLORS = { Immediate: '#ef4444', 'This Sprint': '#f59e0b', 'Next Sprint': '#10b981' };
+
+  const actionPlanRows = actionPlanItems.map((item, i) => {
+    const pc  = PRI_COLORS[item.priority]  || '#f59e0b';
+    const pbg = PRI_BGS[item.priority]     || 'rgba(245,158,11,.06)';
+    const cc  = CAT_COLORS[item.category]  || '#64748b';
+    const rc  = RESP_COLORS[item.responsible] || '#64748b';
+    const dc  = DEAD_COLORS[item.deadline] || '#f59e0b';
+    return `
+      <tr style="background:${pbg};border-bottom:1px solid rgba(255,255,255,.05)">
+        <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+        <td style="padding:9px 12px;font-size:12px;color:#e2e8f0">${(item.scenario||'').substring(0,60)}</td>
+        <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${item.category}</span></td>
+        <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${item.priority}</span></td>
+        <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${(item.action||'').substring(0,70)}</td>
+        <td style="padding:9px 12px;text-align:center"><span style="color:${rc};font-weight:700;font-size:10px">${item.responsible}</span></td>
+        <td style="padding:9px 12px;text-align:center"><span style="color:${dc};font-weight:700;font-size:10px">${item.deadline}</span></td>
+        <td style="padding:9px 12px;text-align:center"><span style="font-size:10px;color:#64748b">⏳ ${item.status}</span></td>
+      </tr>`;
+  }).join('');
+
+  const sectionActionPlan = actionPlanItems.length > 0 ? `
+    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;padding-bottom:8px;border-bottom:2.5px solid #c9a227">
+      <span style="font-size:18px">📋</span>
+      <span style="font-size:20px;font-weight:700;color:#e2e8f0">AI-Generated Action Plan</span>
+    </div>
+    <p style="font-size:11px;color:#64748b;font-style:italic;margin-bottom:12px">
+      Action plan generated by Claude AI based on real functional test failures.
+    </p>
+    <div style="background:#0d1526;border:1px solid rgba(201,162,39,.3);border-radius:12px;overflow:hidden;margin-bottom:16px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:#040914">
+          ${['#','Scenario','Category','Priority','Action','Responsible','Deadline','Status'].map(h =>
+            `<th style="padding:10px 12px;text-align:${['#','Priority','Responsible','Deadline','Status'].includes(h)?'center':'left'};font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">${h}</th>`
+          ).join('')}
+        </tr></thead>
+        <tbody>${actionPlanRows}</tbody>
+      </table>
+    </div>` : '';
+
+  // ── SECTIONS (garde tout l'existant + ajoute l'Action Plan) ─────────────
+  const ACTION_COLORS = {
+    navigate: '#10b981', check_visible: '#3b82f6', fill: '#8b5cf6',
+    click: '#f97316', auth_success: '#10b981', auth_fail: '#ef4444',
+    check_text: '#0d9488', select: '#6366f1', hover: '#ec4899', logout: '#f59e0b',
+  };
+  const CAT_COLORS2 = {
+    navigation: '#10b981', form: '#8b5cf6', action: '#f97316',
+    authentication: '#6366f1', ui: '#3b82f6',
+  };
+
   const getAction = (t) => t.action || t.step_meta?.action || 'check_visible';
   const getSelector = (t) => t.selector || t.step_meta?.selector || t.step_meta?.value || '—';
   const getReason = (t) => t.reason || t.reason_pass || t.suite || t.error || '—';
- 
-  // ── Section helpers ─────────────────────────────────────────────────────
+
   const secHdr = (emoji, title, color = '#6366f1') => `
-    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;
-      padding-bottom:8px;border-bottom:2.5px solid ${color}">
+    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;padding-bottom:8px;border-bottom:2.5px solid ${color}">
       <span style="font-size:18px">${emoji}</span>
       <span style="font-size:20px;font-weight:700;color:#e2e8f0">${title}</span>
     </div>`;
- 
+
   const tblWrap = (inner, border = '#6366f1') => `
-    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;
-      overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">
+    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">
       ${inner}
     </div>`;
- 
+
   const tblHdr = (cols) => `
     <table style="width:100%;border-collapse:collapse">
       <thead><tr style="background:#040914">
-        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};
-          font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
-          color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
+        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
       </tr></thead>`;
- 
-  // ── 1. SCENARIOS ────────────────────────────────────────────────────────
+
+  // ── 1. SCENARIOS ──
+  const EXPECTED_MAP = {
+    navigate: 'Page loads and DOM is ready',
+    check_visible: 'Element is visible in the DOM',
+    fill: 'Field accepts and retains the input value',
+    click: 'Element responds to click — action triggered',
+    auth_success: 'Login succeeds — redirected to dashboard',
+    auth_fail: 'Login rejected — error message displayed',
+    check_text: 'Expected text found in page content',
+    select: 'Option selected in dropdown',
+    hover: 'Hover state applied to element',
+    logout: 'Session cleared — redirected to login',
+  };
   const scenarioRows = allTests.map((t, i) => {
-    const action   = getAction(t);
+    const action = getAction(t);
     const category = t.category || 'action';
     const priority = t.priority || 'medium';
-    const ac  = ACTION_COLORS[action]   || '#64748b';
-    const cc  = CAT_COLORS[category]   || '#64748b';
-    const pc  = priority === 'high' ? '#ef4444' : priority === 'medium' ? '#f59e0b' : '#10b981';
-    const expectedMap = {
-      navigate:      'Page loads and DOM is ready',
-      check_visible: 'Element is visible in the DOM',
-      fill:          'Field accepts and retains the input value',
-      click:         'Element responds to click — action triggered',
-      auth_success:  'Login succeeds — redirected to dashboard',
-      auth_fail:     'Login rejected — error message displayed',
-      check_text:    'Expected text found in page content',
-      select:        'Option selected in dropdown',
-      hover:         'Hover state applied to element',
-      logout:        'Session cleared — redirected to login',
-    };
-    const expected = t.expected || expectedMap[action] || 'Step completes without error';
+    const ac = ACTION_COLORS[action] || '#64748b';
+    const cc = CAT_COLORS2[category] || '#64748b';
+    const pc = priority === 'high' ? '#ef4444' : priority === 'medium' ? '#f59e0b' : '#10b981';
+    const expected = EXPECTED_MAP[action] || 'Step completes without error';
     return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
       <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
       <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
       <td style="padding:9px 12px;text-align:center"><span style="color:${ac};font-weight:700;font-size:10px">${action.toUpperCase()}</span></td>
       <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${category.toUpperCase()}</span></td>
       <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${priority.toUpperCase()}</span></td>
-      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${expected.substring(0,60)}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${expected.substring(0,55)}</td>
     </tr>`;
   }).join('');
- 
-  // ── 2. CATEGORY SUMMARY ─────────────────────────────────────────────────
+
+  // ── 2. CATEGORY SUMMARY ──
   const cats = {};
   allTests.forEach(t => {
     const c = t.category || 'action';
@@ -5264,15 +5937,14 @@ const downloadHtml_Functional = () => {
     if (t.status === 'pass') cats[c].pass++;
     else if (t.status === 'fail') cats[c].fail++;
     else cats[c].skip++;
-    try { cats[c].dur += parseInt((t.duration || '0').replace('ms', '') || 0); } catch {}
+    try { cats[c].dur += parseInt((t.duration||'0').replace('ms','') || 0); } catch {}
   });
- 
   const catRows = Object.entries(cats).map(([cat, d]) => {
-    const cc     = CAT_COLORS[cat] || '#64748b';
-    const r      = Math.round(d.pass / d.total * 100);
-    const rc     = r === 100 ? '#10b981' : r >= 60 ? '#f59e0b' : '#ef4444';
-    const avg    = Math.round(d.dur / d.total);
-    const vc     = d.fail === 0 ? '#10b981' : '#ef4444';
+    const cc = CAT_COLORS2[cat] || '#64748b';
+    const r  = Math.round(d.pass / d.total * 100);
+    const rc = r === 100 ? '#10b981' : r >= 60 ? '#f59e0b' : '#ef4444';
+    const avg = Math.round(d.dur / d.total);
+    const vc = d.fail === 0 ? '#10b981' : '#ef4444';
     const row_bg = d.fail === 0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
     return `<tr style="background:${row_bg};border-bottom:1px solid rgba(255,255,255,.05)">
       <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
@@ -5285,28 +5957,49 @@ const downloadHtml_Functional = () => {
       <td style="padding:10px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${d.fail===0?'✅ PASS':'❌ FAIL'}</span></td>
     </tr>`;
   }).join('');
- 
-  // ── 3. DETAILED RESULTS ──────────────────────────────────────────────────
+
+  // ── 3. DETAILED RESULTS ──
   const detailRows = allTests.map((t, i) => {
-    const sc  = t.status === 'pass' ? '#10b981' : t.status === 'fail' ? '#ef4444' : '#f59e0b';
-    const sl  = t.status === 'pass' ? '✓ PASS'  : t.status === 'fail' ? '✗ FAIL'  : '■ SKIP';
-    const sb  = t.status === 'pass' ? 'rgba(16,185,129,.06)' : t.status === 'fail' ? 'rgba(239,68,68,.06)' : 'rgba(245,158,11,.06)';
-    const action   = getAction(t);
+    const sc = t.status==='pass'?'#10b981':t.status==='fail'?'#ef4444':'#f59e0b';
+    const sl = t.status==='pass'?'✓ PASS':t.status==='fail'?'✗ FAIL':'■ SKIP';
+    const sb = t.status==='pass'?'rgba(16,185,129,.06)':t.status==='fail'?'rgba(239,68,68,.06)':'rgba(245,158,11,.06)';
+    const action = getAction(t);
     const selector = getSelector(t);
-    const reason   = getReason(t);
-    const ac       = ACTION_COLORS[action] || '#64748b';
+    const reason = getReason(t);
+    const ac = ACTION_COLORS[action] || '#64748b';
+    const aiSev = t.ai_analysis?.severity || 'medium';
+    const sevC = aiSev === 'high' ? '#ef4444' : aiSev === 'medium' ? '#f59e0b' : '#10b981';
     return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
       <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
       <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
       <td style="padding:9px 12px;text-align:center"><span style="color:${ac};font-weight:700;font-size:10px">${action.toUpperCase()}</span></td>
-      <td style="padding:9px 12px;font-size:10px;color:#818cf8;font-family:monospace">${selector.substring(0,35)}</td>
+      <td style="padding:9px 12px;font-size:10px;color:#818cf8;font-family:monospace">${selector.substring(0,30)}</td>
       <td style="padding:9px 12px;text-align:center;background:${sb}"><span style="color:${sc};font-weight:800;font-size:11px">${sl}</span></td>
-      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${reason.substring(0,70)}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${sevC};font-weight:700;font-size:10px">${aiSev.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${reason.substring(0,65)}</td>
       <td style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b;font-weight:700">${t.duration||'—'}</td>
     </tr>`;
   }).join('');
- 
-  // ── 4. VERDICT SUMMARY ───────────────────────────────────────────────────
+
+  // ── 4. LLAMA ANALYSIS TABLE ──
+  const llamaRows = allTests.map((t, i) => {
+    const ai = t.ai_analysis || {};
+    const sc = t.status==='pass'?'#10b981':'#ef4444';
+    const sl = t.status==='pass'?'✓ PASS':'✗ FAIL';
+    const sev = ai.severity || 'medium';
+    const sevc = sev==='high'?'#ef4444':sev==='medium'?'#f59e0b':'#10b981';
+    const bg = sev==='high'?'rgba(239,68,68,.04)':sev==='medium'?'rgba(245,158,11,.04)':'rgba(16,185,129,.04)';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:12px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${sc};font-weight:800;font-size:10px">${sl}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#475569">${(ai.root_cause||'—').substring(0,65)}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#4f46e5">${(ai.fix||'—').substring(0,65)}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${sevc};font-weight:700;font-size:10px">${sev.toUpperCase()}</span></td>
+    </tr>`;
+  }).join('');
+
+  // ── 5. VERDICT SUMMARY ──
   const PASS_MSG = {
     navigation:     'Page loads correctly — routing and URL resolution confirmed',
     form:           'Form interactions work — fill and input fields respond correctly',
@@ -5318,17 +6011,15 @@ const downloadHtml_Functional = () => {
     navigation:     'Critical: page failed to load or selector timed out',
     form:           'Moderate: form fields unreachable or fill action failed',
     action:         'Moderate: click target not found or action not triggered',
-    authentication: 'Critical: authentication flow broken — login/logout not working',
+    authentication: 'Critical: authentication flow broken',
     ui:             'Minor: element not visible or not rendered in DOM',
   };
   const verdictRows = Object.entries(cats).map(([cat, d]) => {
-    const cc = CAT_COLORS[cat] || '#64748b';
+    const cc = CAT_COLORS2[cat] || '#64748b';
     const vc = d.fail > 0 ? '#ef4444' : '#10b981';
     const vt = d.fail > 0 ? 'FAIL' : 'PASS';
     const bg = d.fail > 0 ? 'rgba(239,68,68,.06)' : 'rgba(16,185,129,.06)';
-    const interp = d.fail > 0
-      ? (FAIL_MSG[cat] || `Interaction failure in ${cat}`)
-      : (PASS_MSG[cat] || `${cat} steps completed successfully`);
+    const interp = d.fail > 0 ? (FAIL_MSG[cat]||`Failure in ${cat}`) : (PASS_MSG[cat]||`${cat} operational`);
     return `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
       <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
       <td style="padding:10px 12px;text-align:center"><span style="font-size:9px;font-weight:800;padding:3px 10px;border-radius:12px;color:${vc};background:${vc}18;border:1px solid ${vc}44">${vt}</span></td>
@@ -5338,22 +6029,21 @@ const downloadHtml_Functional = () => {
       <td style="padding:10px 12px;font-size:11px;color:#94a3b8">${interp}</td>
     </tr>`;
   }).join('');
- 
-  const authFail = (cats['authentication']?.fail || 0) > 0;
-  const navFail  = (cats['navigation']?.fail || 0) > 0;
-  const vc   = authFail || navFail ? '#ef4444' : fail > 0 ? '#b45309' : '#059669';
-  const vb   = authFail || navFail ? 'rgba(239,68,68,.08)' : fail > 0 ? 'rgba(245,158,11,.08)' : 'rgba(16,185,129,.08)';
-  const vi   = authFail || navFail ? '🔴' : fail > 0 ? '🟡' : '🟢';
-  const vt_v = authFail || navFail
+
+  const authFail = (cats['authentication']?.fail||0) > 0;
+  const navFail  = (cats['navigation']?.fail||0) > 0;
+  const vc   = authFail||navFail ? '#ef4444' : fail > 0 ? '#b45309' : '#059669';
+  const vb   = authFail||navFail ? 'rgba(239,68,68,.08)' : fail > 0 ? 'rgba(245,158,11,.08)' : 'rgba(16,185,129,.08)';
+  const vi   = authFail||navFail ? '🔴' : fail > 0 ? '🟡' : '🟢';
+  const vt_v = authFail||navFail
     ? 'Functional validation FAILED — critical auth or navigation steps are broken.'
     : fail > 0
     ? `Functional validation passed with ${fail} non-critical step(s) failing. Core flows are operational.`
     : `All ${pass} functional steps passed (${rate}%). Fill, click, navigate, and auth flows are fully operational.`;
- 
-  // ── 5. AI RECOMMENDATIONS ────────────────────────────────────────────────
+
+  // ── 6. AI RECOMMENDATIONS ──
   const slow = allTests.filter(t => { try { return parseInt((t.duration||'0').replace('ms','')) > 10000; } catch { return false; } });
   const failed = allTests.filter(t => t.status === 'fail');
- 
   const recsHtml = `
     <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#f59e0b">⚡ Interaction Quality</div>
     ${slow.length > 0
@@ -5363,18 +6053,18 @@ const downloadHtml_Functional = () => {
     <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 14px;margin:10px 0 4px;font-weight:700;color:#818cf8">🔧 Reliability</div>
     <div style="background:#0d1526;border-left:3px solid #818cf8;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05)">
       ${failed.length > 0
-        ? `• Fix "${failed[0]?.name}" — ${getReason(failed[0]).substring(0,80)}`
+        ? `• Fix "${failed[0]?.name}" — ${getReason(failed[0]).substring(0,75)}`
         : '• No interaction failures — all selectors resolved correctly.'}
     </div>
     <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 14px;margin:10px 0 4px;font-weight:700;color:#10b981">👤 Auth & UX Flows</div>
     <div style="background:#0d1526;border-left:3px solid #10b981;padding:8px 14px 8px 16px;font-size:12px;color:#94a3b8">
-      ${(cats['authentication']?.pass || 0) > 0
+      ${(cats['authentication']?.pass||0) > 0
         ? '• Auth flow validated — login success and failure paths both tested.'
-        : (cats['authentication']?.fail || 0) > 0
+        : (cats['authentication']?.fail||0) > 0
         ? '• Auth failure detected — check token injection and credentials.'
         : '• No auth tests found — consider adding auth_success / auth_fail steps.'}
     </div>`;
- 
+
   // ── FULL HTML ─────────────────────────────────────────────────────────────
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -5393,18 +6083,14 @@ const downloadHtml_Functional = () => {
 </head>
 <body>
 <div class="page">
- 
+
   <!-- HEADER -->
-  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#0a0f2e 50%,#0a0f1e 100%);
-    border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
-    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;
-      background:linear-gradient(90deg,transparent,#6366f1,transparent)"></div>
+  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#0a0f2e 50%,#0a0f1e 100%);border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,#6366f1,transparent)"></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#6366f1"></div>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
       <div>
-        <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px">
-          <span style="color:#6366f1">NEX</span>TEST
-        </div>
+        <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px"><span style="color:#6366f1">NEX</span>TEST</div>
         <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">Functional Test Report</div>
         <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${timeStr}</div>
       </div>
@@ -5413,7 +6099,7 @@ const downloadHtml_Functional = () => {
       ${[
         {l:'URL',      v:`<span style="color:#a5b4fc;font-size:11px;word-break:break-all">${url}</span>`},
         {l:'Framework',v:`<span style="color:#E2574C;font-weight:700">${framework}</span>`},
-        {l:'Test Type',v:`<span style="color:#6366f1;font-weight:700">Functional Test — Playwright Interactions</span>`},
+        {l:'Test Type',v:`<span style="color:#6366f1;font-weight:700">Functional · Playwright</span>`},
         {l:'Steps',    v:`<span style="color:#fff">${total} steps · ${pass} passed · ${fail} failed</span>`},
       ].map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
         <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
@@ -5421,16 +6107,14 @@ const downloadHtml_Functional = () => {
       </div>`).join('')}
     </div>
   </div>
- 
+
   <!-- PRINT BUTTON -->
   <div class="no-print" style="margin-bottom:28px">
-    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;
-      background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;
-      font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
       🖨 Print / Save as PDF
     </button>
   </div>
- 
+
   <!-- STAT CARDS -->
   <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px">
     ${[
@@ -5445,23 +6129,24 @@ const downloadHtml_Functional = () => {
       <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
     </div>`).join('')}
   </div>
- 
+
   ${secHdr('⚙️', 'Functional Test Scenarios', '#6366f1')}
   ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Scenario'},{l:'Action',align:'center'},{l:'Category',align:'center'},{l:'Priority',align:'center'},{l:'Expected Result'}])}
     <tbody>${scenarioRows}</tbody></table>`)}
- 
+
   ${secHdr('📊', 'Results by Category', '#6366f1')}
   ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Skipped',align:'center'},{l:'Pass Rate',align:'center'},{l:'Avg Duration',align:'center'},{l:'Status',align:'center'}])}
     <tbody>${catRows}</tbody></table>`)}
- 
+
   ${secHdr('🧪', 'Detailed Functional Results', '#0d9488')}
-  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Action',align:'center'},{l:'Selector / Value'},{l:'Status',align:'center'},{l:'Reason / Evidence'},{l:'Duration',align:'center'}])}
+  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Action',align:'center'},{l:'Selector / Value'},{l:'Status',align:'center'},{l:'Severity',align:'center'},{l:'Reason / Evidence'},{l:'Duration',align:'center'}])}
     <tbody>${detailRows}</tbody></table>`, '#0d9488')}
- 
+
+  ${secHdr('🤖', 'LLaMA Analysis — Root Cause & Fix', '#4f46e5')}
+  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Status',align:'center'},{l:'Root Cause'},{l:'Fix / Action'},{l:'Severity',align:'center'}])}
+    <tbody>${llamaRows}</tbody></table>`, '#4f46e5')}
+
   ${secHdr('🏁', 'Execution Verdict Summary', '#c9a227')}
-  <p style="font-size:11px;color:#64748b;font-style:italic;margin-bottom:12px">
-    Functional interpretation — maps each interaction category to a pass/fail verdict with user-impact context.
-  </p>
   ${tblWrap(`${tblHdr([{l:'Category'},{l:'Verdict',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Skipped',align:'center'},{l:'Interpretation'}])}
     <tbody>${verdictRows}</tbody></table>`, '#c9a227')}
   <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:16px 20px;display:flex;gap:12px;align-items:flex-start;margin-bottom:28px">
@@ -5471,32 +6156,796 @@ const downloadHtml_Functional = () => {
       <p style="font-size:13px;color:${vc};margin:0;line-height:1.6">${vt_v}</p>
     </div>
   </div>
- 
+
+  ${sectionActionPlan}
+
   ${secHdr('🤖', 'AI Recommendations', '#6366f1')}
   ${recsHtml}
- 
-  <!-- FOOTER -->
-  <div style="margin-top:48px;padding:20px 28px;background:rgba(99,102,241,.04);border-radius:12px;
-    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
-    border:1px solid rgba(99,102,241,.15)">
-    <div style="font-size:14px;font-weight:700;color:#64748b">
-      <span style="color:#6366f1">NEX</span>TEST · Functional Test Report
-    </div>
-    <div style="font-size:11px;color:#94a3b8">
-      Generated ${dateStr} · ${framework} · ${total} steps · ${rate}% pass rate
+
+  <!-- FINAL VERDICT WITH QUALITY SCORE -->
+  <div style="background:${vb};border:2px solid ${vc};border-radius:14px;padding:20px 22px;display:flex;gap:14px;align-items:flex-start;margin-top:8px">
+    <span style="font-size:28px">${vi}</span>
+    <div style="flex:1">
+      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:8px">Final AI Verdict</div>
+      <p style="font-size:13px;color:${vc};margin:0 0 12px;line-height:1.6">${vt_v}</p>
+      <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <div>
+          <span style="font-size:11px;color:#64748b;font-weight:700">Quality Score </span>
+          <span style="font-size:20px;font-weight:700;color:${vc}">${quality}<span style="font-size:12px">/100</span></span>
+        </div>
+        <div>
+          <span style="font-size:11px;color:#64748b;font-weight:700">Risk Level </span>
+          <span style="font-size:13px;font-weight:800;color:${riskColor};padding:3px 12px;border-radius:12px;background:${riskColor}18;border:1px solid ${riskColor}44">${risk}</span>
+        </div>
+        <div>
+          <span style="font-size:11px;color:#64748b;font-weight:700">Pass Rate </span>
+          <span style="font-size:20px;font-weight:700;color:${rateColor}">${rate}%</span>
+        </div>
+      </div>
     </div>
   </div>
- 
+
+  <!-- FOOTER -->
+  <div style="margin-top:48px;padding:20px 28px;background:rgba(99,102,241,.04);border-radius:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid rgba(99,102,241,.15)">
+    <div style="font-size:14px;font-weight:700;color:#64748b"><span style="color:#6366f1">NEX</span>TEST · Functional Test Report</div>
+    <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${framework} · ${total} steps · ${rate}% pass rate · Quality: ${quality}/100</div>
+  </div>
+
 </div>
 </body>
 </html>`;
- 
+
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = `functional_report_${genId}.html`;
   link.click();
+  saveReportToStorage({
+    url,
+    framework,
+    testType: 'functional',
+    passCount: pass,
+    failCount: fail,
+    htmlContent: html,
+    generationData: generation,
+  });
+  setPdfLoading(false);
+};
+const downloadCsv_Functional = async () => {
   setDropdownOpen(false);
+  setPdfLoading(true);
+
+  const allTests = tests;
+  const genId = generation?.generation?.id || 'nextest';
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const pass  = allTests.filter(t => t.status === 'pass').length;
+  const fail  = allTests.filter(t => t.status === 'fail').length;
+  const skip  = allTests.filter(t => t.status === 'skip').length;
+  const total = allTests.length || 1;
+  const rate  = Math.round(pass / total * 100);
+
+  const getAction   = (t) => t.action || t.step_meta?.action || 'check_visible';
+  const getSelector = (t) => t.selector || t.step_meta?.selector || t.step_meta?.value || '—';
+  const getReason   = (t) => t.reason || t.reason_pass || t.suite || t.error || '—';
+
+  // ── Escape CSV cell ──────────────────────────────────────────────────────
+  const esc = (val) => {
+    const str = String(val ?? '').replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  const rows = [];
+
+  // ── SECTION 1: Report Info ───────────────────────────────────────────────
+  rows.push(['NEXTEST — Functional Test Report']);
+  rows.push([`Generated: ${dateStr}`]);
+  rows.push([`URL: ${url}`]);
+  rows.push([`Framework: ${framework}`]);
+  rows.push([`Total: ${total} | Pass: ${pass} | Fail: ${fail} | Skip: ${skip} | Rate: ${rate}%`]);
+  rows.push([]);
+
+  // ── SECTION 2: Test Scenarios ────────────────────────────────────────────
+  rows.push(['=== FUNCTIONAL TEST SCENARIOS ===']);
+  rows.push(['#', 'Test Scenario', 'Action', 'Category', 'Priority', 'Expected Result']);
+
+  const EXPECTED_MAP = {
+    navigate:      'Page loads and DOM is ready',
+    check_visible: 'Element is visible in the DOM',
+    fill:          'Field accepts and retains the input value',
+    click:         'Element responds to click — action triggered',
+    auth_success:  'Login succeeds — redirected to dashboard',
+    auth_fail:     'Login rejected — error message displayed',
+    check_text:    'Expected text found in page content',
+    select:        'Option selected in dropdown',
+    hover:         'Hover state applied to element',
+    logout:        'Session cleared — redirected to login',
+  };
+
+  allTests.forEach((t, i) => {
+    const action = getAction(t);
+    const expected = t.expected || EXPECTED_MAP[action] || 'Step completes without error';
+    rows.push([
+      i + 1,
+      esc(t.name),
+      esc(action.toUpperCase()),
+      esc((t.category || 'action').toUpperCase()),
+      esc((t.priority || 'medium').toUpperCase()),
+      esc(expected),
+    ]);
+  });
+  rows.push([]);
+
+  // ── SECTION 3: Results by Category ──────────────────────────────────────
+  rows.push(['=== RESULTS BY CATEGORY ===']);
+  rows.push(['Category', 'Total', 'Passed', 'Failed', 'Skipped', 'Pass Rate', 'Avg Duration (ms)', 'Verdict']);
+
+  const cats = {};
+  allTests.forEach(t => {
+    const c = t.category || 'action';
+    if (!cats[c]) cats[c] = { pass: 0, fail: 0, skip: 0, total: 0, dur: 0 };
+    cats[c].total++;
+    if (t.status === 'pass') cats[c].pass++;
+    else if (t.status === 'fail') cats[c].fail++;
+    else cats[c].skip++;
+    try { cats[c].dur += parseInt((t.duration || '0').replace('ms', '') || 0); } catch {}
+  });
+
+  Object.entries(cats).forEach(([cat, d]) => {
+    const r = Math.round(d.pass / d.total * 100);
+    const avg = Math.round(d.dur / d.total);
+    rows.push([
+      esc(cat.toUpperCase()),
+      d.total, d.pass, d.fail, d.skip,
+      `${r}%`,
+      avg,
+      d.fail === 0 ? 'PASS' : 'FAIL',
+    ]);
+  });
+  rows.push([]);
+
+  // ── SECTION 4: Detailed Results ──────────────────────────────────────────
+  rows.push(['=== DETAILED FUNCTIONAL RESULTS ===']);
+  rows.push(['#', 'Test Name', 'Action', 'Selector / Value', 'Status', 'Severity', 'Reason / Evidence', 'Duration']);
+
+  allTests.forEach((t, i) => {
+    rows.push([
+      i + 1,
+      esc(t.name),
+      esc(getAction(t).toUpperCase()),
+      esc(getSelector(t)),
+      t.status === 'pass' ? 'PASS' : t.status === 'fail' ? 'FAIL' : 'SKIP',
+      esc((t.ai_analysis?.severity || 'medium').toUpperCase()),
+      esc(getReason(t)),
+      esc(t.duration || '—'),
+    ]);
+  });
+  rows.push([]);
+
+  // ── SECTION 5: LLaMA Analysis ────────────────────────────────────────────
+  rows.push(['=== LLAMA ANALYSIS — ROOT CAUSE & FIX ===']);
+  rows.push(['#', 'Test Name', 'Status', 'Root Cause', 'Fix / Action', 'Severity']);
+
+  allTests.forEach((t, i) => {
+    const ai = t.ai_analysis || {};
+    rows.push([
+      i + 1,
+      esc(t.name),
+      t.status === 'pass' ? 'PASS' : 'FAIL',
+      esc(ai.root_cause || '—'),
+      esc(ai.fix || '—'),
+      esc((ai.severity || 'medium').toUpperCase()),
+    ]);
+  });
+  rows.push([]);
+
+  // ── SECTION 6: Action Plan via LLaMA ─────────────────────────────────────
+  const failedTests = allTests.filter(t => t.status === 'fail');
+  let actionPlanItems = [];
+
+  if (failedTests.length > 0) {
+    try {
+      const prompt = `You are a QA engineer. Generate an action plan for these failed functional Playwright tests.
+
+Failed tests (${failedTests.length}):
+${JSON.stringify(failedTests.map(t => ({
+  name: t.name,
+  action: t.action || t.step_meta?.action || 'check_visible',
+  selector: t.selector || t.step_meta?.selector || '—',
+  reason: t.reason || t.suite || '—',
+  root_cause: t.ai_analysis?.root_cause || '—',
+  fix: t.ai_analysis?.fix || '—',
+})))}
+
+Return ONLY a JSON array of max 6 items. Each item must have:
+- scenario: string
+- category: one of "Selector Fix" | "Timing/Wait" | "Auth Flow" | "Page Load" | "Assertion" | "Element State"
+- priority: "HIGH" | "MEDIUM" | "LOW"
+- action: string (max 80 chars)
+- responsible: one of "Frontend" | "QA" | "Backend" | "DevOps"
+- deadline: one of "Immediate" | "This Sprint" | "Next Sprint"
+- status: "To Do"
+
+Return ONLY valid JSON array, no markdown.`;
+
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+      const data = await resp.json();
+      const text = (data.content?.[0]?.text || '[]').replace(/```json|```/g, '').trim();
+      actionPlanItems = JSON.parse(text);
+    } catch (e) {
+      // Fallback statique
+      actionPlanItems = failedTests.slice(0, 4).map(t => ({
+        scenario: t.name,
+        category: 'Selector Fix',
+        priority: t.ai_analysis?.severity === 'high' ? 'HIGH' : 'MEDIUM',
+        action: t.ai_analysis?.fix || 'Verify selector and add explicit wait',
+        responsible: 'QA',
+        deadline: 'This Sprint',
+        status: 'To Do',
+      }));
+    }
+  }
+
+  rows.push(['=== AI-GENERATED ACTION PLAN ===']);
+  rows.push(['#', 'Scenario', 'Category', 'Priority', 'Action', 'Responsible', 'Deadline', 'Status']);
+
+  actionPlanItems.forEach((item, i) => {
+    rows.push([
+      i + 1,
+      esc(item.scenario || ''),
+      esc(item.category || ''),
+      esc(item.priority || ''),
+      esc(item.action || ''),
+      esc(item.responsible || ''),
+      esc(item.deadline || ''),
+      esc(item.status || 'To Do'),
+    ]);
+  });
+
+  // ── Build CSV string ─────────────────────────────────────────────────────
+  const csvContent = rows.map(row =>
+    Array.isArray(row) ? row.join(',') : row
+  ).join('\n');
+
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `functional_report_${genId}.csv`;
+  link.click();
+
+  setPdfLoading(false);
+};
+
+const downloadCsv_Seo = () => {
+  const genId = generation?.generation?.id || 'nextest';
+  const result = generation?.result || {};
+  const seoScore = result?.seo_score || 0;
+  const url = generation?.generation?.url || generation?.url || '';
+  const now = new Date().toLocaleString('en-US');
+
+  const pass  = tests.filter(t => t.status === 'pass').length;
+  const fail  = tests.filter(t => t.status === 'fail').length;
+  const total = tests.length;
+  const rate  = total > 0 ? Math.round(pass / total * 100) : 0;
+
+  const wb = XLSX.utils.book_new();
+
+  // ── DATA ROWS ──────────────────────────────────────────────────────────────
+  const headers = [
+    'Test ID', 'SEO Check', 'Category', 'Status',
+    'Detail / Result', 'Severity', 'Root Cause', 'Fix / Action', 'SEO Score'
+  ];
+
+  const rows = tests.map((t, i) => {
+    const ai = t.ai_analysis || {};
+    return [
+      i + 1,
+      t.name || '—',
+      (t.category || '—').toUpperCase(),
+      t.status === 'pass' ? 'PASS' : 'FAIL',
+      t.detail || t.suite || '—',
+      (ai.severity || '—').toUpperCase(),
+      ai.root_cause || '—',
+      ai.fix || '—',
+      i === 0 ? seoScore : '',
+    ];
+  });
+
+  // Ligne TOTAL
+  const totalRow = [
+    'TOTAL', '', total, `${pass} PASS / ${fail} FAIL`,
+    '', '', '', `Pass Rate: ${rate}%`, `SEO Score: ${seoScore}/100`
+  ];
+
+  // Section EXECUTION SUMMARY
+  const summaryRows = [
+    [],
+    ['EXECUTION SUMMARY', '', '', '', '', '', '', '', ''],
+    ['Generated',    now,          '', '', '', '', '', '', ''],
+    ['URL',          url,          '', '', '', '', '', '', ''],
+    ['Framework',    'Requests + BeautifulSoup', '', '', '', '', '', '', ''],
+    ['Test Type',    'SEO Audit',  '', '', '', '', '', '', ''],
+    ['Total Checks', total,        '', '', '', '', '', '', ''],
+    ['Passed',       pass,         '', '', '', '', '', '', ''],
+    ['Failed',       fail,         '', '', '', '', '', '', ''],
+    ['Pass Rate',    `${rate}%`,   '', '', '', '', '', '', ''],
+    ['SEO Score',    `${seoScore}/100`, '', '', '', '', '', '', ''],
+  ];
+
+  const allData = [headers, ...rows, totalRow, ...summaryRows];
+
+  const ws = XLSX.utils.aoa_to_sheet(allData);
+
+  // ── COLUMN WIDTHS ──────────────────────────────────────────────────────────
+  ws['!cols'] = [
+    { wch: 8  }, // Test ID
+    { wch: 30 }, // SEO Check
+    { wch: 16 }, // Category
+    { wch: 10 }, // Status
+    { wch: 50 }, // Detail
+    { wch: 12 }, // Severity
+    { wch: 45 }, // Root Cause
+    { wch: 45 }, // Fix
+    { wch: 14 }, // SEO Score
+  ];
+
+  // ── STYLES ─────────────────────────────────────────────────────────────────
+  const headerStyle = {
+    font:      { bold: true, color: { rgb: 'FFFFFF' }, sz: 10 },
+    fill:      { fgColor: { rgb: '0A0F1E' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: {
+      top:    { style: 'thin', color: { rgb: 'C9A227' } },
+      bottom: { style: 'thin', color: { rgb: 'C9A227' } },
+      left:   { style: 'thin', color: { rgb: 'C9A227' } },
+      right:  { style: 'thin', color: { rgb: 'C9A227' } },
+    }
+  };
+
+  const passStyle = {
+    font:      { bold: true, color: { rgb: '059669' }, sz: 10 },
+    fill:      { fgColor: { rgb: 'D1FAE5' } },
+    alignment: { horizontal: 'center' },
+    border:    { bottom: { style: 'thin', color: { rgb: 'E2E8F0' } } }
+  };
+
+  const failStyle = {
+    font:      { bold: true, color: { rgb: 'DC2626' }, sz: 10 },
+    fill:      { fgColor: { rgb: 'FEE2E2' } },
+    alignment: { horizontal: 'center' },
+    border:    { bottom: { style: 'thin', color: { rgb: 'E2E8F0' } } }
+  };
+
+  const normalStyle = {
+    font:      { sz: 9 },
+    alignment: { vertical: 'top', wrapText: true },
+    border:    { bottom: { style: 'thin', color: { rgb: 'E2E8F0' } } }
+  };
+
+  const totalStyle = {
+    font:      { bold: true, color: { rgb: 'FFFFFF' }, sz: 10 },
+    fill:      { fgColor: { rgb: '16A34A' } },
+    alignment: { horizontal: 'center' },
+  };
+
+  const summaryHeaderStyle = {
+    font:      { bold: true, color: { rgb: 'FFFFFF' }, sz: 10 },
+    fill:      { fgColor: { rgb: '16A34A' } },
+    alignment: { horizontal: 'left' },
+  };
+
+  const summaryLabelStyle = {
+    font:      { bold: true, color: { rgb: '1E293B' }, sz: 9 },
+    fill:      { fgColor: { rgb: 'F0FDF4' } },
+  };
+
+  const summaryValueStyle = {
+    font:      { sz: 9, color: { rgb: '16A34A' } },
+    fill:      { fgColor: { rgb: 'F0FDF4' } },
+  };
+
+  // Apply header styles (row 0)
+  headers.forEach((_, ci) => {
+    const cellRef = XLSX.utils.encode_cell({ r: 0, c: ci });
+    if (ws[cellRef]) ws[cellRef].s = headerStyle;
+  });
+
+  // Apply row styles
+  rows.forEach((row, ri) => {
+    const rowIdx = ri + 1; // +1 for header
+    row.forEach((_, ci) => {
+      const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: ci });
+      if (!ws[cellRef]) return;
+      if (ci === 3) {
+        ws[cellRef].s = row[3] === 'PASS' ? passStyle : failStyle;
+      } else {
+        ws[cellRef].s = normalStyle;
+      }
+    });
+  });
+
+  // Apply total row style
+  const totalRowIdx = rows.length + 1;
+  totalRow.forEach((_, ci) => {
+    const cellRef = XLSX.utils.encode_cell({ r: totalRowIdx, c: ci });
+    if (ws[cellRef]) ws[cellRef].s = totalStyle;
+  });
+
+  // Apply summary styles
+  const summaryStartIdx = totalRowIdx + 2; // +2 pour la ligne vide
+  summaryRows.forEach((row, ri) => {
+    if (ri === 0) return; // ligne vide
+    const rowIdx = summaryStartIdx + ri;
+    if (ri === 1) {
+      // EXECUTION SUMMARY header
+      const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: 0 });
+      if (ws[cellRef]) ws[cellRef].s = summaryHeaderStyle;
+    } else {
+      const labelRef = XLSX.utils.encode_cell({ r: rowIdx, c: 0 });
+      const valueRef = XLSX.utils.encode_cell({ r: rowIdx, c: 1 });
+      if (ws[labelRef]) ws[labelRef].s = summaryLabelStyle;
+      if (ws[valueRef]) ws[valueRef].s = summaryValueStyle;
+    }
+  });
+
+  // Row heights
+  ws['!rows'] = [
+    { hpt: 20 }, // header
+    ...rows.map(() => ({ hpt: 40 })),
+    { hpt: 20 }, // total
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'seo_report');
+  XLSX.writeFile(wb, `seo_report_${genId}.xlsx`);
+  setDropdownOpen(false);
+};
+
+const downloadHtml_Seo = () => {
+  try{
+  const now     = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const genId   = generation?.generation?.id || 'nextest';
+  const allTests = tests;
+  
+  const pass  = allTests.filter(t => t.status === 'pass').length;
+  const fail  = allTests.filter(t => t.status === 'fail').length;
+  const total = allTests.length || 1;
+  const rate  = Math.round(pass / total * 100);
+  const rateColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+
+  // SEO score depuis generation result
+const result = generation?.result || {};
+const seoScore = result?.seo_score || 0;
+const aiResult = result?.ai || {};
+const scoreColor = seoScore >= 80 ? '#10b981' : seoScore >= 50 ? '#f59e0b' : '#ef4444';
+
+  const CAT_COLORS = {
+    security: '#ef4444', accessibility: '#8b5cf6', meta: '#3b82f6',
+    structure: '#f97316', mobile: '#0ea5e9', technical: '#6366f1',
+    social: '#ec4899', content: '#10b981', performance: '#f59e0b',
+  };
+  const SEV_COLORS = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
+
+  const secHdr = (emoji, title, color = '#16a34a') => `
+    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;
+      padding-bottom:8px;border-bottom:2.5px solid ${color}">
+      <span style="font-size:18px">${emoji}</span>
+      <span style="font-size:20px;font-weight:700;color:#1e293b">${title}</span>
+    </div>`;
+
+  const tblWrap = (inner, border = '#16a34a') => `
+    <div style="background:#fff;border:1px solid ${border}44;border-radius:12px;
+      overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+      ${inner}
+    </div>`;
+
+  const tblHdr = (cols) => `
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#0a0f1e">
+        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};
+          font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+          color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
+      </tr></thead>`;
+
+  // ── 1. SCENARIOS ──
+  const IMPACT_MAP = { security:'HIGH', technical:'HIGH', meta:'HIGH', accessibility:'HIGH', structure:'MEDIUM', mobile:'MEDIUM', content:'MEDIUM', performance:'MEDIUM', social:'LOW' };
+  const EXPECTED_MAP = {
+    security: 'Secure connection — HTTPS enforced',
+    accessibility: 'Page reachable — HTTP 200 response',
+    meta: 'Tag present and within optimal length',
+    structure: 'Correct heading hierarchy in HTML',
+    mobile: 'Viewport configured for mobile devices',
+    technical: 'Technical SEO element present and valid',
+    social: 'Social sharing metadata configured',
+    content: 'Content meets SEO quantity threshold',
+    performance: 'Page loads within 3000ms threshold',
+  };
+  const IMPACT_COLORS = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#10b981' };
+
+  const scenarioRows = allTests.map((t, i) => {
+    const cat = t.category || 'technical';
+    const cc  = CAT_COLORS[cat] || '#64748b';
+    const impact = IMPACT_MAP[cat] || 'MEDIUM';
+    const ic = IMPACT_COLORS[impact];
+    return `<tr style="border-bottom:1px solid #f1f5f9;background:${i%2===0?'#fff':'#f8fafc'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#1e293b;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${cat.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#475569">${EXPECTED_MAP[cat] || 'Check passes successfully'}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${ic};font-weight:700;font-size:10px">${impact}</span></td>
+    </tr>`;
+  }).join('');
+
+  // ── 2. CATEGORY SUMMARY ──
+  const cats = {};
+  allTests.forEach(t => {
+    const c = t.category || 'technical';
+    if (!cats[c]) cats[c] = { pass: 0, fail: 0, total: 0 };
+    cats[c].total++;
+    if (t.status === 'pass') cats[c].pass++; else cats[c].fail++;
+  });
+  const catRows = Object.entries(cats).map(([cat, d]) => {
+    const cc  = CAT_COLORS[cat] || '#64748b';
+    const r   = Math.round(d.pass / d.total * 100);
+    const rc  = r === 100 ? '#10b981' : r >= 50 ? '#f59e0b' : '#ef4444';
+    const vc  = d.fail === 0 ? '#10b981' : '#ef4444';
+    const bg  = d.fail === 0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
+    return `<tr style="background:${bg};border-bottom:1px solid #f1f5f9">
+      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
+      <td style="padding:10px 12px;text-align:center;color:#1e293b;font-weight:700">${d.total}</td>
+      <td style="padding:10px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
+      <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
+      <td style="padding:10px 12px;text-align:center;color:${rc};font-weight:700">${r}%</td>
+      <td style="padding:10px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${d.fail===0?'✅ PASS':'❌ FAIL'}</span></td>
+    </tr>`;
+  }).join('');
+
+  // ── 3. DETAILED RESULTS ──
+  const detailRows = allTests.map((t, i) => {
+    const sc  = t.status==='pass'?'#10b981':'#ef4444';
+    const sl  = t.status==='pass'?'✓ PASS':'✗ FAIL';
+    const sb  = t.status==='pass'?'rgba(16,185,129,.06)':'rgba(239,68,68,.06)';
+    const cc  = CAT_COLORS[t.category] || '#64748b';
+    const ai  = t.ai_analysis || {};
+    const sev = ai.severity || 'medium';
+    const sevc = SEV_COLORS[sev] || '#f59e0b';
+    const detail = (t.detail || t.suite || '—').substring(0, 80);
+    return `<tr style="border-bottom:1px solid #f1f5f9;background:${i%2===0?'#fff':'#f8fafc'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#1e293b;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${(t.category||'').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center;background:${sb}"><span style="color:${sc};font-weight:800;font-size:11px">${sl}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#475569">${detail}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${sevc};font-weight:700;font-size:10px">${sev.toUpperCase()}</span></td>
+    </tr>`;
+  }).join('');
+
+  // ── 4. LLAMA ANALYSIS ──
+  const llamaRows = allTests.map((t, i) => {
+    const ai   = t.ai_analysis || {};
+    const sc   = t.status==='pass'?'#10b981':'#ef4444';
+    const sl   = t.status==='pass'?'✓ PASS':'✗ FAIL';
+    const sev  = ai.severity || 'medium';
+    const sevc = SEV_COLORS[sev] || '#f59e0b';
+    const rc   = (ai.root_cause || '—').substring(0, 70);
+    const fix  = (ai.fix || '—').substring(0, 70);
+    const bg   = sev==='high'?'rgba(239,68,68,.04)':sev==='medium'?'rgba(245,158,11,.04)':'rgba(16,185,129,.04)';
+    return `<tr style="border-bottom:1px solid #f1f5f9;background:${bg}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#1e293b;font-size:12px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${sc};font-weight:800;font-size:10px">${sl}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#475569">${rc}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#4f46e5">${fix}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${sevc};font-weight:700;font-size:10px">${sev.toUpperCase()}</span></td>
+    </tr>`;
+  }).join('');
+
+  // ── 5. AI RECOMMENDATIONS ──
+  const summary  = aiResult.summary || '';
+  const recs     = aiResult.recommendations || [];
+  const actionPlan = aiResult.action_plan || [];
+
+  const recsHtml = `
+    ${summary ? `<div style="background:#e0e7ff;border:1px solid #6366f1;border-left:3px solid #6366f1;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#4338ca;line-height:1.6">
+      <b>AI Summary:</b> ${summary}
+    </div>` : ''}
+    ${recs.length > 0 ? `
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
+        <thead><tr style="background:#0a0f1e">
+          <th style="padding:9px 12px;text-align:center;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">Priority</th>
+          <th style="padding:9px 12px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">Category</th>
+          <th style="padding:9px 12px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">Issue</th>
+          <th style="padding:9px 12px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">Fix</th>
+        </tr></thead>
+        <tbody>${recs.map((r, i) => {
+          const pri = r.priority || 'medium';
+          const pc  = pri==='high'?'#ef4444':pri==='medium'?'#f59e0b':'#10b981';
+          const bg  = i%2===0?'#fff':'#f8fafc';
+          return `<tr style="border-bottom:1px solid #f1f5f9;background:${bg}">
+            <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${pri.toUpperCase()}</span></td>
+            <td style="padding:9px 12px;font-size:11px;color:#4f46e5;font-weight:700">${r.category||'—'}</td>
+            <td style="padding:9px 12px;font-size:11px;color:#1e293b">${(r.issue||'—').substring(0,65)}</td>
+            <td style="padding:9px 12px;font-size:11px;color:#475569">${(r.fix||'—').substring(0,65)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>` : ''}
+    ${actionPlan.length > 0 ? `
+      <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">Action Plan</div>
+      ${actionPlan.map(step => `
+        <div style="background:#fafafa;border-left:2px solid #6366f1;padding:7px 14px;margin-bottom:3px;font-size:12px;color:#475569">${step}</div>
+      `).join('')}` : ''}`;
+
+  // ── 6. FINAL VERDICT ──
+  const critFailed = allTests.filter(t => t.status==='fail' && ['security','technical','meta'].includes(t.category));
+  const vc  = critFailed.length ? '#ef4444' : fail > 0 ? '#b45309' : '#059669';
+  const vb  = critFailed.length ? 'rgba(239,68,68,.08)' : fail > 0 ? 'rgba(245,158,11,.08)' : 'rgba(16,185,129,.08)';
+  const vi  = critFailed.length ? '🔴' : fail > 0 ? '🟡' : '🟢';
+  const vt  = critFailed.length
+    ? `SEO audit FAILED — critical issues in: ${[...new Set(critFailed.map(t=>t.category.toUpperCase()))].join(', ')}. Fix to improve search visibility.`
+    : fail > 0
+    ? `SEO audit passed with ${fail} non-critical issue(s). Core technical SEO is functional.`
+    : `SEO audit PASSED — all ${pass} checks passed. Page meets technical SEO best practices.`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NexTest SEO Report #${genId}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#f8fafc;color:#1e293b;font-family:'DM Sans',sans-serif;min-height:100vh}
+  .page{max-width:1100px;margin:0 auto;padding:48px 32px 80px}
+  table{width:100%;border-collapse:collapse}
+  th,td{vertical-align:top}
+  @media print{body{background:#fff}.no-print{display:none}.page{padding:10mm}@page{margin:15mm;size:A4}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#0a2010 50%,#0a0f1e 100%);
+    border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,#16a34a,transparent)"></div>
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#16a34a"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
+      <div>
+        <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px">
+          <span style="color:#16a34a">NEX</span>TEST
+        </div>
+        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">SEO Test Report</div>
+        <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${timeStr}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:32px;font-weight:800;color:${scoreColor};font-family:Georgia,serif;line-height:1">${seoScore}<span style="font-size:16px">/100</span></div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px">SEO Score</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px">
+      ${[
+        {l:'URL',      v:`<span style="color:#86efac;font-size:11px;word-break:break-all">${url}</span>`},
+        {l:'Analyzer', v:`<span style="color:#16a34a;font-weight:700">Requests + BeautifulSoup</span>`},
+        {l:'Test Type',v:`<span style="color:#16a34a;font-weight:700">SEO Audit — 17 Checks</span>`},
+        {l:'SEO Score',v:`<span style="color:${scoreColor};font-weight:800;font-size:16px">${seoScore}/100</span>`},
+      ].map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
+        <div style="font-size:12px">${r.v}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+
+  <!-- PRINT BUTTON -->
+  <div class="no-print" style="margin-bottom:28px">
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,#16a34a,#15803d);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+      🖨 Print / Save as PDF
+    </button>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px">
+    ${[
+      {icon:'✅',val:pass,       lbl:'PASSED',    c:'#10b981',bg:'#d1fae5',bd:'#a7f3d0'},
+      {icon:'❌',val:fail,       lbl:'FAILED',    c:'#ef4444',bg:'#fee2e2',bd:'#fca5a5'},
+      {icon:'🎯',val:`${rate}%`, lbl:'PASS RATE', c:rateColor,bg:'#eff6ff',bd:'#bfdbfe'},
+      {icon:'🔍',val:seoScore,   lbl:'SEO SCORE', c:scoreColor,bg:'#f0fdf4',bd:'#bbf7d0'},
+      {icon:'🔢',val:total,      lbl:'TOTAL',     c:'#3b82f6',bg:'#dbeafe',bd:'#93c5fd'},
+    ].map(s => `<div style="background:${s.bg};border:1px solid ${s.bd};border-radius:14px;padding:20px;text-align:center">
+      <div style="font-size:20px;margin-bottom:8px">${s.icon}</div>
+      <div style="font-size:36px;font-weight:700;color:${s.c};line-height:1;margin-bottom:4px">${s.val}</div>
+      <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
+    </div>`).join('')}
+  </div>
+
+  ${secHdr('🔍', 'SEO Test Scenarios', '#16a34a')}
+  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'SEO Check'},{l:'Category',align:'center'},{l:'Expected Result'},{l:'Impact',align:'center'}])}
+    <tbody>${scenarioRows}</tbody></table>`)}
+
+  ${secHdr('📊', 'Results by Category', '#16a34a')}
+  ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Pass Rate',align:'center'},{l:'Verdict',align:'center'}])}
+    <tbody>${catRows}</tbody></table>`)}
+
+  ${secHdr('🧪', 'Detailed SEO Test Results', '#0d9488')}
+  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'SEO Check'},{l:'Category',align:'center'},{l:'Status',align:'center'},{l:'Result / Detail'},{l:'Severity',align:'center'}])}
+    <tbody>${detailRows}</tbody></table>`, '#0d9488')}
+
+  ${secHdr('🤖', 'LLaMA Analysis — Root Cause & Fix', '#4f46e5')}
+  <div style="background:#fff;border:1px solid #e0e7ff;border-radius:12px;overflow:hidden;margin-bottom:16px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#0a0f1e">
+        <th style="padding:10px 12px;text-align:center;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">#</th>
+        <th style="padding:10px 12px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">Check</th>
+        <th style="padding:10px 12px;text-align:center;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">Status</th>
+        <th style="padding:10px 12px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">Root Cause</th>
+        <th style="padding:10px 12px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">Fix / Action</th>
+        <th style="padding:10px 12px;text-align:center;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">Sev.</th>
+      </tr></thead>
+      <tbody>${llamaRows}</tbody>
+    </table>
+  </div>
+
+  ${secHdr('✨', 'AI Recommendations', '#6366f1')}
+  ${recsHtml}
+
+  <!-- FINAL VERDICT -->
+  <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:16px 20px;margin-top:24px;display:flex;gap:12px;align-items:flex-start">
+    <span style="font-size:24px">${vi}</span>
+    <div>
+      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:6px">Final SEO Verdict</div>
+      <p style="font-size:13px;color:${vc};margin:0 0 10px;line-height:1.6">${vt}</p>
+      <div style="font-size:12px;color:${vc}">
+        <b>SEO Score:</b> ${seoScore}/100 &nbsp;|&nbsp; <b>Pass Rate:</b> ${rate}% &nbsp;|&nbsp;
+        <span style="color:#10b981;font-weight:700">${pass} passed</span> / <span style="color:#ef4444;font-weight:700">${fail} failed</span> / ${total} total
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="margin-top:48px;padding:20px 28px;background:rgba(22,163,74,.04);border-radius:12px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+    border:1px solid rgba(22,163,74,.15)">
+    <div style="font-size:14px;font-weight:700;color:#64748b">
+      <span style="color:#16a34a">NEX</span>TEST · SEO Test Report
+    </div>
+    <div style="font-size:11px;color:#94a3b8">
+      Generated ${dateStr} · Requests+BS4 · ${total} checks · ${rate}% pass rate · SEO Score: ${seoScore}/100
+    </div>
+  </div>
+
+</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `seo_report_${genId}.html`;
+  link.click();
+  saveReportToStorage({
+  url,
+  framework: 'Requests',
+  testType: 'seo',
+  passCount: pass,
+  failCount: fail,
+  htmlContent: html,
+  generationData: generation,  // ← assurez-vous que generation est bien défini ici
+});
+  setDropdownOpen(false);
+    } catch (err) {
+    console.error('[SEO HTML ERROR]', err);
+    alert('Error: ' + err.message);
+  }
 };
 const downloadHtml_Regression = () => {
   const now     = new Date();
@@ -5723,8 +7172,18 @@ const downloadHtml_Regression = () => {
   link.href = URL.createObjectURL(blob);
   link.download = `regression_report_${genId}.html`;
   link.click();
+  saveReportToStorage({
+    url,
+    framework,
+    testType: 'regression',
+    passCount: pass,
+    failCount: fail,
+    htmlContent: html,
+    generationData: generation,
+  });
   setDropdownOpen(false);
 };
+
 const downloadHtml = () => {
   const now     = new Date();
   const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -6202,7 +7661,40 @@ const downloadHtml = () => {
     : rate === 100
     ? `Smoke validation passed successfully with no critical UI issues detected. ${loadTime > 3000 ? 'Performance optimization is recommended to improve load time.' : 'Application is stable and ready for functional testing.'}`
     : `Smoke validation completed with a ${rate}% pass rate. Review skipped tests and confirm selector health before proceeding.`;
+// ── AI ACTION PLAN ────────────────────────────────────────────
+const buildActionPlan = async (failedTests) => {
+  if (!failedTests.length) return '';
+  
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `You are a QA engineer. Generate an action plan for these failed functional tests.
+Failed tests: ${JSON.stringify(failedTests.map(t => ({name: t.name, action: t.action || t.step_meta?.action, reason: t.reason || t.suite})))}
 
+Return ONLY a JSON array of max 6 items, each with:
+- scenario: string (what to fix)
+- category: "Bug Fix" | "Selector" | "Timing" | "Auth"
+- priority: "HIGH" | "MEDIUM" | "LOW"  
+- action: string (concrete fix)
+- responsible: "Frontend" | "Backend" | "QA"
+- deadline: "Immediate" | "This Sprint" | "Next Sprint"
+- status: "To Do"
+
+No markdown, only JSON array.`
+        }]
+      })
+    });
+    const data = await response.json();
+    const text = data.content?.[0]?.text?.replace(/```json|```/g, '').trim() || '[]';
+    return JSON.parse(text);
+  } catch { return []; }
+};
   const sectionRecs = `
     ${secHdr('🤖', 'AI Recommendations', '#4f46e5')}
     <p style="font-size:11px;color:#64748b;font-style:italic;margin-bottom:14px">
@@ -6482,18 +7974,21 @@ const downloadPdf = async () => {
 
             {dropdownOpen && (
               <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 6, boxShadow: '0 8px 32px rgba(0,0,0,.5), 0 0 0 1px rgba(99,102,241,.08)', zIndex: 200, minWidth: 190, animation: 'dFadeUp .18s var(--ease) both' }}>
-                <button onClick={downloadCsv} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
+                <button onClick={isSeo ? downloadCsv_Seo : isFunctional ? downloadCsv_Functional : downloadCsv} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'var(--green-bg)'; e.currentTarget.style.color = 'var(--green)'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--sub)'; }}>
                   <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#10b981', letterSpacing: .5 }}>CSV</span>
                   <div><div style={{ fontSize: 12, fontWeight: 700 }}>rapport.csv</div><div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>Données tabulaires</div></div>
                 </button>
-                <button onClick={isSecurity ? downloadHtml_Security : isRegression ? downloadHtml_Regression : isFunctional ? downloadHtml_Functional : downloadHtml} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
+                <button onClick={isSecurity ? downloadHtml_Security : isRegression ? downloadHtml_Regression : isFunctional ? downloadHtml_Functional : isSeo ? downloadHtml_Seo : downloadHtml}
+
+ style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'var(--indigo-bg)'; e.currentTarget.style.color = 'var(--indigo3)'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--sub)'; }}>
                   <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'var(--indigo-dim)', border: '1px solid var(--indigo-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: 'var(--indigo2)', letterSpacing: .5 }}>HTML</span>
                   <div><div style={{ fontSize: 12, fontWeight: 700 }}>rapport.html</div><div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>Rapport visuel</div></div>
                 </button>
+                
                 <div style={{ height: 1, background: 'var(--border)', margin: '4px 6px' }} />
                 <button onClick={downloadPdf} disabled={pdfLoading} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left', opacity: pdfLoading ? .5 : 1 }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,.08)'; e.currentTarget.style.color = '#ef4444'; }}
@@ -6549,7 +8044,7 @@ const downloadPdf = async () => {
         </div>
         <div className="ep-progress-track">
           <div className="ep-progress-fill" style={{ width: `${running ? 100 : rate}%`, background: running ? 'linear-gradient(90deg,var(--indigo),var(--indigo2))' : rateGrad }} />
-          {loadTimeMs > 0 && (<>{loadTimeMs > 0 && (<><span className="ep-progress-sep">·</span><span style={{ color: 'var(--muted)' }}>{loadTimeMs}ms load time</span></>)}{loadTimeMs > 0 && (<><span className="ep-progress-sep">·</span><span style={{ color: 'var(--muted)' }}>{loadTimeMs}ms load time</span></>)}</>)}
+          
         </div>
       </div>
 
@@ -6594,16 +8089,72 @@ const downloadPdf = async () => {
 
     <div className="ep-list">
       {running
-        ? Array.from({ length: tests.length || 4 }).map((_, i) => (
-            <div key={i} className="ep-row ep-row--skeleton" style={{ animationDelay: `${i * 0.05}s` }}>
-              <div className="ep-row-status-wrap"><div className="ep-skeleton-circle" /></div>
-              <div className="ep-row-body"><div className="ep-skeleton-line" style={{ width: '55%', height: 13 }} /><div className="ep-skeleton-line" style={{ width: '35%', height: 10, marginTop: 6 }} /></div>
-              <div className="ep-skeleton-pill" />
+        ? (
+          <div style={{
+            background: '#050a14',
+            border: '1px solid rgba(99,102,241,.25)',
+            borderRadius: 16,
+            overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(0,0,0,.5)',
+            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+          }}>
+            {/* Header */}
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 16px', background:'linear-gradient(135deg,#0a0f1e,#0d1526)', borderBottom:'1px solid rgba(255,255,255,.06)' }}>
+              <div style={{ display:'flex', gap:6 }}>
+                {['#ef4444','#f59e0b','#10b981'].map((c,i) => (
+                  <div key={i} style={{ width:12, height:12, borderRadius:'50%', background:c, opacity:.8 }} />
+                ))}
+              </div>
+              <div style={{ flex:1, textAlign:'center', fontSize:11, fontWeight:700, color:'#64748b', letterSpacing:1 }}>
+                NexTest Terminal — AI Test Runner
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <div style={{ width:7, height:7, borderRadius:'50%', background:'#10b981', animation:'termPulse 1s ease-in-out infinite' }} />
+                <span style={{ fontSize:10, color:'#10b981', fontWeight:700, letterSpacing:1 }}>RUNNING</span>
+              </div>
             </div>
-          ))
+
+            {/* Body */}
+            <div style={{ padding:'16px 20px', minHeight:280, maxHeight:380, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}
+              ref={el => { if (el) el.scrollTop = el.scrollHeight; }}>
+              {terminalLines.map((line, i) => {
+                const colors = { system:'#818cf8', info:'#94a3b8', ai:'#c9a227', success:'#10b981', fail:'#ef4444', pass:'#10b981', skip:'#f59e0b', running:'#60a5fa', muted:'#475569', divider:'#1e293b', summary:'#e2e8f0' };
+                const icons  = { system:'⬡', info:'›', ai:'◆', success:'✓', fail:'✗', pass:'✓', skip:'◌', running:'◉', muted:'·', divider:'', summary:'▸' };
+                if (line.type === 'divider') return (
+                  <div key={i} style={{ color:'#1e2d47', fontSize:11, userSelect:'none', margin:'4px 0' }}>{line.text}</div>
+                );
+                return (
+                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, animation:'termFadeIn .3s ease both', fontSize:12, lineHeight:1.6 }}>
+                    <span style={{ color:'#1e3a5f', fontSize:10, flexShrink:0, marginTop:1 }}>{line.time}</span>
+                    <span style={{ color:colors[line.type]||'#94a3b8', flexShrink:0, fontSize:11 }}>{icons[line.type]||'›'}</span>
+                    <span style={{ color:colors[line.type]||'#94a3b8', flex:1 }}>{line.text}</span>
+                  </div>
+                );
+              })}
+              {/* Blinking cursor */}
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:4 }}>
+                <span style={{ color:'#1e3a5f', fontSize:10 }}>{new Date().toLocaleTimeString('en-US',{hour12:false})}</span>
+                <span style={{ color:'#6366f1' }}>›</span>
+                <span style={{ display:'inline-block', width:8, height:15, background:'#6366f1', borderRadius:1, animation:'termBlink .8s step-end infinite' }} />
+              </div>
+            </div>
+
+            {/* Status bar */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 16px', background:'rgba(99,102,241,.06)', borderTop:'1px solid rgba(99,102,241,.1)' }}>
+              <span style={{ fontSize:10, color:'#6366f1', fontWeight:700 }}>◉ {terminalLines.length} events</span>
+              <span style={{ fontSize:10, color:'#475569', fontWeight:600 }}>{generation?.framework || generation?.generation?.framework || ''} · AI-Powered</span>
+            </div>
+
+            <style>{`
+              @keyframes termFadeIn { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+              @keyframes termBlink  { 0%,100%{opacity:1} 50%{opacity:0} }
+              @keyframes termPulse  { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+            `}</style>
+          </div>
+        )
         : shown.length === 0
         ? (<div className="ep-no-results"><svg width="24" height="24" fill="none" stroke="var(--muted)" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>No tests match this filter</div>)
-        : shown.map((test, i) => (
+        : paginatedShown.map((test, i) => (
             <div key={test.id} className={`ep-row ep-row--${test.status}`} style={{ animationDelay: `${i * 0.04}s` }}>
               <div className="ep-row-status-wrap"><StatusIcon s={test.status} /></div>
               <div className="ep-row-body">
@@ -6636,15 +8187,31 @@ const downloadPdf = async () => {
                     fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6
                   }}>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: 'rgba(99,102,241,.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,.2)' }}>
-                        {test.category?.toUpperCase() || 'SMOKE'}
-                      </span>
-                      <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: test.priority === 'high' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)', color: test.priority === 'high' ? '#ef4444' : '#f59e0b', border: `1px solid ${test.priority === 'high' ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}` }}>
-                        {test.priority?.toUpperCase() || 'MEDIUM'}
-                      </span>
-                      <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 10, background: 'var(--bg2)', color: 'var(--muted)', border: '1px solid var(--border)', fontFamily: 'monospace' }}>
-                        ⏱ {test.duration}
-                      </span>
+                    <span style={{
+  padding: '2px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+  color: test.status === 'pass' 
+    ? '#10b981' 
+    : test.ai_analysis?.severity === 'high' ? '#ef4444' 
+    : test.ai_analysis?.severity === 'medium' ? '#f59e0b' 
+    : '#10b981',
+  background: test.status === 'pass' 
+    ? 'rgba(16,185,129,.1)' 
+    : test.ai_analysis?.severity === 'high' ? 'rgba(239,68,68,.1)' 
+    : test.ai_analysis?.severity === 'medium' ? 'rgba(245,158,11,.1)' 
+    : 'rgba(16,185,129,.1)',
+  border: `1px solid ${
+    test.status === 'pass' 
+      ? 'rgba(16,185,129,.2)' 
+      : test.ai_analysis?.severity === 'high' ? 'rgba(239,68,68,.2)' 
+      : test.ai_analysis?.severity === 'medium' ? 'rgba(245,158,11,.2)' 
+      : 'rgba(16,185,129,.2)'
+  }`
+}}>
+  {test.status === 'pass' 
+    ? 'LOW' 
+    : (test.ai_analysis?.severity?.toUpperCase() || test.priority?.toUpperCase() || 'MEDIUM')}
+</span>
+
                     </div>
                     {test.step_meta?.selector && (
                       <div>
@@ -6672,12 +8239,32 @@ const downloadPdf = async () => {
                         background: 'rgba(99,102,241,.06)',
                         border: '1px solid rgba(99,102,241,.2)',
                       }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#818cf8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          🤖 LLaMA Analysis
-                          <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 9, fontWeight: 800, color: test.ai_analysis.severity === 'critical' ? '#ef4444' : test.ai_analysis.severity === 'high' ? '#f97316' : '#f59e0b', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)' }}>
-                            {test.ai_analysis.severity?.toUpperCase()}
-                          </span>
-                        </div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#818cf8', letterSpacing: 1, 
+  textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+  🤖 LLaMA Analysis
+  <span style={{
+    padding: '1px 8px', borderRadius: 20, fontSize: 9, fontWeight: 800,
+    color: test.ai_analysis.severity === 'high' || test.ai_analysis.severity === 'critical'
+      ? '#ef4444'
+      : test.ai_analysis.severity === 'medium'
+      ? '#f59e0b'
+      : '#10b981',
+    background: test.ai_analysis.severity === 'high' || test.ai_analysis.severity === 'critical'
+      ? 'rgba(239,68,68,.1)'
+      : test.ai_analysis.severity === 'medium'
+      ? 'rgba(245,158,11,.1)'
+      : 'rgba(16,185,129,.1)',
+    border: `1px solid ${
+      test.ai_analysis.severity === 'high' || test.ai_analysis.severity === 'critical'
+        ? 'rgba(239,68,68,.2)'
+        : test.ai_analysis.severity === 'medium'
+        ? 'rgba(245,158,11,.2)'
+        : 'rgba(16,185,129,.2)'
+    }`
+  }}>
+    {test.ai_analysis.severity?.toUpperCase()}
+  </span>
+</div>
                         <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>
                           <span style={{ fontWeight: 700, color: '#e2e8f0' }}>Root cause: </span>
                           {test.ai_analysis.root_cause}
@@ -6737,14 +8324,184 @@ const downloadPdf = async () => {
  : 'S'}
 </span>
                 <span className={`ep-status-badge ep-status-badge--${test.status}`}>{test.status}</span>
-                <span className="ep-duration">{test.duration}</span>
+                {testType !== 'seo' && <span className="ep-duration">{test.duration}</span>}
               </div>
             </div>
           ))
       }
     </div>
+
+    {/* ── PAGINATION ── */}
+    {shown.length > 0 && (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 12,
+        marginTop: 20, padding: '14px 20px',
+        background: 'var(--card)', border: '1px solid var(--border)',
+        borderRadius: 12, boxShadow: 'var(--shadow)',
+      }}>
+
+        {/* Left — Rows per page */}
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:12, color:'var(--muted)', fontWeight:600, whiteSpace:'nowrap' }}>
+            Rows per page:
+          </span>
+          <div style={{ position:'relative' }}>
+            <select
+              value={rowsPerPage}
+              onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+              style={{
+                appearance: 'none',
+                background: 'var(--bg2)',
+                border: '1.5px solid var(--border)',
+                borderRadius: 8,
+                color: 'var(--text)',
+                fontSize: 12, fontWeight: 700,
+                padding: '6px 28px 6px 12px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                outline: 'none',
+                transition: 'border-color .2s',
+              }}
+              onFocus={e => e.target.style.borderColor = 'var(--indigo-border)'}
+              onBlur={e => e.target.style.borderColor = 'var(--border)'}
+            >
+              {[10, 20, 50, 100].map(n => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            <svg width="10" height="10" fill="none" stroke="var(--muted)" strokeWidth="2.5"
+              viewBox="0 0 24 24"
+              style={{ position:'absolute', right:9, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}>
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </div>
+
+          {/* Showing X–Y of Z */}
+          <span style={{ fontSize:12, color:'var(--muted)', fontWeight:600, whiteSpace:'nowrap' }}>
+            Showing{' '}
+            <span style={{ color:'var(--text)', fontWeight:700 }}>
+              {Math.min((currentPage - 1) * rowsPerPage + 1, shown.length)}
+            </span>
+            {' '}–{' '}
+            <span style={{ color:'var(--text)', fontWeight:700 }}>
+              {Math.min(currentPage * rowsPerPage, shown.length)}
+            </span>
+            {' '}of{' '}
+            <span style={{ color:'var(--indigo2)', fontWeight:700 }}>{shown.length}</span>
+            {' '}tests
+          </span>
+        </div>
+
+        {/* Right — Page controls */}
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+
+          {/* Previous */}
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            style={{
+              display:'flex', alignItems:'center', gap:5,
+              padding:'7px 14px', borderRadius:8,
+              background: currentPage === 1 ? 'var(--bg2)' : 'var(--card)',
+              border: '1.5px solid var(--border)',
+              color: currentPage === 1 ? 'var(--dimmed)' : 'var(--sub)',
+              fontSize:11, fontWeight:700, cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              fontFamily:'inherit', transition:'all .18s', opacity: currentPage === 1 ? .5 : 1,
+            }}
+            onMouseEnter={e => { if (currentPage !== 1) { e.currentTarget.style.borderColor = 'var(--indigo-border)'; e.currentTarget.style.color = 'var(--indigo2)'; }}}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sub)'; }}
+          >
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+            Prev
+          </button>
+
+          {/* Page numbers */}
+          {(() => {
+            const pages = [];
+            let start = Math.max(1, currentPage - 2);
+            let end   = Math.min(totalPages, currentPage + 2);
+            if (currentPage <= 3) end   = Math.min(5, totalPages);
+            if (currentPage >= totalPages - 2) start = Math.max(1, totalPages - 4);
+
+            if (start > 1) {
+              pages.push(
+                <button key={1} onClick={() => setCurrentPage(1)}
+                  style={{ width:34, height:34, borderRadius:8, border:'1.5px solid var(--border)', background:'var(--card)', color:'var(--sub)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', transition:'all .18s' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--indigo-border)'; e.currentTarget.style.color = 'var(--indigo2)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sub)'; }}>
+                  1
+                </button>
+              );
+              if (start > 2) pages.push(
+                <span key="dots-start" style={{ fontSize:12, color:'var(--dimmed)', padding:'0 4px' }}>…</span>
+              );
+            }
+
+            for (let p = start; p <= end; p++) {
+              const isActive = p === currentPage;
+              pages.push(
+                <button key={p} onClick={() => setCurrentPage(p)}
+                  style={{
+                    width:34, height:34, borderRadius:8,
+                    border: isActive ? 'none' : '1.5px solid var(--border)',
+                    background: isActive ? 'linear-gradient(135deg, var(--indigo), #4f46e5)' : 'var(--card)',
+                    color: isActive ? '#fff' : 'var(--sub)',
+                    fontSize:12, fontWeight:700, cursor:'pointer',
+                    fontFamily:'inherit', transition:'all .18s',
+                    boxShadow: isActive ? '0 3px 10px rgba(99,102,241,.35)' : 'none',
+                    transform: isActive ? 'scale(1.08)' : 'scale(1)',
+                  }}
+                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = 'var(--indigo-border)'; e.currentTarget.style.color = 'var(--indigo2)'; }}}
+                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sub)'; }}}>
+                  {p}
+                </button>
+              );
+            }
+
+            if (end < totalPages) {
+              if (end < totalPages - 1) pages.push(
+                <span key="dots-end" style={{ fontSize:12, color:'var(--dimmed)', padding:'0 4px' }}>…</span>
+              );
+              pages.push(
+                <button key={totalPages} onClick={() => setCurrentPage(totalPages)}
+                  style={{ width:34, height:34, borderRadius:8, border:'1.5px solid var(--border)', background:'var(--card)', color:'var(--sub)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', transition:'all .18s' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--indigo-border)'; e.currentTarget.style.color = 'var(--indigo2)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sub)'; }}>
+                  {totalPages}
+                </button>
+              );
+            }
+            return pages;
+          })()}
+
+          {/* Next */}
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages || totalPages === 0}
+            style={{
+              display:'flex', alignItems:'center', gap:5,
+              padding:'7px 14px', borderRadius:8,
+              background: currentPage === totalPages ? 'var(--bg2)' : 'var(--card)',
+              border: '1.5px solid var(--border)',
+              color: currentPage === totalPages ? 'var(--dimmed)' : 'var(--sub)',
+              fontSize:11, fontWeight:700,
+              cursor: currentPage === totalPages || totalPages === 0 ? 'not-allowed' : 'pointer',
+              fontFamily:'inherit', transition:'all .18s',
+              opacity: currentPage === totalPages || totalPages === 0 ? .5 : 1,
+            }}
+            onMouseEnter={e => { if (currentPage !== totalPages) { e.currentTarget.style.borderColor = 'var(--indigo-border)'; e.currentTarget.style.color = 'var(--indigo2)'; }}}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sub)'; }}
+          >
+            Next
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+      </div>
+    )}
   </>
 )}
+    
 
 {activeTab === 'scenarios' && (
   <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
@@ -6812,6 +8569,7 @@ const TYPE_CONFIG = {
   regression:  { color: '#F97316', bg: 'rgba(249,115,22,.1)',  border: 'rgba(249,115,22,.25)',  label: 'Regression',  letter: 'R' },
   security:    { color: '#EF4444', bg: 'rgba(239,68,68,.1)',   border: 'rgba(239,68,68,.25)',   label: 'Security',    letter: 'S' },
   unit:        { color: '#0EA5E9', bg: 'rgba(14,165,233,.1)',  border: 'rgba(14,165,233,.25)',  label: 'Unit',        letter: 'U' },
+  seo: {color: '#06b6d4', bg: 'rgba(6,182,212,.1)', border: 'rgba(6,182,212,.25)', label: 'SEO', letter: 'S',},
 
 };
 
@@ -7169,6 +8927,8 @@ useEffect(() => {
       test_cases: item.test_cases || parsedResult.test_cases || [],
       test_cases_selenium: item.test_cases_selenium || parsedResult.test_cases_selenium || [],
       test_cases_cypress: item.test_cases_cypress || parsedResult.test_cases_cypress || [],
+      seo_score: parsedResult.seo_score || item.seo_score || 0,  // ← AJOUTE
+      ai: parsedResult.ai || item.ai || {},                      // ← AJOUTE
       script: item.script || parsedResult.script || '',
       script_selenium: item.script_selenium || parsedResult.script_selenium || '',
       script_playwright: item.script_playwright || parsedResult.script_playwright || '',
@@ -8221,6 +9981,874 @@ function CommandPalette({ open, onClose, histories, projects, goTo, setGeneratio
     document.body
   );
 }
+function ReportsPanel({ goTo, setGeneration }) {
+  const [reports, setReports] = useState([]);
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [expandedId, setExpandedId] = useState(null);
+  const [pdfLoadingId, setPdfLoadingId] = useState(null);
+  const [dateFilter, setDateFilter] = useState('all');
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('nextest-reports') || '[]';
+      setReports(JSON.parse(raw));
+    } catch { setReports([]); }
+  }, []);
+
+  const TYPE_CONFIG = {
+    smoke:       { label: 'Smoke',       color: '#64748b', icon: '🔍' },
+    functional:  { label: 'Functional',  color: '#6366f1', icon: '⚙️' },
+    performance: { label: 'Performance', color: '#8b5cf6', icon: '⚡' },
+    api:         { label: 'API',         color: '#10b981', icon: '🔗' },
+    regression:  { label: 'Regression',  color: '#f97316', icon: '🔄' },
+    security:    { label: 'Security',    color: '#ef4444', icon: '🔒' },
+    seo:         { label: 'SEO',         color: '#06b6d4', icon: '🔎' },
+  };
+
+  const FW_CONFIG = {
+    Selenium:   { color: '#43B02A', letters: 'Se' },
+    Cypress:    { color: '#00BFA5', letters: 'Cy' },
+    Playwright: { color: '#E2574C', letters: 'Pl' },
+    Pytest:     { color: '#3776AB', letters: 'Py' },
+    Postman:    { color: '#FF6C37', letters: 'Po' },
+    k6:         { color: '#7D64FF', letters: 'k6' },
+    Requests:   { color: '#06b6d4', letters: 'RQ' },
+  };
+
+  const timeStr = (iso) => {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const rateColorOf = (rate) => rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+
+  const deleteReport = (id) => {
+    const updated = reports.filter(r => r.id !== id);
+    setReports(updated);
+    localStorage.setItem('nextest-reports', JSON.stringify(updated));
+    if (expandedId === id) setExpandedId(null);
+  };
+
+  const clearAll = () => {
+    setReports([]); setExpandedId(null);
+    localStorage.setItem('nextest-reports', JSON.stringify([]));
+  };
+
+  // ── PDF download (via backend) ──
+  const downloadPdf = async (report) => {
+    const id = report.generationData?.generation?.id;
+    if (!id) return;
+    setPdfLoadingId(report.id);
+    try {
+      const res = await api.get(`/generations/${id}/pdf`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `report_${id}.pdf`;
+      link.click();
+    } catch (err) { console.error('[PDF]', err); }
+    setPdfLoadingId(null);
+  };
+
+  // ── CSV download (uses saved csv, or builds a generic one) ──
+  const downloadCsv = (report) => {
+    let csv = report.csvContent;
+    if (!csv) {
+      const cases = report.generationData?.result?.test_cases
+        || report.generationData?.result?.execution_results
+        || [];
+      const headers = ['#', 'Test Name', 'Status', 'Duration', 'Section'];
+      const rows = cases.map((t, i) => [
+        i + 1,
+        `"${(t.name || '').replace(/"/g, '""')}"`,
+        t.status || '—',
+        t.duration || '—',
+        t.section || t.category || '—',
+      ]);
+      csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    }
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `report_${report.id}.csv`;
+    link.click();
+  };
+
+  const filtered = reports
+    .filter(r => {
+      const matchSearch = !search || (r.url || '').toLowerCase().includes(search.toLowerCase()) || (r.framework || '').toLowerCase().includes(search.toLowerCase());
+      const matchType   = filterType === 'all' || r.testType === filterType;
+      const now = Date.now();
+      const rDate = new Date(r.date).getTime();
+      const matchDate = dateFilter === 'all'   ? true
+        : dateFilter === 'today' ? (now - rDate) < 86400000
+        : dateFilter === 'week'  ? (now - rDate) < 7 * 86400000
+        : dateFilter === 'month' ? (now - rDate) < 30 * 86400000
+        : true;
+      return matchSearch && matchType && matchDate;
+    })
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+// ── Dynamic KPI calculations ──────────────────────────────────────
+  const kpiNow = Date.now();
+  const KPI_WEEK = 7 * 86400000;
+  const kpiThisWeek = reports.filter(r => kpiNow - new Date(r.date).getTime() < KPI_WEEK);
+  const kpiLastWeek = reports.filter(r => {
+    const d = kpiNow - new Date(r.date).getTime();
+    return d >= KPI_WEEK && d < 2 * KPI_WEEK;
+  });
+  const sumField = (arr, fn) => arr.reduce((s, r) => s + (fn(r) || 0), 0);
+  const kpiTotalPass  = sumField(reports, r => r.passCount);
+  const kpiTotalFail  = sumField(reports, r => r.failCount);
+  const kpiTotalTests = kpiTotalPass + kpiTotalFail;
+  const kpiAvgRate    = kpiTotalTests > 0 ? Math.round((kpiTotalPass / kpiTotalTests) * 100) : 0;
+  const estDurMin = r => {
+     if (r.durationMs) return Math.round(r.durationMs / 1000);
+    const t = (r.passCount || 0) + (r.failCount || 0);
+    const perTest = r.testType === 'performance' ? 8
+                  : r.testType === 'security'    ? 5
+                  : r.testType === 'functional'  ? 3 : 1.5;
+    return Math.round(t * perTest);
+  };
+  const kpiTotalMinutes = sumField(reports, estDurMin);
+  const fmtDur = s => s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+  const calcTrend = (thisVal, lastVal, invertBad = false) => {
+    if (lastVal === 0 && thisVal === 0) return { label: 'No data yet', positive: null };
+    if (lastVal === 0) return { label: `+${thisVal} this week`, positive: !invertBad };
+    const pct  = Math.round(((thisVal - lastVal) / lastVal) * 100);
+    const sign = pct >= 0 ? '+' : '';
+    return { label: `${sign}${pct}% vs last week`, positive: pct === 0 ? null : (pct > 0 ? !invertBad : invertBad) };
+  };
+  const trendReports = calcTrend(kpiThisWeek.length, kpiLastWeek.length);
+  const trendPass    = calcTrend(sumField(kpiThisWeek, r => r.passCount), sumField(kpiLastWeek, r => r.passCount));
+  const trendFail    = calcTrend(sumField(kpiThisWeek, r => r.failCount), sumField(kpiLastWeek, r => r.failCount), true);
+  const trendRate    = calcTrend(
+    (() => { const t = sumField(kpiThisWeek, r => r.passCount + r.failCount); return t > 0 ? Math.round(sumField(kpiThisWeek, r => r.passCount) / t * 100) : 0; })(),
+    (() => { const t = sumField(kpiLastWeek, r => r.passCount + r.failCount); return t > 0 ? Math.round(sumField(kpiLastWeek, r => r.passCount) / t * 100) : 0; })()
+  );
+  const trendDur = calcTrend(sumField(kpiThisWeek, estDurMin), sumField(kpiLastWeek, estDurMin));
+  
+
+  // ── Group by date ──
+  const groups = { Today: [], Yesterday: [], 'This Week': [], Earlier: [] };
+  const now = new Date();
+  filtered.forEach(r => {
+    const d = new Date(r.date);
+    const diffDays = Math.floor((now - d) / 86400000);
+    if (diffDays === 0) groups['Today'].push(r);
+    else if (diffDays === 1) groups['Yesterday'].push(r);
+    else if (diffDays < 7) groups['This Week'].push(r);
+    else groups['Earlier'].push(r);
+  });
+  const groupEntries = Object.entries(groups).filter(([, arr]) => arr.length > 0);
+
+  const totalPass = reports.reduce((s, r) => s + (r.passCount || 0), 0);
+  const totalFail = reports.reduce((s, r) => s + (r.failCount || 0), 0);
+  const avgRate = reports.length
+    ? Math.round(reports.reduce((s, r) => {
+        const t = (r.passCount || 0) + (r.failCount || 0);
+        return s + (t > 0 ? Math.round((r.passCount / t) * 100) : 0);
+      }, 0) / reports.length)
+    : 0;
+
+  // ── Trend chart data (oldest -> newest) ──
+  const chartData = [...reports]
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .map(r => {
+      const total = (r.passCount || 0) + (r.failCount || 0);
+      const rate  = total > 0 ? Math.round((r.passCount / total) * 100) : 0;
+      return {
+        name: new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        rate,
+      };
+    });
+
+
+  
+
+  return (
+    <div className="panel">
+      {/* ── HEADER ── */}
+      <div className="p-header">
+        <div>
+          <h1 className="p-title">Test Reports<span className="g"> Overview</span></h1>
+          <p className="p-sub">A timeline of every report you've generated and downloaded.</p>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
+
+          {/* Date badge */}
+          <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:9, background:'var(--card)', border:'1px solid var(--border)', fontSize:11, fontWeight:700, color:'var(--muted)' }}>
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            {new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}
+          </div>
+
+          {/* Date filter */}
+          <select value={dateFilter} onChange={e => setDateFilter(e.target.value)}
+            style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:9, color:'var(--text)', fontSize:11, fontWeight:700, padding:'9px 14px', cursor:'pointer', fontFamily:'inherit', outline:'none' }}>
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="week">This week</option>
+            <option value="month">This month</option>
+          </select>
+
+          {/* New Generation */}
+          <button onClick={() => goTo('generate')}
+            style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'9px 16px', borderRadius:9, background:'linear-gradient(135deg,var(--indigo),#4f46e5)', border:'none', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer', letterSpacing:'1px', textTransform:'uppercase', fontFamily:'inherit', boxShadow:'0 4px 14px rgba(99,102,241,.3)' }}>
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            New Generation
+          </button>
+
+         
+        </div>
+      </div>
+
+      {reports.length === 0 ? (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'90px 32px', background:'var(--card)', border:'1px solid var(--border)', borderRadius:18, textAlign:'center' }}>
+          <div style={{ width:72, height:72, borderRadius:'50%', background:'var(--indigo-bg)', border:'1px solid var(--indigo-border)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:20, color:'var(--indigo2)' }}>
+            <IconFileText size={32} stroke={1.5} />
+          </div>
+          <h3 style={{ fontFamily:'var(--C)', fontSize:24, fontWeight:700, color:'var(--text)', marginBottom:8 }}>No reports yet</h3>
+          <p style={{ fontSize:13, color:'var(--sub)', lineHeight:1.7, maxWidth:320, marginBottom:24 }}>
+            Generate tests and download PDF, HTML, or CSV reports — they'll appear here automatically.
+          </p>
+          <button className="btn-primary" onClick={() => goTo('generate')}>
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Generate Tests
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* ── COMPACT STATS STRIP (pro icons) ── */}
+          {/* NOUVEAU bloc avec trends */}
+<div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:12, marginBottom:20 }}>
+  {[
+    { Icon: IconFileText,    val: reports.length,          lbl: 'Total reports',  color: '#818cf8', trend: trendReports, barW: `${Math.min(100, reports.length * 5)}%`              },
+    { Icon: IconCircleCheck, val: kpiTotalPass,             lbl: 'Tests passed',   color: '#10b981', trend: trendPass,    barW: `${kpiTotalTests > 0 ? Math.round(kpiTotalPass / kpiTotalTests * 100) : 0}%` },
+    { Icon: IconCircleX,     val: kpiTotalFail,             lbl: 'Tests failed',   color: '#ef4444', trend: trendFail,    barW: `${kpiTotalTests > 0 ? Math.round(kpiTotalFail / kpiTotalTests * 100) : 0}%` },
+    { Icon: IconTarget,      val: `${kpiAvgRate}%`,         lbl: 'Avg pass rate',  color: rateColorOf(kpiAvgRate), trend: trendRate, barW: `${kpiAvgRate}%` },
+    { Icon: IconActivity,    val: fmtDur(kpiTotalMinutes),  lbl: 'Total duration', color: '#4f86e8', trend: trendDur,    barW: `${Math.min(100, kpiTotalMinutes / 10)}%`             },
+  ].map(s => (
+    <div key={s.lbl} style={{
+      background: 'var(--card)', border: '1px solid var(--border)',
+      borderTop: `3px solid ${s.color}`, borderRadius: 14,
+      padding: '16px', transition: 'transform .2s, box-shadow .2s',
+    }}
+      onMouseEnter={e => { e.currentTarget.style.transform='translateY(-3px)'; e.currentTarget.style.boxShadow=`0 8px 24px ${s.color}22`; }}
+      onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)';    e.currentTarget.style.boxShadow='none'; }}
+    >
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+        <div style={{ width:36, height:36, borderRadius:10, background:`${s.color}15`, border:`1px solid ${s.color}30`, display:'flex', alignItems:'center', justifyContent:'center', color:s.color }}>
+          <s.Icon size={18} stroke={1.6} />
+        </div>
+        <span style={{
+          fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:20,
+          color:      s.trend.positive === true ? '#10b981' : s.trend.positive === false ? '#ef4444' : 'var(--muted)',
+          background: s.trend.positive === true ? 'rgba(16,185,129,.1)' : s.trend.positive === false ? 'rgba(239,68,68,.1)' : 'var(--bg2)',
+          border:    `1px solid ${s.trend.positive === true ? 'rgba(16,185,129,.2)' : s.trend.positive === false ? 'rgba(239,68,68,.2)' : 'var(--border)'}`,
+        }}>
+          {s.trend.positive === true ? '↑' : s.trend.positive === false ? '↓' : '—'} {s.trend.label}
+        </span>
+      </div>
+      <div style={{ fontSize:26, fontWeight:700, color:'var(--text)', fontFamily:'var(--C)', lineHeight:1, marginBottom:4 }}>{s.val}</div>
+      <div style={{ fontSize:11, color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'1px' }}>{s.lbl}</div>
+      <div style={{ height:3, borderRadius:2, background:'var(--border)', marginTop:10, overflow:'hidden' }}>
+        <div style={{ height:'100%', borderRadius:2, background:s.color, width:s.barW, transition:'width 1s ease' }} />
+      </div>
+    </div>
+  ))}
+</div>
+{/* ── ANALYTICS ROW ── */}
+{reports.length > 0 && (
+  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
+
+    {/* ── PASS RATE TREND ── */}
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 20px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <IconChartArea size={15} stroke={1.5} style={{ color: '#818cf8' }} />
+          Pass Rate Trend
+        </span>
+        <select
+          id="trend-period"
+          onChange={e => {
+            const val = e.target.value;
+            document.getElementById('trend-period').dataset.val = val;
+            // trigger re-render via a small hack
+            e.target.dispatchEvent(new Event('change-period', { bubbles: true }));
+          }}
+          style={{
+            background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8,
+            color: 'var(--text)', fontSize: 11, fontWeight: 700, padding: '4px 10px',
+            cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
+          }}
+        >
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      {(() => {
+        const sorted = [...reports].sort((a, b) => new Date(a.date) - new Date(b.date));
+        const grouped = {};
+        sorted.forEach(r => {
+          const d = new Date(r.date);
+          const key = `${d.getMonth() + 1}/${d.getDate()}`;
+          if (!grouped[key]) grouped[key] = { pass: 0, total: 0 };
+          grouped[key].pass  += r.passCount || 0;
+          grouped[key].total += (r.passCount || 0) + (r.failCount || 0);
+        });
+        const labels = Object.keys(grouped).slice(-14);
+        const data   = labels.map(k => grouped[k].total > 0 ? Math.round(grouped[k].pass / grouped[k].total * 100) : 0);
+        const minVal = Math.max(0,  Math.min(...data) - 10);
+        const maxVal = Math.min(100, Math.max(...data) + 10);
+
+        return (
+          <div style={{ height: 160, position: 'relative' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={labels.map((l, i) => ({ name: l, rate: data[i] }))} margin={{ top: 8, right: 4, left: -28, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stopColor="#818cf8" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#818cf8" stopOpacity={0}   />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.4} />
+                <XAxis dataKey="name" tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis domain={[minVal, maxVal]} tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
+                <Tooltip
+                  contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
+                  formatter={(v) => [`${v}%`, 'Pass Rate']}
+                />
+                <Area type="monotone" dataKey="rate" stroke="#818cf8" strokeWidth={2.5} fill="url(#trendGrad)"
+                  dot={{ r: 3, fill: '#818cf8', stroke: 'var(--card)', strokeWidth: 2 }}
+                  activeDot={{ r: 5, fill: '#818cf8' }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      })()}
+    </div>
+
+    {/* ── TESTS SUMMARY DONUT ── */}
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 20px' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <IconChartDonut size={15} stroke={1.5} style={{ color: '#10b981' }} />
+        Tests Summary
+      </div>
+      {(() => {
+        const pass  = reports.reduce((s, r) => s + (r.passCount || 0), 0);
+        const fail  = reports.reduce((s, r) => s + (r.failCount || 0), 0);
+        const skip  = reports.reduce((s, r) => s + (r.skipCount  || 0), 0);
+        const total = pass + fail + skip;
+        const pct   = v => total > 0 ? Math.round(v / total * 100) : 0;
+
+        const donutData = [
+          { name: 'Passed',  value: pass, color: '#10b981' },
+          { name: 'Failed',  value: fail, color: '#ef4444' },
+          { name: 'Skipped', value: skip, color: '#f59e0b' },
+        ].filter(d => d.value > 0);
+
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            {/* Donut */}
+            <div style={{ position: 'relative', width: 120, height: 120, flexShrink: 0 }}>
+              <PieChart width={120} height={120}>
+                <Pie
+                  data={donutData.length > 0 ? donutData : [{ name: 'empty', value: 1, color: 'var(--border)' }]}
+                  cx={55} cy={55} innerRadius={38} outerRadius={55}
+                  dataKey="value" strokeWidth={0} paddingAngle={donutData.length > 1 ? 2 : 0}
+                >
+                  {(donutData.length > 0 ? donutData : [{ color: 'var(--border)' }]).map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
+                  formatter={(v, n) => [`${v} (${pct(v)}%)`, n]}
+                />
+              </PieChart>
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--C)', lineHeight: 1 }}>{total}</div>
+                <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 2 }}>total tests</div>
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+              {[
+                { label: 'Passed',  val: pass, color: '#10b981' },
+                { label: 'Failed',  val: fail, color: '#ef4444' },
+                { label: 'Skipped', val: skip, color: '#f59e0b' },
+              ].map(s => (
+                <div key={s.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{s.label}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: s.color, fontFamily: 'var(--C)' }}>{s.val}</span>
+                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>({pct(s.val)}%)</span>
+                  </div>
+                </div>
+              ))}
+              <div style={{ borderTop: '1px solid var(--border3)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Total</span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--C)' }}>{total} <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>tests</span></span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+
+    {/* ── REPORTS BY TYPE ── */}
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 20px' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <IconChartDonut size={15} stroke={1.5} style={{ color: '#4f86e8' }} />
+        Reports by Type
+      </div>
+      {(() => {
+        const TYPE_COLORS = {
+          performance: '#8b5cf6', functional: '#6366f1', api: '#10b981',
+          smoke: '#64748b', regression: '#f97316', security: '#ef4444',
+          seo: '#06b6d4', unit: '#0ea5e9',
+        };
+        const counts = {};
+        reports.forEach(r => {
+          const t = r.testType || 'smoke';
+          counts[t] = (counts[t] || 0) + 1;
+        });
+        const typeData = Object.entries(counts)
+          .map(([name, value]) => ({ name, value, color: TYPE_COLORS[name] || '#64748b' }))
+          .sort((a, b) => b.value - a.value);
+        const total = typeData.reduce((s, d) => s + d.value, 0);
+        const pct   = v => total > 0 ? Math.round(v / total * 100) : 0;
+
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            {/* Donut */}
+            <div style={{ position: 'relative', width: 120, height: 120, flexShrink: 0 }}>
+              <PieChart width={120} height={120}>
+                <Pie
+                  data={typeData.length > 0 ? typeData : [{ name: 'empty', value: 1, color: 'var(--border)' }]}
+                  cx={55} cy={55} innerRadius={38} outerRadius={55}
+                  dataKey="value" strokeWidth={0} paddingAngle={typeData.length > 1 ? 2 : 0}
+                >
+                  {(typeData.length > 0 ? typeData : [{ color: 'var(--border)' }]).map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
+                  formatter={(v, n) => [`${v} (${pct(v)}%)`, n]}
+                />
+              </PieChart>
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--C)', lineHeight: 1 }}>{total}</div>
+                <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 2 }}>total</div>
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto', maxHeight: 120 }}>
+              {typeData.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', paddingTop: 20 }}>No data yet</div>
+              ) : typeData.map(d => (
+                <div key={d.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 2, background: d.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, textTransform: 'capitalize' }}>{d.name}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: d.color, fontFamily: 'var(--C)' }}>{d.value}</span>
+                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>({pct(d.value)}%)</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+
+  </div>
+)}
+          
+
+          {/* ── TOOLBAR ── */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:24, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, flex:'1 1 220px', minWidth:200, background:'var(--card)', border:'1.5px solid var(--border)', borderRadius:10, padding:'9px 14px' }}>
+              <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by URL or framework…"
+                style={{ flex:1, background:'none', border:'none', outline:'none', color:'var(--text)', fontSize:13, fontFamily:'inherit' }} />
+              {search && (
+                <button onClick={() => setSearch('')} style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', display:'flex', padding:0 }}>
+                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              )}
+            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {['all', 'smoke', 'functional', 'performance', 'api', 'regression', 'security', 'seo'].map(t => {
+                const cfg = TYPE_CONFIG[t];
+                const active = filterType === t;
+                return (
+                  <button key={t} onClick={() => setFilterType(t)}
+                    style={{ padding:'7px 13px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit', border: active ? `1.5px solid ${cfg?.color || '#818cf8'}` : '1.5px solid var(--border)', background: active ? `${cfg?.color || '#818cf8'}15` : 'var(--card)', color: active ? (cfg?.color || '#818cf8') : 'var(--muted)', transition:'all .18s', textTransform:'capitalize' }}>
+                    {t === 'all' ? 'All' : cfg?.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+{/* ── TIMELINE ── */}
+{filtered.length === 0 ? (
+  <div style={{ padding:'48px 32px', textAlign:'center', background:'var(--card)', border:'1px solid var(--border)', borderRadius:16, color:'var(--muted)', fontSize:13 }}>
+    No results for your current filters.
+  </div>
+) : (
+  <div>
+    {groupEntries.map(([label, items]) => (
+      <div key={label} style={{ marginBottom: 32 }}>
+        
+        {/* Group header */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
+          <span style={{ fontSize:11, fontWeight:800, letterSpacing:2, textTransform:'uppercase', color:'var(--indigo2)' }}>
+            {label}
+          </span>
+          <span style={{ fontSize:10, color:'var(--muted)', background:'var(--bg2)', border:'1px solid var(--border)', padding:'2px 8px', borderRadius:20 }}>
+            {new Date(items[0]?.date).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })}
+          </span>
+          <div style={{ flex:1, height:1, background:'var(--border)' }} />
+          <span style={{ fontSize:10, color:'var(--muted)' }}>{items.length} report{items.length !== 1 ? 's' : ''}</span>
+        </div>
+
+        {/* Report rows */}
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {items.map(report => {
+            const type = TYPE_CONFIG[report.testType] || TYPE_CONFIG.smoke;
+            const fw   = FW_CONFIG[report.framework] || { color:'#64748b', letters: report.framework?.slice(0,2) || '?' };
+            const total = (report.passCount || 0) + (report.failCount || 0);
+            const skip  = report.skipCount || 0;
+            const rate  = total > 0 ? Math.round((report.passCount / total) * 100) : 0;
+            const rc    = rateColorOf(rate);
+            const isOpen = expandedId === report.id;
+            const hasGenId = !!report.generationData?.generation?.id;
+            const dur = report.durationMs ? fmtDur(Math.round(report.durationMs / 1000)) : estDurMin(report) > 0 ? fmtDur(estDurMin(report)) : null;
+
+            // Performance metrics from generationData
+            const perf = report.generationData?.result?.performance || report.generationData?.performance;
+            const avgResp = perf?.metrics?.http_req_duration_avg || perf?.metrics?.load_time_ms;
+            const reqSec  = perf?.metrics?.http_reqs_per_second;
+            const errRate = perf?.metrics?.http_req_failed_rate;
+            const throughput = perf?.metrics?.data_received;
+
+            return (
+              <div key={report.id} style={{
+                background: 'var(--card)',
+                border: `1px solid ${isOpen ? type.color : 'var(--border)'}`,
+                borderRadius: 14,
+                overflow: 'hidden',
+                transition: 'all .2s',
+                boxShadow: isOpen ? `0 4px 24px ${type.color}18` : 'none',
+              }}>
+                
+                {/* ── MAIN ROW ── */}
+                <div
+                  onClick={() => setExpandedId(isOpen ? null : report.id)}
+                  style={{ display:'flex', alignItems:'center', gap:16, padding:'16px 24px 16px 20px', cursor:'pointer' }}
+                  onMouseEnter={e => { if (!isOpen) e.currentTarget.parentElement.style.borderColor = `${type.color}55`; }}
+                  onMouseLeave={e => { if (!isOpen) e.currentTarget.parentElement.style.borderColor = 'var(--border)'; }}
+                >
+                 
+
+                  {/* Type icon */}
+                  {(() => {
+                    const TYPE_ICONS = {
+                      smoke:       <IconFlame       size={18} stroke={1.8} />,
+                      functional:  <IconSettings2   size={18} stroke={1.8} />,
+                      performance: <IconBolt        size={18} stroke={1.8} />,
+                      api:         <IconApi         size={18} stroke={1.8} />,
+                      regression:  <IconRefresh     size={18} stroke={1.8} />,
+                      security:    <IconShieldCheck size={18} stroke={1.8} />,
+                      seo:         <IconWorldSearch size={18} stroke={1.8} />,
+                    };
+                    return (
+                      <div style={{ width:38, height:38, borderRadius:10, flexShrink:0, background:`${type.color}15`, border:`1px solid ${type.color}30`, display:'flex', alignItems:'center', justifyContent:'center', color:type.color }}>
+                        {TYPE_ICONS[report.testType] || <IconFileText size={18} stroke={1.8} />}
+                      </div>
+                    );
+                  })()}
+
+                  {/* URL + badges */}
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
+                      {report.url || '—'}
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                      {/* Framework badge */}
+                      <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:20, color:fw.color, background:`${fw.color}15`, border:`1px solid ${fw.color}33` }}>
+                        {fw.letters}
+                      </span>
+                      {/* Type badge */}
+                      <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, color:type.color, background:`${type.color}15`, border:`1px solid ${type.color}30`, textTransform:'uppercase', letterSpacing:.5 }}>
+                        {type.label}
+                      </span>
+                      {/* Time */}
+                      <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, color:'var(--muted)' }}>
+                        <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        {timeStr(report.date)}
+                      </span>
+                      {/* Duration */}
+                      {dur && (
+                        <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, color:'var(--muted)' }}>
+                          <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                          {dur}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                 {/* Stats — premium inline */}
+                  <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+
+                    {/* Mini progress bar + counts */}
+                    <div style={{ display:'flex', flexDirection:'column', gap:5, minWidth:160 }}>
+                      {/* Bar */}
+                      <div style={{ height:5, borderRadius:4, background:'var(--border)', overflow:'hidden', display:'flex' }}>
+                        <div style={{ width:`${total > 0 ? (report.passCount||0)/total*100 : 0}%`, background:'#10b981', transition:'width .6s ease' }} />
+                        <div style={{ width:`${total > 0 ? skip/total*100 : 0}%`, background:'#f59e0b', transition:'width .6s ease' }} />
+                        <div style={{ width:`${total > 0 ? (report.failCount||0)/total*100 : 0}%`, background:'#ef4444', transition:'width .6s ease' }} />
+                      </div>
+                      {/* Counts inline */}
+                      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                        <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#10b981' }}>
+                          <IconCircleCheck size={11} stroke={2.5} />{report.passCount||0}
+                        </span>
+                        {skip > 0 && (
+                          <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#f59e0b' }}>
+                            <IconCircleDashed size={11} stroke={2.5} />{skip}
+                          </span>
+                        )}
+                        <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#ef4444' }}>
+                          <IconCircleX size={11} stroke={2.5} />{report.failCount||0}
+                        </span>
+                        <span style={{ fontSize:10, color:'var(--muted)', marginLeft:'auto' }}>
+                          {total + skip} tests
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Rate ring */}
+                    <div style={{ position:'relative', width:48, height:48, flexShrink:0 }}>
+                      <svg width="48" height="48" style={{ transform:'rotate(-90deg)' }}>
+                        <circle cx="24" cy="24" r="19" fill="none" stroke="var(--border)" strokeWidth="3.5" />
+                        <circle cx="24" cy="24" r="19" fill="none" stroke={rc} strokeWidth="3.5"
+                          strokeDasharray={`${2 * Math.PI * 19}`}
+                          strokeDashoffset={`${2 * Math.PI * 19 * (1 - rate / 100)}`}
+                          strokeLinecap="round"
+                          style={{ transition:'stroke-dashoffset .8s ease' }}
+                        />
+                      </svg>
+                      <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
+                        <span style={{ fontSize:11, fontWeight:800, color:rc, fontFamily:'var(--C)', lineHeight:1 }}>{rate}%</span>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Chevron */}
+                  <IconChevronDown size={16} stroke={2.5} style={{ color:'var(--muted)', flexShrink:0, transition:'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+                </div>
+
+                {/* ── EXPANDED ── */}
+                
+{isOpen && (
+  <div onClick={e => e.stopPropagation()} style={{ borderTop:`1px solid var(--border)` }}>
+    
+    {/* Progress bar */}
+    <div style={{ height:3, background:'var(--bg2)', overflow:'hidden' }}>
+      <div style={{ display:'flex', height:'100%' }}>
+        <div style={{ width:`${total > 0 ? (report.passCount||0)/total*100 : 0}%`, background:'#10b981' }} />
+        <div style={{ width:`${total > 0 ? skip/total*100 : 0}%`, background:'#f59e0b' }} />
+        <div style={{ width:`${total > 0 ? (report.failCount||0)/total*100 : 0}%`, background:'#ef4444' }} />
+      </div>
+    </div>
+
+    <div style={{ display:'grid', gridTemplateColumns:'280px 1fr auto', gap:16, padding:'16px 20px', alignItems:'start' }}>
+
+      {/* HTML Preview */}
+      {report.htmlContent ? (
+        <div style={{ position:'relative', width:'100%', height:160, overflow:'hidden', borderRadius:10, border:'1px solid var(--border)', background:'#070e1c', flexShrink:0 }}>
+          <iframe srcDoc={report.htmlContent} title="report preview"
+            style={{ width:1400, height:900, border:'none', transform:'scale(0.2)', transformOrigin:'top left', pointerEvents:'none' }} />
+          <div style={{ position:'absolute', bottom:6, right:6 }}>
+            <button onClick={() => { const b=new Blob([report.htmlContent],{type:'text/html'}); window.open(URL.createObjectURL(b),'_blank'); }}
+              style={{ padding:'4px 10px', borderRadius:6, background:'rgba(0,0,0,.7)', border:'1px solid rgba(255,255,255,.15)', color:'#fff', fontSize:9, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+              Full Preview ↗
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ width:'100%', height:160, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted)', fontSize:11 }}>
+          No preview
+        </div>
+      )}
+
+      {/* Middle — Test Summary + Test Environment */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+
+        {/* Test Summary */}
+        <div>
+          <div style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.5, marginBottom:10 }}>Test Summary</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {[
+              { val: report.passCount||0, lbl:'Passed',  color:'#10b981', bg:'rgba(16,185,129,.12)', border:'rgba(16,185,129,.2)' },
+              { val: report.failCount||0, lbl:'Failed',  color:'#ef4444', bg:'rgba(239,68,68,.12)',   border:'rgba(239,68,68,.2)'  },
+              { val: skip,                lbl:'Skipped', color:'#f59e0b', bg:'rgba(245,158,11,.12)',  border:'rgba(245,158,11,.2)' },
+              { val: total + skip,        lbl:'Total',   color:'var(--text)', bg:'var(--bg2)', border:'var(--border)' },
+            ].map(s => (
+              <div key={s.lbl} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', borderRadius:8, background:s.bg, border:`1px solid ${s.border}` }}>
+                <span style={{ fontSize:12, color:s.color, fontWeight:700 }}>{s.lbl}</span>
+                <span style={{ fontSize:15, fontWeight:800, color:s.color, fontFamily:'var(--C)' }}>{s.val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Test Environment */}
+        <div>
+          <div style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.5, marginBottom:10 }}>Test Environment</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', background:`${fw.color}12`, border:`1px solid ${fw.color}25`, borderRadius:8 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:fw.color }}>{fw.letters}</span>
+              <span style={{ fontSize:12, color:'var(--text)', fontWeight:600 }}>{report.framework}</span>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', background:`${type.color}12`, border:`1px solid ${type.color}25`, borderRadius:8 }}>
+              <span style={{ fontSize:13 }}>{type.icon}</span>
+              <span style={{ fontSize:12, color:type.color, fontWeight:700 }}>{type.label}</span>
+            </div>
+            {dur && (
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:8 }}>
+                <span style={{ fontSize:12, color:'var(--muted)' }}>Duration</span>
+                <span style={{ fontSize:12, fontWeight:700, color:'var(--text)' }}>{dur}</span>
+              </div>
+            )}
+            {/* Performance metrics inline */}
+            {perf && avgResp && (
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:8 }}>
+                <span style={{ fontSize:12, color:'var(--muted)' }}>Avg Response</span>
+                <span style={{ fontSize:12, fontWeight:700, color:'#8b5cf6' }}>{avgResp}ms</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Right — Action buttons vertical */}
+      <div style={{ display:'flex', flexDirection:'column', gap:8, minWidth:140 }}>
+        {report.generationData && (
+          <button onClick={() => { setGeneration(report.generationData); goTo('execution'); }}
+            style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 16px', borderRadius:9, background:'linear-gradient(135deg,var(--indigo),#4f46e5)', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 4px 14px rgba(99,102,241,.3)', whiteSpace:'nowrap' }}>
+            <IconEye size={13} stroke={2}/> View Full Results
+          </button>
+        )}
+        <div style={{ display:'flex', gap:6 }}>
+          {report.htmlContent && (
+            <button onClick={() => { const b=new Blob([report.htmlContent],{type:'text/html'}); const l=document.createElement('a'); l.href=URL.createObjectURL(b); l.download=`report_${report.id}.html`; l.click(); }}
+              style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'8px 10px', borderRadius:8, background:'var(--indigo-bg)', border:'1px solid var(--indigo-border)', color:'var(--indigo2)', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+              <IconCode size={12} stroke={2}/> HTML
+            </button>
+          )}
+          <button onClick={() => downloadCsv(report)}
+            style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'8px 10px', borderRadius:8, background:'rgba(16,185,129,.08)', border:'1px solid rgba(16,185,129,.2)', color:'#10b981', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+            <IconFileTypeCsv size={12} stroke={2}/> CSV
+          </button>
+          {hasGenId && (
+            <button onClick={() => downloadPdf(report)} disabled={pdfLoadingId === report.id}
+              style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)', color:'#ef4444', fontSize:11, fontWeight:700, cursor: pdfLoadingId===report.id ? 'not-allowed':'pointer', fontFamily:'inherit', opacity: pdfLoadingId===report.id ? .6:1 }}>
+              {pdfLoadingId===report.id ? <span className="spinner"/> : <IconFileTypePdf size={12} stroke={2}/>} PDF
+            </button>
+          )}
+        </div>
+        <button onClick={() => deleteReport(report.id)}
+          style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'7px', borderRadius:8, background:'var(--bg2)', border:'1px solid var(--border)', color:'var(--muted)', cursor:'pointer', fontFamily:'inherit', fontSize:11 }}
+          onMouseEnter={e => { e.currentTarget.style.background='var(--red-bg)'; e.currentTarget.style.color='var(--red)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background='var(--bg2)'; e.currentTarget.style.color='var(--muted)'; }}>
+          <IconTrash size={12} stroke={2}/> Delete
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    ))}
+
+   {/* Pagination info */}
+    {filtered.length > 0 && (
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', background:'var(--card)', border:'1px solid var(--border)', borderRadius:10, marginTop:8 }}>
+        <span style={{ fontSize:12, color:'var(--muted)' }}>
+          Showing <span style={{ color:'var(--text)', fontWeight:700 }}>1</span> to <span style={{ color:'var(--text)', fontWeight:700 }}>{filtered.length}</span> of <span style={{ color:'var(--indigo2)', fontWeight:700 }}>{filtered.length}</span> reports
+        </span>
+        <span style={{ fontSize:11, color:'var(--muted)' }}>
+          {filtered.length} / page
+        </span>
+      </div>
+    )}
+  </div>
+)}  
+      </>
+      )}
+    </div>
+  );
+} 
+
+function saveReportToStorage({ url, framework, testType, passCount, failCount, skipCount, htmlContent, csvContent, generationData, durationMs }) {
+  try {
+    const key = 'nextest-reports';
+    const existing = JSON.parse(localStorage.getItem(key) || '[]');
+    const genId = generationData?.generation?.id;
+
+    if (genId) {
+      const idx = existing.findIndex(r => r.generationData?.generation?.id === genId);
+      if (idx !== -1) {
+        // Mettre à jour le rapport existant
+        if (htmlContent) existing[idx].htmlContent = htmlContent;
+        if (csvContent) existing[idx].csvContent = csvContent;
+        // Mettre à jour aussi les compteurs si fournis
+        if (passCount !== undefined) existing[idx].passCount = passCount;
+        if (failCount !== undefined) existing[idx].failCount = failCount;
+        if (skipCount !== undefined) existing[idx].skipCount = skipCount;
+        localStorage.setItem(key, JSON.stringify(existing));
+        return;
+      }
+    }
+
+    // Nouveau rapport
+    const newReport = {
+      id: Date.now(),
+      date: new Date().toISOString(),
+      url, framework, testType,
+      passCount: passCount || 0,
+      failCount: failCount || 0,
+      skipCount: skipCount || 0,
+      durationMs: durationMs || 0,
+      htmlContent: htmlContent || null,
+      csvContent: csvContent || null,
+      generationData: generationData || null,
+    };
+    const updated = [newReport, ...existing].slice(0, 50);
+    localStorage.setItem(key, JSON.stringify(updated));
+  } catch (err) {
+    console.error('[saveReport]', err);
+  }
+}
 export default function Dashboard() {
 
   const [page, setPage]= useState('dashboard');
@@ -8259,6 +10887,8 @@ const headerRef = useRef(null);
   const [generation,      setGeneration]    = useState(null);
   const [currentProject,  setCurrentProject] = useState(null);
   const [selectedPageUrl, setSelectedPageUrl] = useState('');
+  const [selectedTestType, setSelectedTestType] = useState('');   // ← AJOUTE ICI
+  const [selectedFramework, setSelectedFramework] = useState('');
   const [projectStep,     setProjectStep]   = useState('list');
 
   const { user, logout } = useAuth();
@@ -8307,7 +10937,9 @@ useEffect(() => {
     { id: 'dashboard', label: t('dashboard'),     badge: null     },
     { id: 'generate',  label: 'Projects',          badge: t('new') },
     { id: 'execution', label: t('testExecution'), badge: null     },
+    { id: 'reports', label: 'Reports', badge: null },
     { id: 'history',   label: t('history'),       badge: null     },
+    
   ];
   const NAV_USER = [{ id: 'account', label: t('account') }, { id: 'settings', label: t('settings') }];
   const LABELS   = { dashboard: t('dashboard'), generate: t('newGeneration'), execution: t('testExecution'), history: t('history'), account: t('account'), settings: t('settings') };
@@ -8487,7 +11119,12 @@ onClearAll={() => {
           {page === 'generate' && (
             <>
               {projectStep === 'list' && (<ProjectsListPanel onNewProject={() => setProjectStep('create')} onSelectProject={(project) => { setCurrentProject(project); setProjectStep('detail'); }} />)}
-              {projectStep === 'detail' && (<ProjectDetailPanel project={currentProject} onBack={() => setProjectStep('list')} onNewGeneration={() => { setSelectedPageUrl(''); setProjectStep('generate'); }} setGeneration={setGeneration} goTo={setPage} />)}
+              {projectStep === 'detail' && (<ProjectDetailPanel project={currentProject} onBack={() => setProjectStep('list')} onNewGeneration={(url, testType, framework) => {
+  setSelectedPageUrl(url || '');
+  setSelectedTestType(testType || '');
+  setSelectedFramework(framework || '');
+  setProjectStep('generate');
+}} setGeneration={setGeneration} goTo={setPage} />)}
               {projectStep === 'create' && (
                 <>
                   <button onClick={() => setProjectStep('list')} style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:11, fontWeight:700, color:'var(--muted)', background:'none', border:'none', cursor:'pointer', padding:'0 0 20px', transition:'color .18s', letterSpacing:'.5px', textTransform:'uppercase' }} onMouseEnter={e=>e.currentTarget.style.color='var(--indigo2)'} onMouseLeave={e=>e.currentTarget.style.color='var(--muted)'}>
@@ -8501,7 +11138,7 @@ onClearAll={() => {
                   <button onClick={() => setProjectStep('detail')} style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:11, fontWeight:700, color:'var(--muted)', background:'none', border:'none', cursor:'pointer', padding:'0 0 20px', transition:'color .18s', letterSpacing:'.5px', textTransform:'uppercase' }} onMouseEnter={e=>e.currentTarget.style.color='var(--indigo2)'} onMouseLeave={e=>e.currentTarget.style.color='var(--muted)'}>
                     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>Back to project
                   </button>
-                  <GeneratePanel goTo={(p) => { setProjectStep('list'); setPage(p); }} setGeneration={setGeneration} project={currentProject} initialUrl={selectedPageUrl} onGenerationSaved={(notif) => {
+                  <GeneratePanel goTo={(p) => { setProjectStep('list'); setPage(p); }} setGeneration={setGeneration} project={currentProject} initialUrl={selectedPageUrl} initialTestType={selectedTestType}initialFramework={selectedFramework} onGenerationSaved={(notif) => {
   const newNotif = { ...notif, id: Date.now(), date: new Date().toISOString() };
  setNotifs(prev => {
   const updated = [newNotif, ...prev];
@@ -8527,6 +11164,7 @@ onClearAll={() => {
             </>
           )}
           {page === 'execution' && <ExecutionPanel generation={generation} />}
+          {page === 'reports' && <ReportsPanel goTo={setPage} setGeneration={setGeneration} />}
           {page === 'history'   && <HistoryPanel   goTo={setPage} setGeneration={setGeneration} />}
           {page === 'account'   && <AccountPanel   user={user} />}
           {page === 'settings'  && <SettingsPanel  theme={theme} setTheme={setTheme} />}

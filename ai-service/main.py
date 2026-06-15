@@ -1,4 +1,5 @@
 from unittest import result
+from urllib.request import Request
 
 from fastapi import FastAPI
 from scraper import scrape_page
@@ -9,6 +10,7 @@ from runner import run_selenium_script
 from runner_selenium import run_selenium_real
 from fastapi.responses import Response
 from pdf_generator import generate_pdf
+from seo_pdf_generator import generate_seo_pdf
 #internal test
 from scraper_internal import scrape_internal
 from generator_internal import generate_internal_tests
@@ -32,6 +34,15 @@ from functional_runner import run_functional_tests
 from performance_generator import generate_performance_tests
 from performance_runner import run_performance_tests
 
+
+from fastapi import Request as FastAPIRequest
+from seo_runner import run_seo_test
+
+
+
+
+
+
 _api_lock = threading.Lock()
 
 
@@ -42,6 +53,12 @@ executor = ThreadPoolExecutor(max_workers=8)
 
 app = FastAPI(title="NexTest AI Service")
 
+@app.post("/generate-seo")
+async def generate_seo(request: FastAPIRequest):
+    body = await request.json()
+    url = body.get("url", "")
+    result = run_seo_test(url)
+    return {"result": result}
 
 @app.get("/")
 def root():
@@ -85,7 +102,7 @@ def generate(data: dict):
     print(f"[GENERATE] url={url} | framework={framework} | test_type={test_type}")
 
     # ── Scrape the page ──────────────────────────────────────────────────────
-    scraped = scrape_page(url, wait_time=wait_time)
+    scraped = scrape_page(url, wait_time=4000)
 
     if "error" in scraped:
         return {
@@ -312,7 +329,11 @@ def generate_pdf_report(data: dict):
         print(f"[PDF] test_cases count: {len(data.get('test_cases', []))}")
         print(f"[PDF] execution_results count: {len(data.get('execution_results', []))}")
         
-        pdf_bytes = generate_pdf(data)
+        test_type = data.get('test_type', '')
+        if test_type == 'seo':
+            pdf_bytes = generate_seo_pdf(data)
+        else:
+            pdf_bytes = generate_pdf(data)
         
         print(f"[PDF] Generated {len(pdf_bytes)} bytes")
         
@@ -726,4 +747,7 @@ def generate_performance(data: dict):
             "scripts":           {k: v["script"] for k, v in scripts.items()},
         },
     }
+
+    
+
   
