@@ -38,11 +38,15 @@ class GoogleController extends Controller
                 'avatar'            => $googleUser->getAvatar(),
                 'password'          => bcrypt(Str::random(24)),
                 'email_verified_at' => now(),
+                'last_login_at'     => now(),       
+                'last_login_ip'     => request()->ip(),
             ]);
         } else {
             $user->update([
                 'google_id' => $googleUser->getId(),
                 'avatar'    => $googleUser->getAvatar(),
+                'last_login_at'  => now(),                   
+                'last_login_ip'  => request()->ip(), 
             ]);
         }
 

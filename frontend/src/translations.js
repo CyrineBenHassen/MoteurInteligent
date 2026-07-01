@@ -365,6 +365,35 @@ const translations = {
 
     // Header
     searchPlaceholder: 'ابحث في التوليدات والسجل…',
+
+
+  
+
+
+  en: {
+  testsTrend: 'Tests & Scripts Trend',
+  thisWeek: 'This Week',
+  testsExecuted: 'Tests Executed',
+  testsResults: 'Tests Results',
+  testTypeDistribution: 'Test Type Distribution',
+  topUrls: 'Top Tested URLs',
+},
+fr: {
+  testsTrend: 'Tendance Tests & Scripts',
+  thisWeek: 'Cette Semaine',
+  testsExecuted: 'Tests Exécutés',
+  testsResults: 'Résultats des Tests',
+  testTypeDistribution: 'Distribution des Types de Tests',
+  topUrls: 'URLs les Plus Testées',
+},
+ar: {
+  testsTrend: 'اتجاه الاختبارات والسكريبتات',
+  thisWeek: 'هذا الأسبوع',
+  testsExecuted: 'الاختبارات المنفذة',
+  testsResults: 'نتائج الاختبارات',
+  testTypeDistribution: 'توزيع أنواع الاختبارات',
+  topUrls: 'أكثر الروابط اختباراً',
+},
   },
 };
 

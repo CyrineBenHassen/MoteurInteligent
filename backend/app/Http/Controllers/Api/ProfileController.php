@@ -8,25 +8,54 @@ use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
 {
-public function update(Request $request)
-{
-    $user = $request->user();
+    public function show(Request $request)
+    {
+        $user = $request->user();
 
-    $request->validate([
-        'name'  => 'required|string|max:255',
-        'email' => 'required|email|unique:users,email,' . $user->id,
-    ]);
+        return response()->json([
+            'name'             => $user->name,
+            'email'            => $user->email,
+            'avatar'           => $user->avatar
+                                    ? asset('storage/' . $user->avatar)
+                                    : null,
+            'onboarding_data'  => $user->onboarding_data,
+            'created_at'       => $user->created_at,
+            'phone'    => $user->phone,
+            'company'  => $user->company,
+            'position' => $user->position,
 
-    $user->update([
-        'name'  => $request->name,
-        'email' => $request->email,
-    ]);
+            'generations_count' => $user->generations()->count(),
+            'projects_count'    => $user->projects()->count(),
+            'avg_pass_rate'     => $this->getAvgPassRate($user),
+            'alerts_count'      => $this->getAlertsCount($user),
+            'last_login' => $user->last_login_at 
+            ? \Carbon\Carbon::parse($user->last_login_at)->timezone('Africa/Tunis')->format('M d, H:i')
+            : null,
+        ]);
+    }
 
-    return response()->json([
-        'message' => 'Profile updated successfully',
-        'user'    => $this->formatUser($user),
-    ]);
-}
+    public function update(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'name'  => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+        ]);
+
+        $user->update([
+            'name'  => $request->name,
+            'email' => $request->email,
+            'phone'    => $request->phone,    // ← AJOUTE
+            'company'  => $request->company,  // ← AJOUTE
+            'position' => $request->position, // ← AJOUTE
+        ]);
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user'    => $this->formatUser($user),
+        ]);
+    }
 
     public function updatePassword(Request $request)
     {
@@ -47,61 +76,71 @@ public function update(Request $request)
             'password' => Hash::make($request->new_password)
         ]);
 
+        return response()->json(['message' => 'Password updated successfully']);
+    }
+
+    public function updateAvatar(Request $request)
+    {
+        $request->validate([
+            'avatar' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        $user = $request->user();
+
+        if ($user->avatar && file_exists(storage_path('app/public/' . $user->avatar))) {
+            unlink(storage_path('app/public/' . $user->avatar));
+        }
+
+        $path = $request->file('avatar')->store('avatars', 'public');
+        $user->update(['avatar' => $path]);
+
         return response()->json([
-            'message' => 'Password updated successfully'
+            'message' => 'Avatar updated successfully',
+            'avatar'  => asset('storage/' . $path),
         ]);
     }
 
-
- public function updateAvatar(Request $request)
-{
-    $request->validate([
-        'avatar' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
-    ]);
-
-    $user = $request->user();
-
-    // Supprimer l'ancienne photo
-    if ($user->avatar && file_exists(storage_path('app/public/' . $user->avatar))) {
-        unlink(storage_path('app/public/' . $user->avatar));
+    public function deleteAccount(Request $request)
+    {
+        $user = $request->user();
+        $user->tokens()->delete();
+        $user->delete();
+        return response()->json(['message' => 'Account deleted successfully']);
     }
 
-    $path = $request->file('avatar')->store('avatars', 'public');
-    $user->update(['avatar' => $path]);
+    // ─── Private helpers
 
-    return response()->json([
-        'message' => 'Avatar updated successfully',
-        'avatar'  => asset('storage/' . $path) // 👈 URL complète
-    ]);
-}
-
-public function deleteAccount(Request $request)
-{
-    $user = $request->user();
-    $user->tokens()->delete();
-    $user->delete();
-    return response()->json(['message' => 'Account deleted successfully']);
-}
-private function formatUser($user): array
-{
-    $data = $user->fresh()->toArray();
-    if (!empty($data['avatar']) && !str_starts_with($data['avatar'], 'http')) {
-        $data['avatar'] = asset('storage/' . $data['avatar']);
+    private function formatUser($user): array
+    {
+        $data = $user->fresh()->toArray();
+        if (!empty($data['avatar']) && !str_starts_with($data['avatar'], 'http')) {
+            $data['avatar'] = asset('storage/' . $data['avatar']);
+        }
+        $data['generations_count'] = $user->generations()->count();
+        $data['projects_count']    = $user->projects()->count();
+        return $data;
     }
-    $data['generations_count'] = $user->generations()->count();
-    $data['projects_count']    = $user->projects()->count();
-    return $data;
-}
-public function show(Request $request)
-{
-    $user = $request->user();
-    $userData = $user->toArray();
-    if ($user->avatar && !str_starts_with($user->avatar, 'http')) {
-        $userData['avatar'] = asset('storage/' . $user->avatar);
-    }
-    $userData['generations_count'] = $user->generations()->count();
-    $userData['projects_count']    = $user->projects()->count();
 
-    return response()->json($userData);
+   private function getAvgPassRate($user): int
+{
+    $totals = $user->generations()
+        ->selectRaw('SUM(pass_count) as total_pass, SUM(fail_count) as total_fail')
+        ->whereNotNull('pass_count')
+        ->first();
+
+    $totalPass = $totals->total_pass ?? 0;
+    $totalFail = $totals->total_fail ?? 0;
+    $total     = $totalPass + $totalFail;
+
+    return $total > 0 ? (int) round(($totalPass / $total) * 100) : 0;
+}
+
+   private function getAlertsCount($user): int
+{
+    $projectIds = $user->projects()->pluck('id');
+
+    return \App\Models\Alert::whereIn('project_id', $projectIds)
+        ->where('read', false)
+        ->count();
 }
 }

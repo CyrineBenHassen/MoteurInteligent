@@ -2,14 +2,18 @@
 import subprocess
 import tempfile
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import time
 import re
 import requests
+from alert_recorder import record_results
 
 # ── k6 binary path ────────────────────────────────────────────────────────────
 K6_BINARY = os.getenv("K6_PATH", "k6")
 
-# ── ANPE credentials ──────────────────────────────────────────────────────────
+# ── ANPE token ──────────────────────────────────────────────────────────
 _CACHED_TOKEN = os.getenv("ANPE_TOKEN", "")
 ANPE_BASE_URL = os.getenv("ANPE_BASE_URL", "https://anpe.demopro.tn:10443")
 
@@ -22,12 +26,12 @@ TEST_LABELS = {
 
 
 # ── Token refresh ─────────────────────────────────────────────────────────────
-def _refresh_token() -> str:
+def _refresh_token(username: str = "", password: str = "") -> str:
     global _CACHED_TOKEN
     try:
         r = requests.post(
             f"{ANPE_BASE_URL}/api/auth/login",
-            json={"email": "admin@admin.com", "password": "password1%Aa"},
+            json={"email": username, "password": password},
             verify=False,
             timeout=10,
         )
@@ -140,13 +144,16 @@ def _parse_k6_output(stdout: str, stderr: str, test_type: str) -> dict:
         metrics["data_sent"] = data_snt.group(1)
 
     # ── checks ───────────────────────────────────────────────────────────────
-    checks_match = re.search(r"checks[.\s:]+(\d+\.?\d*)%", output)
+    
+    checks_match = re.search(r"checks_succeeded\.+:\s*(\d+\.?\d*)%", output)
+    if not checks_match:
+        checks_match = re.search(r"checks[.\s:]+(\d+\.?\d*)%", output)
     if checks_match:
         metrics["checks_rate"] = float(checks_match.group(1))
         print(f"[PERF_RUNNER] ✓ checks={checks_match.group(1)}%")
     else:
         print(f"[PERF_RUNNER] ✗ checks NOT parsed")
-
+        
     # ── Thresholds ───────────────────────────────────────────────────────────
     threshold_passes   = [t.strip() for t in re.findall(r"✓\s+(.+)", output)]
     threshold_failures = [t.strip() for t in re.findall(r"✗\s+(.+)", output)]
@@ -198,8 +205,8 @@ def _run_k6_script(script: str, test_type: str, timeout: int = 600) -> dict:
             capture_output=True, text=True,
             timeout=timeout, encoding="utf-8", errors="replace",
         )
-        print(f"[DEBUG STDOUT]:\n{result.stdout[:1000]}")
-        print(f"[DEBUG STDERR]:\n{result.stderr[:1000]}")
+        print(f"[DEBUG STDOUT]:\n{result.stdout[-2000:]}")
+        print(f"[DEBUG STDERR]:\n{result.stderr[-2000:]}")
 
         elapsed = time.time() - start_time
         print(f"[PERF_RUNNER] ✓ finished in {elapsed:.1f}s rc={result.returncode}")
@@ -321,7 +328,7 @@ def _build_test_cases(test_type: str, run_result: dict, profile_name: str) -> li
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
-def run_performance_tests(scripts: dict, base_url: str) -> dict:
+def run_performance_tests(scripts: dict, base_url: str, username: str = "", password: str = "") -> dict:
     all_test_cases  = []
     all_run_results = {}
     total_pass = total_fail = total_skip = 0
@@ -334,7 +341,7 @@ def run_performance_tests(scripts: dict, base_url: str) -> dict:
         print(f"\n[PERF_RUNNER] ══ Starting: {profile_name} ══")
 
         # ← refresh token avant chaque test type
-        _refresh_token()
+        _refresh_token(username, password)
 
         run_result = _run_k6_script(script_code, test_type)
         all_run_results[test_type] = run_result
@@ -365,7 +372,13 @@ def run_performance_tests(scripts: dict, base_url: str) -> dict:
 
     total     = total_pass + total_fail + total_skip
     pass_rate = round((total_pass / total * 100)) if total > 0 else 0
-
+     
+     
+     # ── Alerts ────────────────────────────────────────────────────────────────
+    gen_id     = all_test_cases[0].get("generation_id") if all_test_cases else None
+    project_id = all_test_cases[0].get("project_id")    if all_test_cases else None
+    record_results(all_test_cases, base_url, "performance", "k6", gen_id, project_id)
+    
     return {
         "results":     all_test_cases,
         "run_results": all_run_results,

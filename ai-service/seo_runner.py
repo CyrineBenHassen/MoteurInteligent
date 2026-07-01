@@ -5,12 +5,14 @@ from datetime import datetime
 from groq import Groq
 from seo_analyzer import analyze_seo, compute_seo_score
 
-# ── Groq client ──────────────────────────────────────────────────────────────
+from alert_recorder import record_results
+
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 
-# ── LLaMA global recommendations ─────────────────────────────────────────────
+# LLaMA global recommendations
 def _generate_seo_recommendations(analysis: dict, score: int) -> dict:
     if not groq_client:
         return {"summary": "Groq API key not configured.", "recommendations": [], "action_plan": []}

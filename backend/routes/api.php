@@ -8,6 +8,10 @@ use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\GenerationController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\OnboardingController;
+use App\Http\Controllers\TestFlagController;
+use App\Http\Controllers\FlakyTestController;
+use App\Http\Controllers\ScheduledTaskController;
+
 
 
 Route::prefix('auth')->group(function () {
@@ -40,6 +44,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/generations',           [GenerationController::class, 'index']);
     Route::delete('/generations/all', [GenerationController::class, 'destroyAll']);
 
+   Route::get('/flaky-tests', [FlakyTestController::class, 'index']);
+Route::post('/flaky-tests/rerun', [FlakyTestController::class, 'rerun']);
+Route::get('/flaky-tests/details', [FlakyTestController::class, 'details']);
+
+Route::post('/flaky-tests/record', [FlakyTestController::class, 'record']);
+Route::post('/flaky-tests/flag', [TestFlagController::class, 'store']);
+Route::delete('/flaky-tests/flag', [TestFlagController::class, 'destroy']);
+
+
     Route::post('/generations/generate-api', [GenerationController::class, 'generateApi']);
     Route::post('/generations/generate-security', [GenerationController::class, 'generateSecurity']);
     Route::post('/generations/generate-regression', [GenerationController::class, 'generateRegression']);
@@ -62,4 +75,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/projects/{id}/generations',     [ProjectController::class, 'generations']);
     Route::post('/onboarding', [OnboardingController::class, 'store']);
 
+   // Alerts
+Route::get('/alerts/unread-count',   [\App\Http\Controllers\Api\AlertController::class, 'unreadCount']);
+Route::patch('/alerts/read-all',     [\App\Http\Controllers\Api\AlertController::class, 'markAllRead']);
+Route::get('/alerts',                [\App\Http\Controllers\Api\AlertController::class, 'index']);
+Route::patch('/alerts/{id}/read',    [\App\Http\Controllers\Api\AlertController::class, 'markRead']);
+Route::patch('/alerts/{id}/status', [\App\Http\Controllers\Api\AlertController::class, 'updateStatus']);
+Route::delete('/alerts/{id}',       [\App\Http\Controllers\Api\AlertController::class, 'destroy']);
+
+
+Route::get('/projects/{projectId}/tested-urls', [GenerationController::class, 'testedUrlsForProject']);
+
+
+// routes/api.php — dans le groupe middleware('auth:sanctum') existant
+Route::get('/scheduled-tasks',              [ScheduledTaskController::class, 'index']);
+Route::post('/scheduled-tasks',             [ScheduledTaskController::class, 'store']);
+Route::put('/scheduled-tasks/{scheduledTask}',     [ScheduledTaskController::class, 'update']);
+Route::delete('/scheduled-tasks/{scheduledTask}',  [ScheduledTaskController::class, 'destroy']);
+Route::post('/scheduled-tasks/{scheduledTask}/run',     [ScheduledTaskController::class, 'runNow']);
+Route::patch('/scheduled-tasks/{scheduledTask}/status', [ScheduledTaskController::class, 'updateStatus']);
 });
+

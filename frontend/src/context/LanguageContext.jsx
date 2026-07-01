@@ -4,14 +4,24 @@ import translations from '../translations';
 const LanguageContext = createContext();
 
 export function LanguageProvider({ children }) {
-  const [language, setLanguage] = useState('en');
-  const t = (key) => translations[language]?.[key] || key;
+  const [lang, setLang] = useState(
+    () => localStorage.getItem('nextest-lang') || 'en'
+  );
+
+  const setLanguage = (code) => {
+    setLang(code);
+    localStorage.setItem('nextest-lang', code);
+    document.documentElement.setAttribute('dir', code === 'ar' ? 'rtl' : 'ltr');
+    document.documentElement.setAttribute('lang', code);
+  };
+
+  const t = (key) => translations[lang]?.[key] || translations['en']?.[key] || key;
+
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ lang, setLanguage, t }}>
       {children}
     </LanguageContext.Provider>
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useLang = () => useContext(LanguageContext);

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import './Home.css';
 
-// ─── Translations ───────────────────────────────────────────────────────────
+//Translations
 const TRANSLATIONS = {
   en: {
     features:    'Features',
@@ -51,7 +51,7 @@ const TRANSLATIONS = {
   },
 };
 
-// ─── Language Switcher (Dropdown) ────────────────────────────────────────────
+//Language Switcher (Dropdown)
 const LANGS = [
   { code: 'en', flag: '🇬🇧', label: 'EN', full: 'English'  },
   { code: 'fr', flag: '🇫🇷', label: 'FR', full: 'Français' },
@@ -119,7 +119,7 @@ function LangSwitcher({ lang, setLang }) {
   );
 }
 
-// ─── Hooks ───────────────────────────────────────────────────────────────────
+//Hooks
 function useCounter(target, duration = 2200, started = false) {
   const [val, setVal] = useState(0);
   useEffect(() => {
@@ -149,54 +149,122 @@ function useVisible(threshold = 0.15) {
   return [ref, visible];
 }
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+//Data
 const FEATURES = [
   {
-    icon: '🧠',
-    tag: 'Generative AI',
-    title: 'AI-Powered Analysis',
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a4 4 0 0 1 4 4c0 1.5-.8 2.8-2 3.5V12h2a2 2 0 0 1 2 2v2h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1v-2a2 2 0 0 1 2-2h2V9.5A4 4 0 0 1 12 2z"/>
+        <circle cx="12" cy="6" r="1.5" fill="#a78bfa" stroke="none"/>
+      </svg>
+    ),
+    iconColor: '#a78bfa',   // violet
+    tag: 'Generative AI', title: 'AI-Powered Analysis',
     desc: 'Automatically scans application interfaces, detects interactive elements, and prepares intelligent test scenarios.',
   },
   {
-    icon: '⚡',
-    tag: 'Speed',
-    title: 'Fast Test Generation',
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+    ),
+    iconColor: '#fb923c',   // orange
+    tag: 'Speed', title: 'Fast Test Generation',
     desc: 'Generate automated test cases within seconds, including user flows, validations, and edge cases.',
   },
   {
-    icon: '🎯',
-    tag: 'Export',
-    title: 'Multi-Framework Support',
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+        <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+      </svg>
+    ),
+    iconColor: '#38bdf8',   // bleu ciel
+    tag: 'Export', title: 'Multi-Framework Support',
     desc: 'Export ready-to-use scripts for Selenium, Cypress, and Playwright with seamless CI/CD integration.',
   },
   {
-    icon: '🛡️',
-    tag: 'Quality',
-    title: 'Comprehensive Testing',
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    ),
+    iconColor: '#4ade80',   // vert
+    tag: 'Quality', title: 'Comprehensive Testing',
     desc: 'Support multiple testing types including functional, UI, regression, and performance testing.',
   },
   {
-    icon: '🔄',
-    tag: 'Reliability',
-    title: 'Smart Adaptation',
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f472b6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.36-3.36L23 10M1 14l5.13 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    ),
+    iconColor: '#f472b6',   // rose
+    tag: 'Reliability', title: 'Smart Adaptation',
     desc: 'Automatically detects interface changes and updates affected test scenarios dynamically.',
   },
   {
-    icon: '📊',
-    tag: 'Reports',
-    title: 'Reports & Insights',
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c9a227" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+    ),
+    iconColor: '#c9a227',   // gold
+    tag: 'Reports', title: 'Reports & Insights',
     desc: 'Access smart recommendations, reports, alerts, history, and generated test scripts from a centralized dashboard.',
   },
 ];
 
 const STEPS = [
-  { n: '01', icon: '🔗', title: 'Provide a URL',         desc: 'Enter a public or internal web application URL to start the automated testing process.'},
-  { n: '02', icon: '🤖', title: 'AI Analyzes the Application', desc: 'The system scans the interface, detects interactive elements, pages, and user flows automatically.' },
-  { n: '03', icon: '🧪', title: 'Generate & Execute Automated Tests',  desc: 'Run different types of automated tests including smoke, functional, regression, UI, and performance testing directly from the dashboard.' },
-  { n: '04', icon: '🚀', title: 'Smart Recommendations, Reports & Script Generation',     desc: 'Receive intelligent recommendations, detailed reports, execution history and automatically generated test scripts to improve application quality.' },
+  {
+    n: '01', color: '#38bdf8',
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+      </svg>
+    ),
+    title: 'Provide a URL',
+    desc: 'Enter a public or internal web application URL to start the automated testing process.',
+  },
+  {
+    n: '02', color: '#a78bfa',
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+    ),
+    title: 'AI Analyzes the Application',
+    desc: 'The system scans the interface, detects interactive elements, pages, and user flows automatically.',
+  },
+  {
+    n: '03', color: '#4ade80',
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="9 11 12 14 22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    ),
+    title: 'Generate & Execute Automated Tests',
+    desc: 'Run different types of automated tests including smoke, functional, regression, UI, and performance testing directly from the dashboard.',
+  },
+  {
+    n: '04', color: '#fb923c',
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+    ),
+    title: 'Smart Recommendations, Reports & Script Generation',
+    desc: 'Receive intelligent recommendations, detailed reports, execution history and automatically generated test scripts to improve application quality.',
+  },
 ];
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// Component
 export default function HomePage() {
   const [navSolid, setNavSolid] = useState(false);
   const [lang,     setLang]     = useState('en');
@@ -224,11 +292,41 @@ export default function HomePage() {
     return () => { document.documentElement.dir = 'ltr'; };
   }, [isRtl]);
 
-  const NAV_ITEMS = [
-    { label: t.features,   id: 'features'   },
-    { label: t.howItWorks, id: 'howitworks' },
-    { label: t.stats,      id: 'stats'      },
-  ];
+ const NAV_ITEMS = [
+  {
+    label: t.features,
+    id: 'features',
+    icon: (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+      </svg>
+    )
+  },
+  {
+    label: t.howItWorks,
+    id: 'howitworks',
+    icon: (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M10 8l6 4-6 4V8z" fill="currentColor"/>
+      </svg>
+    )
+  },
+  {
+    label: t.stats,
+    id: 'stats',
+    icon: (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10"/>
+        <line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+    )
+  },
+];
 
   return (
     <div className="hp" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -237,32 +335,58 @@ export default function HomePage() {
       <nav className={`nav ${navSolid ? 'nav--solid' : ''}`}>
         <div className="nav__inner">
          
-         <Link to="/" className="nav__brand">
-  <div
-    className="nav__gem"
-    style={{
-      background: 'linear-gradient(135deg, #8a6a00, #C9A227, #E8C84A)',
-      boxShadow: '0 4px 16px rgba(201,162,39,0.5)'
-    }}
-  >
-    <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
-      <circle cx="22" cy="22" r="17" stroke="#060e1e" strokeWidth="2" fill="none" opacity="0.6"/>
-      <polyline points="13,22 20,30 32,14" stroke="#060e1e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+ <Link to="/" className="nav__brand">
+  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90" width="42" height="42" style={{ flexShrink: 0 }}>
+      <defs>
+        <linearGradient id="hexGradHome" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#8a6a00"/>
+          <stop offset="40%" stopColor="#C9A227"/>
+          <stop offset="100%" stopColor="#E8C84A"/>
+        </linearGradient>
+        <filter id="glowHome">
+          <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+          <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <polygon points="45,8 77,27 77,63 45,82 13,63 13,27"
+        fill="rgba(201,162,39,0.08)" stroke="url(#hexGradHome)" strokeWidth="2"/>
+      <circle cx="45" cy="8"  r="2.5" fill="#C9A227" opacity="0.8"/>
+      <circle cx="77" cy="27" r="2.5" fill="#C9A227" opacity="0.8"/>
+      <circle cx="77" cy="63" r="2.5" fill="#C9A227" opacity="0.8"/>
+      <circle cx="45" cy="82" r="2.5" fill="#C9A227" opacity="0.8"/>
+      <circle cx="13" cy="63" r="2.5" fill="#C9A227" opacity="0.8"/>
+      <circle cx="13" cy="27" r="2.5" fill="#C9A227" opacity="0.8"/>
+      {/* ← #ffffff → #C9A227 */}
+      <text x="45" y="56" textAnchor="middle"
+        fontFamily="Georgia, serif" fontSize="36" fontWeight="700"
+        fill="#C9A227" filter="url(#glowHome)">N</text>
     </svg>
-  </div>
-  <div>
-    <div className="nav__name">NexTest</div>
-    <div className="nav__sub">Test Automation</div>
+    <div>
+      <div style={{
+        fontFamily: "'DM Sans', sans-serif",
+        fontSize: 15, fontWeight: 700, color: '#ffffff',
+        letterSpacing: '4px', textTransform: 'uppercase', lineHeight: 1,
+      }}>NexTest</div>
+      <div style={{
+        fontFamily: "'DM Sans', sans-serif",
+        fontSize: 8.5, fontWeight: 500, color: '#a5b4fc',
+        letterSpacing: '3.5px', textTransform: 'uppercase', marginTop: 5,
+      }}>Test Automation</div>
+    </div>
   </div>
 </Link>
 
           <ul className="nav__links">
-            {NAV_ITEMS.map(item => (
-              <li key={item.id}>
-                <a href={`#${item.id}`}>{item.label}</a>
-              </li>
-            ))}
-          </ul>
+  {NAV_ITEMS.map(item => (
+    <li key={item.id}>
+      <a href={`#${item.id}`}>
+        {item.icon}
+        {item.label}
+      </a>
+    </li>
+  ))}
+</ul>
 
           <div className="nav__actions">
             {/* ── Dropdown Language Switcher ── */}
@@ -424,11 +548,22 @@ export default function HomePage() {
 
           <div className={`how__grid ${howOn ? 'is-visible' : ''}`}>
             {STEPS.map((s, i) => (
-              <div key={s.n} className="how__card" style={{'--i': i}}>
-                <div className="how__num">{s.n}</div>
-                <div className="how__icon">{s.icon}</div>
-                <h3 className="how__title">{s.title}</h3>
-                <p className="how__desc">{s.desc}</p>
+  <div key={s.n} className="how__card" style={{'--i': i}}>
+    <div className="how__num" style={{color: s.color}}>{s.n}</div>
+    <div
+      className="how__icon"
+      style={{
+        background: `${s.color}14`,
+        border: `1px solid ${s.color}30`,
+        borderRadius: '16px',
+        width: '72px', height: '72px',
+        margin: '0 auto 22px',
+      }}
+    >
+      {s.icon}
+    </div>
+    <h3 className="how__title">{s.title}</h3>
+    <p className="how__desc">{s.desc}</p>
                 {i < STEPS.length - 1 && (
                   <div className="how__arrow" aria-hidden="true">
                     <div className="how__line"/><span className="how__arr">›</span>
@@ -448,19 +583,31 @@ export default function HomePage() {
 
           <div className="stats__grid">
             {[
-              {icon:'🚀', val:fmt(c1), suf:'+', label:'Scripts Generated',  accent:'#4f86e8'},
-              {icon:'🔬', val:fmt(c2), suf:'+', label:'Apps Analyzed',       accent:'#c9a227'},
-              {icon:'🎯', val:c3,      suf:'%', label:'Accuracy Rate',       accent:'#4ade80'},
-              {icon:'⏱️', val:c4,     suf:'%', label:'Faster QA Cycles',    accent:'#fb923c'},
-            ].map((s, i) => (
-              <div key={s.label} className="stat__card" style={{'--accent': s.accent, '--i': i}}>
-                <span className="stat__ghost">{s.val}{s.suf}</span>
-                <span className="stat__icon">{s.icon}</span>
-                <div className="stat__val">{s.val}<span style={{color: s.accent}}>{s.suf}</span></div>
-                <div className="stat__label">{s.label}</div>
-                <div className="stat__bar"><div className="stat__fill" style={{background: s.accent}}/></div>
-              </div>
-            ))}
+  {
+    icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
+    val: fmt(c1), suf: '+', label: 'Scripts Generated', accent: '#4f86e8',
+  },
+  {
+    icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+    val: fmt(c2), suf: '+', label: 'Apps Analyzed', accent: '#c9a227',
+  },
+  {
+    icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+    val: c3, suf: '%', label: 'Accuracy Rate', accent: '#4ade80',
+  },
+  {
+    icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+    val: c4, suf: '%', label: 'Faster QA Cycles', accent: '#fb923c',
+  },
+].map((s, i) => (
+  <div key={s.label} className="stat__card" style={{ '--accent': s.accent, '--i': i }}>
+    <span className="stat__ghost">{s.val}{s.suf}</span>
+    <span className="stat__icon" style={{ color: s.accent }}>{s.icon}</span>
+    <div className="stat__val">{s.val}<span style={{ color: s.accent }}>{s.suf}</span></div>
+    <div className="stat__label">{s.label}</div>
+    <div className="stat__bar"><div className="stat__fill" style={{ background: s.accent }}/></div>
+  </div>
+))}
           </div>
         </div>
       </section>
@@ -498,35 +645,49 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ══ FOOTER ══ */}
-      <footer className="footer">
-        <div className="footer__inner">
-          <div className="footer__brand">
-  <div
-    className="nav__gem"
-    style={{
-      background: 'linear-gradient(135deg, #8a6a00, #C9A227, #E8C84A)',
-      boxShadow: '0 4px 16px rgba(201,162,39,0.5)'
-    }}
-  >
-    <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
-      <circle cx="22" cy="22" r="17" stroke="#060e1e" strokeWidth="2" fill="none" opacity="0.6"/>
-      <polyline points="13,22 20,30 32,14" stroke="#060e1e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-    </svg>
-  </div>
-  <div>
-    <div className="nav__name">NexTest</div>
-    <div className="nav__sub">Test Automation</div>
-  </div>
-</div>
-          <p className="footer__copy">© 2025–2026 NexTest · Software Engineering PFE — Cyrine Ben Hassen · Tac-Tic</p>
-          <nav className="footer__links">
-            {['Privacy', 'Terms', 'Documentation', 'Status'].map(l => (
-              <a key={l} href="#">{l}</a>
-            ))}
-          </nav>
+ {/* ══ FOOTER ══ */}
+<footer className="footer">
+  <div className="footer__inner">
+    <div className="footer__brand">
+      <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none' }}>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90" width="36" height="36" style={{ flexShrink: 0 }}>
+          <defs>
+            <linearGradient id="hexGradFooterDB" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#8a6a00"/>
+              <stop offset="40%" stopColor="#C9A227"/>
+              <stop offset="100%" stopColor="#E8C84A"/>
+            </linearGradient>
+            <filter id="glowFooterDB">
+              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+              <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <polygon points="45,8 77,27 77,63 45,82 13,63 13,27"
+            fill="rgba(201,162,39,0.08)" stroke="url(#hexGradFooterDB)" strokeWidth="2"/>
+          <circle cx="45" cy="8"  r="2.5" fill="#C9A227" opacity="0.7"/>
+          <circle cx="77" cy="27" r="2.5" fill="#C9A227" opacity="0.7"/>
+          <circle cx="77" cy="63" r="2.5" fill="#C9A227" opacity="0.7"/>
+          <circle cx="45" cy="82" r="2.5" fill="#C9A227" opacity="0.7"/>
+          <circle cx="13" cy="63" r="2.5" fill="#C9A227" opacity="0.7"/>
+          <circle cx="13" cy="27" r="2.5" fill="#C9A227" opacity="0.7"/>
+          <text x="45" y="56" textAnchor="middle"
+            fontFamily="Georgia, serif" fontSize="36" fontWeight="700"
+            fill="#C9A227" filter="url(#glowFooterDB)">N</text>
+        </svg>
+        <div>
+          <div className="nav__name">NexTest</div>
+          <div className="nav__sub">Test Automation</div>
         </div>
-      </footer>
+      </Link>
+    </div>
+    <p className="footer__copy">© 2025–2026 NexTest · Software Engineering PFE — Cyrine Ben Hassen · Tac-Tic</p>
+    <nav className="footer__links">
+      {['Privacy', 'Terms', 'Documentation', 'Status'].map(l => (
+        <a key={l} href="#">{l}</a>
+      ))}
+    </nav>
+  </div>
+</footer>
     </div>
   );
 }

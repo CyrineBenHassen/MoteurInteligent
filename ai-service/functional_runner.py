@@ -1,29 +1,52 @@
-# functional_runner.py — NexTest Functional Internal Test Runner (Playwright)
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
-# ── Credentials ANPE ─────────────────────────────────────────────────────────
-LOGIN_EMAIL    = "admin@admin.com"
-LOGIN_PASSWORD = "password1%Aa"
+from alert_recorder import record_results
 
-# ── JWT Token (même approche que regression_runner.py) ───────────────────────
-_CACHED_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJhMGRmOWI3My01MzZmLTQxZmUtOGM1Ny01MTUwOGQ2NDE0NjQiLCJqdGkiOiIxZTQzMmU2MTY5NWI4MjgxOGYwZmMxNzI5ZTY4ZTM5ZWM4ZjgwZjM2MmMyMDk4Y2Y5M2ViMGVjODJiYzI0NzUzZDlkMDA0YmNmMTk5MGU3NSIsImlhdCI6MTc4MTMwMTg1Mi40NzQ0MywibmJmIjoxNzgxMzAxODUyLjQ3NDQzMSwiZXhwIjoxNzk3MTEzMDUyLjQ3MjAwMywic3ViIjoiYTAxZWEwMDQtNTA3NC00NTEyLTllMGQtYTY3OTg0NWY1ZGNlIiwic2NvcGVzIjpbXX0.CdVfTqrS8OL7q0uadADPbknBstVExvBDb4cOQ67a187l5qA4Ze380hC1ABhgNypjO2boKcteAM34iAjeI4uJU-VKityh94ZDmt2HZe3SkfOSSklN9GdiuoFOqrkRdpoEEEnmUT1G4IOUeAf9ALcp8IOeWOZpgCLvxCIt49Bvjb5diWD39J2v9hBACc-i19X3VFpsOKoqjmjoaCx4EeyQuKzty2jyxUtjiaK9YIeVVJRHuJSE2DLOG6ij-crGUzYgDdMnEBD9frWLkIgc3QeTE_lYAxCWmY0KeJkSPAds90LN-mnlu2PikkKe5W7K5uI10O9p-lfSg7-du7vaTGXRTixHnrLeCBt9jXy19JrYSinpbU5ggeIcyPr7UolwI0Zv1EGqP740Abipr8EVNi1VJ5V_XutsFgqLQ3XmhjHBXWQUv-QdBOeNRveZLG9lI3w3tq_BRANSmwMTccG_Soh8HSS_Gz0ZWPAWDOeUtHTSrEh0jUIkty7aafNh8dgAcyVhETXIUOKTJBSiLRTUiH3hEiMHwwWDK38F9fyDAAGWglblJBwQuM_e-J8_-qmKj2fBCwvtgWiliIW_84cLUKG4ORfJM6eez7CJus0arsaZyCIrncFjf_qyJdRFT_LYDYTEYiokSbhlJ1brzPePzEC3HJyU6uDR-6SCNgqGAzj6Pzg"
+_CACHED_TOKEN = os.getenv("ANPE_TOKEN")
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Auth helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _inject_token(page, base_url: str) -> bool:
+def _inject_token(page, base_url: str, username: str = "", password: str = "") -> bool:
     """Inject JWT token + full localStorage into browser"""
     try:
         print(f"[FUNCTIONAL_RUNNER] Injecting token...")
-        page.goto(base_url, wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(2000)
+
+        # ── Si credentials fournis → login API pour token frais ──
+        if username and password:
+            import requests
+            try:
+                resp = requests.post(
+                    f"{base_url}/api/auth/login",
+                    json={"email": username.strip(), "password": password.strip()},
+                    verify=False,
+                    timeout=15
+                )
+                print(f"[DEBUG] API login status: {resp.status_code}")
+                print(f"[DEBUG] API login response: {resp.text[:200]}")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    fresh_token = data.get("token") or data.get("access_token")
+                    if fresh_token:
+                        print(f"[FUNCTIONAL_RUNNER] ✓ Fresh token via API login")
+                        page.goto(base_url, wait_until="domcontentloaded", timeout=30000)
+                        page.wait_for_timeout(1000)
+                        page.evaluate(f"localStorage.setItem('token', '{fresh_token}')")
+                        page.evaluate(f"localStorage.setItem('access_token', '{fresh_token}')")
+                        page.goto(f"{base_url}/dashboard", wait_until="domcontentloaded", timeout=30000)
+                        page.wait_for_timeout(3000)
+                        if "login" not in page.url.lower():
+                            print(f"[FUNCTIONAL_RUNNER] ✓ Token injection successful")
+                            return True
+            except Exception as e:
+                print(f"[FUNCTIONAL_RUNNER] API login failed: {e}")
+                return _login_form(page, base_url, username, password)
+            
+        
 
         _PERMISSIONS = '[{"id":"0794c877-c77e-4a97-8b06-cb6a3146fbbe","name":"verify_completeness_ed","type_code":"ed"},{"id":"31d71f0e-b76d-4417-902a-4ad1ac898917","name":"view_dashboard","type_code":"dashboard"},{"id":"a57fcffd-165c-4eda-a419-32370bc5a7ea","name":"view_statistiques","type_code":"statistiques"},{"id":"bc41cdae-c3dd-40ae-b47d-89def93fd1d7","name":"read_commission","type_code":"commissions"},{"id":"7ecb6362-67fe-4693-8057-15d3d1e53377","name":"refuse_visite","type_code":"visite"},{"id":"b4287f83-af63-4f9b-a42d-9a1747556561","name":"accept_visite","type_code":"visite"},{"id":"465b2adf-f586-489a-abda-09bc4a8fd9d1","name":"read_dossiers","type_code":"reception"}]'
-
+ 
         _ROLES = '[{"id":"a01ea004-0189-40e7-8dca-5f3e21a96630","name":"super_admin","permissions":[]}]'
 
         _USER = '{"id":"a01ea004-5074-4512-9e0d-a679845f5dce","fullName":"Super Admin","email":"admin@admin.com","is_super":true,"status":"active"}'
@@ -41,6 +64,9 @@ def _inject_token(page, base_url: str) -> bool:
             "permissions":    _PERMISSIONS,
             "roles":          _ROLES,
         }
+        
+        page.goto(base_url, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(2000)
 
         for key, value in storage_items.items():
             page.evaluate(f"localStorage.setItem({repr(key)}, {repr(value)})")
@@ -53,23 +79,23 @@ def _inject_token(page, base_url: str) -> bool:
             return True
         else:
             print(f"[FUNCTIONAL_RUNNER] ✗ Token rejected — trying form login")
-            return _login_form(page, base_url)
+            return _login_form(page, base_url, username, password)  
 
     except Exception as e:
         print(f"[FUNCTIONAL_RUNNER] Token injection error: {e}")
         return _login_form(page, base_url)
 
-def _login_form(page, base_url: str) -> bool:
+def _login_form(page, base_url: str, username: str = "", password: str = "") -> bool:
     """Fallback — login with real credentials via form"""
     try:
-        login_url = f"{base_url}/admin-anpe/login"
+        login_url = f"{base_url}/login"
         page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
         page.wait_for_timeout(3000)
 
         for sel in ["#basic_email", "input[type='email']", "input[name='email']"]:
             try:
                 if page.is_visible(sel):
-                    page.fill(sel, LOGIN_EMAIL)
+                    page.fill(sel, username)
                     break
             except:
                 continue
@@ -77,7 +103,7 @@ def _login_form(page, base_url: str) -> bool:
         for sel in ["#basic_password", "input[type='password']", "input[name='password']"]:
             try:
                 if page.is_visible(sel):
-                    page.fill(sel, LOGIN_PASSWORD)
+                    page.fill(sel, password)
                     break
             except:
                 continue
@@ -100,9 +126,7 @@ def _login_form(page, base_url: str) -> bool:
         return False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Single test executor
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def _run_one_functional(page, tc: dict, base_url: str) -> dict:
     """Execute a single functional test case"""
@@ -126,7 +150,6 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
         return sel.replace("'", '"')
 
     try:
-        # ── NAVIGATE ─────────────────────────────────────────────────────────
         if action == "navigate":
             page.goto(url, wait_until="domcontentloaded", timeout=40000)
             page.wait_for_timeout(wait_after)
@@ -156,7 +179,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                     final_status = "pass"
                     reason = f"Page chargée ✓ | {title[:40] if title else 'N/A'}"
 
-        # ── FILL ─────────────────────────────────────────────────────────────
+        
         elif action == "fill":
             # For login page: clear token first
             if "login" in url:
@@ -188,7 +211,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 final_status = "fail"
                 reason = f"Erreur fill '{selector}': {str(e)[:60]}"
 
-        # ── CLICK ─────────────────────────────────────────────────────────────
+        
         elif action == "click":
             if "login" in url:
                 page.evaluate("() => { localStorage.clear(); sessionStorage.clear(); }")
@@ -212,7 +235,6 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 final_status = "fail"
                 reason = f"Erreur click '{selector}': {str(e)[:60]}"
 
-        # ── CHECK VISIBLE ─────────────────────────────────────────────────────
         elif action == "check_visible":
             if "login" in url:
                 page.evaluate("() => { localStorage.clear(); sessionStorage.clear(); }")
@@ -241,7 +263,6 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 final_status = "fail"
                 reason = f"Élément '{selector}' introuvable sur la page"
 
-         # ── CHECK TEXT ────────────────────────────────────────────────────────
         elif action == "check_text":
             page.goto(url, wait_until="domcontentloaded", timeout=25000)
             page.wait_for_timeout(wait_after)
@@ -249,7 +270,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
             content = page.content()
             text_to_find = selector or fill_value
 
-            # Si text_to_find est trop générique (ex: "body"), forcer un vrai check
+            
             generic_selectors = ["body", "html", "div", ""]
             if not text_to_find or text_to_find.lower().strip() in generic_selectors:
                 final_status = "fail"
@@ -261,7 +282,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 final_status = "fail"
                 reason = f"Texte '{text_to_find}' NON trouvé sur la page"
 
-        # ── SELECT ────────────────────────────────────────────────────────────
+        
         elif action == "select":
             page.goto(url, wait_until="domcontentloaded", timeout=25000)
             page.wait_for_timeout(wait_after)
@@ -280,7 +301,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 final_status = "fail"
                 reason = f"Erreur select '{selector}': {str(e)[:60]}"
 
-        # ── HOVER ─────────────────────────────────────────────────────────────
+       
         elif action == "hover":
             page.goto(url, wait_until="domcontentloaded", timeout=25000)
             page.wait_for_timeout(wait_after)
@@ -296,7 +317,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 final_status = "fail"
                 reason = f"Erreur hover '{selector}': {str(e)[:60]}"
 
-        # ── LOGOUT ────────────────────────────────────────────────────────────
+        
         elif action == "logout":
             page.goto(url, wait_until="domcontentloaded", timeout=25000)
             page.wait_for_timeout(wait_after)
@@ -335,7 +356,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 final_status = "fail"
                 reason = "Bouton logout introuvable"
                 
-        # ── AUTH SUCCESS TEST ─────────────────────────────────────────────────
+        
         elif action == "auth_success":
             page.evaluate("() => { localStorage.clear(); sessionStorage.clear(); }")
             
@@ -527,7 +548,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
 # Main runner
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_functional_tests(test_cases: list, base_url: str) -> dict:
+def run_functional_tests(test_cases: list, base_url: str, username: str = "", password: str = "") -> dict:
     """Run all functional tests with Playwright"""
 
     print(f"[FUNCTIONAL_RUNNER] Running {len(test_cases)} functional tests on {base_url}")
@@ -557,7 +578,7 @@ def run_functional_tests(test_cases: list, base_url: str) -> dict:
         needs_login  = any(tc.get("requires_login", True) for tc in test_cases)
 
         if needs_login:
-            logged_in = _inject_token(page, base_url)
+            logged_in = _inject_token(page, base_url, username, password) 
             if not logged_in:
                 print(f"[FUNCTIONAL_RUNNER] ⚠ Login failed — tests requiring auth may fail")
 
@@ -603,6 +624,11 @@ def run_functional_tests(test_cases: list, base_url: str) -> dict:
     print(f"[FUNCTIONAL_RUNNER] DONE | {pass_count} pass / {fail_count} fail / {skip_count} skip | {pass_rate}%")
     for cat, stats in cat_stats.items():
         print(f"[FUNCTIONAL_RUNNER]   {cat}: {stats['pass']}/{stats['total']} ({stats['rate']}%)")
+        
+    # ── Alerts ────────────────────────────────────────────────────────────────────
+    gen_id     = test_cases[0].get("generation_id") if test_cases else None
+    project_id = test_cases[0].get("project_id")    if test_cases else None
+    record_results(results, base_url, "functional", "Playwright", gen_id, project_id)
 
     return {
         "results":        results,

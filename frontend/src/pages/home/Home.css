@@ -93,6 +93,9 @@ html { scroll-behavior: smooth; }
   border-radius: 7px;
   border: 1px solid transparent;
   transition: all 0.22s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 .nav__links a::after {
   content: ''; position: absolute; bottom: 2px; left: 12px; right: 12px;
@@ -687,15 +690,14 @@ html { scroll-behavior: smooth; }
 
 .feat__top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px; position: relative; z-index: 1; }
 .feat__icon {
-  width: 56px; height: 56px; border-radius: 16px; font-size: 28px;
-  background: rgba(201,162,39,0.07);
-  border: 1px solid rgba(201,162,39,0.15);
+  width: 56px; height: 56px; border-radius: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
   display: flex; align-items: center; justify-content: center;
   transition: transform 0.3s var(--ease2), box-shadow 0.3s;
 }
 .feat__card:hover .feat__icon {
   transform: scale(1.12) rotate(-6deg);
-  box-shadow: 0 8px 24px rgba(201,162,39,0.2);
 }
 .feat__tag {
   font-family: var(--D); font-size: 9px; font-weight: 600;
@@ -760,10 +762,11 @@ html { scroll-behavior: smooth; }
   font-family: var(--D); font-size: 10px; font-weight: 600;
   color: var(--gold); letter-spacing: 3px; margin-bottom: 22px; opacity: 0.5;
 }
-.how__icon { font-size: 48px; margin-bottom: 22px; display: block; filter: drop-shadow(0 4px 12px rgba(201,162,39,0.15)); }
-.how__title {
-  font-family: var(--C); font-size: 20px; font-weight: 600;
-  color: var(--white); margin-bottom: 12px;
+.how__icon {
+  display: flex; align-items: center; justify-content: center; /* ← modifier */
+  color: var(--gold); /* ← ajouter */
+  margin-bottom: 22px;
+  filter: drop-shadow(0 4px 12px rgba(201,162,39,0.15));
 }
 .how__desc { font-size: 13px; color: var(--muted); line-height: 1.8; font-weight: 300; }
 
@@ -803,7 +806,10 @@ html { scroll-behavior: smooth; }
   color: rgba(201,162,39,0.03); pointer-events: none; white-space: nowrap;
   letter-spacing: -5px; user-select: none;
 }
-.stat__icon { font-size: 38px; margin-bottom: 20px; display: block; position: relative; }
+.stat__icon {
+  display: flex; align-items: center; justify-content: center; /* ← modifier */
+  margin-bottom: 20px; position: relative;
+}
 .stat__val {
   font-family: var(--C); font-size: 62px; font-weight: 600;
   color: var(--white); line-height: 1; margin-bottom: 12px; display: block;

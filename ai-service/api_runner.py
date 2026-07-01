@@ -5,12 +5,15 @@ import urllib3
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
+from alert_recorder import record_results
 
 load_dotenv()
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-_CACHED_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJhMGRmOWI3My01MzZmLTQxZmUtOGM1Ny01MTUwOGQ2NDE0NjQiLCJqdGkiOiIxNzYwZGZhMzFiOTQ3ZTY5ZjNlMmI2MWRlOTdiMDIzOWIyYTIzNTZjMmRhY2M5MTEzMmFjODBjNmJlMzU5NWEyZGRiNGU4ZjE5NjJlNGNkZCIsImlhdCI6MTc4MDQ3NzkwOC4yNjgxNTUsIm5iZiI6MTc4MDQ3NzkwOC4yNjgxNTYsImV4cCI6MTc5NjI4OTEwOC4yNjcxNDMsInN1YiI6ImEwMWVhMDA0LTUwNzQtNDUxMi05ZTBkLWE2Nzk4NDVmNWRjZSIsInNjb3BlcyI6W119.eL4_5H9Ns9YgmhgLr9krcCs8CcI2HjYosuEbOvURBR44N2f9L3XMwwVDHQpYQb-7PMypSPn_9e_9D4qkujhqZRwnN14UPQa8uaQRCgDas_eerQJDVgU3heIAlfOXDfM5zHOqRZlMx5wK_LYSdeH2ew7WUyGdTqptZcjusZ514lPgqyxx6IAeB4ni6PpmIepCsgjy0fFsrz_38B5dhJkxuntGbvWaUUBlmBQT11lkojSMb1VhdUnSI678VhGPXJyY9Gj-hchD7lYEDpu4k4hNukHu2Z7IiXPUJTQjy3llRlPrBjy0sag3n0yKfaCZNB3rrWQuWNW8s07_46gtNnM4vXgBalz4cvFJzJWobj60bWifJOGvVa29_2ZG1-gVsvEW8JdOjJT0WaG_JV6KKghUa1DQkRi4FbROTxOxutAs-HuqNmGW9QVhJltpSlw6e74Eee7z_47aFb9pzdAl_304W45rVVSn5E3hF3I0nj4bQcQmF8j6eqQE1z9AFLm3zcUfGujLoRygqAgwd9-Ljbj8JCrcKH70C_smcsZVMtF4-_xZbguJ7j2Vriao4ml0zYmUfkx2fcZ9zEROsD_wY0cJkn2cMW2GTtQJ8axnuuLt5i8-b_0fqGqis9vb_q-v7m0pIH_d8EqcVX7BRgG55YsVizijRBKCMh7_iriKDpPoeto"
+_CACHED_TOKEN = os.getenv("ANPE_TOKEN")
+print(f"[DEBUG] ANPE_TOKEN loaded: {str(_CACHED_TOKEN)[:30] if _CACHED_TOKEN else 'NONE'}")
+
 
 def _get_nested(obj: dict, path: str):
     """Navigate nested dict using dot notation e.g. 'data.token'"""
@@ -387,7 +390,11 @@ def run_api_tests(test_cases: list, token: str = "") -> dict:
 
     print(f"[API_RUNNER] DONE | {pass_count} pass / {fail_count} fail | {pass_rate}% | {duration_total}s")
 
-    
+    # ── Alerts ────────────────────────────────────────────────────────────────
+    gen_id     = test_cases[0].get("generation_id") if test_cases else None
+    project_id = test_cases[0].get("project_id")    if test_cases else None
+    base_url   = test_cases[0].get("url", "") if test_cases else ""
+    record_results(results, base_url, "api", "Pytest", gen_id, project_id)
 
     return {
         "results":    results,

@@ -1,26 +1,44 @@
-# security_runner.py — NexTest Security Test Runner
-# Uses Playwright to test FRONTEND security with JWT token
-# Target: https://anpe.demopro.tn:10443
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 import asyncio
 import time
 import json
 import requests
 import urllib3
+from alert_recorder import record_results
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# ── Cached token — remplace par ton token actuel ─────────────────────────────
-_CACHED_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJhMGRmOWI3My01MzZmLTQxZmUtOGM1Ny01MTUwOGQ2NDE0NjQiLCJqdGkiOiIxZTQzMmU2MTY5NWI4MjgxOGYwZmMxNzI5ZTY4ZTM5ZWM4ZjgwZjM2MmMyMDk4Y2Y5M2ViMGVjODJiYzI0NzUzZDlkMDA0YmNmMTk5MGU3NSIsImlhdCI6MTc4MTMwMTg1Mi40NzQ0MywibmJmIjoxNzgxMzAxODUyLjQ3NDQzMSwiZXhwIjoxNzk3MTEzMDUyLjQ3MjAwMywic3ViIjoiYTAxZWEwMDQtNTA3NC00NTEyLTllMGQtYTY3OTg0NWY1ZGNlIiwic2NvcGVzIjpbXX0.CdVfTqrS8OL7q0uadADPbknBstVExvBDb4cOQ67a187l5qA4Ze380hC1ABhgNypjO2boKcteAM34iAjeI4uJU-VKityh94ZDmt2HZe3SkfOSSklN9GdiuoFOqrkRdpoEEEnmUT1G4IOUeAf9ALcp8IOeWOZpgCLvxCIt49Bvjb5diWD39J2v9hBACc-i19X3VFpsOKoqjmjoaCx4EeyQuKzty2jyxUtjiaK9YIeVVJRHuJSE2DLOG6ij-crGUzYgDdMnEBD9frWLkIgc3QeTE_lYAxCWmY0KeJkSPAds90LN-mnlu2PikkKe5W7K5uI10O9p-lfSg7-du7vaTGXRTixHnrLeCBt9jXy19JrYSinpbU5ggeIcyPr7UolwI0Zv1EGqP740Abipr8EVNi1VJ5V_XutsFgqLQ3XmhjHBXWQUv-QdBOeNRveZLG9lI3w3tq_BRANSmwMTccG_Soh8HSS_Gz0ZWPAWDOeUtHTSrEh0jUIkty7aafNh8dgAcyVhETXIUOKTJBSiLRTUiH3hEiMHwwWDK38F9fyDAAGWglblJBwQuM_e-J8_-qmKj2fBCwvtgWiliIW_84cLUKG4ORfJM6eez7CJus0arsaZyCIrncFjf_qyJdRFT_LYDYTEYiokSbhlJ1brzPePzEC3HJyU6uDR-6SCNgqGAzj6Pzg"
-
-LOGIN_URL = "/admin-anpe/login"
+#Cached token just for anpe
+_CACHED_TOKEN = os.getenv("ANPE_TOKEN")
 
 
-async def _inject_token(page, token: str, frontend_url: str):
-    """Navigate to app and inject JWT token into localStorage"""
-    await page.goto(f"{frontend_url}{LOGIN_URL}", wait_until="domcontentloaded", timeout=15000)
-    await page.evaluate(f"localStorage.setItem('token', '{token}')")
-    print(f"[SECURITY_RUNNER] Token injected into localStorage")
+LOGIN_URL = "/login"
+
+
+
+async def _inject_token(page, token: str, frontend_url: str, login_url: str = "/login", username: str = '', password: str = ''):
+    from urllib.parse import urlparse
+    parsed = urlparse(frontend_url)
+    clean_frontend = f"{parsed.scheme}://{parsed.netloc}"
+    
+    if token:
+        # ANPE → bypass captcha avec token
+        await page.goto(f"{clean_frontend}{login_url}", wait_until="domcontentloaded", timeout=15000)
+        await page.evaluate(f"localStorage.setItem('token', '{token}')")
+        print(f"[SECURITY_RUNNER] Token injected into localStorage")
+    elif username and password:
+        # Autre app → form login normal
+        await page.goto(f"{clean_frontend}{login_url}", wait_until="domcontentloaded", timeout=15000)
+        await page.fill("input[type='email'], input[name='email']", username)
+        await page.fill("input[type='password']", password)
+        await page.click("button[type='submit']")
+        await page.wait_for_timeout(2000)
+        print(f"[SECURITY_RUNNER] Logged in with credentials")
 
 
 async def _run_one_playwright(tc: dict, token: str) -> dict:
@@ -29,7 +47,8 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
 
     test_type       = tc.get("test_type", "no_token")
     url             = tc.get("url", "")
-    frontend_url    = tc.get("frontend_url", "https://anpe.demopro.tn:10443")
+    frontend_url    = tc.get("frontend_url", url)
+    login_url       = tc.get("login_url", "/login")
     inject_field    = tc.get("inject_field")
     inject_value    = tc.get("inject_value")
     expect          = tc.get("expect", "redirect_to_login")
@@ -79,11 +98,10 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
                     final_status = "fail"
                     reason = f"✗ Invalid token ACCEPTED! Dashboard accessible at: {current_url} — Critical vulnerability!"
 
-            # ── TEST: XSS injection ──
-            # ── TEST: Invalid/expired token ───────────────────────────
+            
             elif test_type == "expired_token":
                 fake_token = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJmYWtlIiwiZXhwIjoxMDAwMH0.invalidsignature"
-                await page.goto(f"{frontend_url}{LOGIN_URL}", wait_until="domcontentloaded", timeout=15000)
+                await page.goto(f"{frontend_url}{login_url}", wait_until="domcontentloaded", timeout=15000)
                 await page.evaluate(f"localStorage.setItem('token', '{fake_token}')")
                 await page.goto(url, wait_until="domcontentloaded", timeout=15000)
                 await page.wait_for_timeout(2000)
@@ -109,12 +127,12 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
                     final_status = "fail"
                     reason = f"✗ Invalid token ACCEPTED! Dashboard accessible at: {current_url} — Critical vulnerability!"
 
-            # ── TEST: XSS injection ───────────────────────────────────
-
-            # ── TEST: XSS injection ───────────────────────────────────────────
+            
             elif test_type == "xss_input":
                 # Inject valid token first
-                await _inject_token(page, token, frontend_url)
+                await _inject_token(page, token, frontend_url, login_url, tc.get("username", ""), tc.get("password", ""))
+
+
                 await page.goto(url, wait_until="domcontentloaded", timeout=15000)
                 await page.wait_for_timeout(2000)
 
@@ -168,9 +186,10 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
                     final_status = "pass"
                     reason = f"✓ XSS input sanitized — no script execution detected ✓"
 
-            # ── TEST: localStorage inspection ─────────────────────────────────
+            #TEST: localStorage inspection
             elif test_type == "dom_inspect" or check_ls:
-                await _inject_token(page, token, frontend_url)
+                await _inject_token(page, token, frontend_url, login_url, tc.get("username", ""), tc.get("password", ""))
+
                 await page.goto(url, wait_until="domcontentloaded", timeout=15000)
                 await page.wait_for_timeout(2000)
 
@@ -209,7 +228,7 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
                     final_status = "pass"
                     reason = f"✓ No sensitive data exposed in localStorage or DOM ✓"
 
-            # ── TEST: Security headers ────────────────────────────────────────
+            #TEST: Security headers
             elif test_type == "header_check" or check_headers:
                 try:
                     resp = requests.get(url, verify=False, timeout=10)
@@ -230,10 +249,11 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
                     final_status = "warn"
                     reason = f"Could not check headers: {str(e)[:80]}"
 
-            # ── TEST: Direct navigation (protected route) ─────────────────────
+            #TEST: Direct navigation (protected route)
             elif test_type == "direct_nav":
                 # Clear storage — simulate unauthenticated user
-                await page.goto(f"{frontend_url}{LOGIN_URL}", wait_until="domcontentloaded", timeout=15000)
+                await page.goto(frontend_url, wait_until="domcontentloaded", timeout=15000)
+
                 await page.evaluate("localStorage.clear(); sessionStorage.clear();")
 
                 await page.goto(url, wait_until="domcontentloaded", timeout=15000)
@@ -247,13 +267,14 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
                     final_status = "fail"
                     reason = f"✗ Protected route accessible without auth! URL: {current_url}"
 
-            # ── TEST: Logout clears token ─────────────────────────────────────
+            #TEST: Logout clears token
             elif test_type == "logout":
-                await _inject_token(page, token, frontend_url)
+                await _inject_token(page, token, frontend_url, login_url, tc.get("username", ""), tc.get("password", ""))
+
                 await page.goto(url, wait_until="domcontentloaded", timeout=15000)
                 await page.wait_for_timeout(2000)
 
-                # Try to find and click logout
+                
                 logout_selectors = [
                     "button:has-text('Déconnexion')",
                     "button:has-text('Logout')",
@@ -272,7 +293,7 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
                         continue
 
                 if not logout_clicked:
-                    # Clear manually
+                    
                     await page.evaluate("localStorage.removeItem('token')")
 
                 await page.wait_for_timeout(1500)
@@ -285,9 +306,9 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
                     final_status = "fail"
                     reason = f"✗ Token still present after logout! Session not properly terminated."
 
-            # ── TEST: Brute force login ───────────────────────────────────────
+            #TEST: Brute force login
             elif test_type == "brute_force":
-                await page.goto(f"{frontend_url}{LOGIN_URL}", wait_until="domcontentloaded", timeout=15000)
+                await page.goto(f"{frontend_url}{login_url}", wait_until="domcontentloaded", timeout=15000)
                 await page.wait_for_timeout(1000)
 
                 blocked = False
@@ -328,8 +349,9 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
                     reason = f"No rate limiting detected after 5 attempts — consider adding CAPTCHA/rate limiting"
 
             else:
-                # Fallback — basic page load check
-                await _inject_token(page, token, frontend_url)
+                #Fallback — basic page load check
+                await _inject_token(page, token, frontend_url, login_url, tc.get("username", ""), tc.get("password", ""))
+
                 await page.goto(url, wait_until="domcontentloaded", timeout=15000)
                 await page.wait_for_timeout(1000)
                 current_url = page.url
@@ -403,6 +425,15 @@ def run_security_tests(test_cases: list, token: str = "") -> dict:
 
     print(f"[SECURITY_RUNNER] DONE | {pass_count} pass / {warn_count} warn / "
           f"{fail_count} fail | {pass_rate}%")
+    
+    
+    #Alerts
+    gen_id     = test_cases[0].get("generation_id") if test_cases else None
+    project_id = test_cases[0].get("project_id")    if test_cases else None
+    base_url   = test_cases[0].get("url", "")       if test_cases else ""
+    record_results(results, base_url, "security", "Pytest", gen_id, project_id)
+
+    
 
     return {
         "results":    results,

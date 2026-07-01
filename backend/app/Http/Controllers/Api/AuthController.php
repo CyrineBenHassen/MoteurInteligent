@@ -37,8 +37,9 @@ class AuthController extends Controller
     }
 
     # Login
-    # Login
-public function login(Request $request)
+    
+
+    public function login(Request $request)
 {
     $request->validate([
         'email'    => 'required|email',
@@ -56,7 +57,13 @@ public function login(Request $request)
     $user->tokens()->delete();
     $token = $user->createToken('auth_token')->plainTextToken;
 
-    // ← fix avatar
+    // update D'ABORD
+    $user->update([
+        'last_login_ip' => $request->ip(),
+        'last_login_at' => now(),
+    ]);
+
+    // toArray() APRÈS
     $userData = $user->toArray();
     if (!empty($userData['avatar']) && !str_starts_with($userData['avatar'], 'http')) {
         $userData['avatar'] = asset('storage/' . $userData['avatar']);
@@ -64,7 +71,7 @@ public function login(Request $request)
 
     return response()->json([
         'message'      => 'Connexion réussie',
-        'user'         => $userData,  // ← pas $user direct
+        'user'         => $userData,
         'access_token' => $token,
         'token_type'   => 'Bearer',
     ]);
@@ -91,6 +98,8 @@ public function me(Request $request)
     if (!empty($data['avatar']) && !str_starts_with($data['avatar'], 'http')) {
         $data['avatar'] = asset('storage/' . $data['avatar']);
     }
+
+    $data['session_count'] = $user->tokens()->count(); 
     
     return response()->json($data);
 }

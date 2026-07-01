@@ -1,16 +1,16 @@
-# regression_runner.py — NexTest Regression Test Runner (Playwright)
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
 import time
 import json
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from alert_recorder import record_results
 
-# ── Credentials ANPE ─────────────────────────────────────────────────────────
-LOGIN_EMAIL    = "admin@admin.com"
-LOGIN_PASSWORD = "password1%Aa"
 
-# ── Token ANPE (même approche que api_runner.py) ─────────────────────────────
-_CACHED_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJhMGRmOWI3My01MzZmLTQxZmUtOGM1Ny01MTUwOGQ2NDE0NjQiLCJqdGkiOiIxZTQzMmU2MTY5NWI4MjgxOGYwZmMxNzI5ZTY4ZTM5ZWM4ZjgwZjM2MmMyMDk4Y2Y5M2ViMGVjODJiYzI0NzUzZDlkMDA0YmNmMTk5MGU3NSIsImlhdCI6MTc4MTMwMTg1Mi40NzQ0MywibmJmIjoxNzgxMzAxODUyLjQ3NDQzMSwiZXhwIjoxNzk3MTEzMDUyLjQ3MjAwMywic3ViIjoiYTAxZWEwMDQtNTA3NC00NTEyLTllMGQtYTY3OTg0NWY1ZGNlIiwic2NvcGVzIjpbXX0.CdVfTqrS8OL7q0uadADPbknBstVExvBDb4cOQ67a187l5qA4Ze380hC1ABhgNypjO2boKcteAM34iAjeI4uJU-VKityh94ZDmt2HZe3SkfOSSklN9GdiuoFOqrkRdpoEEEnmUT1G4IOUeAf9ALcp8IOeWOZpgCLvxCIt49Bvjb5diWD39J2v9hBACc-i19X3VFpsOKoqjmjoaCx4EeyQuKzty2jyxUtjiaK9YIeVVJRHuJSE2DLOG6ij-crGUzYgDdMnEBD9frWLkIgc3QeTE_lYAxCWmY0KeJkSPAds90LN-mnlu2PikkKe5W7K5uI10O9p-lfSg7-du7vaTGXRTixHnrLeCBt9jXy19JrYSinpbU5ggeIcyPr7UolwI0Zv1EGqP740Abipr8EVNi1VJ5V_XutsFgqLQ3XmhjHBXWQUv-QdBOeNRveZLG9lI3w3tq_BRANSmwMTccG_Soh8HSS_Gz0ZWPAWDOeUtHTSrEh0jUIkty7aafNh8dgAcyVhETXIUOKTJBSiLRTUiH3hEiMHwwWDK38F9fyDAAGWglblJBwQuM_e-J8_-qmKj2fBCwvtgWiliIW_84cLUKG4ORfJM6eez7CJus0arsaZyCIrncFjf_qyJdRFT_LYDYTEYiokSbhlJ1brzPePzEC3HJyU6uDR-6SCNgqGAzj6Pzg"
-def _inject_token(page, base_url: str) -> bool:
+#token for captcha
+_CACHED_TOKEN = os.getenv("ANPE_TOKEN")
+
+def _inject_token(page, base_url: str, username: str = "", password: str = "") -> bool:
     """Inject JWT token into browser localStorage — same token as api_runner.py"""
     try:
         print(f"[REGRESSION_RUNNER] Injecting token into browser...")
@@ -43,17 +43,17 @@ def _inject_token(page, base_url: str) -> bool:
             return True
         else:
             print(f"[REGRESSION_RUNNER] ✗ Token rejected — trying real login...")
-            return _login_form(page, base_url)
+            return _login_form(page, base_url, username, password)
 
     except Exception as e:
         print(f"[REGRESSION_RUNNER] Token injection error: {e}")
         return _login_form(page, base_url)
 
 
-def _login_form(page, base_url: str) -> bool:
+def _login_form(page, base_url: str, username: str = "", password: str = "") -> bool:
     """Fallback — login with form if token injection fails"""
     try:
-        login_url = f"{base_url}/admin-anpe/login"
+        login_url = f"{base_url}/login"
         page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
         page.wait_for_timeout(3000)
 
@@ -68,7 +68,7 @@ def _login_form(page, base_url: str) -> bool:
         for sel in ["input[type='email']", "input[name='email']", "input:nth-of-type(1)"]:
             try:
                 if page.is_visible(sel):
-                    page.fill(sel, LOGIN_EMAIL)
+                    page.fill(sel, username)
                     break
             except:
                 continue
@@ -76,7 +76,7 @@ def _login_form(page, base_url: str) -> bool:
         for sel in ["input[type='password']", "input[name='password']"]:
             try:
                 if page.is_visible(sel):
-                    page.fill(sel, LOGIN_PASSWORD)
+                    page.fill(sel, password)
                     break
             except:
                 continue
@@ -118,6 +118,15 @@ def _run_one_regression(page, tc: dict, base_url: str) -> dict:
     try:
         # ── Navigate to page ─────────────────────────────────────────────────
         if action == "navigate" or not action:
+            if tc.get("requires_login", True):
+                page.evaluate(f"""
+                    () => {{
+                        localStorage.setItem('token', '{_CACHED_TOKEN}');
+                        localStorage.setItem('access_token', '{_CACHED_TOKEN}');
+                        localStorage.setItem('authToken', '{_CACHED_TOKEN}');
+                        localStorage.setItem('auth_token', '{_CACHED_TOKEN}');
+                    }}
+                 """)
             page.goto(url, wait_until="networkidle", timeout=20000)
             page.wait_for_timeout(1500)
 
@@ -145,8 +154,8 @@ def _run_one_regression(page, tc: dict, base_url: str) -> dict:
         elif action == "check_visible" and selector:
             if "login" in url:
                 page.evaluate("() => { localStorage.clear(); sessionStorage.clear(); }")
-                page.goto(url, wait_until="domcontentloaded", timeout=20000)
-                page.wait_for_timeout(3000)
+                page.goto(url, wait_until="networkidle", timeout=20000)
+                page.wait_for_timeout(5000)
             else:
                 page.evaluate(f"""
                     () => {{
@@ -155,8 +164,8 @@ def _run_one_regression(page, tc: dict, base_url: str) -> dict:
                         localStorage.setItem('authToken', '{_CACHED_TOKEN}');
                     }}
                 """)
-                page.goto(url, wait_until="domcontentloaded", timeout=20000)
-                page.wait_for_timeout(3000)
+                page.goto(url, wait_until="networkidle", timeout=20000)
+                page.wait_for_timeout(5000)
 
             try:
                 # Fix guillemets pour input[type='email']
@@ -255,7 +264,7 @@ def _run_one_regression(page, tc: dict, base_url: str) -> dict:
     }
 
 
-def run_regression_tests(test_cases: list, base_url: str) -> dict:
+def run_regression_tests(test_cases: list, base_url: str, username: str = "", password: str = "") -> dict:
     """Run all regression tests with Playwright"""
 
     print(f"[REGRESSION_RUNNER] Running {len(test_cases)} regression tests")
@@ -279,7 +288,7 @@ def run_regression_tests(test_cases: list, base_url: str) -> dict:
         needs_login = any(tc.get("requires_login", True) for tc in test_cases)
 
         if needs_login:
-            logged_in = _inject_token(page, base_url)
+            logged_in = _inject_token(page, base_url, username, password)
             if not logged_in:
                 print(f"[REGRESSION_RUNNER] ⚠ Login failed — running without session")
 
@@ -317,7 +326,14 @@ def run_regression_tests(test_cases: list, base_url: str) -> dict:
     pass_rate  = round(pass_count / executed * 100) if executed else 0
 
     print(f"[REGRESSION_RUNNER] DONE | {pass_count} pass / {fail_count} fail / {skip_count} skip | {pass_rate}%")
-
+     
+     
+     
+    # ── Alerts ────────────────────────────────────────────────────────────────────
+    gen_id     = test_cases[0].get("generation_id") if test_cases else None
+    project_id = test_cases[0].get("project_id")    if test_cases else None
+    record_results(results, base_url, "functional", "Playwright", gen_id, project_id)
+    
     return {
         "results":    results,
         "pass_count": pass_count,

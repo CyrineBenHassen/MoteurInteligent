@@ -1,5 +1,3 @@
-# regression_generator.py — NexTest Regression Test Generator (LLaMA-powered)
-
 import json
 import os
 import requests
@@ -15,36 +13,59 @@ groq_client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY"),
 )
 
-# ── Pages ANPE connues ────────────────────────────────────────────────────────
-ANPE_PAGES = [
-    "/statistiques",
-    "/dashboard",
-    "/reception",
-    "/outbox",
-    "/traitement_dossier_eie",
-    "/traitement_dossier_ed",
-    "/traitement_dossier_avis",
-    "/traitement_dossier_transaction",
-    "/gestion_commission",
-    "/reunions",
-    "/traitement_dossier_cc",
-    "/visites",
-    "/traitement_dossier_af",
-    "/ancien_module_eie", #fausse url n'existe pas dans anpe
+DEFAULT_PATHS = [
+    "/dashboard", "/login", "/home", "/admin", "/index",
+    "/profile", "/settings", "/users", "/reports", "/statistics",
 ]
 
-def _discover_pages(base_url: str) -> list:
-    """Check which pages respond (not 404)"""
+
+def _extract_pages_from_doc(doc_text: str) -> list:
+    """Use LLM to extract page paths from documentation"""
+    print("[REGRESSION_GENERATOR] Extracting pages from doc_text via LLM...")
+    try:
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a path extractor. Extract all page/route paths from the documentation. "
+                        "Return ONLY a JSON array of strings like [\"/dashboard\", \"/login\"]. "
+                        "No markdown, no explanation, no extra text."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Extract all page/route paths from this documentation:\n\n{doc_text[:3000]}",
+                },
+            ],
+            temperature=0.1,
+            max_tokens=500,
+        )
+        raw = resp.choices[0].message.content.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        paths = json.loads(raw.strip())
+        if isinstance(paths, list) and len(paths) > 0:
+            print(f"[REGRESSION_GENERATOR] LLM extracted {len(paths)} paths from doc")
+            return paths
+        raise ValueError("Empty or invalid paths list")
+    except Exception as e:
+        print(f"[REGRESSION_GENERATOR] Doc extraction error: {e} — using defaults")
+        return DEFAULT_PATHS
+
+
+def _discover_pages(base_url: str, paths: list) -> list:
+    """Check which pages actually respond (not 404/500)"""
     discovered = []
     print(f"[REGRESSION_GENERATOR] Probing pages on {base_url}...")
 
-    for path in ANPE_PAGES:
+    for path in paths:
         url = f"{base_url}{path}"
         try:
-            resp = requests.get(
-                url, verify=False, timeout=5,
-                allow_redirects=True,
-            )
+            resp = requests.get(url, verify=False, timeout=5, allow_redirects=True)
             if resp.status_code not in [404, 500]:
                 discovered.append({
                     "path":   path,
@@ -56,25 +77,22 @@ def _discover_pages(base_url: str) -> list:
                 print(f"[REGRESSION_GENERATOR]   ✗ {path} → {resp.status_code}")
         except Exception as e:
             print(f"[REGRESSION_GENERATOR]   ✗ {path} → error: {e}")
-            continue
 
     print(f"[REGRESSION_GENERATOR] Discovered {len(discovered)} pages")
     return discovered
 
 
-def generate_regression_tests(base_url: str) -> dict:
-    """
-    1. Discover available pages
-    2. LLaMA generates regression test cases
-    """
+def generate_regression_tests(base_url: str, username: str = "", password: str = "", doc_text: str = "") -> dict:
+    print(f"[REGRESSION] doc_text received: {doc_text[:100] if doc_text else 'EMPTY'}")
 
-    # ── Step 1: Discover pages ───────────────────────────────────────────────
-    discovered = _discover_pages(base_url)
+    # Step 1: Get pages from doc or defaults, then probe
+    paths = _extract_pages_from_doc(doc_text) if doc_text else DEFAULT_PATHS
+    discovered = _discover_pages(base_url, paths)
 
     if not discovered:
         discovered = [
             {"path": "/dashboard", "url": f"{base_url}/dashboard", "status": 200},
-            {"path": "/reception", "url": f"{base_url}/reception", "status": 200},
+            {"path": "/login",     "url": f"{base_url}/login",     "status": 200},
         ]
 
     pages_str = "\n".join([
@@ -82,20 +100,25 @@ def generate_regression_tests(base_url: str) -> dict:
         for p in discovered
     ])
 
+    # Step 2: Build app context from doc or generic
+    if doc_text:
+        app_context = f"Application documentation provided by user:\n{doc_text[:1500]}"
+    else:
+        app_context = f"Generic web application at {base_url}"
+
     print(f"[REGRESSION_GENERATOR] LLaMA generating regression tests...")
 
-    # ── Step 2: LLaMA generates tests ────────────────────────────────────────
     prompt = f"""You are a regression testing expert using Playwright.
 
-    Application: ANPE (Agence Nationale de Protection de l'Environnement) — Tunisia
-    Base URL: {base_url}
-    Login URL: {base_url}/admin-anpe/login
-    Credentials: email=admin@admin.com, password=password1%Aa
+{app_context}
 
-Available pages:
+Base URL: {base_url}
+Credentials: username={username}, password={password}
+
+Available pages (discovered and responding):
 {pages_str}
 
-Generate Playwright regression test cases to verify these pages still work correctly.
+Generate Playwright regression test cases to verify these pages still work correctly after changes.
 Return ONLY a valid JSON array. No markdown. No explanation.
 
 Each test case must have this exact structure:
@@ -114,23 +137,16 @@ Each test case must have this exact structure:
   "priority": "high|medium|low"
 }}
 
-STRICT RULES:
-- authentication tests MUST be exactly these 2:
-    * {{"name": "Verify login page loads", "category": "authentication", "severity": "critical", "page": "/admin-anpe/login", "url": "{base_url}/admin-anpe/login", "action": "navigate", "selector": "", "expected": "Login page loads", "requires_login": false, "priority": "high"}}
-    * {{"name": "Verify login form works", "category": "authentication", "severity": "critical", "page": "/admin-anpe/login", "url": "{base_url}/admin-anpe/login", "action": "fill", "selector": "input[type='email']", "expected": "Redirected to dashboard", "requires_login": false, "priority": "high"}}
+RULES:
+- Generate exactly 2 authentication tests:
+    * action="navigate" on the login page, requires_login=false
+    * action="check_visible", selector="input[type='password']" on login page, requires_login=false
+- Generate 1 navigation test per discovered page (action="navigate", requires_login=true)
+- Generate 1 content test per discovered page using ONLY this selector:
+    * action="check_visible", selector="body > div", requires_login=true
+- Do NOT use main, nav, header, or any invented CSS class selectors
 
-- navigation tests: one per discovered page, action="navigate", requires_login=true
-
-- content tests MUST be exactly these 3 (check login form elements):
-    * {{"name": "Verify email input exists in login", "category": "content", "severity": "critical", "page": "/admin-anpe/login", "url": "{base_url}/admin-anpe/login", "action": "check_visible", "selector": "#basic_email", "expected": "Email input is visible", "requires_login": false, "priority": "high"}}
-    * {{"name": "Verify password input exists in login", "category": "content", "severity": "critical", "page": "/admin-anpe/login", "url": "{base_url}/admin-anpe/login", "action": "check_visible", "selector": "#basic_password", "expected": "Password input is visible", "requires_login": false, "priority": "high"}}
-    * {{"name": "Verify submit button exists in login", "category": "content", "severity": "critical", "page": "/admin-anpe/login", "url": "{base_url}/admin-anpe/login", "action": "check_visible", "selector": "button[type=submit]", "expected": "Submit button is visible", "requires_login": false, "priority": "high"}}
-    * {{"name": "Verify captcha exists in login", "category": "content", "severity": "critical", "page": "/admin-anpe/login", "url": "{base_url}/admin-anpe/login", "action": "check_visible", "selector": "#basic_captcha", "expected": "Captcha is visible", "requires_login": false, "priority": "high"}}
-- functionality tests MUST be exactly these 2:
-    * {{"name": "Verify submit button is clickable", "category": "functionality", "severity": "critical", "page": "/admin-anpe/login", "url": "{base_url}/admin-anpe/login", "action": "click", "selector": "button[type=submit]", "expected": "Button clicked successfully", "requires_login": false, "priority": "high"}}
-    * {{"name": "Verify dashboard content exists", "category": "functionality", "severity": "high", "page": "/dashboard", "url": "{base_url}/dashboard", "action": "check_visible", "selector": "div", "expected": "Dashboard content is visible", "requires_login": true, "priority": "high"}}
-
-Generate 2 authentication + {len(discovered)} navigation + 4 content + 2 functionality = total tests.
+Generate ONLY {len(discovered) * 2 + 2} tests total.
 Return ONLY the JSON array."""
 
     try:
@@ -139,12 +155,12 @@ Return ONLY the JSON array."""
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a regression testing expert. Return only valid JSON arrays. No markdown."
+                    "content": "You are a regression testing expert. Return only valid JSON arrays. No markdown.",
                 },
                 {
                     "role": "user",
-                    "content": prompt
-                }
+                    "content": prompt,
+                },
             ],
             temperature=0.2,
             max_tokens=4000,
@@ -180,10 +196,10 @@ Return ONLY the JSON array."""
         print(f"[REGRESSION_GENERATOR] ✓ {len(cleaned)} regression tests generated")
 
         return {
-            "test_cases":        cleaned,
-            "total":             len(cleaned),
-            "base_url":          base_url,
-            "discovered_pages":  discovered,
+            "test_cases":       cleaned,
+            "total":            len(cleaned),
+            "base_url":         base_url,
+            "discovered_pages": discovered,
         }
 
     except json.JSONDecodeError as e:
@@ -196,30 +212,30 @@ Return ONLY the JSON array."""
 
 
 def _fallback_tests(base_url: str, discovered: list) -> dict:
-    """Fallback static tests"""
+    """Generic fallback static tests"""
     static = [
         {
             "id": 1, "name": "Login page loads",
             "category": "authentication", "severity": "critical",
-            "page": "/admin-anpe/login",
-            "url": f"{base_url}/admin-anpe/login",
-            "action": "navigate", "selector": "input[type='email']",
-            "expected": "Login form visible",
-            "description": "Login page must load correctly",
+            "page": "/login",
+            "url": f"{base_url}/login",
+            "action": "navigate", "selector": "",
+            "expected": "Login page loads successfully",
+            "description": "Login page must be accessible",
             "requires_login": False, "priority": "high",
         },
         {
-            "id": 2, "name": "Login with credentials",
+            "id": 2, "name": "Login form is visible",
             "category": "authentication", "severity": "critical",
-            "page": "/admin-anpe/login",
-            "url": f"{base_url}/admin-anpe/login",
-            "action": "fill", "selector": "input[type='email']",
-            "expected": "Redirected to dashboard",
-            "description": "Login must work with valid credentials",
+            "page": "/login",
+            "url": f"{base_url}/login",
+            "action": "check_visible", "selector": "input[type='password']",
+            "expected": "Password input is visible",
+            "description": "Login form elements must be present",
             "requires_login": False, "priority": "high",
         },
         {
-            "id": 3, "name": "Dashboard loads",
+            "id": 3, "name": "Dashboard loads after login",
             "category": "navigation", "severity": "high",
             "page": "/dashboard",
             "url": f"{base_url}/dashboard",

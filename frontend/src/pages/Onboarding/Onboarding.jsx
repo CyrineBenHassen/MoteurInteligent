@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import './Onboarding.css';
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+
 
 const ROLES = [
   {
@@ -76,7 +76,7 @@ const ROLE_LABELS = {
   other:     'Other',
 };
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+
 
 function NexLogo() {
   return (
@@ -105,7 +105,7 @@ function StepBar({ step, total }) {
   );
 }
 
-// ─── Step 1: Role ─────────────────────────────────────────────────────────────
+
 
 function StepRole({ selected, onSelect, onNext, onSkip }) {
   return (
@@ -152,7 +152,7 @@ function StepRole({ selected, onSelect, onNext, onSkip }) {
   );
 }
 
-// ─── Step 2: Interests ────────────────────────────────────────────────────────
+
 
 function StepInterests({ interests, exp, onToggleInterest, onSelectExp, onNext, onBack }) {
   return (
@@ -206,7 +206,7 @@ function StepInterests({ interests, exp, onToggleInterest, onSelectExp, onNext, 
   );
 }
 
-// ─── Step 3: Ready ────────────────────────────────────────────────────────────
+
 
 function StepReady({ role, interests, exp, onBack, onFinish, loading }) {
   const expLabel = EXP_LEVELS.find(l => l.id === exp)?.label;
@@ -282,7 +282,7 @@ function StepReady({ role, interests, exp, onBack, onFinish, loading }) {
   );
 }
 
-// ─── Main Onboarding component ────────────────────────────────────────────────
+
 
 export default function Onboarding() {
   const [step,      setStep]      = useState(1);
@@ -295,7 +295,7 @@ export default function Onboarding() {
   const navigate  = useNavigate();
   const { setUser } = useAuth();
 
-  // Trigger re-animation on step change
+
   const goTo = (n) => {
     setAnimKey(k => k + 1);
     setStep(n);

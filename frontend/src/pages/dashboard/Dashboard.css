@@ -1888,9 +1888,8 @@
   animation: gpPulse 1.8s ease-in-out infinite;
 }
 
-/* ── Two-col grid ── */
 .dash-root .ac2-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
   gap: 20px;
   animation: hFadeUp .5s var(--ease) .1s both;
 }
@@ -2045,7 +2044,7 @@
   letter-spacing: 1.5px; text-transform: uppercase;
   font-family: var(--D); cursor: pointer; border: none;
   color: #040914;
-  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  background: linear-gradient(135deg, #b8860b, #c9a227);
   box-shadow: 0 4px 16px rgba(201,162,39,.3);
   transition: all .22s;
 }
@@ -2066,7 +2065,7 @@
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
-  .dash-root .ac2-grid { grid-template-columns: 1fr; }
+  .dash-root .ac2-grid { grid-template-columns: 1fr 1fr; }
   .dash-root .ac2-hero { flex-direction: column; text-align: center; gap: 16px; }
 }
 
@@ -4001,3 +4000,4 @@
 .dash-root .section-box {
   height: 100%;
 }
+

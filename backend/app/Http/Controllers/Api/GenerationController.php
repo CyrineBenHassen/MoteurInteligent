@@ -8,11 +8,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Models\Project;
+use App\Http\Controllers\Traits\NotifiesTestResults;
+
+
 
 class GenerationController extends Controller
 {
-    // ── Valid test types ─────────────────────────────────────────────────────
-    private const VALID_TEST_TYPES = ['smoke', 'functional', 'regression', 'performance'];
+
+use NotifiesTestResults;
+private const VALID_TEST_TYPES = ['smoke', 'functional', 'regression', 'performance', 'api', 'security', 'seo'];
 
     public function generate(Request $request)
     {
@@ -37,6 +41,10 @@ class GenerationController extends Controller
         ];
         $framework = $frameworkMap[strtolower($framework)] ?? $framework;
         $testType  = strtolower($testType);
+        if ($request->has('data')) {
+    $request->merge(json_decode($request->input('data'), true) ?? []);
+}
+$docText = $this->extractDocText($request);
 
         // Block localhost
         if (str_contains($url, 'localhost') || str_contains($url, '127.0.0.1')) {
@@ -455,140 +463,9 @@ public function downloadPdf($id)
     }
 }
 
-    // ── À ajouter AVANT le dernier } de la classe ──────────────────
 
-private function notifyN8n(
-    Generation $generation,
-    int    $pass,
-    int    $fail,
-    int    $skip,
-    int    $rate,
-    string $url,
-    string $framework,
-    string $testType
-): void {
-    try {
-        $pdfBytes = $this->generatePdfBytes($generation);
 
-        \Illuminate\Support\Facades\Mail::send([], [], function($message) use ($generation, $pdfBytes, $pass, $fail, $skip, $rate) {
-            $id     = $generation->id;
-            $rc     = $rate >= 80 ? '#10b981' : ($rate >= 50 ? '#f59e0b' : '#ef4444');
-            $si     = $rate >= 80 ? '✅' : '❌';
-            $status = $rate >= 80 ? 'Tests Passed' : 'Tests Failed';
-            $sbg    = $rate >= 80 ? '#d1fae5' : '#fee2e2';
-            $sc     = $rate >= 80 ? '#059669' : '#dc2626';
-            $sbd    = $rate >= 80 ? '#10b981' : '#ef4444';
-            $date   = now()->format('d/m/Y H:i');
 
-            $html = "
-            <!DOCTYPE html>
-            <html>
-            <head><meta charset='UTF-8'/></head>
-            <body style='margin:0;padding:0;background:#f8fafc;font-family:Segoe UI,sans-serif'>
-              <div style='max-width:600px;margin:0 auto;padding:32px'>
-                <div style='background:#0a0f1e;border-radius:16px;padding:32px;text-align:center;margin-bottom:24px'>
-                  <div style='height:3px;background:linear-gradient(90deg,transparent,#c9a227,transparent);margin-bottom:16px'></div>
-                  <h1 style='color:#c9a227;margin:0;font-size:32px;letter-spacing:4px'>NEX<span style='color:#fff;font-weight:300'>TEST</span></h1>
-                  <p style='color:#94a3b8;margin:8px 0 0;font-size:12px;letter-spacing:2px;text-transform:uppercase'>AI-Powered Test Automation</p>
-                </div>
-                <div style='text-align:center;margin-bottom:24px'>
-                  <span style='display:inline-block;padding:10px 28px;border-radius:30px;font-size:18px;font-weight:700;background:{$sbg};color:{$sc};border:2px solid {$sbd}'>
-                    {$si} {$status}
-                  </span>
-                </div>
-                <div style='background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;margin-bottom:20px'>
-                  <table style='width:100%;border-collapse:collapse'>
-                    <tr style='border-bottom:1px solid #f1f5f9'>
-                      <td style='padding:10px 0;color:#64748b;font-weight:700;font-size:13px;width:120px'>🔗 URL</td>
-                      <td style='padding:10px 0;color:#1e293b;font-size:13px'>{$generation->url}</td>
-                    </tr>
-                    <tr style='border-bottom:1px solid #f1f5f9'>
-                      <td style='padding:10px 0;color:#64748b;font-weight:700;font-size:13px'>⚙️ Framework</td>
-                      <td style='padding:10px 0;color:#1e293b;font-size:13px'><b>{$generation->framework}</b></td>
-                    </tr>
-                    <tr style='border-bottom:1px solid #f1f5f9'>
-                      <td style='padding:10px 0;color:#64748b;font-weight:700;font-size:13px'>🧪 Type</td>
-                      <td style='padding:10px 0;color:#1e293b;font-size:13px'>{$generation->test_type}</td>
-                    </tr>
-                    <tr>
-                      <td style='padding:10px 0;color:#64748b;font-weight:700;font-size:13px'>🕐 Date</td>
-                      <td style='padding:10px 0;color:#1e293b;font-size:13px'>{$date}</td>
-                    </tr>
-                  </table>
-                </div>
-                <div style='display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px'>
-                  <div style='background:#d1fae5;border:1px solid #a7f3d0;border-radius:12px;padding:16px;text-align:center'>
-                    <div style='font-size:32px;font-weight:700;color:#059669'>{$pass}</div>
-                    <div style='font-size:10px;color:#059669;font-weight:700;text-transform:uppercase;margin-top:4px'>Passés</div>
-                  </div>
-                  <div style='background:#fee2e2;border:1px solid #fca5a5;border-radius:12px;padding:16px;text-align:center'>
-                    <div style='font-size:32px;font-weight:700;color:#dc2626'>{$fail}</div>
-                    <div style='font-size:10px;color:#dc2626;font-weight:700;text-transform:uppercase;margin-top:4px'>Échoués</div>
-                  </div>
-                  <div style='background:#fef3c7;border:1px solid #fde68a;border-radius:12px;padding:16px;text-align:center'>
-                    <div style='font-size:32px;font-weight:700;color:#d97706'>{$skip}</div>
-                    <div style='font-size:10px;color:#d97706;font-weight:700;text-transform:uppercase;margin-top:4px'>Ignorés</div>
-                  </div>
-                  <div style='background:#fff;border:2px solid {$rc};border-radius:12px;padding:16px;text-align:center'>
-                    <div style='font-size:32px;font-weight:700;color:{$rc}'>{$rate}%</div>
-                    <div style='font-size:10px;color:{$rc};font-weight:700;text-transform:uppercase;margin-top:4px'>Pass Rate</div>
-                  </div>
-                </div>
-                <div style='background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px'>
-                  <div style='display:flex;justify-content:space-between;margin-bottom:8px'>
-                    <span style='font-size:13px;font-weight:700;color:#1e293b'>Taux de réussite global</span>
-                    <span style='font-size:13px;font-weight:700;color:{$rc}'>{$rate}%</span>
-                  </div>
-                  <div style='height:10px;background:#f1f5f9;border-radius:10px;overflow:hidden'>
-                    <div style='height:100%;width:{$rate}%;background:{$rc};border-radius:10px'></div>
-                  </div>
-                </div>
-                <div style='background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;margin-bottom:20px;text-align:center'>
-                  <p style='margin:0;color:#1d4ed8;font-size:13px;font-weight:600'>📎 Rapport PDF complet en pièce jointe</p>
-                </div>
-                <div style='text-align:center;padding:16px'>
-  <p style='color:#94a3b8;font-size:11px;margin:0'>Généré automatiquement par <b style='color:#c9a227'>NexTest</b> — AI-Powered Test Automation</p>
-  <p style='color:#cbd5e1;font-size:10px;margin:8px 0 0;font-style:italic'>
-    This email was sent automatically with <a href='https://n8n.io' style='color:#ea4b71;text-decoration:none;font-weight:600'>n8n</a>
-  </p>
-</div>
-              </div>
-            </body>
-            </html>";
-                
-            $subject = ($rate >= 80 ? '✅' : '❌')
-         . " [NexTest] "
-         . ucfirst($generation->test_type)
-         . " | " . $generation->framework
-         . " | {$rate}% Pass Rate"
-         . " | {$pass}P · {$fail}F · {$skip}S"
-         . " | {$date}";
-
-            $message->to('syrinebenhassen09@gmail.com')
-                    ->subject($subject)
-                    ->html($html)
-                    ->attachData($pdfBytes, "nextest_report_{$id}.pdf", ['mime' => 'application/pdf']);
-        });
-
-        Log::info('[MAIL] Rapport envoyé', ['generation_id' => $generation->id]);
-
-    } catch (\Exception $e) {
-        Log::warning('[MAIL] Echec envoi', ['error' => $e->getMessage()]);
-    }
-}
-private function generatePdfBytes(Generation $generation): string
-{
-    $response = Http::timeout(30)->post('http://127.0.0.1:8001/generate-pdf', [
-        'url'               => $generation->url,
-        'framework'         => $generation->framework,
-        'test_cases'        => $generation->test_cases        ?? [],
-        'execution_results' => $generation->execution_results ?? [],
-        'load_time_ms'      => $generation->load_time_ms,
-        'scraped'           => $generation->scraped           ?? [],
-        'page_type'         => $generation->page_type         ?? 'general',
-    ]);
-    return $response->body();
-}
 
 private function generateHtmlBytes(Generation $generation): string
 {
@@ -659,6 +536,10 @@ public function generateInternal(Request $request)
 {
     set_time_limit(600);
 
+    if ($request->has('data')) {              
+        $request->merge(json_decode($request->input('data'), true) ?? []);
+    }
+
     $request->validate([
         'url'          => 'required|url',
         'framework'    => 'required|in:Selenium,Playwright,Cypress',
@@ -680,6 +561,8 @@ public function generateInternal(Request $request)
     $username    = $request->username    ?? null;
     $password    = $request->password    ?? null;
     $loginUrl    = $request->login_url   ?? null;
+ 
+$docText = $this->extractDocText($request);
 
     Log::info('[NEXTEST] generateInternal()', [
         'url'          => $url,
@@ -798,13 +681,17 @@ public function generateApi(Request $request)
 {
     set_time_limit(600);
 
+    if ($request->has('data')) {
+        $request->merge(json_decode($request->input('data'), true) ?? []);
+    }
+
     $request->validate([
         'url'        => 'required|url',
         'framework'  => 'required|in:Pytest,Postman',
         'test_type'  => 'nullable|string',
         'username'   => 'nullable|string',
         'password'   => 'nullable|string',
-        'anpe_token' => 'nullable|string',  // ← AJOUTE
+        'anpe_token' => 'nullable|string',  
         'project_id' => 'nullable|integer',
     ]);
     // ← AJOUTE ICI
@@ -817,14 +704,17 @@ public function generateApi(Request $request)
     $framework = $request->framework ?? 'Pytest';
 
     try {
-        $response = Http::timeout(180)->post('http://127.0.0.1:8001/generate-api', [
-            'url'       => $url,
-            'framework' => $framework,
-            'username'  => $request->username ?? null,
-            'password'  => $request->password ?? null,
-            'token'     => $request->anpe_token ?? '',  // ← CHANGE
+    $docText = $this->extractDocText($request);
 
-        ]);
+    $response = Http::timeout(180)->post('http://127.0.0.1:8001/generate-api', [
+        'url'       => $url,
+        'framework' => $framework,
+         'username'  => $request->username ?? null,
+        'password'  => $request->password ?? null,
+        'token'     => $request->anpe_token ?? '',
+        'domains'   => $request->domains ?? ['auth'],
+        'doc_text'  => $docText,
+    ]);
 
         if ($response->failed()) {
             return response()->json(['error' => 'AI service error', 'detail' => $response->body()], 500);
@@ -849,7 +739,10 @@ public function generateApi(Request $request)
             'page_type'         => 'api',
             'scraped'           => [],
         ]);
+$this->notifyN8n($generation, $result['pass_count'] ?? 0, $result['fail_count'] ?? 0, $result['skip_count'] ?? 0, $result['pass_rate'] ?? 0, $url, $framework, 'api');
 
+$this->recordFlakyAlerts($generation, $result['execution_results'] ?? [], 'api', $framework);
+        
         return response()->json([
             'message'    => 'API tests generated successfully',
             'generation' => $generation,
@@ -866,11 +759,23 @@ public function generateSecurity(Request $request)
 {
     set_time_limit(600);
 
+    if ($request->has('data')) {
+        $request->merge(json_decode($request->input('data'), true) ?? []);
+    }
+
     $request->validate([
         'url'        => 'required|url',
         'project_id' => 'nullable|integer',
         'categories' => 'nullable|array',
+        'anpe_token' => 'nullable|string',
+        'project_name' => 'nullable|string',   
+        'project_type' => 'nullable|string',   
     ]);
+
+    if ($request->has('data')) {
+    $request->merge(json_decode($request->input('data'), true) ?? []);
+}
+$docText = $this->extractDocText($request);
 
     $url = $request->url;
 
@@ -881,6 +786,7 @@ public function generateSecurity(Request $request)
             'url'        => $url,
             'token'      => $request->anpe_token ?? '',
             'categories' => $request->categories ?? null,
+            'doc_text'   => $docText,
         ]);
 
         if ($response->failed()) {
@@ -931,6 +837,7 @@ public function generateSecurity(Request $request)
         ]);
 
         $this->notifyN8n($generation, $pass, $fail, $warn, $rate, $url, 'Pytest', 'security');
+        $this->recordFlakyAlerts($generation, $executionResults, 'security', 'Pytest');
 
         return response()->json([
             'message'    => 'Security tests completed',
@@ -955,24 +862,40 @@ public function generateSecurity(Request $request)
 }
 
 public function generateRegression(Request $request)
+
 {
-    $validated = $request->validate([
-        'url'        => 'required|string',
-        'framework'  => 'nullable|string',
-        'project_id' => 'nullable|integer',
-    ]);
+    Log::info('[REGRESSION] request data', $request->all());
+    Log::info('[REGRESSION] files', ['files' => $request->allFiles()]);
+  
+    if ($request->has('data')) {
+    $request->merge(json_decode($request->input('data'), true) ?? []);
+}
+
+$validated = $request->validate([
+    'url'        => 'required|string',
+    'framework'  => 'nullable|string',
+    'project_id' => 'nullable|integer',
+    'doc_files'  => 'nullable|array',
+    'doc_files.*'=> 'nullable|file|mimes:pdf,txt,json,yaml,yml,md,docx|max:10240',
+    'data'       => 'nullable|string',
+]);
 
     $url       = $validated['url'];
     $framework = $validated['framework'] ?? 'Playwright';
     $projectId = $validated['project_id'] ?? null;
 
+    if ($request->has('data')) {
+    $request->merge(json_decode($request->input('data'), true) ?? []);
+}
+$docText = $this->extractDocText($request);
+
     try {
         $response = Http::timeout(300)->post('http://127.0.0.1:8001/generate-regression', [
-            'url'        => $url,
-            'framework'  => $framework,
-            'project_id' => $projectId,
-        ]);
-
+    'url'        => $url,
+    'framework'  => $framework,
+    'project_id' => $projectId,
+    'doc_text'   => $docText,   // ← AJOUTE
+]);
         $data = $response->json();
 
         if (!$data || isset($data['error'])) {
@@ -1005,7 +928,10 @@ public function generateRegression(Request $request)
     'page_type'         => 'general',
     'scraped'           => [],
 ]);
+$this->notifyN8n($generation, $passCount, $failCount, $skipCount, $passRate, $url, $framework, 'regression');
 
+
+$this->recordFlakyAlerts($generation, $testCases, 'regression', $framework);
         return response()->json([
             'id'         => $generation->id,
             'url'        => $url,
@@ -1026,6 +952,11 @@ public function generateRegression(Request $request)
 
 public function generateFunctional(Request $request)
 {
+    // ← ICI EN PREMIER, avant tout
+    if ($request->has('data')) {
+        $request->merge(json_decode($request->input('data'), true) ?? []);
+    }
+
     $validated = $request->validate([
         'url'        => 'required|string',
         'framework'  => 'nullable|string',
@@ -1036,11 +967,15 @@ public function generateFunctional(Request $request)
     $framework = $validated['framework'] ?? 'Playwright';
     $projectId = $validated['project_id'] ?? null;
 
+    $docText = $this->extractDocText($request);
+
     try {
         $response = Http::timeout(300)->post('http://127.0.0.1:8001/generate-functional', [
             'url'        => $url,
             'framework'  => $framework,
             'project_id' => $projectId,
+            'username'   => $request->username ?? '',   
+            'password'   => $request->password ?? '',   
         ]);
 
         $data = $response->json();
@@ -1074,8 +1009,11 @@ public function generateFunctional(Request $request)
             'page_type'         => 'general',
             'scraped'           => [],
         ]);
-
         $this->notifyN8n($generation, $passCount, $failCount, $skipCount, $passRate, $url, $framework, 'functional');
+
+        
+        // ── Record flaky alerts ───────────────────────────────────────────────
+        $this->recordFlakyAlerts($generation, $testCases, 'functional', $framework);
 
         return response()->json([
             'id'         => $generation->id,
@@ -1190,6 +1128,11 @@ public function generateSeo(Request $request)
 public function generatePerformance(Request $request)
 {
     set_time_limit(1000);
+
+    if ($request->has('data')) {
+        $request->merge(json_decode($request->input('data'), true) ?? []);
+    }
+
     $validated = $request->validate([
         'url'        => 'required|string',
         'framework'  => 'nullable|string',
@@ -1201,14 +1144,16 @@ public function generatePerformance(Request $request)
     $framework  = $validated['framework'] ?? 'k6';
     $projectId  = $validated['project_id'] ?? null;
     $testTypes  = $validated['test_types'] ?? ['load', 'stress', 'spike', 'soak'];
+    $docText    = $this->extractDocText($request);
  
     try {
         // Performance tests take longer — timeout 600s
-        $response = Http::timeout(900)->post('http://127.0.0.1:8001/generate-performance', [
+       $response = Http::timeout(900)->post('http://127.0.0.1:8001/generate-performance', [
             'url'        => $url,
             'framework'  => $framework,
             'project_id' => $projectId,
             'test_types' => $testTypes,
+            'doc_text'   => $docText,
         ]);
  
         $data = $response->json();
@@ -1240,7 +1185,9 @@ public function generatePerformance(Request $request)
     'skip_count'  => $skipCount,
     'pass_rate'   => (int) round($passRate),
 ]);
+$this->notifyN8n($generation, $passCount, $failCount, $skipCount, (int) round($passRate), $url, $framework, 'performance');
  
+$this->recordFlakyAlerts($generation, $testCases, 'performance', $framework);
         return response()->json([
             'id'         => $generation->id,
             'url'        => $url,
@@ -1259,4 +1206,47 @@ public function generatePerformance(Request $request)
         return response()->json(['error' => $e->getMessage()], 500);
     }
 }
+
+private function extractDocText(Request $request): string
+{
+    if (!$request->hasFile('doc_files')) return '';
+
+    $texts = [];
+    foreach ($request->file('doc_files') as $file) {
+        $ext  = strtolower($file->getClientOriginalExtension());
+        $name = $file->getClientOriginalName();
+
+        if ($ext === 'txt' || $ext === 'md') {
+            $texts[] = "--- {$name} ---\n" . mb_substr(file_get_contents($file->getRealPath()), 0, 3000);
+        } elseif ($ext === 'pdf') {
+            $text = shell_exec("pdftotext " . escapeshellarg($file->getRealPath()) . " -");
+            $texts[] = "--- {$name} ---\n" . mb_substr($text ?? '', 0, 3000);
+        } elseif (in_array($ext, ['json', 'yaml', 'yml'])) {
+            $texts[] = "--- {$name} ---\n" . mb_substr(file_get_contents($file->getRealPath()), 0, 3000);
+        }
+    }
+
+    return implode("\n\n", $texts);
+}
+public function testedUrlsForProject(Request $request, $projectId)
+{
+    $testType = $request->query('test_type');
+
+    $query = Generation::where('project_id', $projectId)
+        ->where('user_id', auth()->id());
+
+    if ($testType) {
+        $query->where('test_type', $testType);
+    }
+
+    $urls = $query->orderByDesc('created_at')
+        ->pluck('url')
+        ->filter()
+        ->unique()
+        ->values();
+
+    return response()->json(['urls' => $urls]);
+}
+
+
 }

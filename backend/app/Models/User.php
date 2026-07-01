@@ -16,9 +16,14 @@ class User extends Authenticatable
         'email',
         'password',
         'google_id',  
-        'avatar',  
+        'avatar', 
+        'phone',
+        'company',
+        'position', 
         'onboarding_completed',  // ← ajoute
-        'onboarding_data',       // ← ajoute   
+        'onboarding_data',
+        'last_login_ip',    // ← AJOUTE
+        'last_login_at',    // ← AJOUTE 
     ];
 
     protected $hidden = [
@@ -31,6 +36,7 @@ class User extends Authenticatable
         'password' => 'hashed',
         'onboarding_completed' => 'boolean',  
         'onboarding_data'      => 'array', 
+        'last_login_at'        => 'datetime', 
     ];
 
     public function sendPasswordResetNotification($token)

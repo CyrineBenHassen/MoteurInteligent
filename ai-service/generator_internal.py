@@ -41,9 +41,6 @@ LOAD_THRESHOLD_MS = 5000
 LOAD_CRITICAL_MS  = 8000
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Step Builder Helper
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _make_step(name: str, selector: str, check_type: str, reason: str, optional: bool = None) -> dict:
     meta = CRITICALITY_INTERNAL.get(check_type, {"score": 40, "tier": 3, "optional": True})
@@ -630,6 +627,7 @@ def _build_scripts(steps: list, url: str, framework: str) -> dict:
 def generate_internal_tests(
     scraped:   dict,
     framework: str  = "playwright",
+    doc_text:  str  = "",
 ) -> dict:
     """
     Main entry point for internal back office smoke tests.

@@ -1,4 +1,3 @@
-# functional_generator.py — NexTest Functional Test Generator (single page, LLaMA-powered)
 
 import json
 import os
@@ -13,41 +12,61 @@ groq_client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY"),
 )
 
-# ── Map page path → features connues ─────────────────────────────────────────
-PAGE_FEATURES = {
-    "/dashboard": ["click_menu_item", "click_card", "verify_data", "navigate_to_page"],
-    "/reception":                      ["dossier_list", "search_filter", "open_dossier", "assign_button"],
-    "/outbox":                         ["dossier_list", "search_filter", "send_action"],
-    "/traitement_dossier_eie":         ["form_fields", "validate_button", "reject_button", "submit_form"],
-    "/traitement_dossier_ed":          ["form_fields", "validate_button", "reject_button"],
-    "/traitement_dossier_avis":        ["form_fields", "validate_button", "submit_form"],
-    "/traitement_dossier_transaction": ["form_fields", "validate_button"],
-    "/gestion_commission":             ["commission_list", "create_button", "form_fields"],
-    "/reunions":                       ["reunion_list", "create_button", "form_fields", "calendar"],
-    "/traitement_dossier_cc":          ["form_fields", "validate_button", "reject_button"],
-    "/visites":                        ["visite_list", "create_button", "form_fields"],
-    "/statistiques":                   ["charts", "filters", "export_button"],
-    "/admin-anpe/login":               ["email_input", "password_input", "submit_button", "captcha"],
-}
+DEFAULT_FEATURES = ["page_content", "navigation", "buttons", "form_fields"]
 
+def _get_page_features(path: str, doc_text: str = "") -> list:
+    if not doc_text:
+        return DEFAULT_FEATURES
 
-def _get_page_features(path: str) -> list:
-    if path in PAGE_FEATURES:
-        return PAGE_FEATURES[path]
-    for key, features in PAGE_FEATURES.items():
-        if key in path:
+    print(f"[FUNCTIONAL_GENERATOR] Extracting features for {path} from doc_text via LLM...")
+    try:
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a feature extractor. Given documentation and a page path, "
+                        "extract the UI features/elements present on that page. "
+                        "Return ONLY a JSON array of short strings like "
+                        "[\"form_fields\", \"search_filter\", \"create_button\"]. "
+                        "No markdown, no explanation."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Page path: {path}\n\nDocumentation:\n{doc_text[:2000]}\n\nWhat UI features exist on this page?",
+                },
+            ],
+            temperature=0.1,
+            max_tokens=300,
+        )
+        raw = resp.choices[0].message.content.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        features = json.loads(raw.strip())
+        if isinstance(features, list) and len(features) > 0:
+            print(f"[FUNCTIONAL_GENERATOR] LLM extracted features: {features}")
             return features
-    return ["page_content", "navigation", "buttons", "form_fields"]
+        return DEFAULT_FEATURES
+    except Exception as e:
+        print(f"[FUNCTIONAL_GENERATOR] Feature extraction error: {e} — using defaults")
+        return DEFAULT_FEATURES
 
+def generate_functional_tests(base_url: str, target_url: str = None, username: str = "", password: str = "", doc_text: str = "") -> dict:
+    print(f"[FUNCTIONAL_GENERATOR] username='{username}' | password='{password[:15] if password else 'EMPTY'}'") 
+    username = username.strip()
+    password = password.strip()
 
-def generate_functional_tests(base_url: str, target_url: str = None) -> dict:
     url_to_test = target_url or base_url
 
     parsed    = urlparse(url_to_test)
     page_path = parsed.path or "/dashboard"
     base      = "{0}://{1}".format(parsed.scheme, parsed.netloc)
 
-    features     = _get_page_features(page_path)
+    features     = _get_page_features(page_path, doc_text)
     is_login     = "login" in page_path.lower()
     features_str = ", ".join(features)
 
@@ -61,8 +80,8 @@ def generate_functional_tests(base_url: str, target_url: str = None) -> dict:
             "- Generate exactly these 8 tests in this order:\n"
             "  1. action=navigate, selector='body'\n"
             "  2. action=check_visible, selector='#basic_email'\n"
-            "  3. action=fill, selector='#basic_email', fill_value='admin@admin.com'\n"
-            "  4. action=fill, selector='#basic_password', fill_value='password1%Aa'\n"
+            "  3. action=fill, selector='#basic_email', fill_value='" + username + "'\n"
+            "  4. action=fill, selector='#basic_password', fill_value='" + password + "'\n"
             "  5. action=click, selector='button[type=submit]'\n"
             "  6. action=check_visible, selector='#basic_captcha'\n"
             "  7. action=auth_success — name='Authentification reussie', category='authentication', selector='body', fill_value='', expected='Dashboard visible'\n"
@@ -88,60 +107,23 @@ def generate_functional_tests(base_url: str, target_url: str = None) -> dict:
             "  header: .ant-layout-header, .ant-page-header, header\n"
             "- NEVER invent class names like '.stat_cards', '.sidebar_navigation', '.header_menu'\n"
             "- fill_value: use realistic sample data\n"
-            + (
-                "- For /dashboard page: ONLY generate these tests:\n"
-                "  1. navigate — page loads\n"
-                "  2. check_visible selector='.ant-card' — cartes stats visibles\n"
-                "  3. check_visible selector='.ant-btn' — boutons visibles\n"
-                "  4. check_visible selector='.ant-card-body' — contenu cartes visible\n"
-                "  5. check_visible selector='.ant-btn-primary' — bouton principal visible\n"
-                "  6. check_visible selector='.sider-primary', wait_after_ms=5000 — sidebar visible\n"
-                "- DO NOT use selectors: header, .ant-menu, .ant-statistic, .ant-layout-content\n"
-                "- DO NOT generate form/search tests for dashboard\n"
-                if page_path == "/dashboard" else
-                "- For /gestion_commission page: ONLY generate these 6 tests, in this exact order:\n"
-                "  1. action=navigate, selector='body' — page se charge\n"
-                "  2. action=check_visible, selector='text=Gestion des commissions', wait_after_ms=4000 — titre de la page visible\n"
-                "  3. action=check_visible, selector='input[placeholder=\"Entrer une valeur\"]' — champ filtre identifiant visible\n"
-                "  4. action=fill, selector='input[placeholder=\"Entrer une valeur\"]', fill_value='TEST-999' — remplir le filtre identifiant\n"
-                "  5. action=check_visible, selector='.ant-table', wait_after_ms=4000 — tableau des commissions visible\n"
-                "  6. action=check_visible, selector='button:has-text(\"Ajouter une commission\")' — bouton ajouter une commission visible\n"
-                "- DO NOT use selectors: .ant-page-header, .ant-form-item .ant-input, generic .ant-btn-primary\n"
-                if page_path == "/gestion_commission" else
-                "- For /visites page: ONLY generate these 6 tests, in this exact order:\n"
-                "  1. action=navigate, selector='body' — page se charge\n"
-                "  2. action=check_visible, selector='text=Gestion des visites planifiées', wait_after_ms=4000 — titre de la page visible\n"
-                "  3. action=check_visible, selector='text=Numéro de dossier', wait_after_ms=4000 — en-tete du tableau visible\n"
-                "  4. action=check_visible, selector='input[placeholder=\"Entrer une valeur\"] >> nth=0' — champ filtre numero de dossier visible\n"
-                "  5. action=fill, selector='input[placeholder=\"Entrer une valeur\"] >> nth=0', fill_value='A26' — remplir le filtre numero de dossier\n"
-                "  6. action=check_visible, selector='.ant-btn-primary' — bouton Filtrer visible\n"
-                "- DO NOT generate 'creation form' tests — there is NO standalone create form on this page\n"
-                "- DO NOT use selectors: .ant-table, .ant-form-item, .ant-input\n"
-                if page_path == "/visites" else
-                "- For /statistiques page: ONLY generate these 6 tests:\n"
-                "  1. action=navigate, selector='body' — page se charge\n"
-                "  2. action=check_visible, selector='text=Statistiques des Dossiers', wait_after_ms=4000 — titre visible\n"
-                "  3. action=check_visible, selector='.ant-card', wait_after_ms=3000 — cartes stats visibles\n"
-                "  4. action=check_visible, selector='button:has-text(\"Exporter Excel\")' — bouton export visible\n"
-                "  5. action=check_visible, selector='.ant-table', wait_after_ms=4000 — tableau promoteurs visible\n"
-                "  6. action=check_visible, selector='input[placeholder*=\"Rechercher\"]' — champ recherche visible\n"
-                "- DO NOT use selectors: .ant-statistic, .ant-layout-content\n"
-                if page_path == "/statistiques" else ""
-            )
+            + (f"- Focus on the features specific to {page_path} based on the documentation provided.\n" if doc_text else "")
         )
         
         
         login_context = (
-            "Login URL: " + base + "/admin-anpe/login\n"
-            "Credentials: email=admin@admin.com, password=password1%Aa\n"
+            "Login URL: " + base + "/login\n"
+            "Credentials: username=" + username + ", password=" + password + "\n"
         )
         
 
     requires_login_default = "false" if is_login else "true"
 
+    app_context = f"Application documentation:\n{doc_text[:1500]}\n\n" if doc_text else ""
+
     prompt = (
         "You are a functional testing expert using Playwright for internal web apps.\n\n"
-        "Application: ANPE (Agence Nationale de Protection de l'Environnement) — Tunisia\n"
+        + app_context +
         "Base URL: " + base + "\n"
         + login_context +
         "Target page to test: " + url_to_test + "\n"
@@ -223,48 +205,9 @@ def generate_functional_tests(base_url: str, target_url: str = None) -> dict:
             })
 
         print("[FUNCTIONAL_GENERATOR] Generated " + str(len(cleaned)) + " tests for " + page_path)
-        # ── Force correct selectors for known pages ───────────────────────────
-        if page_path == "/dashboard":
-            for tc in cleaned:
-                if "sidebar" in tc["name"].lower() or "menu" in tc["name"].lower() or "sider" in tc["selector"] or "ant-menu" in tc["selector"]:
-                    tc["selector"] = ".ant-layout"
-                    tc["action"]   = "check_visible"
-                    tc["name"]     = "Layout principal visible"
 
-        elif page_path == "/gestion_commission":
-            for tc in cleaned:
-                sel = tc.get("selector", "")
-                if "page-header" in sel:
-                    tc["selector"]      = "text=Gestion des commissions"
-                    tc["action"]        = "check_visible"
-                    tc["wait_after_ms"] = max(tc.get("wait_after_ms", 2000), 4000)
-                elif ".ant-form-item" in sel or "ant-input" in sel:
-                    tc["selector"] = 'input[placeholder="Entrer une valeur"]'
-                    if tc["action"] == "fill" and not tc.get("fill_value"):
-                        tc["fill_value"] = "TEST-999"
-                elif ".ant-btn-primary" in sel:
-                    tc["selector"] = 'button:has-text("Ajouter une commission")'
-                if ".ant-table" in sel:
-                    tc["wait_after_ms"] = max(tc.get("wait_after_ms", 2000), 4000)
-        elif page_path == "/visites":
-            for tc in cleaned:
-                sel = tc.get("selector", "")
-                if ".ant-table" in sel:
-                    tc["selector"]      = "text=Numéro de dossier"
-                    tc["wait_after_ms"] = max(tc.get("wait_after_ms", 2000), 4000)
-                elif ".ant-form-item" in sel or sel == ".ant-input":
-                    tc["selector"] = 'input[placeholder="Entrer une valeur"] >> nth=0'
-                    if tc["action"] == "fill" and not tc.get("fill_value"):
-                        tc["fill_value"] = "A26"
-        elif page_path == "/statistiques":
-            for tc in cleaned:
-                sel = tc.get("selector", "")
-                if ".ant-statistic" in sel:
-                    tc["selector"] = ".ant-card"
-                    tc["wait_after_ms"] = max(tc.get("wait_after_ms", 2000), 3000)
-                if ".ant-layout-content" in sel:
-                    tc["selector"] = "text=Statistiques des Dossiers"
-                    tc["wait_after_ms"] = max(tc.get("wait_after_ms", 2000), 4000)
+       
+          
         return {
             "test_cases": cleaned,
             "total":      len(cleaned),
@@ -282,14 +225,16 @@ def generate_functional_tests(base_url: str, target_url: str = None) -> dict:
 
     except json.JSONDecodeError as e:
         print("[FUNCTIONAL_GENERATOR] JSON error: " + str(e) + " — fallback")
-        return _fallback_tests(base, url_to_test, page_path, features, is_login)
+        return _fallback_tests(base, url_to_test, page_path, features, is_login, username, password)
+
 
     except Exception as e:
         print("[FUNCTIONAL_GENERATOR] LLaMA error: " + str(e) + " — fallback")
-        return _fallback_tests(base, url_to_test, page_path, features, is_login)
+        return _fallback_tests(base, url_to_test, page_path, features, is_login, username, password)
 
 
-def _fallback_tests(base_url: str, url: str, page_path: str, features: list, is_login: bool) -> dict:
+
+def _fallback_tests(base_url: str, url: str, page_path: str, features: list, is_login: bool, username: str = "", password: str = "") -> dict:
     static = [
         {
             "id": 1,
@@ -343,7 +288,7 @@ def _fallback_tests(base_url: str, url: str, page_path: str, features: list, is_
                 "action": "fill", "selector": "#basic_email",
                 "expected": "Email saisi", "description": "Fill email field",
                 "requires_login": False, "priority": "high",
-                "fill_value": "admin@admin.com", "wait_after_ms": 500,
+                "fill_value": username, "wait_after_ms": 500,
             },
             {
                 "id": 5, "name": "Saisie mot de passe",
@@ -352,7 +297,7 @@ def _fallback_tests(base_url: str, url: str, page_path: str, features: list, is_
                 "action": "fill", "selector": "#basic_password",
                 "expected": "Mot de passe saisi", "description": "Fill password field",
                 "requires_login": False, "priority": "high",
-                "fill_value": "password1%Aa", "wait_after_ms": 500,
+                "fill_value": password, "wait_after_ms": 500,
             },
             {
                 "id": 6, "name": "Clic bouton submit",

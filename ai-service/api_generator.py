@@ -21,7 +21,7 @@ KNOWN_ENDPOINTS = {
     "name": "Login — captcha required (expects 422)",
     "category": "auth", "priority": "high",
     "description": "Login endpoint requires captcha — always returns 422 without it",
-    "body": {"email": "admin@admin.com", "password": "password1%Aa"},
+    "body": {"email": "__USERNAME__", "password": "__PASSWORD__"},
     "expect_status": 422, "expect_field": None, "skip_auth": True,
 },
         {
@@ -37,7 +37,7 @@ KNOWN_ENDPOINTS = {
             "name": "Login — missing email (negative)",
             "category": "auth", "priority": "medium",
             "description": "Login without email — expects 422 validation error",
-            "body": {"password": "password1%Aa"},
+            "body": {"password": "__PASSWORD__"},
             "expect_status": 422, "expect_field": None, "skip_auth": True,
         },
     ],
@@ -47,7 +47,7 @@ KNOWN_ENDPOINTS = {
     "name": "Login — captcha required (expects 422)",
     "category": "auth", "priority": "high",
     "description": "Login endpoint requires captcha — always returns 422 without it",
-    "body": {"email": "admin@admin.com", "password": "password1%Aa"},
+    "body": {"email": "__USERNAME__", "password": "__PASSWORD__"},
     "expect_status": 422, "expect_field": None, "skip_auth": True,
 },
         {
@@ -63,7 +63,7 @@ KNOWN_ENDPOINTS = {
             "name": "Login — missing email (negative)",
             "category": "auth", "priority": "medium",
             "description": "Login without email — expects 422 validation error",
-            "body": {"password": "password1%Aa"},
+            "body": {"password": "__PASSWORD__"},
             "expect_status": 422, "expect_field": None, "skip_auth": True,
         },
         {
@@ -524,7 +524,7 @@ def _generate_assertions(endpoint: dict, base_url: str) -> dict:
     Returns enriched endpoint with assertions.
     """
     system_prompt = (
-        "You are an expert API QA engineer for a Tunisian government back office system (ANPE).\n"
+        "You are an expert API QA engineer\n"
         "Generate smart, specific test assertions for REST API endpoints.\n"
         "RULES:\n"
         "1. Respond ONLY with valid JSON — no markdown, no explanation\n"
@@ -808,14 +808,117 @@ def _build_postman_collection(test_cases: list, base_url: str, token: str) -> di
     }
 
 
+def _generate_endpoints_with_llama(base_url: str, username: str = "", password: str = "", doc_text: str = "") -> list:
+    """Generate generic API endpoints using LLaMA for any unknown app."""
+    doc_context = f"\nUse this documentation to extract real API endpoints:\n{doc_text[:2000]}" if doc_text else ""
+    system_prompt = (
+        "You are an expert API QA engineer. Generate REST API test endpoints for any web application.\n"
+        "Return ONLY valid JSON array, no markdown, no explanation.\n"
+    )
+    user_prompt = f"""Generate 8 common REST API test endpoints for: {base_url}{doc_context}
 
+IMPORTANT RULES:
+- Do NOT generate login endpoints that require captcha
+- Do NOT generate endpoints with {{id}} placeholders — skip them or use a fixed test ID like 1
+- Focus on GET endpoints that return lists or stats (more reliable)
+- Only generate POST endpoints if you have a complete valid body
+Return ONLY a JSON array:
+[
+  {{
+    "method": "POST",
+    "path": "/api/login",
+    "name": "Login with valid credentials",
+    "category": "auth",
+    "priority": "high",
+    "description": "Login with valid credentials",
+    "body": {{"email": "{username}", "password": "{password}"}},
+    "expect_status": 200,
+    "expect_field": "token",
+    "skip_auth": true
+  }},
+  {{
+    "method": "POST",
+    "path": "/api/login",
+    "name": "Login — invalid credentials (negative)",
+    "category": "auth",
+    "priority": "high",
+    "description": "Login with wrong password",
+    "body": {{"email": "wrong@wrong.com", "password": "wrongpass"}},
+    "expect_status": 401,
+    "expect_field": null,
+    "skip_auth": true
+  }},
+  {{
+    "method": "GET",
+    "path": "/api/user",
+    "name": "Get authenticated user",
+    "category": "auth",
+    "priority": "high",
+    "description": "Get current user profile",
+    "body": null,
+    "expect_status": 200,
+    "expect_field": "data",
+    "skip_auth": false
+  }},
+  {{
+    "method": "GET",
+    "path": "/api/user",
+    "name": "Get user — unauthorized (negative)",
+    "category": "auth",
+    "priority": "high",
+    "description": "Access without token",
+    "body": null,
+    "expect_status": 401,
+    "expect_field": null,
+    "skip_auth": true
+  }}
+]
+
+Return ONLY the JSON array."""
+
+    try:
+        raw = _call_groq(system_prompt, user_prompt)
+        raw = raw.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        raw = raw.strip()
+        endpoints = json.loads(raw)
+        print(f"[API_GEN] LLaMA generated {len(endpoints)} endpoints for {base_url}")
+        return endpoints
+    except Exception as e:
+        print(f"[API_GEN] LLaMA endpoint generation failed: {e}")
+        return [
+            {
+                "method": "POST", "path": "/api/login",
+                "name": "Login with valid credentials",
+                "category": "auth", "priority": "high",
+                "description": "Login endpoint",
+                "body": {"email": username, "password": password},
+                "expect_status": 200, "expect_field": "token",
+                "skip_auth": True,
+            },
+            {
+                "method": "GET", "path": "/api/user",
+                "name": "Get authenticated user",
+                "category": "auth", "priority": "high",
+                "description": "Get current user",
+                "body": None,
+                "expect_status": 200, "expect_field": "data",
+                "skip_auth": False,
+            },
+        ]
 # MAIN ENTRY POINT
 def generate_api_tests(
-    base_url:  str,
-    framework: str = "Pytest",
-    token:     str = "",
-    domains:   list = None,
+    base_url:     str,       
+    username:     str = "",
+    password:     str = "",
+    framework:    str = "Pytest",
+    token:        str = "",
+    domains:      list = None,
     original_url: str = "",
+    doc_text:     str = "",   
 ) -> dict:
 
     try:
@@ -853,10 +956,7 @@ def generate_api_tests(
             elif "/auditing" in url_lower:
                 domains = ["auditing"]
             else:
-                # URL de base → teste tout
-                domains = ["auth", "dashboard", "dossiers", "commissions",
-                          "users", "roles", "notifications", "meetings",
-                          "inspections", "promoteurs", "regions", "auditing"]
+                 domains = []
 
         # ── Extract base URL (remove path) ──
         from urllib.parse import urlparse
@@ -864,13 +964,35 @@ def generate_api_tests(
         base_url = f"{parsed.scheme}://{parsed.netloc}"
 
         print(f"[API_GEN] base_url={base_url} | framework={framework} | domains={domains}")
+        
+        
+        import copy
 
-        #1Collect endpoints
         all_endpoints = []
+        found_known = False
         for domain in domains:
             endpoints = KNOWN_ENDPOINTS.get(domain, [])
-            all_endpoints.extend(endpoints)
-            print(f"[API_GEN] Domain '{domain}': {len(endpoints)} endpoints")
+            if endpoints:
+                found_known = True
+                print(f"[API_GEN] Domain '{domain}': {len(endpoints)} endpoints")
+                for ep in endpoints:
+                    ep = copy.deepcopy(ep)
+                    if ep.get("body"):
+                        if "__USERNAME__" in str(ep["body"]):
+                            ep["body"]["email"] = username
+                        if "__PASSWORD__" in str(ep["body"]):
+                            ep["body"]["password"] = password
+                    all_endpoints.append(ep)
+
+        if doc_text:
+            print(f"[API_GEN] Doc provided — using LLaMA to extract endpoints from doc")
+            all_endpoints = _generate_endpoints_with_llama(base_url, username, password, doc_text)
+        elif not found_known or not all_endpoints:
+            print(f"[API_GEN] No known endpoints — using LLaMA to generate for {base_url}")
+            all_endpoints = _generate_endpoints_with_llama(base_url, username, password)
+
+        if not all_endpoints:
+            return {"error": f"No endpoints found for {base_url}"}
 
         if not all_endpoints:
             return {"error": f"No endpoints found for domains: {domains}"}

@@ -1,3 +1,7 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 # scraper_internal.py — Back Office Internal Scraper
 # Supports:
 #   1. Login page testing (smoke + negative tests — CAPTCHA-aware)
@@ -19,7 +23,7 @@ import requests
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Token JWT valide jusqu'en janvier 2027
-_CACHED_TOKEN= "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJhMGRmOWI3My01MzZmLTQxZmUtOGM1Ny01MTUwOGQ2NDE0NjQiLCJqdGkiOiI3YTkwYWI0OTMwNjU0YmQ1ZjE2ZTc3NmFhYjA4MGY1Y2FhNGViOTY1YTgzNWE4MzRkYjZhZjY4OGNlMzRhMmFlNjFmZDYyODBjNTQ3MWE4NCIsImlhdCI6MTc3OTYyMDQ5NC41NzE0NzUsIm5iZiI6MTc3OTYyMDQ5NC41NzE0NzYsImV4cCI6MTc5NTUxODA5NC41NzAyMzYsInN1YiI6ImEwMWVhMDA0LTUwNzQtNDUxMi05ZTBkLWE2Nzk4NDVmNWRjZSIsInNjb3BlcyI6W119.HNkxvxfwsyaEfWBdzWbB1n_gInONCt_xmcMqmgyZP-gCkMpQj8k5c_M4VckhJlFxVIwS85aNNuJLNp1n0FTJUoPWfmQ-9KqgdzlD_iCrMB9HECrAvTVPCzX-Y62STjPM423EsSpqbNRW6nCWvRg0JwPEPohxxc-GxgNcyDbRBSMMQhi4nU9sc8-IZswwvu8tnrFYC8ZQPf5FU-Ag_-NIh91sr7_jKh5khOD-KFiD44ZinMvkWLDudzt9ugsAhGaDKY_-GZufIqjDa4w-tnX6ECLJf7gupZSV7zTn3mbYsQtoHJBOXy_Mg26-WKRCKsWm6E7Bdsm6IFMjia22isXViEteKUu5SR_xlids6zJwjS-3MYwbnlrnNE-BSoFoscMsKRU0f15Wq5ugnnwuhWkjGBoANhbw73mvCc4wVZGXqtRGfvV2vawv7z_ZXE-GYv8moFwFrBvCowW4mBYc8YkoVSK7K7XhQEQQ_THuUNwErZd4Trrw2qD5O1DhMBrCvB6OhNKxnev7SJYKSZjDAPPERu8iPg9foSODbXjrU_UFPQRKJ8C_ens-Jyvx_xspDIHmrpb4j8M68X-WcfEGKhpoDUeDV81dfKGOI7MLm6QzKVjpomGX8wYEa5T2jwemMf1RuKZ3p_Yw_z3O7s6THqqVRmYOFmvttZ8MT1hYq04diHk"
+_CACHED_TOKEN = os.getenv("ANPE_TOKEN")
 
 
 API_BASE = "https://anpe.back.demopro.tn:10443/api/v1"

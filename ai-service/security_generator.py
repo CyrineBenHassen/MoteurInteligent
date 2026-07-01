@@ -1,6 +1,3 @@
-# security_generator.py — NexTest Security Test Generator
-# Tests the FRONTEND via Playwright using JWT token from localStorage
-# Target: https://anpe.demopro.tn:10443
 
 import json
 import os
@@ -14,32 +11,48 @@ groq_client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY"),
 )
 
-# ── Pages disponibles après login ────────────────────────────────────────────
-FRONTEND_PAGES = [
-    "/dashboard",
-    "/statistiques",
-    "/reception",
-    "/outbox",
-    "/traitement_dossier_eie",
-    "/traitement_dossier_ed",
-    "/traitement_dossier_avis",
-    "/traitement_dossier_transaction",
-    "/gestion_commission",
-    "/reunions",
-    "/traitement_dossier_cc",
-    "/visites",
-    "/traitement_dossier_af",
-]
+DEFAULT_PAGES = ["/dashboard", "/login", "/home", "/admin", "/profile", "/settings"]
+DEFAULT_LOGIN_URL = "/login"
 
-# ── Login page selectors ─────────────────────────────────────────────────────
-LOGIN_URL        = "/admin-anpe/login"
-EMAIL_SELECTOR   = "input[type='email'], #basic_email, input[name='email']"
-PASSWORD_SELECTOR= "input[type='password'], #basic_password, input[name='password']"
-SUBMIT_SELECTOR  = "button[type='submit'], .btn-primary, button:has-text('Connexion')"
-CAPTCHA_SELECTOR = "#basic_captcha, input[name='captcha']"
-
-
-def generate_security_tests(base_url: str, categories: list = None) -> dict:
+def _extract_pages_from_doc(doc_text: str, base_url: str) -> tuple:
+    """Extract pages and login URL from documentation via LLM"""
+    print("[SECURITY_GENERATOR] Extracting pages from doc_text via LLM...")
+    try:
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a path extractor. Extract page paths and the login URL from documentation. "
+                        "Return ONLY a JSON object like: "
+                        "{\"pages\": [\"/dashboard\", \"/users\"], \"login_url\": \"/login\"}. "
+                        "No markdown, no explanation."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Extract pages and login URL from this documentation:\n\n{doc_text[:2000]}",
+                },
+            ],
+            temperature=0.1,
+            max_tokens=500,
+        )
+        raw = resp.choices[0].message.content.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        data = json.loads(raw.strip())
+        pages = data.get("pages", DEFAULT_PAGES)
+        login_url = data.get("login_url", DEFAULT_LOGIN_URL)
+        print(f"[SECURITY_GENERATOR] LLM extracted {len(pages)} pages, login_url={login_url}")
+        return pages, login_url
+    except Exception as e:
+        print(f"[SECURITY_GENERATOR] Doc extraction error: {e} — using defaults")
+        return DEFAULT_PAGES, DEFAULT_LOGIN_URL
+    
+def generate_security_tests(base_url: str, categories: list = None, doc_text: str = "") -> dict:
     """
     Generate frontend security tests for ANPE using Playwright + JWT token.
     Tests: auth, xss, session, navigation, headers, info_exposure
@@ -49,24 +62,25 @@ def generate_security_tests(base_url: str, categories: list = None) -> dict:
         categories = ["auth", "xss", "session", "navigation", "headers", "info_exposure"]
 
     frontend_url = base_url
-    # Normalise URL — utilise le frontend pas le backend
-    if "back.demopro" in base_url:
-        frontend_url = base_url.replace("back.demopro", "demopro").replace(
-            "anpe.back", "anpe"
-        )
 
     print(f"[SECURITY_GENERATOR] Frontend URL: {frontend_url}")
     print(f"[SECURITY_GENERATOR] Generating tests for categories: {categories}")
+    
+    # Extract pages from doc or use defaults
+    if doc_text:
+        pages, login_url = _extract_pages_from_doc(doc_text, frontend_url)
+    else:
+        pages, login_url = DEFAULT_PAGES, DEFAULT_LOGIN_URL
 
-    # ── Générer les tests via Groq ────────────────────────────────────────────
+   
     prompt = f"""You are a security testing expert for web applications.
 
 Target frontend URL: {frontend_url}
-Login page: {frontend_url}{LOGIN_URL}
+Login page: {frontend_url}{login_url}
 After login, user lands on: {frontend_url}/dashboard
 
 Available pages after login:
-{json.dumps(FRONTEND_PAGES, indent=2)}
+{json.dumps(pages, indent=2)}
 
 The app uses JWT stored in localStorage key "token".
 Testing framework: Playwright (Python async)
@@ -99,21 +113,20 @@ category=auth (3 tests):
   3. Access /dashboard with INVALID token (fake JWT) → expect redirect_to_login, severity=high
 
 category=xss (2 tests):
-  4. Inject <script>alert('XSS')</script> in search field "Rechercher par référence" on /reception → expect xss_not_executed, severity=high
-  5. Inject <img src=x onerror=alert(1)> in search field on /dashboard → expect xss_not_executed, severity=high
+  4. Inject <script>alert('XSS')</script> in search field on {pages[1] if len(pages) > 1 else '/home'} → expect xss_not_executed, severity=high
+  5. Inject <img src=x onerror=alert(1)> in search field on {pages[0] if len(pages) > 0 else '/dashboard'} → expect xss_not_executed, severity=high
 
 category=session (2 tests):
   6. Check localStorage doesn't expose sensitive user data beyond token → check_localStorage=true, forbidden_in_dom=["password","secret","private_key"], severity=medium
   7. After logout, verify token is cleared from localStorage → expect no_token_after_logout, severity=high
 
 category=navigation (2 tests):
-  8. Direct URL access to /reception without being logged in → expect redirect_to_login, severity=high
-  9. Direct URL access to /gestion_commission without being logged in → expect redirect_to_login, severity=medium
+  8. Direct URL access to {pages[1] if len(pages) > 1 else '/home'} without being logged in → expect redirect_to_login, severity=high
+  9. Direct URL access to {pages[2] if len(pages) > 2 else '/settings'} without being logged in → expect redirect_to_login, severity=medium
 
 category=headers (2 tests):
   10. Check /dashboard for security headers X-Content-Type-Options, X-Frame-Options → check_headers=["X-Content-Type-Options","X-Frame-Options"], severity=medium
-  11. Check login page {frontend_url}{LOGIN_URL} for security headers → check_headers=["X-Content-Type-Options","Strict-Transport-Security"], severity=medium
-
+  11. Check login page {frontend_url}{login_url} for security headers → check_headers=["X-Content-Type-Options","Strict-Transport-Security"], severity=medium
 category=info_exposure (1 test):
   12. Verify dashboard DOM doesn't expose passwords, API keys, or secrets → forbidden_in_dom=["password","api_key","secret","private_key","token_secret"], severity=high
 
@@ -162,6 +175,7 @@ Return ONLY the JSON array. No markdown. No explanation."""
                 "check_headers":    tc.get("check_headers", []),
                 "forbidden_in_dom": tc.get("forbidden_in_dom", []),
                 "frontend_url":     frontend_url,
+                "login_url": login_url
             })
 
         print(f"[SECURITY_GENERATOR] ✓ {len(cleaned)} security tests generated")

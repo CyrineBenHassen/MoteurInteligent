@@ -1377,8 +1377,8 @@ def _call_groq_for_recommendations(tests: list, url: str) -> dict:
 
 Real test results:
 - PASSED ({len(passed)}): {[t.get('name') for t in passed]}
-- FAILED ({len(failed)}): {[{{'name': t.get('name'), 'reason': t.get('reason','')}} for t in failed]}
-- SLOW >3000ms ({len(slow)}): {[{{'name': t.get('name'), 'duration': t.get('duration')}} for t in slow]}
+- FAILED ({len(failed)}): {[t.get('name','') + ': ' + t.get('reason','') for t in failed]}
+- SLOW >3000ms ({len(slow)}): {[t.get('name') for t in slow]}
 
 Generate professional QA recommendations as a JSON object with exactly these 3 keys:
 - performance: list of 2-3 strings about speed/timing issues based on real durations
@@ -2715,7 +2715,7 @@ def _generate_security_pdf(generation_data: dict, tests: list) -> bytes:
         build_regression_action_plan(elements, action_plan)
 
     # ── AI RECOMMENDATIONS via Groq/Llama ────────────────────
-    pythonscraped = generation_data.get('scraped', result.get('scraped', {}))
+    scraped = generation_data.get('scraped', {})
     if not isinstance(scraped, dict):
         scraped = {}
     scraped['_is_security'] = True
@@ -2761,11 +2761,14 @@ def _call_groq_security_recommendations(tests: list, url: str) -> dict:
         warned  = [t for t in tests if t.get('status') == 'warn']
         passed  = [t for t in tests if t.get('status') == 'pass']
  
+        slow = [t for t in tests if int(str(t.get('duration', '0')).replace('ms', '') or 0) > 5000]
+
         prompt = f"""You are a senior security engineer analyzing frontend security test results for {url}.
 
 Real test results:
-- PASSED ({len(passed)}): {[{{'name': t.get('name'), 'duration': t.get('duration','')}} for t in passed]}
-- FAILED ({len(failed)}): {[{{'name': t.get('name'), 'reason': t.get('reason','')}} for t in failed]}
+- PASSED ({len(passed)}): {[t.get('name') for t in passed]}
+- FAILED ({len(failed)}): {[t.get('name','') + ': ' + t.get('reason','') for t in failed]}
+- SLOW >5000ms ({len(slow)}): {[t.get('name','') + ' (' + str(t.get('duration','')) + ')' for t in slow]}
 - WARNED ({len(warned)}): {[t.get('name') for t in warned]}
 
 Even if all tests passed, generate professional proactive security recommendations as a JSON object with exactly these 3 keys:
@@ -2798,6 +2801,7 @@ Rules:
     except Exception as e:
         print(f"[Groq Security Recs] Error: {e}")
         return {}
+    
 def build_security_scenarios(elements, tests: list, url: str):
     """Scenarios table — même style que build_regression_scenarios"""
     elements.append(section_header('🔒', 'Security Test Scenarios', RED))
@@ -3299,7 +3303,7 @@ def build_functional_category_summary(elements, tests: list):
 def _infer_functional_action(t: dict) -> str:
     """Déduit l'action depuis la category + le reason."""
     category = t.get('category', '').lower()
-    reason   = t.get('reason', '').lower()
+    reason = (t.get('reason') or '').lower()
     name     = t.get('name', '').lower()
  
     if 'rempli' in reason or 'fill' in reason or 'remplir' in name:
@@ -3320,7 +3324,7 @@ def _infer_functional_action(t: dict) -> str:
 def _extract_functional_selector(t: dict) -> str:
     reason = t.get('reason', '')
     
-    matches = re.findall(r"'([^']+)'", reason)
+    matches = re.findall(r"'([^']+)'", reason or "")
     
     for m in matches:
         if (m.startswith('#') or 
@@ -6418,6 +6422,8 @@ def generate_pdf(generation_data: dict) -> bytes:
     url       = generation_data.get('url', result.get('url', ''))
     framework = generation_data.get('framework', result.get('framework', 'Playwright'))
     scraped   = generation_data.get('scraped', result.get('scraped', {}))
+    if isinstance(scraped, list):
+         scraped = {}
     load_time = scraped.get('load_time_ms', 0) if isinstance(scraped, dict) else 0
     is_spa    = scraped.get('is_spa', False)
  
@@ -6476,7 +6482,10 @@ def generate_pdf(generation_data: dict) -> bytes:
     load_badge_color = '#ef4444' if load_time > 3000 else '#10b981'
     load_badge       = 'SLOW'    if load_time > 3000 else 'GOOD'
     fw_display       = 'Selenium + Cypress' if framework == 'Both' else framework
-    is_reg_info      = generation_data.get('scraped', {}).get('_is_regression', False)
+    scraped_data = generation_data.get('scraped', {})
+    if isinstance(scraped_data, list):
+        scraped_data = {}
+    is_reg_info = scraped_data.get('_is_regression', False)
  
     info_data = [
         [info_label('URL'),       info_val(url)],
@@ -6514,7 +6523,7 @@ def generate_pdf(generation_data: dict) -> bytes:
     for label, color in legend_items:
         legend_parts.append(f'<font color="{color}"><b>{label}</b></font>' if color
                             else f'<font color="#64748b">{label}</font>')
-    is_reg = generation_data.get('scraped', {}).get('_is_regression', False)
+    is_reg = (generation_data.get('scraped', {}) if not isinstance(generation_data.get('scraped', {}), list) else {}).get('_is_regression', False)
     if not is_reg:
         elements.append(Paragraph(
             '  '.join(legend_parts),

@@ -17,20 +17,12 @@ groq_client = OpenAI(
 
 _CACHED_TOKEN = os.getenv("ANPE_TOKEN", "")
 
-ANPE_PAGES = [
+GENERIC_PAGES = [
     "/dashboard",
-    "/statistiques",
-    "/reception",
-    "/outbox",
-    "/traitement_dossier_eie",
-    "/traitement_dossier_ed",
-    "/traitement_dossier_avis",
-    "/traitement_dossier_transaction",
-    "/gestion_commission",
-    "/reunions",
-    "/traitement_dossier_cc",
-    "/visites",
-    "/traitement_dossier_af",
+    "/login",
+    "/home",
+    "/profile",
+    "/settings",
 ]
 
 ANPE_ENDPOINTS = [
@@ -100,11 +92,39 @@ TEST_PROFILES = {
     },
 }
 
+def _extract_pages_from_doc(doc_text: str) -> list:
+    """Extract page paths from documentation using LLaMA."""
+    prompt = f"""Extract all page URLs/paths from this documentation.
+Return ONLY a JSON array of path strings, like ["/dashboard", "/login"].
+No markdown, no explanation.
 
-def _probe_pages(base_url: str) -> list:
+Documentation:
+{doc_text[:3000]}
+"""
+    try:
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=500,
+        )
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```"):
+            content = "\n".join(content.split("\n")[1:-1])
+        pages = json.loads(content)
+        if isinstance(pages, list) and pages:
+            print(f"[PERF_GENERATOR] ✓ Extracted {len(pages)} pages from doc")
+            return pages
+    except Exception as e:
+        print(f"[PERF_GENERATOR] ✗ Doc extraction failed: {e}")
+    return []
+
+def _probe_pages(base_url: str, pages_to_probe: list = None) -> list:
+    if pages_to_probe is None:
+        pages_to_probe = GENERIC_PAGES
     available = []
     headers = {"Authorization": f"Bearer {_CACHED_TOKEN}"}
-    for page in ANPE_PAGES:
+    for page in pages_to_probe:
         try:
             r = requests.get(
                 f"{base_url}{page}",
@@ -224,7 +244,6 @@ def generate_k6_script_with_llama(
 
     prompt = f"""You are a k6 performance testing expert. Generate a complete k6 JavaScript script.
 
-Application: ANPE — Tunisia
 Base URL: {base_url}
 Auth Token: {_CACHED_TOKEN}
 Test Type: {profile['name']}
@@ -290,12 +309,18 @@ Start directly with: import http from 'k6/http';"""
         return _build_fallback_script(base_url, test_type, profile, pages)
 
 
-def generate_performance_tests(base_url: str, test_types: list = None) -> dict:
+def generate_performance_tests(base_url: str, test_types: list = None, doc_text: str = "") -> dict:
     if test_types is None:
         test_types = ["load", "stress", "spike", "soak"]
 
+    pages_to_probe = GENERIC_PAGES
+    if doc_text:
+        doc_pages = _extract_pages_from_doc(doc_text)
+        if doc_pages:
+            pages_to_probe = doc_pages
+
     print(f"[PERF_GENERATOR] Probing pages on {base_url}...")
-    pages = _probe_pages(base_url)
+    pages = _probe_pages(base_url, pages_to_probe)
     print(f"[PERF_GENERATOR] {len(pages)} pages available")
     pages = pages[:5]
 

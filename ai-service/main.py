@@ -39,32 +39,46 @@ from fastapi import Request as FastAPIRequest
 from seo_runner import run_seo_test
 
 
+import json
+import asyncio
+from fastapi.responses import StreamingResponse
 
 
+from alert_recorder import record_results
+
+from runner_performance import run_performance, run_k6_performance
+
+from performance_generator import generate_performance_tests  # ← internal k6
 
 
 _api_lock = threading.Lock()
 
-
-
 executor = ThreadPoolExecutor(max_workers=8)
 
-
-
 app = FastAPI(title="NexTest AI Service")
+
+#Doc file
+def get_doc_text(data: dict) -> str:
+    """Extrait le doc_text si présent, sinon retourne ''"""
+    return data.get("doc_text", "").strip()
 
 @app.post("/generate-seo")
 async def generate_seo(request: FastAPIRequest):
     body = await request.json()
     url = body.get("url", "")
     result = run_seo_test(url)
+    generation_id = body.get("generation_id")
+    project_id    = body.get("project_id")
+    for tc in result.get("test_cases", []):
+        tc["generation_id"] = generation_id
+        tc["project_id"]    = project_id
     return {"result": result}
 
 @app.get("/")
 def root():
     return {"message": "NexTest AI Service is running — v14 (Performance)"}
 
-
+#Scarper
 @app.post("/scrape")
 def scrape(data: dict):
     url       = data.get("url")
@@ -73,7 +87,7 @@ def scrape(data: dict):
         return {"error": "URL is required"}
     return scrape_page(url, wait_time=wait_time)
 
-
+#Generate
 @app.post("/generate")
 def generate(data: dict):
     print(f"==============================")
@@ -89,6 +103,8 @@ def generate(data: dict):
     
 
     user_scenario = data.get("user_scenario", None)
+    doc_text = get_doc_text(data)
+    print(f"[DEBUG] doc_text length: {len(doc_text)}")
 
     if not url:
         return {"error": "URL is required"}
@@ -118,21 +134,19 @@ def generate(data: dict):
             }
         }
 
-    # ── PERFORMANCE : chemin dédié ───────────────────────────────────────────
+    # ── PERFORMANCE : isolé du reste, ne s'exécute QUE si demandé ────────────
     if test_type == "performance":
         print(f"[GENERATE] Performance test | framework={framework} | url={url}")
 
         if framework == "k6":
-            # ── K6 : Load Test ───────────────────────────────────────────
             from runner_performance import run_k6_performance
             result = run_k6_performance(url, scraped)
-
         else:
-            # ── PLAYWRIGHT : Web Vitals ──────────────────────────────────
+            from generator_performance import generate_performance_tests as gen_perf_public
             metrics = run_performance(url)
-            result  = generate_performance_tests(
-                scraped=scraped,
-                framework=framework,
+            result  = gen_perf_public(
+                scraped,
+                framework,
                 metrics=metrics,
             )
 
@@ -153,6 +167,8 @@ def generate(data: dict):
         password,
         test_type=test_type,
         user_scenario=user_scenario,
+        doc_text=doc_text,
+        
     )
 
     return {
@@ -163,7 +179,7 @@ def generate(data: dict):
         "scraped":       scraped,
         "result":        result,
     }
-
+#Runner
 @app.post("/run")
 async def run_tests(data: dict):
     script     = data.get("script", "")
@@ -194,7 +210,7 @@ async def run_tests(data: dict):
     if not script and not test_cases:
         return {"error": "script or test_cases is required"}
 
-    # ── Filtrer les pré-calculés ──────────────────────────────────────────────
+    #Filtrer les pré-calculés
     PRE_CALC_TYPES = {"http_status", "ssl", "performance"}
     pre_calculated = [s for s in test_cases if s.get("type") in PRE_CALC_TYPES and "status" in s]
     to_run         = [s for s in test_cases if s.get("type") not in PRE_CALC_TYPES]
@@ -217,7 +233,7 @@ async def run_tests(data: dict):
             "screenshot":       None,
         })
 
-    # ── Lancer le runner avec to_run seulement ────────────────────────────────
+    
     loop = asyncio.get_event_loop()
     if framework.lower() == "selenium":
         run_result = await loop.run_in_executor(
@@ -232,7 +248,7 @@ async def run_tests(data: dict):
             executor, lambda: run_selenium_real(script, to_run)
         )
 
-    # ── Combiner pré-calculés + résultats runner ──────────────────────────────
+    #Combiner pré-calculés + résultats runner
     all_results = pre_results + run_result.get("results", [])
     pass_count  = sum(1 for r in all_results if r["status"] == "pass")
     fail_count  = sum(1 for r in all_results if r["status"] == "fail")
@@ -251,6 +267,7 @@ async def run_tests(data: dict):
         "raw_output": "",
     }
 
+#Analyzer
 @app.post("/analyze")
 def analyze(data: dict):
     error     = data.get("error")
@@ -265,7 +282,7 @@ def analyze(data: dict):
     result = analyze_error(error, script, framework)
     return {"framework": framework, "original_error": error, "analysis": result}
 
-
+#Chatboot
 @app.post("/chat")
 def chat(data: dict):
     message = data.get("message", "")
@@ -298,7 +315,7 @@ def chat(data: dict):
     ]
 
     try:
-        from openai import OpenAI
+        from openai import OpenAI 
         from dotenv import load_dotenv
         import os
         load_dotenv()
@@ -320,7 +337,7 @@ def chat(data: dict):
     except Exception as e:
         return {"error": str(e)}
 
-
+#Rapport
 @app.post("/generate-pdf")
 def generate_pdf_report(data: dict):
     try:
@@ -352,6 +369,7 @@ def generate_pdf_report(data: dict):
         print(traceback.format_exc())
         return {"error": str(e), "traceback": traceback.format_exc()}
     
+#Generate interne
 @app.post("/generate-internal")
 def generate_internal(data: dict):
 
@@ -363,7 +381,8 @@ def generate_internal(data: dict):
     username     = data.get("username", None)
     password     = data.get("password", None)
     login_url    = data.get("login_url", None)
-    scrape_login = data.get("scrape_login", False)  # True → tester la page login
+    scrape_login = data.get("scrape_login", False)
+    doc_text = get_doc_text(data)
     wait_time    = data.get("wait_time", 2000)
 
     print(f"[INTERNAL] url={url} | test_type={test_type} | "
@@ -373,7 +392,7 @@ def generate_internal(data: dict):
     if not url:
         return {"error": "URL is required"}
 
-    # ── 1. Scrape ────────────────────────────────────────────────────────────
+    #1. Scrape
     scraped = scrape_internal(
         target_url   = url,
         cookies      = cookies,
@@ -406,6 +425,7 @@ def generate_internal(data: dict):
     result = generate_internal_tests(
         scraped   = scraped,
         framework = framework,
+         doc_text  = doc_text
     )
 
     return {
@@ -424,9 +444,11 @@ def generate_api(data: dict):
         url       = data.get("url", "")
         framework = data.get("framework", "Pytest")
         token     = data.get("token", "")
+        print(f"[DEBUG] token from frontend: '{token[:20] if token else 'EMPTY'}'")
         domains   = data.get("domains", ["auth"])
         username  = data.get("username", "")
         password  = data.get("password", "")
+        doc_text  = get_doc_text(data) 
 
         if not url:
             return {"error": "URL is required"}
@@ -441,7 +463,7 @@ def generate_api(data: dict):
                 base_api_url = f"{parsed.scheme}://{parsed.netloc}"
 
         print(f"[GENERATE-API] base_api_url={base_api_url} | framework={framework} | domains={domains}")
-
+        doc_text = get_doc_text(data)
         # ── 1. Generate test cases ──
         result = generate_api_tests(
             base_url     = base_api_url,
@@ -449,6 +471,9 @@ def generate_api(data: dict):
             token        = token,
             domains      = domains,
             original_url = url,
+            username     = data.get("username", ""),
+            password     = data.get("password", ""),
+            doc_text     = doc_text,
         )
 
         if not result:
@@ -462,9 +487,23 @@ def generate_api(data: dict):
 
         # ── 3. Run tests ──
         test_cases = result.get("test_cases", [])
+        generation_id = data.get("generation_id")
+        project_id    = data.get("project_id")
+        for tc in test_cases:
+            tc["generation_id"] = generation_id
+            tc["project_id"]    = project_id
         run_result = run_api_tests(test_cases, jwt_token)
 
         execution_results = run_result.get("results", [])
+        
+        record_results(
+    results=execution_results,
+    base_url=url,
+    test_type="api",
+    framework=framework,
+    generation_id=generation_id,
+    project_id=project_id,
+)
 
         return {
             "url":       url,
@@ -483,6 +522,8 @@ def generate_api(data: dict):
         }
     finally:
         _api_lock.release()
+        
+        
 @app.post("/generate-security")
 def generate_security(data: dict):
     url        = data.get("url", "")
@@ -508,9 +549,11 @@ def generate_security(data: dict):
     print(f"[SECURITY] frontend_url={frontend_url} | framework={framework} | categories={categories}")
 
     # ── 1. Générer les tests cases via Groq ──────────────────────────────────
+    doc_text = get_doc_text(data)
     gen_result = generate_security_tests(
         base_url   = frontend_url,
         categories = categories,
+        doc_text   = doc_text,    # ← AJOUTE
     )
 
     test_cases = gen_result.get("test_cases", [])
@@ -523,6 +566,11 @@ def generate_security(data: dict):
     from security_runner import _CACHED_TOKEN
     jwt_token = token if token else _CACHED_TOKEN
 
+    generation_id = data.get("generation_id")
+    project_id    = data.get("project_id")
+    for tc in test_cases:
+        tc["generation_id"] = generation_id
+        tc["project_id"]    = project_id
     run_result = run_security_tests(test_cases, jwt_token)
     execution_results = run_result.get("results", [])
 
@@ -533,6 +581,15 @@ def generate_security(data: dict):
     pass_rate  = run_result["pass_rate"]
 
     print(f"[SECURITY] DONE | {pass_count} pass / {warn_count} warn / {fail_count} fail | {pass_rate}%")
+    
+    record_results(
+    results=execution_results,
+    base_url=url,
+    test_type="security",
+    framework="Pytest",
+    generation_id=generation_id,
+    project_id=project_id,
+)
 
     return {
         "url":       url,
@@ -595,20 +652,36 @@ def generate_regression(data: dict):
     print(f"[REGRESSION] base_url={base_url}")
 
     # Generate tests
-    result = generate_regression_tests(base_url=base_url)
+    doc_text = get_doc_text(data)
+    result = generate_regression_tests(base_url=base_url, username=data.get("username", ""), password=data.get("password", ""), doc_text=doc_text)
     test_cases = result.get("test_cases", [])
 
     # Run tests
+    generation_id = data.get("generation_id")
+    project_id    = data.get("project_id")
+    for tc in test_cases:
+        tc["generation_id"] = generation_id
+        tc["project_id"]    = project_id
     run_result = run_regression_tests(
         test_cases=test_cases,
         base_url=base_url,
+        username=data.get("username", ""),
+        password=data.get("password", ""),
     )
-
     execution_results = run_result.get("results", [])
     pass_count = run_result["pass_count"]
     fail_count = run_result["fail_count"]
     skip_count = run_result["skip_count"]
     pass_rate  = run_result["pass_rate"]
+    
+    record_results(
+    results=execution_results,
+    base_url=url,
+    test_type="regression",
+    framework="Playwright",
+    generation_id=generation_id,
+    project_id=project_id,
+)
 
     return {
         "url":       url,
@@ -640,11 +713,16 @@ def generate_functional(data: dict):
  
     print(f"[FUNCTIONAL] target_url={url} | base_url={base_url}")
  
-    # ── 1. LLaMA génère les tests pour CETTE page uniquement ─────────────────
+    username = data.get("username", "")
+    password = data.get("password", "")
+    doc_text = get_doc_text(data)
     gen_result = generate_functional_tests(
-        base_url   = base_url,
-        target_url = url,        # ← la page exacte à tester
-    )
+    base_url   = base_url,
+    target_url = url,
+    username   = username,
+    password   = password,
+    doc_text   = doc_text,
+)
  
     test_cases = gen_result.get("test_cases", [])
  
@@ -654,7 +732,12 @@ def generate_functional(data: dict):
     print(f"[FUNCTIONAL] {len(test_cases)} tests generated for {gen_result.get('page')} — running...")
  
     # ── 2. Playwright exécute les tests ───────────────────────────────────────
-    run_result        = run_functional_tests(test_cases=test_cases, base_url=base_url)
+    generation_id = data.get("generation_id")
+    project_id    = data.get("project_id")
+    for tc in test_cases:
+        tc["generation_id"] = generation_id
+        tc["project_id"]    = project_id
+    run_result        = run_functional_tests(test_cases=test_cases, base_url=base_url, username=username, password=password)
     execution_results = run_result.get("results", [])
  
     pass_count = run_result["pass_count"]
@@ -663,6 +746,15 @@ def generate_functional(data: dict):
     pass_rate  = run_result["pass_rate"]
  
     print(f"[FUNCTIONAL] DONE | {pass_count} pass / {fail_count} fail | {pass_rate}%")
+    
+    record_results(
+    results=execution_results,
+    base_url=url,
+    test_type="functional",
+    framework="Playwright",
+    generation_id=generation_id,
+    project_id=project_id,
+)
  
     return {
         "url":       url,
@@ -681,6 +773,8 @@ def generate_functional(data: dict):
             "category_stats":    run_result.get("category_stats", {}),
         },
     }
+    
+    
     # ── Performance Test Endpoint
 @app.post("/generate-performance")
 def generate_performance(data: dict):
@@ -695,11 +789,13 @@ def generate_performance(data: dict):
     base_url = f"{parsed.scheme}://{parsed.netloc}"
  
     print(f"[PERFORMANCE] base_url={base_url} | types={test_types}")
+    doc_text = get_doc_text(data)
  
     # Step 1 — Generate k6 scripts with LLaMA
     gen_result = generate_performance_tests(
         base_url=base_url,
         test_types=test_types,
+        doc_text=doc_text,
     )
     scripts = gen_result.get("scripts", {})
  
@@ -710,6 +806,8 @@ def generate_performance(data: dict):
     run_result = run_performance_tests(
         scripts=scripts,
         base_url=base_url,
+        username=data.get("username", ""),
+        password=data.get("password", ""),
     )
  
     execution_results = run_result.get("results", [])
@@ -748,6 +846,200 @@ def generate_performance(data: dict):
         },
     }
 
-    
+    def sse(data: dict) -> str:
+        return f"data: {json.dumps(data)}\n\n"
+ 
+async def stream_generate(data: dict):
+    """
+    Générateur SSE — appelle tes fonctions EXISTANTES
+    et streame chaque résultat test par test.
+    """
+ 
+    url       = data.get("url", "")
+    framework = data.get("framework", "Selenium")
+    test_type = data.get("test_type", "smoke").lower()
+ 
+    # ── Connexion établie ────────────────────────────────────────────────────
+    yield sse({"type": "log", "text": f"NexTest AI Engine — connecting to {url}"})
+    await asyncio.sleep(0.05)
+    yield sse({"type": "log", "text": f"Launching {framework} (headless)..."})
+    await asyncio.sleep(0.05)
+    yield sse({"type": "log", "text": "Scraping DOM and analyzing page structure..."})
+    await asyncio.sleep(0.05)
+ 
+    try:
+        # ── APPELLE TES FONCTIONS EXISTANTES ─────────────────────────────────
+        # (les mêmes que dans tes endpoints actuels)
+ 
+        loop = asyncio.get_event_loop()
+ 
+        if test_type == "functional":
+            from urllib.parse import urlparse
+            base_url = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
+            gen_result = await loop.run_in_executor(
+                executor, lambda: generate_functional_tests(base_url=base_url, target_url=url)
+            )
+            test_cases = gen_result.get("test_cases", [])
+            runner_fn  = lambda: run_functional_tests(test_cases=test_cases, base_url=base_url)
+ 
+        elif test_type == "security":
+            frontend_url = url
+            for suffix in ["/admin-anpe/login", "/admin-anpe", "/dashboard", "/reception"]:
+                if suffix in frontend_url:
+                    frontend_url = frontend_url.split(suffix)[0]
+                    break
+            gen_result = await loop.run_in_executor(
+                executor, lambda: generate_security_tests(base_url=frontend_url)
+            )
+            test_cases = gen_result.get("test_cases", [])
+            from security_runner import _CACHED_TOKEN
+            jwt = data.get("token") or _CACHED_TOKEN
+            runner_fn = lambda: run_security_tests(test_cases, jwt)
+ 
+        elif test_type == "regression":
+            from urllib.parse import urlparse
+            base_url = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
+            gen_result = await loop.run_in_executor(
+                executor, lambda: generate_regression_tests(base_url=base_url, username=data.get("username", ""), password=data.get("password", ""))
+
+            )
+            test_cases = gen_result.get("test_cases", [])
+            runner_fn  = lambda: run_regression_tests(test_cases=test_cases, base_url=base_url, username=data.get("username", ""), password=data.get("password", ""))
+
+ 
+        elif test_type == "api":
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            base_api_url = f"{parsed.scheme}://{parsed.netloc}"
+            gen_result = await loop.run_in_executor(
+                executor, lambda: generate_api_tests(
+                    base_url=base_api_url,
+                    framework=framework,
+                    token=data.get("token", ""),
+                    domains=data.get("domains", ["auth"]),
+                    original_url=url,
+                )
+            )
+            test_cases = gen_result.get("test_cases", [])
+            from api_runner import _CACHED_TOKEN
+            jwt = data.get("token") or _CACHED_TOKEN
+            runner_fn  = lambda: run_api_tests(test_cases, jwt)
+ 
+        else:
+            # smoke / performance / default → appelle /generate normal
+            scraped = await loop.run_in_executor(
+                executor, lambda: scrape_page(url, wait_time=4000)
+            )
+            gen_result = await loop.run_in_executor(
+                executor, lambda: generate_tests(
+                    scraped, framework,
+                    data.get("username"), data.get("password"),
+                    test_type=test_type,
+                    user_scenario=data.get("user_scenario"),
+                )
+            )
+            test_cases = gen_result.get("test_cases", [])
+            runner_fn  = lambda: run_selenium_real(
+                gen_result.get("script", ""), test_cases
+            )
+ 
+        # ── Annonce le nombre de tests ────────────────────────────────────────
+        total = len(test_cases)
+        yield sse({"type": "log", "text": f"AI generated {total} test cases — starting execution..."})
+        yield sse({"type": "log", "text": "─" * 52})
+        await asyncio.sleep(0.05)
+ 
+        # ── Lance le runner dans un thread (non-bloquant) ─────────────────────
+        # Le runner retourne TOUS les résultats d'un coup.
+        # On les streame un par un pour l'affichage terminal.
+        run_result = await loop.run_in_executor(executor, runner_fn)
+        results    = run_result.get("results", [])
+ 
+        pass_count = 0
+        fail_count = 0
+        skip_count = 0
+ 
+        for i, r in enumerate(results):
+            status = r.get("status", "skip")
+            if status == "pass":  pass_count += 1
+            elif status == "fail": fail_count += 1
+            else:                  skip_count += 1
+ 
+            # Stream ce résultat immédiatement
+            yield sse({
+                "type":       "test_result",
+                "index":      i,
+                "total":      total,
+                "name":       r.get("name", f"Test {i+1}"),
+                "status":     status,
+                "duration":   r.get("duration", "—"),
+                "suite":      r.get("suite", r.get("detail", "")),
+                "category":   r.get("category", "smoke"),
+                "priority":   r.get("priority", "medium"),
+                "ai_analysis": r.get("ai_analysis"),
+                "assertion_result": r.get("assertion_result"),
+                "step_meta":  r.get("step_meta"),
+                "screenshot": r.get("screenshot"),
+                "http_status": r.get("http_status"),
+                "pass_count": pass_count,
+                "fail_count": fail_count,
+                "skip_count": skip_count,
+                "progress":   round((i + 1) / total * 100),
+            })
+            await asyncio.sleep(0.02)  # petit délai pour que React reçoive chaque event
+ 
+        # ── Résumé final ──────────────────────────────────────────────────────
+        total_exec = pass_count + fail_count
+        rate = round(pass_count / total_exec * 100) if total_exec else 0
+ 
+        yield sse({"type": "log", "text": "─" * 52})
+        yield sse({"type": "log", "text": f"Execution complete — {pass_count} passed · {fail_count} failed · {skip_count} skipped"})
+        yield sse({"type": "log", "text": f"Pass rate: {rate}% — Generating AI analysis report..."})
+        yield sse({"type": "log", "text": "Done ✓"})
+ 
+        # ── Événement COMPLETE — contient tout pour que React sauvegarde ──────
+        yield sse({
+            "type":       "complete",
+            "results":    results,
+            "pass_count": pass_count,
+            "fail_count": fail_count,
+            "skip_count": skip_count,
+            "pass_rate":  rate,
+            "total":      total,
+            # Inclure les scripts générés pour le téléchargement
+            "script":            gen_result.get("script", ""),
+            "script_selenium":   gen_result.get("script_selenium", ""),
+            "script_playwright": gen_result.get("script_playwright", ""),
+            "script_cypress":    gen_result.get("script_cypress", ""),
+            "script_postman":    gen_result.get("script_postman", ""),
+            "script_pytest":     gen_result.get("script_pytest", ""),
+            "summary":           run_result.get("summary", {}),
+            "test_type":         test_type,
+            "framework":         framework,
+        })
+ 
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[SSE ERROR] {e}\n{tb}")
+        yield sse({"type": "error", "text": f"Error: {str(e)}"})
+ 
+ 
+@app.post("/generate-stream")
+async def generate_stream(request: FastAPIRequest):
+    """
+    Endpoint SSE — React se connecte ici avec fetch + ReadableStream.
+    Remplace les appels /generate + /run par un seul flux en temps réel.
+    """
+    data = await request.json()
+    return StreamingResponse(
+        stream_generate(data),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control":    "no-cache",
+            "Connection":       "keep-alive",
+            "X-Accel-Buffering": "no",   # IMPORTANT si tu as Nginx
+        }
+    )
 
   

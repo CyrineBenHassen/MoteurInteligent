@@ -1,3 +1,6 @@
+
+//Imports
+
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useLang } from '../../context/LanguageContext';
@@ -29,7 +32,8 @@ import {
   IconExternalLink,
   IconTrash,
   IconEye,
-  IconChevronDown
+  IconChevronDown,
+  
 } from '@tabler/icons-react';
 
 import { IconTrendingUp } from '@tabler/icons-react';
@@ -44,9 +48,16 @@ import { IconActivity } from '@tabler/icons-react';
 
 import { IconLink } from '@tabler/icons-react';
 
-import { IconSearch, IconBolt, IconChartBar, IconCircleDashed, IconShieldCheck, IconSettings2, IconApi, IconRefresh, IconWorldSearch } from '@tabler/icons-react';
-
+import { IconSearch, IconBolt, IconChartBar, IconApi, IconCircleDashed, IconShieldCheck, IconSettings2, IconRefresh, IconWorldSearch, IconLayoutDashboard, IconClick, IconShieldLock, IconSeeding, IconBellRinging, IconBulb } from '@tabler/icons-react';
 import * as XLSX from 'xlsx';
+
+import FlakyTestsPanel from '../FlakyTests/FlakyTestsPanel';
+
+import AlertsPanel from '../Alerts/AlertsPanel';
+
+import { LanguageSwitcher } from './LanguageSwitcher';
+
+import ScheduledTasksPanel from './ScheduledTasksPanel';
 
 
 
@@ -72,89 +83,205 @@ function useCountUp(target, duration = 1200) {
   return ref;
 }
 
+//Function of terminal animation 
 function AnimatedStat({ val }) {
   const ref = useCountUp(val);
   return <span ref={ref}>{val}</span>;
 }
 
+//Function of the logo design
 function NexLogo({ collapsed }) {
   return (
-    <div className="s-logo">
-      <div className="nav__gem nex-icon" style={{ background: 'linear-gradient(135deg, #8a6a00, #C9A227, #E8C84A)', boxShadow: '0 4px 16px rgba(201,162,39,0.5)' }}>
-        <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
-          <circle cx="22" cy="22" r="17" stroke="#060e1e" strokeWidth="2" fill="none" opacity="0.6" />
-          <polyline points="13,22 20,30 32,14" stroke="#060e1e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-        </svg>
-      </div>
+    <div className="s-logo" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90" width="42" height="42" style={{ flexShrink: 0 }}>
+        <defs>
+          <linearGradient id="hexGradNav" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#8a6a00"/>
+            <stop offset="40%" stopColor="#C9A227"/>
+            <stop offset="100%" stopColor="#E8C84A"/>
+          </linearGradient>
+          <filter id="glowNav">
+            <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <polygon points="45,8 77,27 77,63 45,82 13,63 13,27"
+          fill="rgba(201,162,39,0.08)" stroke="url(#hexGradNav)" strokeWidth="2"/>
+        <circle cx="45" cy="8"  r="2.5" fill="#C9A227" opacity="0.8"/>
+        <circle cx="77" cy="27" r="2.5" fill="#C9A227" opacity="0.8"/>
+        <circle cx="77" cy="63" r="2.5" fill="#C9A227" opacity="0.8"/>
+        <circle cx="45" cy="82" r="2.5" fill="#C9A227" opacity="0.8"/>
+        <circle cx="13" cy="63" r="2.5" fill="#C9A227" opacity="0.8"/>
+        <circle cx="13" cy="27" r="2.5" fill="#C9A227" opacity="0.8"/>
+        <text x="45" y="56" textAnchor="middle"
+          fontFamily="Georgia, serif" fontSize="36" fontWeight="700"
+          fill="#C9A227" filter="url(#glowNav)">N</text>
+      </svg>
+
       {!collapsed && (
-        <div className="logo-words">
-          <div className="nav__name nex-name">NexTest</div>
-          <div className="nav__sub">Test Automation</div>
+        <div>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: 15,
+            fontWeight: 700,
+            color: 'var(--text)',
+            letterSpacing: '4px',
+            textTransform: 'uppercase',
+            lineHeight: 1,
+          }}>
+            NexTest
+          </div>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: 8.5,
+            fontWeight: 500,
+            color: '#a5b4fc',
+            letterSpacing: '3.5px',
+            textTransform: 'uppercase',
+            marginTop: 5,
+          }}>
+            Test Automation
+          </div>
         </div>
       )}
     </div>
   );
 }
 
+//Function of switch light and balck mood 
 function ThemeToggle({ theme, setTheme }) {
   const isDark = theme !== 'light';
+  
   const toggle = () => {
     const next = isDark ? 'light' : 'dark';
     setTheme(next);
     localStorage.setItem('nextest-theme', next);
     document.documentElement.setAttribute('data-theme', next);
   };
+
   return (
-    <button onClick={toggle} className={`tt-btn${isDark ? '' : ' tt-btn--light'}`} title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'} aria-label="Toggle theme">
-      <span className="tt-track">
-        <span className="tt-knob">
-          {isDark ? (
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-          ) : (
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <circle cx="12" cy="12" r="5"/>
-              <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-              <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-            </svg>
-          )}
-        </span>
-        <span className="tt-hint tt-hint--sun">☀</span>
-        <span className="tt-hint tt-hint--moon">☽</span>
-      </span>
+    <button
+      onClick={toggle}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Light mode' : 'Dark mode'}
+      style={{
+        width: 34, height: 34,
+        borderRadius: 8,
+        border: `1px solid ${isDark ? 'rgba(99,102,241,.35)' : 'rgba(0,0,0,.12)'}`,
+        background: isDark ? 'rgba(99,102,241,.1)' : 'rgba(255,255,255,.9)',
+        cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative', overflow: 'hidden',
+        transition: 'all 0.2s ease',
+        boxShadow: isDark ? '0 0 0 3px rgba(99,102,241,.08)' : 'none',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+    >
+      {/* Sun icon */}
+      <svg
+        width="16" height="16" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+        style={{
+          position: 'absolute',
+          color: '#f59e0b',
+          transition: 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          opacity: isDark ? 0 : 1,
+          transform: isDark ? 'rotate(-90deg) scale(0.4)' : 'rotate(0deg) scale(1)',
+        }}
+      >
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+
+      {/* Moon icon */}
+      <svg
+        width="16" height="16" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+        style={{
+          position: 'absolute',
+          color: '#a5b4fc',
+          transition: 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          opacity: isDark ? 1 : 0,
+          transform: isDark ? 'rotate(0deg) scale(1)' : 'rotate(90deg) scale(0.4)',
+        }}
+      >
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
     </button>
   );
 }
 
+//icone in the side bar 
 const IC = {
   dashboard: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
   generate:  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
   execution: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+  scheduled: <svg width="16" height="16" fill="none" stroke="currentColor"strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M12 14l2 2 4-4"/></svg>,
+  flaky: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
   reports: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
   history:   <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  alerts: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
   account:   <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
   settings:  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
   logout:    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>,
+  docs: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
 };
 
 function SItem({ id, label, badge, active, collapsed, onClick }) {
   return (
     <button className={`s-item${active ? ' active' : ''}`} onClick={() => onClick(id)} title={collapsed ? label : ''}>
-      <span className="s-icon">{IC[id]}</span>
+      {/* ← Enveloppe l'icône dans un div position:relative pour le dot */}
+      <span className="s-icon" style={{ position: 'relative' }}>
+        {IC[id]}
+        {/* Dot rouge en mode collapsed */}
+        {collapsed && id === 'alerts' && badge > 0 && (
+          <span style={{
+            position: 'absolute', top: -3, right: -3,
+            width: 8, height: 8, borderRadius: '50%',
+            background: '#ef4444',
+            boxShadow: '0 0 6px #ef4444',
+            animation: 'pulse 2s infinite',
+          }} />
+        )}
+      </span>
       {!collapsed && <span className="s-label-txt">{label}</span>}
-      {!collapsed && badge && <span className="s-badge">{badge}</span>}
+      {!collapsed && badge && (
+  <span style={{
+    marginLeft: 'auto',
+    background: 'rgba(239,68,68,0.15)',
+    color: '#f87171',
+    fontSize: 10,
+    fontWeight: 800,
+    padding: '3px 8px',
+    borderRadius: 6,
+    border: '1px solid rgba(239,68,68,0.3)',
+    letterSpacing: '0.3px',
+  }}>
+    {badge > 99 ? '99+' : badge}
+  </span>
+)}
       {active && <span className="s-active-bar" />}
     </button>
   );
 }
 
+//Icon Pass and Fail
 function StatusIcon({ s }) {
   if (s === 'pass') return <svg width="15" height="15" fill="none" stroke="#10b981" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>;
   if (s === 'fail') return <svg width="15" height="15" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>;
   return <svg width="15" height="15" fill="none" stroke="#f59e0b" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>;
 }
 
+//badge for type of the test ...
 function AssertionBadge({ assertion_result, step_meta }) {
   const [open, setOpen] = useState(false);
   if (!assertion_result) return null;
@@ -195,11 +322,7 @@ function AssertionBadge({ assertion_result, step_meta }) {
     </div>
   );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dashboard Panel
-// ─────────────────────────────────────────────────────────────────────────────
-
+//Function of cards
 function KPICard({ icon, iconBg, iconBorder, accentColor, title, value, trend, sparkData, sparkColor, circular }) {
   const [hovered, setHovered] = useState(false);
   const trendColor = trend.positive === true ? 'var(--green)' : trend.positive === false ? 'var(--red)' : 'var(--muted)';
@@ -370,8 +493,14 @@ function CircularProgress({ value = 0, size = 56, stroke = 5, color = '#10b981' 
     </svg>
   );
 }
-function ActivityHeatmap({ gens }) {
+
+//Part of Tests Activity in Dashboard
+function ActivityHeatmap({ gens, projects = [] }) {
   const today = new Date();
+  const [filterProject, setFilterProject] = useState('all');
+  const filteredGens = filterProject === 'all'
+    ? gens
+    : gens.filter(g => String(g.project_id) === filterProject);
   
   // Construire 28 jours de données (4 semaines)
   const days = Array.from({ length: 28 }, (_, i) => {
@@ -385,8 +514,8 @@ function ActivityHeatmap({ gens }) {
     };
   });
 
-  // Remplir avec les vraies données
-  gens.forEach(g => {
+  // Remplissage avec les donneés (project test et runs )
+   filteredGens.forEach(g => {
     const dateStr = new Date(g.created_at).toISOString().split('T')[0];
     const day = days.find(d => d.dateStr === dateStr);
     if (day) {
@@ -405,7 +534,7 @@ function ActivityHeatmap({ gens }) {
     return 'high';
   };
 
-  // Grouper par semaine (4 semaines x 7 jours)
+  // Groupage par semaine (4 semaines x 7 jours)
   const weeks = [
     days.slice(0, 7),
     days.slice(7, 14),
@@ -422,19 +551,26 @@ function ActivityHeatmap({ gens }) {
 
   return (
     <div className="section-box" style={{ flex: 1 }}>
-      <div className="sb-head">
-        <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-  <IconFlame size={15} stroke={1.5} style={{ color: '#f97316' }} />
-  Tests Activity
-</span>
-        <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>Last 4 weeks</span>
-      </div>
+      <div className="sb-head" style={{ alignItems: 'flex-start' }}>
+  {/* Title + "Last 4 weeks" subtitle */}
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <IconFlame size={15} stroke={1.5} style={{ color: '#f97316' }} />
+      Tests Activity
+    </span>
+    <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, paddingLeft: 21 }}>
+      Last 4 weeks
+    </span>
+  </div>
+
+  {/* Project filter alone on the right */}
+  {projects.length > 0 && (
+    <ProjectDropdown projects={projects} filterProject={filterProject} setFilterProject={setFilterProject} />
+  )}
+</div>
 
       <div style={{ padding: '16px 18px 12px' }}>
-        {/* Description */}
-        <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
-          Visualize test execution activity across weeks and days.
-        </p>
+        
 
         {/* Day labels */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 6, paddingLeft: 28 }}>
@@ -537,50 +673,95 @@ function ActivityHeatmap({ gens }) {
 
         {/* Legend */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          marginTop: 14, justifyContent: 'flex-end',
-        }}>
-          <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 600 }}>Less</span>
-          {[null, 'low', 'medium', 'high'].map((level, i) => (
-            <div key={i} style={{
-              width: 12, height: 12, borderRadius: 3,
-              background: level === null
-                ? 'var(--heatmap-empty)'
-                : level === 'low'
-                ? 'var(--heatmap-low)'
-                : level === 'medium'
-                ? 'var(--heatmap-medium)'
-                : 'var(--heatmap-high)',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }} />
-          ))}
-          <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 600 }}>More</span>
-        </div>
+  display: 'flex', alignItems: 'center', gap: 6,
+  marginTop: 16, justifyContent: 'flex-end',
+}}>
+  <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>Less</span>
+  {[null, 'low', 'medium', 'high'].map((level, i) => (
+    <div key={i} style={{
+      width: 14, height: 14, borderRadius: 4,
+      background: level === null ? 'var(--heatmap-empty)'
+        : level === 'low' ? 'var(--heatmap-low)'
+        : level === 'medium' ? 'var(--heatmap-medium)'
+        : 'var(--heatmap-high)',
+      border: '1px solid rgba(255,255,255,0.06)',
+    }} />
+  ))}
+  <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>More</span>
+</div>
 
         {/* Footer stats */}
-        <div style={{
-          display: 'flex', gap: 16, marginTop: 12,
-          paddingTop: 12, borderTop: '1px solid var(--border3)',
-        }}>
-          {[
-            { lbl: 'Active days', val: days.filter(d => d.tests > 0).length, color: '#22c55e' },
-            { lbl: 'Total runs',  val: days.reduce((s, d) => s + d.count, 0), color: 'var(--indigo2)' },
-            { lbl: 'Peak day',    val: `${Math.max(...days.map(d => d.tests))} tests`, color: '#f59e0b' },
-          ].map(s => (
-            <div key={s.lbl} style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: s.color, fontFamily: 'var(--C)' }}>
-                {s.val}
-              </div>
-              <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', marginTop: 2 }}>
-                {s.lbl}
-              </div>
-            </div>
-          ))}
-        </div>
+<div style={{
+  display: 'flex', gap: 16, marginTop: 12,
+  paddingTop: 12, borderTop: '1px solid var(--border3)',
+}}>
+  {[
+    {
+      lbl: 'Active days',
+      val: days.filter(d => d.tests > 0).length,
+      color: '#22c55e',
+      icon: (
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2.5"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+          <polyline points="8 14 10.5 17 16 12" strokeWidth="2.2"/>
+        </svg>
+      ),
+    },
+    {
+      lbl: 'Total runs',
+      val: days.reduce((s, d) => s + d.count, 0),
+      color: '#818cf8',
+      icon: (
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="2 12 5 12 7 6 9 18 11 12 13 15 15 9 17 12 22 12"/>
+        </svg>
+      ),
+    },
+    {
+      lbl: 'Peak day',
+      val: Math.max(...days.map(d => d.tests)),
+      color: '#f59e0b',
+      unit: 'tests',
+      icon: (
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor" fillOpacity="0.15"/>
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      ),
+    },
+  ].map(s => (
+    <div key={s.lbl} style={{ flex: 1, textAlign: 'center' }}>
+      <div style={{
+  width: 42, height: 42, borderRadius: 13, margin: '0 auto 10px',
+  background: `${s.color}16`,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  color: s.color,
+  transition: 'all .22s cubic-bezier(.34,1.56,.64,1)',
+}}
+  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.15)'; e.currentTarget.style.background = `${s.color}28`; e.currentTarget.style.borderColor = ''; }}
+  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = `${s.color}16`; e.currentTarget.style.borderColor = ''; }}
+>
+  {s.icon}
+</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: s.color, fontFamily: 'var(--C)', lineHeight: 1, marginBottom: 5, letterSpacing: '-0.5px' }}>
+        {s.val}
+        {s.unit && <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', marginLeft: 4 }}>{s.unit}</span>}
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase' }}>
+        {s.lbl}
+      </div>
+    </div>
+  ))}
+</div>
       </div>
     </div>
   );
 }
+
+//partie de ai Insights dans le dashboard 
 function AIInsights({ stats, topUrls, typeData }) {
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -678,8 +859,10 @@ color: COLORS[i],
     </div>
   );
 }
+
+//Dashboard 
 function DashboardPanel({ user, goTo }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [stats, setStats] = useState({
   total: 0, projects: 0, avgRate: 0,
   totalPass: 0, publicCount: 0, internalCount: 0, highPassCount: 0,
@@ -701,6 +884,7 @@ function DashboardPanel({ user, goTo }) {
   const [loading, setLoading] = useState(true);
   const [typeData, setTypeData] = useState([]);
   const [allGens,  setAllGens]  = useState([]);
+   const [allProjects, setAllProjects] = useState([]);
 
   useEffect(() => {
     if (!user) return;
@@ -710,7 +894,7 @@ function DashboardPanel({ user, goTo }) {
   const projs = projRes.data;
   const now   = new Date();
 
-  // ── Totaux globaux ──
+  // KPI Cards (4) total
   const totalPass = gens.reduce((s, g) => s + (g.pass_count || 0), 0);
   const totalFail = gens.reduce((s, g) => s + (g.fail_count || 0), 0);
   const totalSkip = gens.reduce((s, g) => s + (g.skip_count || 0), 0);
@@ -772,16 +956,15 @@ function DashboardPanel({ user, goTo }) {
   };
 
   setStats({
-    total:          gens.length,
-    projects:       projs.length,
+    total: gens.length,
+    projects: projs.length,
     avgRate,
     totalPass,
-    totalFail,   // ← ajoute
-    totalSkip,   // ← ajoute
-    publicCount:    projs.filter(p => p.type === 'public').length,
-    internalCount:  projs.filter(p => p.type === 'internal').length,
+    totalFail,   
+    totalSkip,  
+    publicCount:  projs.filter(p => p.type === 'public').length,
+    internalCount: projs.filter(p => p.type === 'internal').length,
     highPassCount:  gens.filter(g => (g.pass_rate || 0) >= 80).length,
-    // ── Trends dynamiques ──
     trendScripts: formatTrend(scriptsDiff),
     trendPass:    formatTrend(passDiff, '', true, passPercent),
     trendProjects: formatTrend(projsDiff),
@@ -805,7 +988,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
   tests: testsPerDay[i],
 })));
 
-  // ── Donut ──
+  // Donut Charts
   const grandTotal = (totalPass + totalFail + totalSkip) || 1;
   setDonutData([
     { name: 'Passed',  value: Math.round(totalPass / grandTotal * 100), color: '#10b981' },
@@ -831,6 +1014,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
   });
   setTypeData(Object.entries(typeCount).map(([name, value]) => ({ name, value })));
   setAllGens(gens);
+  setAllProjects(projs);
 })
     .catch(console.error)
       .finally(() => setLoading(false));
@@ -838,50 +1022,87 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
 
 
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1;
-  
-  if (loading) return (
-  <div className="panel" style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'60vh', gap: 32 }}>
+if (loading) return (
+  <div className="panel" style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'60vh', gap: 28 }}>
     
-    {/* Logo animé */}
-    <div style={{ position: 'relative', width: 80, height: 80 }}>
-      {/* Outer ring */}
-      <svg width="80" height="80" viewBox="0 0 80 80" style={{ position: 'absolute', top: 0, left: 0, animation: 'spin 2s linear infinite' }}>
-        <circle cx="40" cy="40" r="36" fill="none" stroke="rgba(201,162,39,.15)" strokeWidth="3" />
-        <circle cx="40" cy="40" r="36" fill="none" stroke="#c9a227" strokeWidth="3"
-          strokeDasharray="56 170" strokeLinecap="round" />
+    {/* Logo hexagone animé */}
+    <div style={{ position: 'relative', width: 100, height: 100 }}>
+      
+      {/* Ring tournant */}
+      <svg width="100" height="100" viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0, animation: 'spin 2.5s linear infinite' }}>
+        <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(201,162,39,.15)" strokeWidth="2.5" />
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#C9A227" strokeWidth="2.5"
+          strokeDasharray="60 230" strokeLinecap="round" />
       </svg>
-      {/* Inner ring */}
-      <svg width="80" height="80" viewBox="0 0 80 80" style={{ position: 'absolute', top: 0, left: 0, animation: 'spinReverse 1.5s linear infinite' }}>
-        <circle cx="40" cy="40" r="26" fill="none" stroke="rgba(99,102,241,.15)" strokeWidth="2.5" />
-        <circle cx="40" cy="40" r="26" fill="none" stroke="#6366f1" strokeWidth="2.5"
-          strokeDasharray="30 133" strokeLinecap="round" />
+
+      {/* Ring inverse */}
+      <svg width="100" height="100" viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0, animation: 'spinReverse 2s linear infinite' }}>
+        <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(99,102,241,.12)" strokeWidth="2" />
+        <circle cx="50" cy="50" r="38" fill="none" stroke="#6366f1" strokeWidth="2"
+          strokeDasharray="35 200" strokeLinecap="round" />
       </svg>
-      {/* Center gem */}
+
+      {/* Hexagone logo — centre */}
       <div style={{
         position: 'absolute', top: '50%', left: '50%',
         transform: 'translate(-50%, -50%)',
-        width: 32, height: 32, borderRadius: 9,
-        background: 'linear-gradient(135deg, #8a6a00, #C9A227, #E8C84A)',
-        boxShadow: '0 4px 20px rgba(201,162,39,0.6)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        animation: 'pulse 2s ease-in-out infinite',
+        animation: 'logoGlow 2s ease-in-out infinite',
       }}>
-        <svg width="16" height="16" viewBox="0 0 44 44" fill="none">
-          <polyline points="13,22 20,30 32,14" stroke="#060e1e" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90" width="52" height="52">
+          <defs>
+            <linearGradient id="hexGradLoader" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#8a6a00"/>
+              <stop offset="40%" stopColor="#C9A227"/>
+              <stop offset="100%" stopColor="#E8C84A"/>
+            </linearGradient>
+            <filter id="glowLoader">
+              <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+              <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <polygon points="45,8 77,27 77,63 45,82 13,63 13,27"
+            fill="rgba(201,162,39,0.08)" stroke="url(#hexGradLoader)" strokeWidth="2"/>
+          <circle cx="45" cy="8"  r="2.5" fill="#C9A227" opacity="0.8"/>
+          <circle cx="77" cy="27" r="2.5" fill="#C9A227" opacity="0.8"/>
+          <circle cx="77" cy="63" r="2.5" fill="#C9A227" opacity="0.8"/>
+          <circle cx="45" cy="82" r="2.5" fill="#C9A227" opacity="0.8"/>
+          <circle cx="13" cy="63" r="2.5" fill="#C9A227" opacity="0.8"/>
+          <circle cx="13" cy="27" r="2.5" fill="#C9A227" opacity="0.8"/>
+          <text x="45" y="56" textAnchor="middle"
+            fontFamily="Georgia, serif" fontSize="36" fontWeight="700"
+            fill="#C9A227" filter="url(#glowLoader)">N</text>
         </svg>
       </div>
     </div>
 
     {/* Text */}
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontFamily: 'var(--C)', fontSize: 22, fontWeight: 700, color: 'var(--text)', marginBottom: 8, letterSpacing: 2 }}>
-        Nex<span style={{ color: '#c9a227', fontStyle: 'italic', fontWeight: 300 }}>Test</span>
+      <div style={{
+        fontFamily: "'DM Sans', sans-serif",
+        fontSize: 20, fontWeight: 700,
+        color: 'var(--text)',
+        letterSpacing: '4px',
+        textTransform: 'uppercase',
+        lineHeight: 1,
+        marginBottom: 6,
+      }}>
+        NexTest
       </div>
-      <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, letterSpacing: 3, textTransform: 'uppercase' }}>
+      <div style={{
+        fontFamily: "'DM Sans', sans-serif",
+        fontSize: 9, fontWeight: 500,
+        color: '#a5b4fc',
+        letterSpacing: '3.5px',
+        textTransform: 'uppercase',
+        marginBottom: 20,
+      }}>
+        Test Automation
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16 }}>
         Loading Dashboard
       </div>
       {/* Dots */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
         {[0, 1, 2].map(i => (
           <div key={i} style={{
             width: 6, height: 6, borderRadius: '50%',
@@ -895,7 +1116,10 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     <style>{`
       @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       @keyframes spinReverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
-      @keyframes pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 4px 20px rgba(201,162,39,0.6); } 50% { transform: translate(-50%, -50%) scale(1.1); box-shadow: 0 4px 32px rgba(201,162,39,0.9); } }
+      @keyframes logoGlow {
+        0%, 100% { filter: drop-shadow(0 0 6px rgba(201,162,39,0.5)); transform: translate(-50%,-50%) scale(1); }
+        50% { filter: drop-shadow(0 0 14px rgba(201,162,39,0.9)); transform: translate(-50%,-50%) scale(1.06); }
+      }
       @keyframes dotBounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1.2); opacity: 1; } }
     `}</style>
   </div>
@@ -938,7 +1162,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     iconBg="rgba(16,185,129,0.12)"
     iconBorder="rgba(16,185,129,0.25)"
     accentColor="#10b981"
-    title="Tests Passed"
+    title={t('passed')}
     value={stats.totalPass}
     trend={stats.trendPass}
     sparkData={barData.map(d => d.count)}
@@ -949,7 +1173,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     iconBg="rgba(99,102,241,0.12)"
     iconBorder="rgba(99,102,241,0.25)"
     accentColor="#6366f1"
-    title="Active Projects"
+    title={t('activeProjects')}
     value={stats.projects}
     trend={stats.trendProjects}
     sparkData={[stats.publicCount, stats.internalCount, stats.projects, stats.projects, stats.projects, stats.projects, stats.projects]}
@@ -960,7 +1184,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     iconBg="rgba(201,162,39,0.12)"
     iconBorder="rgba(201,162,39,0.25)"
     accentColor="#c9a227"
-    title="Success Rate"
+    title={t('passRate')}
     value={`${stats.avgRate}%`}
     trend={stats.trendRate}
     circular={{
@@ -978,12 +1202,12 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     <div className="sb-head" style={{ padding: '16px 20px', flexShrink: 0 }}>
 <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
   <IconTrendingUp size={15} stroke={1.5} style={{ color: '#8b5cf6' }} />
-  Tests & Scripts Trend
+  {t('testsTrend')}
 </span>
-      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--indigo2)', background: 'var(--indigo-bg)', border: '1px solid var(--indigo-border)', padding: '3px 10px', borderRadius: 20 }}>This Week</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--indigo2)', background: 'var(--indigo-bg)', border: '1px solid var(--indigo-border)', padding: '3px 10px', borderRadius: 20 }}>{t('thisWeek')}</span>
     </div>
     <div style={{ display: 'flex', gap: 20, padding: '8px 20px 0', flexShrink: 0 }}>
-      {[{ color: '#8b5cf6', label: 'Scripts Generated' }, { color: '#10b981', label: 'Tests Executed' }].map(l => (
+      {[{ color: '#8b5cf6', label: t('scriptsGenerated') }, { color: '#10b981', label: t('testsExecuted') }].map(l => (
         <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 24, height: 3, borderRadius: 2, background: l.color }} />
           <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{l.label}</span>
@@ -1016,7 +1240,8 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
   <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: 380 }}>
     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', padding: '16px 20px', borderBottom: '1px solid var(--border3)', display: 'flex', alignItems: 'center', gap: 6 }}>
   <IconChartDonut size={15} stroke={1.5} style={{ color: '#10b981' }} />
-  Tests Results
+  {t('testsResults')}
+
 </div>
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '24px 20px' }}>
       {/* Donut */}
@@ -1063,14 +1288,14 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     </div>
   </div>
 
-  <ActivityHeatmap gens={allGens} />
+  <ActivityHeatmap gens={allGens} projects={allProjects} />
 </div>
 
 <div className="section-box" style={{ marginBottom: 24 }}>
   <div className="sb-head">
     <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
   <IconTestPipe size={15} stroke={1.5} style={{ color: '#6366f1' }} />
-  Test Type Distribution
+  {t('testTypeDistribution')}
 </span>
   </div>
   <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1110,9 +1335,10 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     <div className="sb-head">
       <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
   <IconLink size={15} stroke={1.5} style={{ color: '#0ea5e9' }} />
-  Top Tested URLs
+  {t('topUrls')}
 </span>
-      <span className="sb-action" onClick={() => goTo('history')}>View all</span>
+      <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')}</span>
+
     </div>
     {/* Column headers */}
     <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 100px 50px 110px', gap: 8, padding: '8px 20px 6px', borderBottom: '1px solid var(--border3)' }}>
@@ -1176,9 +1402,9 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
   <div className="sb-head">
     <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
   <IconActivity size={15} stroke={1.5} style={{ color: '#4f86e8' }} />
-  Recent Activity
+  {t('recentActivity')}
 </span>
-    <span className="sb-action" onClick={() => goTo('history')}>View all</span>
+    <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')}</span>
   </div>
   <div>
     {topUrls.length === 0 ? (
@@ -1264,7 +1490,7 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
   );
 }
       
- 
+ //Modal de delete 
 function DeleteConfirmModal({ project, onConfirm, onCancel, loading }) {
   if (!project) return null;
   return createPortal(
@@ -1303,30 +1529,34 @@ function DeleteConfirmModal({ project, onConfirm, onCancel, loading }) {
     document.body
   );
 }
+
+//List Project 
 export function ProjectsListPanel({ onNewProject, onSelectProject }) {
   const [projects,   setProjects]   = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
-
   const [search,     setSearch]     = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [editingProject, setEditingProject] = useState(null);
+  const [editName,       setEditName]       = useState('');
+  const [editDesc,       setEditDesc]       = useState('');
+  const [editSaving,     setEditSaving]     = useState(false);
+  const [deleting,   setDeleting]   = useState(null);
+  const [projPage, setProjPage] = useState(1);
+  const PROJ_PER_PAGE = 8;
 
-const [editingProject, setEditingProject] = useState(null);
-const [editName,       setEditName]       = useState('');
-const [editDesc,       setEditDesc]       = useState('');
-const [editSaving,     setEditSaving]     = useState(false);
-const [deleting,   setDeleting]   = useState(null);
+  useEffect(() => { setProjPage(1); }, [search, filterType]);
 
   useEffect(() => {
     api.get('/projects').then(res => setProjects(res.data)).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-  if (editingProject) {
-    setEditName(editingProject.name);
-    setEditDesc(editingProject.description || '');
-  }
-}, [editingProject]);
+    if (editingProject) {
+      setEditName(editingProject.name);
+      setEditDesc(editingProject.description || '');
+    }
+  }, [editingProject]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -1344,6 +1574,9 @@ const [deleting,   setDeleting]   = useState(null);
     const matchType   = filterType === 'all' || p.type === filterType;
     return matchSearch && matchType;
   });
+
+  // ← ICI après filtered
+  const projTotalPages = Math.ceil(filtered.length / PROJ_PER_PAGE);
 
   const totalPublic   = projects.filter(p => p.type === 'public').length;
   const totalInternal = projects.filter(p => p.type === 'internal').length;
@@ -1371,22 +1604,9 @@ const [deleting,   setDeleting]   = useState(null);
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
         {[
-          {
-  icon: <IconFolder size={28} stroke={1.5} style={{ color: '#6366f1' }} />,
-  val: projects.length, lbl: 'Total Projects',
-  accent: 'linear-gradient(90deg,#6366f1,#818cf8)'
-},
-{
-  icon: <IconWorld size={28} stroke={1.5} style={{ color: '#4f86e8' }} />,
-  val: totalPublic, lbl: 'Public Projects',
-  accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)'
-},
-{
-  icon: <IconLock size={28} stroke={1.5} style={{ color: '#8b5cf6' }} />,
-  val: totalInternal, lbl: 'Internal Projects',
-  accent: 'linear-gradient(90deg,#8b5cf6,#a78bfa)'
-},
-          
+          { icon: <IconFolder size={28} stroke={1.5} style={{ color: '#6366f1' }} />, val: projects.length, lbl: 'Total Projects', accent: 'linear-gradient(90deg,#6366f1,#818cf8)' },
+          { icon: <IconWorld size={28} stroke={1.5} style={{ color: '#4f86e8' }} />, val: totalPublic, lbl: 'Public Projects', accent: 'linear-gradient(90deg,#4f86e8,#6fa3ff)' },
+          { icon: <IconLock size={28} stroke={1.5} style={{ color: '#8b5cf6' }} />, val: totalInternal, lbl: 'Internal Projects', accent: 'linear-gradient(90deg,#8b5cf6,#a78bfa)' },
         ].map((s, i) => (
           <div key={s.lbl} className="stat-card" style={{ '--i': i, minHeight: 120 }}>
             <div className="stat-card-top"><div className="stat-icon-wrap">{s.icon}</div></div>
@@ -1398,95 +1618,62 @@ const [deleting,   setDeleting]   = useState(null);
       </div>
 
       {/* ── SEARCH + FILTER BAR ── */}
-<div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
-  
-  {/* Search input */}
-  <div style={{
-    display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 220,
-    background: 'var(--card)', border: '1.5px solid var(--border)',
-    borderRadius: 10, padding: '9px 14px', transition: 'border-color .2s'
-  }}
-    onFocusCapture={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,.5)'}
-    onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--border)'}
-  >
-    <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-    </svg>
-    <input
-      value={search}
-      onChange={e => setSearch(e.target.value)}
-      placeholder="Search projects by name…"
-      style={{
-        flex: 1, background: 'none', border: 'none', outline: 'none',
-        color: 'var(--text)', fontSize: 13, fontFamily: 'inherit'
-      }}
-    />
-    {search && (
-      <button onClick={() => setSearch('')} style={{
-        background: 'none', border: 'none', color: 'var(--muted)',
-        cursor: 'pointer', display: 'flex', padding: 0
-      }}>
-        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-          <path d="M18 6L6 18M6 6l12 12"/>
-        </svg>
-      </button>
-    )}
-  </div>
-
-  {/* Type filter buttons */}
-  <div style={{ display: 'flex', gap: 6 }}>
-    {[
-{ key: 'all',      label: 'All',      icon: <IconFolder size={14} stroke={1.5} /> },
-{ key: 'public',   label: 'Public',   icon: <IconWorld  size={14} stroke={1.5} /> },
-{ key: 'internal', label: 'Internal', icon: <IconLock   size={14} stroke={1.5} /> },
-    ].map(f => (
-      <button
-        key={f.key}
-        onClick={() => setFilterType(f.key)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
-          fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
-          transition: 'all .18s',
-          background: filterType === f.key
-            ? f.key === 'public'   ? 'rgba(79,134,232,.12)'
-            : f.key === 'internal' ? 'rgba(139,92,246,.12)'
-            : 'rgba(99,102,241,.12)'
-            : 'var(--card)',
-          border: filterType === f.key
-            ? f.key === 'public'   ? '1.5px solid rgba(79,134,232,.4)'
-            : f.key === 'internal' ? '1.5px solid rgba(139,92,246,.4)'
-            : '1.5px solid rgba(99,102,241,.4)'
-            : '1.5px solid var(--border)',
-          color: filterType === f.key
-            ? f.key === 'public'   ? '#4f86e8'
-            : f.key === 'internal' ? '#8b5cf6'
-            : '#818cf8'
-            : 'var(--muted)',
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 220,
+          background: 'var(--card)', border: '1.5px solid var(--border)',
+          borderRadius: 10, padding: '9px 14px', transition: 'border-color .2s'
         }}
-      >
-        <span style={{ display: 'flex' }}>{f.icon}</span>
-        {f.label}
-        <span style={{
-          padding: '1px 7px', borderRadius: 20, fontSize: 10,
-          background: filterType === f.key ? 'rgba(255,255,255,.1)' : 'var(--bg2)',
-          color: filterType === f.key ? 'currentColor' : 'var(--muted)'
-        }}>
-          {f.key === 'all'      ? projects.length
-         : f.key === 'public'   ? projects.filter(p => p.type === 'public').length
-         : projects.filter(p => p.type === 'internal').length}
-        </span>
-      </button>
-    ))}
-  </div>
+          onFocusCapture={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,.5)'}
+          onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--border)'}
+        >
+          <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search projects by name…"
+            style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit' }}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', display: 'flex', padding: 0 }}>
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          )}
+        </div>
 
-  {/* Results count */}
-  {(search || filterType !== 'all') && (
-    <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
-      {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-    </span>
-  )}
-</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[
+            { key: 'all',      label: 'All',      icon: <IconFolder size={14} stroke={1.5} /> },
+            { key: 'public',   label: 'Public',   icon: <IconWorld  size={14} stroke={1.5} /> },
+            { key: 'internal', label: 'Internal', icon: <IconLock   size={14} stroke={1.5} /> },
+          ].map(f => (
+            <button key={f.key} onClick={() => setFilterType(f.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
+                fontFamily: 'inherit', fontSize: 12, fontWeight: 700, transition: 'all .18s',
+                background: filterType === f.key ? f.key === 'public' ? 'rgba(79,134,232,.12)' : f.key === 'internal' ? 'rgba(139,92,246,.12)' : 'rgba(99,102,241,.12)' : 'var(--card)',
+                border: filterType === f.key ? f.key === 'public' ? '1.5px solid rgba(79,134,232,.4)' : f.key === 'internal' ? '1.5px solid rgba(139,92,246,.4)' : '1.5px solid rgba(99,102,241,.4)' : '1.5px solid var(--border)',
+                color: filterType === f.key ? f.key === 'public' ? '#4f86e8' : f.key === 'internal' ? '#8b5cf6' : '#818cf8' : 'var(--muted)',
+              }}
+            >
+              <span style={{ display: 'flex' }}>{f.icon}</span>
+              {f.label}
+              <span style={{ padding: '1px 7px', borderRadius: 20, fontSize: 10, background: filterType === f.key ? 'rgba(255,255,255,.1)' : 'var(--bg2)', color: filterType === f.key ? 'currentColor' : 'var(--muted)' }}>
+                {f.key === 'all' ? projects.length : f.key === 'public' ? projects.filter(p => p.type === 'public').length : projects.filter(p => p.type === 'internal').length}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {(search || filterType !== 'all') && (
+          <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
+            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
 
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1510,89 +1697,101 @@ const [deleting,   setDeleting]   = useState(null);
           )}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-          {filtered.map((project, i) => {
-            const isPublic = project.type === 'public';
-            const color   = isPublic ? '#4f86e8' : '#8b5cf6';
-            const colorBg = isPublic ? 'rgba(79,134,232,.08)' : 'rgba(139,92,246,.08)';
-            const colorBd = isPublic ? 'rgba(79,134,232,.2)'  : 'rgba(139,92,246,.2)';
-            return (
-              <div key={project.id} onClick={() => onSelectProject(project)}
-                style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '24px', cursor: 'pointer', position: 'relative', overflow: 'hidden', transition: 'all .25s', animation: `dFadeUp .35s var(--ease) ${i * 0.05}s both`, boxShadow: 'var(--shadow)' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = color; e.currentTarget.style.boxShadow = `0 12px 32px rgba(0,0,0,.3), 0 0 0 1px ${color}`; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'var(--shadow)'; }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                   <div style={{
-  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-  background: colorBg, border: `1px solid ${colorBd}`,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-}}>
-  {isPublic
-    ? <IconWorld size={22} stroke={1.5} style={{ color: '#4f86e8' }} />
-    : <IconLock size={22} stroke={1.5} style={{ color: '#8b5cf6' }} />
-  }
-</div>
-
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>{project.name}</div>
-                      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '2px 8px', borderRadius: 20, color, background: colorBg, border: `1px solid ${colorBd}` }}>{isPublic ? 'Public' : 'Internal'}</span>
+        <>
+          {/* ── GRID ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+            {filtered.slice((projPage - 1) * PROJ_PER_PAGE, projPage * PROJ_PER_PAGE).map((project, i) => {
+              const isPublic = project.type === 'public';
+              const color   = isPublic ? '#4f86e8' : '#8b5cf6';
+              const colorBg = isPublic ? 'rgba(79,134,232,.08)' : 'rgba(139,92,246,.08)';
+              const colorBd = isPublic ? 'rgba(79,134,232,.2)'  : 'rgba(139,92,246,.2)';
+              return (
+                <div key={project.id} onClick={() => onSelectProject(project)}
+                  style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '24px', cursor: 'pointer', position: 'relative', overflow: 'hidden', transition: 'all .25s', animation: `dFadeUp .35s var(--ease) ${i * 0.05}s both`, boxShadow: 'var(--shadow)' }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = color; e.currentTarget.style.boxShadow = `0 12px 32px rgba(0,0,0,.3), 0 0 0 1px ${color}`; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'var(--shadow)'; }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: colorBg, border: `1px solid ${colorBd}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {isPublic ? <IconWorld size={22} stroke={1.5} style={{ color: '#4f86e8' }} /> : <IconLock size={22} stroke={1.5} style={{ color: '#8b5cf6' }} />}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>{project.name}</div>
+                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '2px 8px', borderRadius: 20, color, background: colorBg, border: `1px solid ${colorBd}` }}>{isPublic ? 'Public' : 'Internal'}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button onClick={(e) => { e.stopPropagation(); setEditingProject(project); }}
+                        style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--indigo-bg)'; e.currentTarget.style.borderColor = 'var(--indigo-border)'; e.currentTarget.style.color = 'var(--indigo2)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
+                        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(project); }}
+                        style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.borderColor = 'var(--red-border)'; e.currentTarget.style.color = 'var(--red)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
+                        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
+                      </button>
                     </div>
                   </div>
-                  
-        
-<div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-  <button onClick={(e) => { e.stopPropagation(); setEditingProject(project); }}
-    style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
-    onMouseEnter={e => { e.currentTarget.style.background = 'var(--indigo-bg)'; e.currentTarget.style.borderColor = 'var(--indigo-border)'; e.currentTarget.style.color = 'var(--indigo2)'; }}
-    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
-    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-    </svg>
-  </button>
-  <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(project); }}
-    style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
-    onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.borderColor = 'var(--red-border)'; e.currentTarget.style.color = 'var(--red)'; }}
-    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
-    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
-  </button>
-</div>
-</div>
-                {project.description ? (
-                  <p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 16, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{project.description}</p>
-                ) : (
-                  <p style={{ fontSize: 12, color: 'var(--dimmed)', fontStyle: 'italic', marginBottom: 16 }}>No description</p>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTop: '1px solid var(--border3)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
-                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                    {project.generations_count || 0} generation{project.generations_count !== 1 ? 's' : ''}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
-                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    {timeAgo(project.created_at)}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color, letterSpacing: '.5px', textTransform: 'uppercase' }}>
-                    Open
-                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  {project.description ? (
+                    <p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 16, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{project.description}</p>
+                  ) : (
+                    <p style={{ fontSize: 12, color: 'var(--dimmed)', fontStyle: 'italic', marginBottom: 16 }}>No description</p>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTop: '1px solid var(--border3)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
+                      <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                      {project.generations_count || 0} generation{project.generations_count !== 1 ? 's' : ''}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
+                      <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      {timeAgo(project.created_at)}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color, letterSpacing: '.5px', textTransform: 'uppercase' }}>
+                      Open
+                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+
+          {/* ── PAGINATION ── */}
+          {projTotalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 24, padding: '12px 0' }}>
+              <button onClick={() => setProjPage(p => Math.max(1, p - 1))} disabled={projPage === 1}
+                style={{ padding: '7px 16px', borderRadius: 8, background: 'var(--card)', border: '1px solid var(--border)', color: projPage === 1 ? 'var(--muted)' : 'var(--text)', cursor: projPage === 1 ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, opacity: projPage === 1 ? 0.5 : 1 }}>
+              Prev
+              </button>
+              {Array.from({ length: projTotalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => setProjPage(p)}
+                  style={{ width: 34, height: 34, borderRadius: 8, background: projPage === p ? 'linear-gradient(135deg,var(--indigo),#4f46e5)' : 'var(--card)', border: projPage === p ? 'none' : '1px solid var(--border)', color: projPage === p ? '#fff' : 'var(--muted)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, boxShadow: projPage === p ? '0 4px 12px rgba(99,102,241,.35)' : 'none', transform: projPage === p ? 'scale(1.08)' : 'scale(1)', transition: 'all .18s' }}>
+                  {p}
+                </button>
+              ))}
+              <button onClick={() => setProjPage(p => Math.min(projTotalPages, p + 1))} disabled={projPage === projTotalPages}
+                style={{ padding: '7px 16px', borderRadius: 8, background: 'var(--card)', border: '1px solid var(--border)', color: projPage === projTotalPages ? 'var(--muted)' : 'var(--text)', cursor: projPage === projTotalPages ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, opacity: projPage === projTotalPages ? 0.5 : 1 }}>
+                Next 
+              </button>
+            </div>
+          )}
+        </>
       )}
 
+      {/* ── EDIT MODAL ── */}
       {editingProject && createPortal(
         <div onClick={() => setEditingProject(null)}
           style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()}
             style={{ width: 480, background: '#0d1526', border: '1px solid rgba(99,102,241,.3)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif", animation: 'dFadeUp .2s ease both' }}>
-            
             <div style={{ height: 3, background: 'linear-gradient(90deg, transparent, #6366f1, transparent)' }} />
-
             <div style={{ padding: '24px 28px 18px', borderBottom: '1px solid rgba(255,255,255,.06)', display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="18" height="18" fill="none" stroke="#818cf8" strokeWidth="2" viewBox="0 0 24 24">
@@ -1604,76 +1803,49 @@ const [deleting,   setDeleting]   = useState(null);
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>Edit Project</div>
                 <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Update name and description</div>
               </div>
-              <button onClick={() => setEditingProject(null)}
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              <button onClick={() => setEditingProject(null)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
-
             <div style={{ padding: '24px 28px' }}>
               <div style={{ marginBottom: 18 }}>
-                <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: 8 }}>
-                  Project Name *
-                </label>
-                <input
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                  maxLength={60}
-                  placeholder="e.g. Login Flow QA"
-                  autoFocus
+                <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: 8 }}>Project Name *</label>
+                <input value={editName} onChange={e => setEditName(e.target.value)} maxLength={60} placeholder="e.g. Login Flow QA" autoFocus
                   style={{ width: '100%', padding: '12px 16px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: `1.5px solid ${editName.trim() ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.08)'}`, color: '#e2e8f0', fontSize: 14, fontFamily: 'inherit', outline: 'none', transition: 'border-color .2s' }}
                 />
                 <div style={{ fontSize: 10, color: '#475569', marginTop: 4, textAlign: 'right' }}>{editName.length}/60</div>
               </div>
-
               <div style={{ marginBottom: 24 }}>
                 <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: 8 }}>
                   Description <span style={{ color: '#475569', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                 </label>
-                <textarea
-                  value={editDesc}
-                  onChange={e => setEditDesc(e.target.value)}
-                  maxLength={280}
-                  rows={3}
-                  placeholder="Briefly describe what this project tests…"
+                <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} maxLength={280} rows={3} placeholder="Briefly describe what this project tests…"
                   style={{ width: '100%', padding: '12px 16px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1.5px solid rgba(255,255,255,.08)', color: '#e2e8f0', fontSize: 14, fontFamily: 'inherit', outline: 'none', resize: 'vertical' }}
                   onFocus={e => e.target.style.borderColor = 'rgba(99,102,241,.4)'}
                   onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,.08)'}
                 />
                 <div style={{ fontSize: 10, color: '#475569', marginTop: 4, textAlign: 'right' }}>{editDesc.length}/280</div>
               </div>
-
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.15)', marginBottom: 24 }}>
                 <svg width="13" height="13" fill="none" stroke="#f59e0b" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
                 <span style={{ fontSize: 11, color: '#f59e0b' }}>Project type (<strong>{editingProject.type}</strong>) cannot be changed after creation.</span>
               </div>
-
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => setEditingProject(null)}
                   style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                   Cancel
                 </button>
-                <button
-                  disabled={!editName.trim() || editSaving}
+                <button disabled={!editName.trim() || editSaving}
                   onClick={async () => {
                     if (!editName.trim()) return;
                     setEditSaving(true);
                     try {
-                      await api.put(`/projects/${editingProject.id}`, {
-                        name: editName.trim(),
-                        description: editDesc.trim(),
-                      });
-                      setProjects(prev => prev.map(p => p.id === editingProject.id
-                        ? { ...p, name: editName.trim(), description: editDesc.trim() }
-                        : p
-                      ));
+                      await api.put(`/projects/${editingProject.id}`, { name: editName.trim(), description: editDesc.trim() });
+                      setProjects(prev => prev.map(p => p.id === editingProject.id ? { ...p, name: editName.trim(), description: editDesc.trim() } : p));
                       setEditingProject(null);
                     } catch (err) { console.error(err); }
                     setEditSaving(false);
                   }}
                   style={{ flex: 2, padding: '12px', borderRadius: 10, background: editName.trim() ? 'linear-gradient(135deg,#6366f1,#4f46e5)' : 'rgba(99,102,241,.1)', border: 'none', color: editName.trim() ? '#fff' : 'rgba(99,102,241,.3)', fontSize: 13, fontWeight: 800, cursor: editName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: editName.trim() ? '0 4px 16px rgba(99,102,241,.35)' : 'none', transition: 'all .2s' }}>
-                  {editSaving
-                    ? <><span className="spinner" /> Saving…</>
-                    : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg> Save Changes</>
-                  }
+                  {editSaving ? <><span className="spinner" /> Saving…</> : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg> Save Changes</>}
                 </button>
               </div>
             </div>
@@ -1681,7 +1853,7 @@ const [deleting,   setDeleting]   = useState(null);
         </div>,
         document.body
       )}
-       {/* ADD THIS ↓ */}
+
       <DeleteConfirmModal
         project={deleteTarget}
         onConfirm={handleDelete}
@@ -1692,6 +1864,7 @@ const [deleting,   setDeleting]   = useState(null);
   );
 }
 
+//Détail project 
 export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGeneration, goTo }) {
   const [generations, setGenerations] = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -1729,6 +1902,7 @@ console.log('[K6] item.execution_results:', item.execution_results);
 console.log('[K6] item.performance_data:', item.performance_data);
 console.log('[K6] first test_case:', JSON.stringify(item.test_cases?.[0], null, 2));
   setGeneration({
+      fresh: false,
     url: item.url, framework: item.framework, test_type: item.test_type,
     generation: { 
       id: item.id, 
@@ -2051,7 +2225,17 @@ const paginatedCards = urlCards.slice(
       View
     </button>
 
-    <button onClick={() => onNewGeneration(item.url, item.test_type, item.framework)} 
+  <button onClick={() => {
+  const saved = JSON.parse(localStorage.getItem(`creds-${item.url}`) || '{}');
+  onNewGeneration(
+    item.url,
+    item.test_type,
+    item.framework,
+    saved.username || '',
+    saved.password || ''
+  );
+}}
+
       style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)', color: '#10b981', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '.5px', transition: 'all .2s' }}
       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,.2)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
       onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,.1)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
@@ -2108,9 +2292,8 @@ const paginatedCards = urlCards.slice(
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CreateProjectPanel
-// ─────────────────────────────────────────────────────────────────────────────
+
+// CreateProjectPanel Page 
 
 export function CreateProjectPanel({ onProjectCreated }) {
   const [projectType, setProjectType] = useState(null);
@@ -2272,24 +2455,42 @@ export function CreateProjectPanel({ onProjectCreated }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GeneratePanel
-// ─────────────────────────────────────────────────────────────────────────────
-
-function GeneratePanel({ goTo, setGeneration, project, initialUrl = '', initialTestType = '', initialFramework = '', onGenerationSaved }) {  const { t } = useLang();
+//Interface de new  generation 
+function GeneratePanel({ goTo, setGeneration, project, initialUrl = '', initialTestType = '', initialFramework = '', initialUsername = '', initialPassword = '', onGenerationSaved }) {
+const { t, lang, setLanguage } = useLang();
   const [url, setUrl] = useState(initialUrl);
-  const [fw, setFw] = useState(initialFramework);
+const [fw, setFw] = useState(initialFramework);
 const [testType, setTestType] = useState(initialTestType);
-  const [loading,  setLoad]     = useState(false);
-  const [error,    setError]    = useState('');
-  const [jwtToken, setJwtToken] = useState('');
+const [jwtToken, setJwtToken] = useState('');
+
+const [showPassword, setShowPassword] = useState(false);
+const [loading, setLoad] = useState(false);
+const [error, setError] = useState('');
+
+const [username, setUsername] = useState(initialUsername);
+const [password, setPassword] = useState(initialPassword);
+
+const [showDocModal, setShowDocModal] = useState(false);
+const [docFiles, setDocFiles] = useState([]);
+const [dragOver, setDragOver] = useState(false);
+
+
+
 
   const [urlValid, setUrlValid] = useState(() => {
-    if (!initialUrl) return null;
-    try { new URL(initialUrl); return true; } catch { return false; }
-  });
+  if (!initialUrl) return null;
+  try { new URL(initialUrl); return true; } catch { return false; }
+});
 
   const isInternal = project?.type === 'internal';
+
+ 
+
+useEffect(() => {
+  if (isInternal && username && password && initialUrl) {
+    localStorage.setItem(`creds-${initialUrl}`, JSON.stringify({ username, password }));
+  }
+}, [username, password]);
 
   const PUBLIC_TEST_TYPES = [
     { key: 'smoke',       label: 'Smoke Test',       desc: 'Visibility checks — elements present in DOM',                   letter: 'S', letterClass: 'gp4-letter-s', badge: 'Quick',    badgeClass: 'gp-badge-quick', time: '~30s'  },
@@ -2340,11 +2541,21 @@ const REGRESSION_FRAMEWORKS = [
 
   const submit = async (e) => {
   e.preventDefault();
+   console.log('[DEBUG] username:', username);
+  console.log('[DEBUG] password:', password);
+  console.log('[DEBUG] isInternal:', isInternal);
+  console.log('[DEBUG] project type:', project?.type);
   if (!url) return;
+   if (isInternal && (!username.trim() || !password.trim())) {
+    setError('Please enter your email and password to test this internal application.');
+    return;
+  }
   setLoad(true); setError('');
+    console.log('[SUBMIT] username:', username, '| password:', password.length > 0 ? '***' : 'EMPTY');
+
    const startTime = Date.now();
   try {
-    // ← ICI : choisir la route selon le type de projet
+    
 const endpoint = testType === 'api'
   ? '/generations/generate-api'
   : testType === 'security'    ? '/generations/generate-security'
@@ -2363,9 +2574,9 @@ const payload = testType === 'api'
       project_id:   project?.id,
       project_name: project?.name,
       project_type: project?.type,
-      username:     "admin@admin.com",
-      password:     "password1%Aa",
-      anpe_token:   localStorage.getItem('refreshToken') || '',
+      username,
+      password,
+      token: localStorage.getItem('token') || '',
     }
   : testType === 'regression'
   ? {
@@ -2375,6 +2586,8 @@ const payload = testType === 'api'
       project_id:   project?.id,
       project_name: project?.name,
       project_type: project?.type,
+      username,   
+      password,   
     }
     : testType === 'functional' && isInternal
 ? {
@@ -2384,16 +2597,20 @@ const payload = testType === 'api'
     project_id:   project?.id,
     project_name: project?.name,
     project_type: project?.type,
+    username,   
+    password,   
   }
-  : testType === 'functional' && isInternal
+
+  : testType === 'security'
 ? {
     url,
-    framework:    fw,
-    test_type:    'functional',
     project_id:   project?.id,
     project_name: project?.name,
     project_type: project?.type,
+    anpe_token:   localStorage.getItem('token') || '',
+    categories:   null,
   }
+  
 
 : testType === 'seo'
 ? {
@@ -2422,8 +2639,8 @@ const payload = testType === 'api'
       project_name: project?.name,
       project_type: project?.type,
       scrape_login: url.includes('login'),
-      username:     "admin@admin.com",
-      password:     "password1%Aa",
+      username,
+      password,
     }
   : {
       url,
@@ -2438,9 +2655,25 @@ const payload = testType === 'api'
 // Debug
 console.log('[SUBMIT] endpoint:', endpoint);
 console.log('[SUBMIT] token:', payload.token?.slice(0, 30));
-
-   const res = await api.post(endpoint, payload);
+// Sauvegarder les credentials
+if (isInternal && username && password) {
+  localStorage.setItem(`creds-${url}`, JSON.stringify({ username, password }));
+}
+   let res;
+if (docFiles.length > 0) {
+  const formData = new FormData();
+  docFiles.forEach(f => formData.append('doc_files[]', f));
+  formData.append('data', JSON.stringify(payload));
+  res = await api.post(endpoint, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+} else {
+  res = await api.post(endpoint, payload);
+}
     const genData = res.data;
+    genData.fresh = true;
+setGeneration(genData);  // ← 1. set les données
+goTo('execution');  
 
     if (genData.test_type === 'performance' || genData.result?.test_type === 'performance') {
       genData.result = genData.result || {};
@@ -2448,36 +2681,57 @@ console.log('[SUBMIT] token:', payload.token?.slice(0, 30));
       genData.result.test_cases  = genData.result.test_cases || genData.generation?.test_cases || [];
     }
 const durationMs = Date.now() - startTime;
-    setGeneration(genData);
-    const notifData = {
-      url:        genData?.generation?.url       || genData?.url       || '',
-      framework:  genData?.generation?.framework  || genData?.framework  || '',
-      testType:   genData?.result?.test_type      || genData?.test_type  || '',
-      passCount: (genData?.result?.execution_results?.length
-        ? genData.result.execution_results
-        : genData?.result?.test_cases || []
-      ).filter(t => t.status === 'pass').length,
-      failCount: (genData?.result?.execution_results?.length
-        ? genData.result.execution_results
-        : genData?.result?.test_cases || []
-      ).filter(t => t.status === 'fail').length,
-      timestamp: Date.now(),
-      durationMs,
-    };
-    localStorage.setItem('nextest-last-notif', JSON.stringify(notifData));
-    onGenerationSaved(notifData);
-    goTo('execution');
-  } catch (err) { setError(err.response?.data?.error || 'Une erreur est survenue'); }
-  setLoad(false);
+genData.fresh = true;
+setGeneration(genData);
+console.log('[SUBMIT] calling goTo(execution)');
+
+goTo('execution');
+  } catch (err) { 
+    console.log('[422 DETAIL]', err.response?.data);  // ← AJOUTE ICI
+    setError(err.response?.data?.error || 'Une erreur est survenue'); 
+    setLoad(false);
+  }
 };
 
   const selectedType = TEST_TYPES.find(t => t.key === testType);
   const selectedFw   = FRAMEWORKS.find(f => f.key === fw);
-  const isReady      = urlValid === true && testType !== '' && fw !== '';
+  const isReady = urlValid === true && testType !== '' && fw !== '' && (
+  !isInternal
+  ? true
+  : (username.trim() !== '' && password.trim() !== '')
+);
   const urlPlaceholder = isInternal ? 'https://api.internal.company.com/v1' : 'https://myapp.com';
   const urlLabel       = isInternal ? 'Target URL or API Endpoint' : 'Target URL';
   const urlHint        = isInternal ? 'Supports REST API endpoints and internal services' : 'Enter the web application you want to test';
+const handleFiles = (newFiles) => {
+  const allowed = ['pdf','txt','json','yaml','yml','md','docx'];
+  const maxSize = 10 * 1024 * 1024;
+  const valid = Array.from(newFiles).filter(f => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    return allowed.includes(ext) && f.size <= maxSize;
+  });
+  setDocFiles(prev => {
+    const existing = prev.map(f => f.name);
+    return [...prev, ...valid.filter(f => !existing.includes(f.name))];
+  });
+};
 
+const removeFile = (name) => setDocFiles(prev => prev.filter(f => f.name !== name));
+
+const fileIcon = (name) => {
+  const ext = name.split('.').pop().toLowerCase();
+  if (ext === 'pdf')               return 'ti-file-type-pdf';
+  if (['json','yaml','yml'].includes(ext)) return 'ti-file-type-json';
+  if (ext === 'md')                return 'ti-markdown';
+  if (ext === 'docx')              return 'ti-file-description';
+  return 'ti-file-text';
+};
+
+const formatSize = (bytes) => {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+};
   return (
     <div className="panel">
       <div className="p-header" style={{ marginBottom: 32 }}>
@@ -2525,11 +2779,57 @@ const durationMs = Date.now() - startTime;
                 {urlValid === false && <svg width="16" height="16" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>}
               </div>
               {urlValid === false && <div className="gp4-url-error">Please enter a valid URL starting with https://</div>}
+
             </div>
+
+ {isInternal && (
+  <div className="gp4-section" style={{ marginTop: 20 }}>
+    <div className="gp4-section-header">
+      <span className="gp4-num">02</span>
+      <div><div className="gp4-section-title">Credentials</div><div className="gp4-section-sub">Login credentials to access the internal application</div></div>
+    </div>
+
+    {/* Honeypot fields — piège l'autofill du navigateur */}
+    <input type="text"     style={{ display: 'none' }} readOnly tabIndex={-1} />
+    <input type="password" style={{ display: 'none' }} readOnly tabIndex={-1} />
+
+    <div style={{ display: 'flex', gap: 12 }}>
+      <div className="gp4-url-wrap" style={{ flex: 1 }}>
+        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16v16H4z" opacity="0"/><path d="M22 6l-10 7L2 6"/><path d="M2 6h20v12H2z"/></svg>
+        <input
+          type="text"
+          inputMode="email"
+          placeholder="email@example.com"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+          autoComplete="off"
+          name={`email-${Math.random()}`}
+        />
+      </div>
+      <div className="gp4-url-wrap" style={{ flex: 1 }}>
+        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <input
+          type={showPassword ? 'text' : 'password'}
+          placeholder="••••••••"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          autoComplete="new-password"
+          name={`pwd-${Math.random()}`}
+        />
+        <button type="button" onClick={() => setShowPassword(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--muted)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          {showPassword
+            ? <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            : <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
             <div className="gp4-section">
               <div className="gp4-section-header">
-                <span className="gp4-num">02</span>
+                <span className="gp4-num">{isInternal ? '03' : '02'}</span>
                 <div><div className="gp4-section-title">Test Type</div><div className="gp4-section-sub">{isInternal ? 'Choose testing strategy for internal services' : 'Choose the depth of test coverage'}</div></div>
               </div>
               <div className="gp4-types">
@@ -2551,7 +2851,7 @@ const durationMs = Date.now() - startTime;
 
             <div className="gp4-section">
               <div className="gp4-section-header">
-                <span className="gp4-num">03</span>
+                <span className="gp4-num">{isInternal ? '04' : '03'}</span>
                 <div><div className="gp4-section-title">Framework</div><div className="gp4-section-sub">Export format for your test scripts</div></div>
               </div>
               <div className="gp4-frameworks">
@@ -2564,9 +2864,85 @@ const durationMs = Date.now() - startTime;
                   </div>
                 ))}
               </div>
+
             </div>
 
-            <button type="submit" className="gp4-submit" disabled={loading || !isReady}>
+            
+
+            {/* ── Project Context — Internal only ── */}
+            {isInternal && (
+            <div className="gp4-section" style={{ marginTop: 24 }}>
+              <div className="gp4-section-header">
+                <span className="gp4-num">05</span>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="gp4-section-title">Project Context</div>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#7F77DD', background: '#EEEDFE', borderRadius: 20, padding: '2px 8px' }}>OPTIONAL</span>
+                  </div>
+                  <div className="gp4-section-sub">Attach docs to help AI generate more accurate tests</div>
+                </div>
+              </div>
+
+              {docFiles.length === 0 ? (
+                <div
+                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+                  onClick={() => setShowDocModal(true)}
+                  style={{
+                    border: `1.5px dashed ${dragOver ? '#7F77DD' : 'var(--border)'}`,
+                    borderRadius: 12, padding: '28px 16px',
+                    background: dragOver ? 'rgba(99,102,241,0.04)' : 'rgba(255,255,255,0.02)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    gap: 10, transition: 'all .2s', cursor: 'pointer'
+                  }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="18" height="18" fill="none" stroke="#818cf8" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>No documentation attached yet</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', opacity: 0.6 }}>Swagger, README, PDF, Postman collections...</div>
+                  <button type="button" style={{ marginTop: 4, padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'transparent', border: '1px solid var(--border)', color: 'var(--fg)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                    Attach Files
+                  </button>
+                </div>
+              ) : (
+                <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 10 }}>Attached files</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {docFiles.map(f => (
+                      <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#534AB7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <svg width="10" height="10" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                        </div>
+                        <span style={{ fontSize: 12, color: 'var(--fg)', flex: 1 }}>{f.name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{formatSize(f.size)}</span>
+                        <button type="button" onClick={() => removeFile(f.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 0 }}>
+                          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ height: 1, background: 'var(--border)', margin: '12px 0' }} />
+                  <button type="button" onClick={() => setShowDocModal(true)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                    Add more files
+                  </button>
+                </div>
+              )}
+            </div>
+
+            
+            )}
+    <button type="button" className="gp4-submit" disabled={loading || !isReady}
+  onClick={() => {
+    if (!isReady) return;
+    if (isInternal && docFiles.length === 0) {
+      setShowDocModal(true);
+    } else {
+      submit({ preventDefault: () => {} });
+    }
+  }}>
               {loading ? (<><span className="spinner" /> Analyzing & Generating...</>) : (<><svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Generate Tests{isReady && <span className="gp4-submit-arrow"></span>}</>)}
             </button>
           </div>
@@ -2585,7 +2961,21 @@ const durationMs = Date.now() - startTime;
                 <div className="gp4-sum-divider" />
                 <div className="gp4-sum-row"><span className="gp4-sum-label">Framework</span><span className="gp4-sum-val">{selectedFw?.key || <span className="gp4-sum-empty">Not selected</span>}</span></div>
                 <div className="gp4-sum-divider" />
-                <div className="gp4-sum-row"><span className="gp4-sum-label">Est. Time</span><span className="gp4-sum-val" style={{ color: 'var(--indigo2)' }}>{selectedType?.time || '—'}</span></div>
+                {isInternal && username && (<><div className="gp4-sum-divider" /><div className="gp4-sum-row"><span className="gp4-sum-label">Email</span><span className="gp4-sum-val" style={{ fontSize: 11, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{username}</span></div></>)}
+                {isInternal && password && (<><div className="gp4-sum-divider" /><div className="gp4-sum-row"><span className="gp4-sum-label">Password</span><span className="gp4-sum-val">{'•'.repeat(Math.min(password.length, 8))}</span></div></>)}
+                <div className="gp4-sum-divider" />
+                {docFiles.length > 0 && (
+  <>
+    <div className="gp4-sum-divider" />
+    <div className="gp4-sum-row">
+      <span className="gp4-sum-label">Context</span>
+      <span className="gp4-sum-val" style={{ color: '#7F77DD' }}>
+        {docFiles.length} file{docFiles.length > 1 ? 's' : ''} attached
+      </span>
+    </div>
+  </>
+)}
+<div className="gp4-sum-row"><span className="gp4-sum-label">Est. Time</span><span className="gp4-sum-val" style={{ color: 'var(--indigo2)' }}>{selectedType?.time || '—'}</span></div>
               </div>
               <div className={`gp4-summary-status ${isReady ? 'ready' : 'waiting'}`}>
                 <span className={`gp4-status-dot ${isReady ? 'ready' : ''}`} />
@@ -2606,13 +2996,100 @@ const durationMs = Date.now() - startTime;
           </div>
         </div>
       </form>
+
+
+{showDocModal && (
+  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 32, width: 480, maxWidth: '90vw', boxShadow: '0 24px 60px rgba(0,0,0,0.4)' }}>
+      
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="18" height="18" fill="none" stroke="#818cf8" strokeWidth="1.8" viewBox="0 0 24 24">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)' }}>Add Project Context</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Optional — helps AI generate more accurate tests</div>
+          </div>
+        </div>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#7F77DD', background: '#EEEDFE', borderRadius: 20, padding: '3px 8px', flexShrink: 0 }}>OPTIONAL</span>
+      </div>
+
+      {/* Drop zone */}
+      <label
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '28px 16px', borderRadius: 12, cursor: 'pointer', border: `1.5px dashed ${dragOver ? '#7F77DD' : 'var(--border)'}`, background: dragOver ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.02)', transition: 'all .2s', marginBottom: 14 }}>
+        <input type="file" multiple accept=".pdf,.txt,.json,.yaml,.yml,.md,.docx" style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
+        <svg width="26" height="26" fill="none" stroke="#818cf8" strokeWidth="1.5" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+          Drop files here or <span style={{ color: '#818cf8' }}>browse</span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', opacity: 0.6 }}>
+          PDF, DOCX, TXT, JSON, YAML — max 10 MB
+        </div>
+      </label>
+
+      {/* Liste fichiers */}
+      {docFiles.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+          {docFiles.map(f => (
+            <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8 }}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#534AB7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="9" height="9" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--fg)', flex: 1 }}>{f.name}</span>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{formatSize(f.size)}</span>
+              <button type="button" onClick={() => removeFile(f.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 0 }}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Formats pills */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 20 }}>
+        {['Swagger / OpenAPI', 'Postman', 'README.md', 'PDF', 'TXT', 'DOCX'].map(label => (
+          <span key={label} style={{ fontSize: 11, color: 'var(--muted)', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 20, padding: '2px 10px' }}>
+            {label}
+          </span>
+        ))}
+      </div>
+
+    
+      {/* Actions */}
+<div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+  <button type="button"
+    onClick={() => setShowDocModal(false)}
+    style={{ padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer' }}>
+    Skip for now
+  </button>
+  <button type="button"
+    onClick={() => { setShowDocModal(false); submit({ preventDefault: () => {} }); }}
+    style={{ padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700, background: 'var(--indigo2)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+    </svg>
+    {docFiles.length > 0 ? `Generate with ${docFiles.length} file${docFiles.length > 1 ? 's' : ''}` : 'Generate Tests'}
+  </button>
+</div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // Performance Components
-// ─────────────────────────────────────────────────────────────────────────────
 
 function PerformanceScoreRing({ score, label, color }) {
   const radius = 54;
@@ -2649,6 +3126,7 @@ function MetricBar({ value, good, poor, unit }) {
   );
 }
 
+//Recomandation
 function RecommendationCard({ rec, index }) {
   const PRIORITY_CONFIG = {
     critical: { color: '#ef4444', bg: 'rgba(239,68,68,.08)', border: 'rgba(239,68,68,.2)',   icon: '🔴' },
@@ -2683,7 +3161,24 @@ function PerformanceMetricRow({ test, index }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 2fr', gap: 12, padding: '14px 20px', borderBottom: '1px solid var(--border)', alignItems: 'center', animation: `dFadeUp .25s var(--ease) ${index * 0.04}s both`, background: test.status === 'fail' ? 'rgba(239,68,68,.02)' : 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: `${color}12`, border: `1px solid ${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{test.name.split(' ')[0]}</div>
+     <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+  background: `${color}12`, border: `1px solid ${color}22`,
+  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+  {(() => {
+    const n = test.name.toLowerCase();
+    if (n.includes('load time'))        return <IconActivity   size={16} stroke={1.5} style={{ color }} />;
+    if (n.includes('contentful paint') && n.includes('first'))   return <IconFlame  size={16} stroke={1.5} style={{ color }} />;
+    if (n.includes('contentful paint') && n.includes('largest')) return <IconTarget size={16} stroke={1.5} style={{ color }} />;
+    if (n.includes('interactive'))      return <IconBolt       size={16} stroke={1.5} style={{ color }} />;
+    if (n.includes('network') || n.includes('requests')) return <IconWorldSearch size={16} stroke={1.5} style={{ color }} />;
+    if (n.includes('page size') || n.includes('total page')) return <IconChartArea size={16} stroke={1.5} style={{ color }} />;
+    if (n.includes('javascript'))       return <IconCode       size={16} stroke={1.5} style={{ color }} />;
+    if (n.includes('css'))              return <IconSettings2  size={16} stroke={1.5} style={{ color }} />;
+    if (n.includes('image'))            return <IconEye        size={16} stroke={1.5} style={{ color }} />;
+    if (n.includes('dom'))              return <IconChartDonut size={16} stroke={1.5} style={{ color }} />;
+    return <IconBolt size={16} stroke={1.5} style={{ color }} />;
+  })()}
+</div>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{test.name.replace(/^[^\s]+\s/, '')}</div>
           <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1 }}>{test.section}</div>
@@ -2701,10 +3196,8 @@ function PerformanceMetricRow({ test, index }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PerformanceExecutionPanel
-// ─────────────────────────────────────────────────────────────────────────────
 
+//  page of PerformanceExecutionPanel
 function PerformanceExecutionPanel({ generation }) {
  const [activeSection, setActiveSection] = useState('metrics');
   const [dropdownOpen,  setDropdownOpen]  = useState(false);
@@ -2801,7 +3294,7 @@ const downloadHtml_Performance = () => {
         font-size="10" fill="#64748b" font-family="'DM Sans',sans-serif">/ 100</text>
     </svg>`;
 
-  // ── 1. PAGE ANALYSIS (matches PDF build_page_analysis) ───────────────────
+  //1. PAGE ANALYSIS (matches PDF build_page_analysis) 
   const detectedItems = [];
   if (metrics?.dom_size)      detectedItems.push({ n: 'DOM Elements',   c: '#3b82f6', d: `${metrics.dom_size} elements in DOM` });
   if (metrics?.js_count)      detectedItems.push({ n: 'JavaScript',     c: '#f59e0b', d: `${metrics.js_count} script resource(s)` });
@@ -2833,7 +3326,7 @@ const downloadHtml_Performance = () => {
       <div style="font-size:12px;color:#f59e0b;padding:5px 2px;
         display:flex;align-items:center;gap:6px">${w}</div>`).join('')}`;
 
-  // ── 2. PERFORMANCE TEST PLAN (matches PDF build_test_plan) ────────────────
+  //2. PERFORMANCE TEST PLAN (matches PDF build_test_plan)
   const SITE_TYPE_LABELS = {
     ecommerce: 'E-Commerce Page — cart, checkout, product performance',
     saas:      'SaaS Application — dashboard and app performance',
@@ -2909,7 +3402,7 @@ const downloadHtml_Performance = () => {
       ])}
       <tbody>${metricPlanRows}</tbody></table>`)}`;
 
-  // ── 3. PLANNED UI ELEMENTS → for perf: "Key Web Vitals" ──────────────────
+  //3. PLANNED UI ELEMENTS → for perf: "Key Web Vitals"
   const KEY_METRICS_DEF = [
     { key: 'load_time_ms', label: 'Page Load Time',           icon: '⏱', unit: 'ms', sel: 'window.performance.timing' },
     { key: 'fcp_ms',       label: 'First Contentful Paint',   icon: '🎨', unit: 'ms', sel: 'paint-timing-api: first-contentful-paint' },
@@ -2963,7 +3456,7 @@ const downloadHtml_Performance = () => {
       ])}
       <tbody>${vitalRows}</tbody></table>`, '#6366f1')}`;
 
-  // ── 4. TEST SUMMARY (matches PDF build_stats_section) ────────────────────
+  //4. TEST SUMMARY (matches PDF build_stats_section)
   const rateGrad = passRate >= 80 ? 'linear-gradient(135deg,#10b981,#34d399)'
                  : passRate >= 50 ? 'linear-gradient(135deg,#f59e0b,#fbbf24)'
                  : 'linear-gradient(135deg,#ef4444,#f87171)';
@@ -3001,7 +3494,7 @@ const downloadHtml_Performance = () => {
       </div>
     </div>`;
 
-  // ── 5. EXECUTION VERDICT SUMMARY (matches PDF build_execution_verdict_summary)
+  //5. EXECUTION VERDICT SUMMARY (matches PDF build_execution_verdict_summary)
   const SECTION_LABELS_MAP = { timing: 'Timing', network: 'Network', assets: 'Assets', dom: 'DOM' };
   const bySection = tests.reduce((acc, t) => {
     const s = t.section || 'other';
@@ -3083,7 +3576,7 @@ const downloadHtml_Performance = () => {
       </div>
     </div>`;
 
-  // ── 6. DETAILED METRICS TABLE (matches PDF PerformanceMetricRow) ──────────
+  //6. DETAILED METRICS TABLE (matches PDF PerformanceMetricRow)
   const SECTION_COLORS_ALL = { timing: '#6366f1', network: '#0ea5e9', assets: '#f97316', dom: '#8b5cf6' };
   const bySectionAll = tests.reduce((acc, t) => {
     const s = t.section || 'other';
@@ -3109,7 +3602,7 @@ const downloadHtml_Performance = () => {
               <div style="width:32px;height:32px;border-radius:8px;flex-shrink:0;
                 background:${sc}12;border:1px solid ${sc}22;
                 display:flex;align-items:center;justify-content:center;font-size:15px">
-                ${t.name.split(' ')[0]}
+                ${test.name.split(' ')[0]}
               </div>
               <div>
                 <div style="font-size:13px;font-weight:600;color:#e2e8f0">
@@ -3411,7 +3904,7 @@ const sectionDetailedMetrics = `
     </div>
     ${recsHtml}`;
 
-  // ── 9. SCRIPT SUMMARY (matches PDF build_script_section FIX 1) ────────────
+  //9. SCRIPT SUMMARY (matches PDF build_script_section)
   const scriptContent = generation?.result?.script_playwright || generation?.result?.script || '';
   const sectionScript = `
     ${secHdr('📄', `Generated Script Summary — ${framework}`)}
@@ -3438,7 +3931,7 @@ const sectionDetailedMetrics = `
       Raw code omitted to keep the report concise.
     </div>`;
 
-  // ── 10. FINAL AI VERDICT (matches PDF build_ai_recommendations final block)
+  //10. FINAL AI VERDICT (matches PDF build_ai_recommendations final block)
   const finalV = critFails.length
     ? { c: '#ef4444', bg: 'rgba(239,68,68,.08)', bd: 'rgba(239,68,68,.3)', i: '🔴',
         t: `Performance validation FAILED — critical timing metrics exceed thresholds. Core Web Vitals are impacted. Optimization is required before production.` }
@@ -3483,7 +3976,7 @@ const sectionDetailedMetrics = `
       </div>
     </div>`;
 
-  // ── FULL HTML DOCUMENT ────────────────────────────────────────────────────
+  //FULL HTML DOCUMENT
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3748,7 +4241,7 @@ const sectionDetailedMetrics = `
   }, {});
 
   const SECTIONS       = ['timing', 'network', 'assets', 'dom'];
-  const SECTION_LABELS = { timing: '⏱ Timing', network: '🌐 Network', assets: '📦 Assets', dom: '🌲 DOM' };
+  const SECTION_LABELS = { timing: 'Timing', network: 'Network', assets: 'Assets', dom: 'DOM' };
   const SECTION_COLORS = { timing: '#6366f1', network: '#0ea5e9', assets: '#f97316', dom: '#8b5cf6' };
 
   return (
@@ -3777,7 +4270,7 @@ const sectionDetailedMetrics = `
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 16 }}>
 
           {/* ACTIONS */}
-          <div className="ep-actions">
+<div className="ep-actions" style={{ opacity: pdfLoading ? 0.25 : 1, pointerEvents: pdfLoading ? 'none' : 'auto', transition: 'opacity .3s' }}>
 
             {/* Download Script */}
             <button onClick={() => {
@@ -3861,16 +4354,15 @@ const sectionDetailedMetrics = `
             {/* ↑ closes dropdownRef div */}
 
           </div>
-          {/* ↑ closes ep-actions — THE FIX: this was missing/misplaced before */}
+          
 
           {/* Score ring is INSIDE the right flex column, AFTER ep-actions */}
           <PerformanceScoreRing score={score} label={scoreLabel} color={scoreColor} />
 
         </div>
-        {/* ↑ closes right flex column */}
-
+        
       </div>
-      {/* ↑ closes ep-header */}
+      
 
       {/* ── SITE ANALYSIS ── */}
       {analysis && (
@@ -3901,10 +4393,10 @@ const sectionDetailedMetrics = `
       {/* ── KEY METRICS ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
-          { key: 'load_time_ms', label: 'Load Time', icon: '⏱', unit: 'ms' },
-          { key: 'fcp_ms',       label: 'FCP',       icon: '🎨', unit: 'ms' },
-          { key: 'lcp_ms',       label: 'LCP',       icon: '🖼', unit: 'ms' },
-          { key: 'tti_ms',       label: 'TTI',       icon: '🖱', unit: 'ms' },
+  { key: 'load_time_ms', label: 'Load Time', icon: <IconActivity size={22} stroke={1.5} style={{ color: '#6366f1' }} />, unit: 'ms' },
+  { key: 'fcp_ms',       label: 'FCP',       icon: <IconFlame    size={22} stroke={1.5} style={{ color: '#f97316' }} />, unit: 'ms' },
+  { key: 'lcp_ms',       label: 'LCP',       icon: <IconTarget   size={22} stroke={1.5} style={{ color: '#10b981' }} />, unit: 'ms' },
+  { key: 'tti_ms',       label: 'TTI',       icon: <IconBolt     size={22} stroke={1.5} style={{ color: '#f59e0b' }} />, unit: 'ms' },
         ].map(m => {
           const val   = metrics[m.key] ?? perf?.[m.key] ?? null;
           const test  = tests.find(t => t.metric_key === m.key);
@@ -3942,8 +4434,16 @@ const sectionDetailedMetrics = `
             return (
               <div key={sec}>
                 <div style={{ padding: '8px 20px', background: `${SECTION_COLORS[sec]}08`, borderBottom: '1px solid var(--border)', fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: SECTION_COLORS[sec], display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: SECTION_COLORS[sec] }} />
-                  {SECTION_LABELS[sec] || sec}
+                  {(() => {
+  const SECTION_ICONS = {
+    timing:  <IconActivity   size={13} stroke={1.5} />,
+    network: <IconWorldSearch size={13} stroke={1.5} />,
+    assets:  <IconChartArea  size={13} stroke={1.5} />,
+    dom:     <IconChartDonut size={13} stroke={1.5} />,
+  };
+  return <span style={{ color: SECTION_COLORS[sec] }}>{SECTION_ICONS[sec]}</span>;
+})()}
+{SECTION_LABELS[sec] || sec}
                 </div>
                 {secTests.map((test, i) => (<PerformanceMetricRow key={test.id} test={test} index={i} />))}
               </div>
@@ -4074,7 +4574,7 @@ function formatK6TestCase(rawName, suite, category) {
     };
   }
  
-  // ── 2. AVERAGE RESPONSE TIME ──────────────────────────────────────────────
+  //2. AVERAGE RESPONSE TIME
   if (/average response time/i.test(name)) {
     const avgMatch = info.match(/avg=([\d.]+ms)/);
     const avg      = avgMatch ? avgMatch[1] : null;
@@ -4086,7 +4586,7 @@ function formatK6TestCase(rawName, suite, category) {
     };
   }
  
-  // ── 3. MAX RESPONSE TIME ──────────────────────────────────────────────────
+  //3. MAX RESPONSE TIME
   if (/max response time/i.test(name)) {
     const maxMatch = info.match(/max=([\d.smµ]+)/);
     const max      = maxMatch ? maxMatch[1] : null;
@@ -4098,7 +4598,7 @@ function formatK6TestCase(rawName, suite, category) {
     };
   }
  
-  // ── 4. ERROR RATE ─────────────────────────────────────────────────────────
+  // 4. ERROR RATE
   if (/error rate/i.test(name)) {
     const rateMatch    = info.match(/error_rate=([\d.]+%)/);
     const rate         = rateMatch ? rateMatch[1] : null;
@@ -4116,7 +4616,7 @@ function formatK6TestCase(rawName, suite, category) {
     };
   }
  
-  // ── 5. THROUGHPUT ─────────────────────────────────────────────────────────
+  //5. THROUGHPUT
   if (/throughput/i.test(name)) {
     const rpsMatch = info.match(/([\d.]+)\s*req\/s/);
     const rps      = rpsMatch ? rpsMatch[1] : null;
@@ -4130,7 +4630,7 @@ function formatK6TestCase(rawName, suite, category) {
     };
   }
  
-  // ── 6. MAX VIRTUAL USERS ──────────────────────────────────────────────────
+  // 6. MAX VIRTUAL USERS
   if (/max virtual users/i.test(name)) {
     const vusMatch = info.match(/max_vus=(\d+)/);
     const vus      = vusMatch ? vusMatch[1] : null;
@@ -4142,7 +4642,7 @@ function formatK6TestCase(rawName, suite, category) {
     };
   }
  
-  // ── 7. K6 CHECKS PASS RATE ───────────────────────────────────────────────
+  //7. K6 CHECKS PASS RATE
   if (/checks pass rate/i.test(name)) {
     const checkMatch = info.match(/checks=([\d.]+%)/);
     const checkRate  = checkMatch ? checkMatch[1] : null;
@@ -4158,7 +4658,7 @@ function formatK6TestCase(rawName, suite, category) {
     };
   }
  
-  // ── 8. THRESHOLDS ─────────────────────────────────────────────────────────
+  //8. THRESHOLDS
   if (/threshold:/i.test(name)) {
     // p95 threshold
     if (/p\(95\)/i.test(name) || /p\(95\)/i.test(info)) {
@@ -4243,7 +4743,7 @@ function formatK6TestCase(rawName, suite, category) {
     };
   }
  
-  // ── FALLBACK ──────────────────────────────────────────────────────────────
+  //FALLBACK
   return {
     title: name.split('\n')[0].trim() || name,
     description: info || 'k6 performance metric',
@@ -4304,7 +4804,7 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
     return () => document.removeEventListener('mousedown', handler);
   }, []);
  
-  // ── Download CSV ──────────────────────────────────────────────────────────
+  //Download CSV 
   const downloadCsv = () => {
     const headers = ['Type', 'Status', 'p95 (ms)', 'Error Rate (%)', 'Req/s', 'Max VUs', 'Duration (s)'];
     const rows = availableTypes.map(t => {
@@ -4331,7 +4831,7 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
 };
 
  
-  // ── Download HTML ─────────────────────────────────────────────────────────
+  //Download HTML 
   const downloadHtml = () => {
     const now     = new Date();
     const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -4543,7 +5043,7 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
   setDropdownOpen(false);
 };
  
-  // ── Render ────────────────────────────────────────────────────────────────
+  //Render 
   return (
     <div className="panel">
  
@@ -5010,9 +5510,8 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
     </div>
   );
 }
-// ─────────────────────────────────────────────────────────────────────────────
-// ExecutionPanel
-// ─────────────────────────────────────────────────────────────────────────────
+
+
 function buildHtmlReport({ generation, tests, testType, framework, url, pass, fail, skip }) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -5158,8 +5657,10 @@ function buildHtmlReport({ generation, tests, testType, framework, url, pass, fa
 </body>
 </html>`;
 }
-function ExecutionPanel({ generation }) {
-  const { t } = useLang();
+//Exection Test Page
+function ExecutionPanel({ generation, onGenerationSaved }) {
+  const notifFiredRef = useRef(false);
+  const { t, lang, setLanguage } = useLang();
   const [filter,       setFilter]       = useState('all');
   const [rowsPerPage, setRowsPerPage] = useState(10);
 const [currentPage, setCurrentPage] = useState(1);
@@ -5233,8 +5734,101 @@ if (testType === 'performance') {
 useEffect(() => {
     if (!generation) return;
     const savedResults = generation?.result?.execution_results || generation?.generation?.execution_results || [];
-    if (savedResults.length > 0) { setRunResults({ results: savedResults }); return; }
-    // ← NE PAS re-runner pour les tests API
+    console.log('[EP] fresh:', generation.fresh, 'savedResults:', savedResults.length);
+
+
+    if (savedResults.length > 0) {
+      if (!generation.fresh) {
+        // Coming from History/Projects — already seen, show instantly
+        setRunResults({ results: savedResults });
+        return;
+      }
+
+      // Fresh generation: play the terminal animation, then reveal saved results
+      setRunning(true); setRunResults(null); setTerminalLines([]);
+
+      const url = generation?.generation?.url || generation?.url || '';
+      const totalTests = savedResults.length || generation?.result?.test_cases?.length || 0;
+      const currentFramework = generation?.generation?.framework
+        || generation?.framework
+        || generation?.result?.framework
+        || framework;
+      const fwLabel = currentFramework === 'Playwright' ? 'Playwright (headless chromium)'
+        : currentFramework === 'Selenium' ? 'Selenium WebDriver'
+        : currentFramework === 'Cypress' ? 'Cypress Test Runner'
+        : currentFramework;
+
+      const addLine = (text, type = 'info', delay = 0) =>
+        new Promise(res => setTimeout(() => {
+          setTerminalLines(prev => [...prev, { text, type, time: new Date().toLocaleTimeString('en-US', { hour12: false }) }]);
+          res();
+        }, delay));
+
+      const playAnimation = async () => {
+        await addLine('NexTest AI Engine v2.0 initializing...', 'system', 0);
+        await addLine(`Connecting to ${url}`, 'info', 400);
+        await addLine(`Launching ${fwLabel}...`, 'info', 800);
+        await addLine('Scraping DOM elements and page structure...', 'info', 1200);
+        await addLine(`AI analyzing ${totalTests} test cases...`, 'ai', 1700);
+        await addLine('Injecting authentication token...', 'info', 2100);
+        await addLine('Browser ready — starting test execution...', 'success', 2500);
+        await addLine('─'.repeat(52), 'divider', 2800);
+
+        for (let i = 0; i < Math.min(savedResults.length, 8); i++) {
+          await addLine(`Running [${i + 1}/${totalTests}] ${savedResults[i]?.name || `Test ${i + 1}`}...`, 'running', 3000 + i * 300);
+        }
+        if (totalTests > 8) {
+          await addLine(`... and ${totalTests - 8} more tests running in parallel`, 'muted', 3000 + 8 * 300);
+        }
+
+        await addLine('─'.repeat(52), 'divider', 3000 + Math.min(totalTests, 8) * 300 + 200);
+
+        const pass = savedResults.filter(r => r.status === 'pass').length;
+        const fail = savedResults.filter(r => r.status === 'fail').length;
+        const skip = savedResults.filter(r => r.status === 'skip').length;
+
+        savedResults.slice(0, 6).forEach((r, i) => {
+          const icon = r.status === 'pass' ? '✓' : r.status === 'fail' ? '✗' : '—';
+          const t = r.status === 'pass' ? 'pass' : r.status === 'fail' ? 'fail' : 'skip';
+          setTerminalLines(prev => [...prev, {
+            text: `${icon} ${r.name || `Test ${i + 1}`}`,
+            type: t,
+            time: new Date().toLocaleTimeString('en-US', { hour12: false })
+          }]);
+        });
+
+        await addLine('─'.repeat(52), 'divider', 200);
+        await addLine(`Execution complete — ${pass} passed · ${fail} failed · ${skip} skipped`, 'summary', 400);
+        await addLine(`Pass rate: ${savedResults.length > 0 ? Math.round(pass / savedResults.length * 100) : 0}%`, pass / (savedResults.length || 1) >= 0.8 ? 'success' : 'fail', 600);
+        await addLine('Generating AI analysis report...', 'ai', 800);
+        await addLine('Done ✓', 'success', 1000);
+
+        setTimeout(() => {
+          setRunResults({ results: savedResults });
+          setRunning(false);
+          // Fire notification AFTER terminal finishes
+          if (onGenerationSaved && !notifFiredRef.current) {
+            notifFiredRef.current = true;
+            const pass = savedResults.filter(r => r.status === 'pass').length;
+            const fail = savedResults.filter(r => r.status === 'fail').length;
+            onGenerationSaved({
+              url:       generation?.generation?.url      || generation?.url      || '',
+              framework: generation?.generation?.framework || generation?.framework || '',
+              testType:  generation?.result?.test_type    || generation?.test_type  || '',
+              passCount: pass,
+              failCount: fail,
+              timestamp: Date.now(),
+              durationMs: 0,
+            });
+          }
+        }, 1200);
+      };
+
+      playAnimation();
+      return;
+    }
+
+    
     if (testType === 'api') return;
     if (!generation?.result?.test_cases?.length) return;
     const currentFramework = generation?.generation?.framework 
@@ -5397,7 +5991,7 @@ useEffect(() => { setCurrentPage(1); }, [filter, rowsPerPage]);
   let content, filename;
   const fw = framework?.toLowerCase();
 
-  // ── API test types (Postman / Pytest / Newman) ──
+  //API test types (Postman / Pytest / Newman)
   if (testType === 'api') {
     if (fw === 'postman' || fw === 'newman') {
       content  = generation?.result?.script_postman
@@ -5418,7 +6012,7 @@ useEffect(() => { setCurrentPage(1); }, [filter, rowsPerPage]);
     return;
   }
 
-  // ── SEO test (Requests + BeautifulSoup) ──
+  //SEO test (Requests + BeautifulSoup)
   if (testType === 'seo') {
     console.log('[SEO SCRIPT] generation.result:', generation?.result);
   console.log('[SEO SCRIPT] script field:', generation?.result?.script);
@@ -5432,7 +6026,7 @@ useEffect(() => { setCurrentPage(1); }, [filter, rowsPerPage]);
     return;
   }
 
-  // ── Both (Selenium + Playwright + Cypress) ──
+  // (Selenium + Playwright + Cypress)
   if (isBoth) {
     content  = type === 'selenium'  ? generation?.result?.script_selenium
              : type === 'playwright' ? generation?.result?.script_playwright
@@ -5543,7 +6137,7 @@ const downloadHtml_Security = () => {
     </tr>`;
   }).join('');
 
-  // ── CATEGORY SUMMARY ──
+  // CATEGORY SUMMARY
   const cats = {};
   allTests.forEach(t => {
     const c = t.category || 'auth';
@@ -5568,7 +6162,7 @@ const downloadHtml_Security = () => {
     </tr>`;
   }).join('');
 
-  // ── DETAILED RESULTS ──
+  // DETAILED RESULTS
   const detailRows = allTests.map((t, i) => {
     const sc = t.status==='pass'?'#10b981':t.status==='fail'?'#ef4444':'#f59e0b';
     const sl = t.status==='pass'?'✓ PASS':t.status==='fail'?'✗ FAIL':'⚠ WARN';
@@ -5586,7 +6180,7 @@ const downloadHtml_Security = () => {
     </tr>`;
   }).join('');
 
-  // ── AI RECOMMENDATIONS ──
+  //AI RECOMMENDATIONS
   const perfItems = allTests.filter(t => {
     try { return parseInt((t.duration||'0').replace('ms','')) > 5000; } catch { return false; }
   });
@@ -5734,7 +6328,7 @@ const downloadHtml_Security = () => {
 };
 
 const downloadHtml_Functional = async () => {
-  // ── Show loading state ──────────────────────────────────────────────────
+  // Show loading state 
   setDropdownOpen(false);
   setPdfLoading(true);
 
@@ -5759,7 +6353,7 @@ const downloadHtml_Functional = async () => {
   const risk = quality >= 80 ? 'LOW' : quality >= 60 ? 'MEDIUM' : 'HIGH';
   const riskColor = quality >= 80 ? '#10b981' : quality >= 60 ? '#f59e0b' : '#ef4444';
 
-  // ── ACTION PLAN via LLaMA ───────────────────────────────────────────────
+  //ACTION PLAN via LLaMA 
   const failedTests = allTests.filter(t => t.status === 'fail');
   let actionPlanItems = [];
 
@@ -5813,7 +6407,7 @@ Return ONLY valid JSON array, no markdown, no explanation.`;
     }));
   }
 
-  // ── ACTION PLAN HTML ────────────────────────────────────────────────────
+  // ACTION PLAN HTML
   const CAT_COLORS = {
     'Selector Fix':   '#6366f1',
     'Timing/Wait':    '#f59e0b',
@@ -5865,7 +6459,7 @@ Return ONLY valid JSON array, no markdown, no explanation.`;
       </table>
     </div>` : '';
 
-  // ── SECTIONS (garde tout l'existant + ajoute l'Action Plan) ─────────────
+  // SECTIONS
   const ACTION_COLORS = {
     navigate: '#10b981', check_visible: '#3b82f6', fill: '#8b5cf6',
     click: '#f97316', auth_success: '#10b981', auth_fail: '#ef4444',
@@ -5897,7 +6491,7 @@ Return ONLY valid JSON array, no markdown, no explanation.`;
         ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
       </tr></thead>`;
 
-  // ── 1. SCENARIOS ──
+  //1. SCENARIOS
   const EXPECTED_MAP = {
     navigate: 'Page loads and DOM is ready',
     check_visible: 'Element is visible in the DOM',
@@ -5928,7 +6522,7 @@ Return ONLY valid JSON array, no markdown, no explanation.`;
     </tr>`;
   }).join('');
 
-  // ── 2. CATEGORY SUMMARY ──
+  //2. CATEGORY SUMMARY 
   const cats = {};
   allTests.forEach(t => {
     const c = t.category || 'action';
@@ -5958,7 +6552,7 @@ Return ONLY valid JSON array, no markdown, no explanation.`;
     </tr>`;
   }).join('');
 
-  // ── 3. DETAILED RESULTS ──
+  //3. DETAILED RESULTS 
   const detailRows = allTests.map((t, i) => {
     const sc = t.status==='pass'?'#10b981':t.status==='fail'?'#ef4444':'#f59e0b';
     const sl = t.status==='pass'?'✓ PASS':t.status==='fail'?'✗ FAIL':'■ SKIP';
@@ -5981,7 +6575,7 @@ Return ONLY valid JSON array, no markdown, no explanation.`;
     </tr>`;
   }).join('');
 
-  // ── 4. LLAMA ANALYSIS TABLE ──
+  //4. LLAMA ANALYSIS TABLE 
   const llamaRows = allTests.map((t, i) => {
     const ai = t.ai_analysis || {};
     const sc = t.status==='pass'?'#10b981':'#ef4444';
@@ -5999,7 +6593,7 @@ Return ONLY valid JSON array, no markdown, no explanation.`;
     </tr>`;
   }).join('');
 
-  // ── 5. VERDICT SUMMARY ──
+  // 5. VERDICT SUMMARY
   const PASS_MSG = {
     navigation:     'Page loads correctly — routing and URL resolution confirmed',
     form:           'Form interactions work — fill and input fields respond correctly',
@@ -6065,7 +6659,7 @@ Return ONLY valid JSON array, no markdown, no explanation.`;
         : '• No auth tests found — consider adding auth_success / auth_fail steps.'}
     </div>`;
 
-  // ── FULL HTML ─────────────────────────────────────────────────────────────
+  //HTML
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7937,7 +8531,8 @@ const downloadPdf = async () => {
           </div>
         </div>
 
-        <div className="ep-actions">
+                <div className="ep-actions" style={{ opacity: running ? 0.35 : 1, pointerEvents: running ? 'none' : 'auto', transition: 'opacity .3s' }}>
+
           {isBoth ? (
             <>
               <button className="ep-dl-btn" onClick={() => downloadScript('selenium')}><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span className="ep-dl-letters" style={{ color: '#43B02A' }}>Se</span> .py</button>
@@ -8013,12 +8608,13 @@ const downloadPdf = async () => {
         </div>
       )}
 
-      <div className="ep-stats">
+      <div className="ep-stats" style={{ opacity: running ? 0.4 : 1, transition: 'opacity .3s' }}>
+
         {[
-          { label: 'Passed',    val: pass,       color: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)', icon: <svg width="18" height="18" fill="none" stroke="#10B981" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> },
-          { label: 'Failed',    val: fail,       color: '#EF4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.2)',   icon: <svg width="18" height="18" fill="none" stroke="#EF4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg> },
-          { label: 'Skipped',   val: skip,       color: '#F59E0B', bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.2)',  icon: <svg width="18" height="18" fill="none" stroke="#F59E0B" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg> },
-          { label: 'Pass Rate', val: `${rate}%`, color: rateColor, bg: `${rateColor}12`, border: `${rateColor}33`, icon: <svg width="18" height="18" fill="none" stroke={rateColor} strokeWidth="2.5" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
+          { label: 'Passed',    val: running ? 0 : pass,      color: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)', icon: <svg width="18" height="18" fill="none" stroke="#10B981" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> },
+          { label: 'Failed',    val: running ? 0 : fail,       color: '#EF4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.2)',   icon: <svg width="18" height="18" fill="none" stroke="#EF4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg> },
+          { label: 'Skipped',   val: running ? 0 : skip,        color: '#F59E0B', bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.2)',  icon: <svg width="18" height="18" fill="none" stroke="#F59E0B" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg> },
+          { label: 'Pass Rate', val: running ? '0%' : `${rate}%`, color: rateColor, bg: `${rateColor}12`, border: `${rateColor}33`, icon: <svg width="18" height="18" fill="none" stroke={rateColor} strokeWidth="2.5" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
         ].map((s, i) => (
           <div key={s.label} className="ep-stat" style={{ '--sc': s.color, '--sb': s.bg, '--sbo': s.border, '--i': i }}>
             <div className="ep-stat-icon">{s.icon}</div>
@@ -8030,7 +8626,8 @@ const downloadPdf = async () => {
         ))}
       </div>
 
-      <div className="ep-progress-card">
+            <div className="ep-progress-card">
+
         <div className="ep-progress-top">
           <div className="ep-progress-info">
             {running ? (<><span className="spinner" style={{ marginRight: 8 }} /><span style={{ color: 'var(--indigo2)' }}>Running tests...</span></>) : (<><svg width="14" height="14" fill="none" stroke="var(--green)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span>{tests.length} tests executed</span><span className="ep-progress-sep">·</span><span style={{ color: 'var(--muted)' }}>{loadTimeMs > 0 && (
@@ -8050,11 +8647,12 @@ const downloadPdf = async () => {
 
 
 {/* ── TABS ── */}
-<div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+<div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0, opacity: running ? 0.3 : 1, pointerEvents: running ? 'none' : 'auto', transition: 'opacity .3s' }}>
+
   {[
-    { key: 'results',         label: '✅ Results',         count: tests.length },
-    { key: 'scenarios',       label: '📋 Scenarios',       count: tests.length },
-    { key: 'recommendations', label: '💡 Recommendations', count: (() => {
+    { key: 'results',         label: '✅ Results',        count: running ? 0 : tests.length },
+    { key: 'scenarios',       label: '📋 Scenarios',       count: running ? 0 : tests.length },
+    { key: 'recommendations', label: '💡 Recommendations', count: running ? 0 :  (() => {
   const perfRecs = [];
   if (loadTimeMs > 5000 || loadTimeMs > 3000) perfRecs.push(1);
   else perfRecs.push(1);
@@ -8075,7 +8673,7 @@ const downloadPdf = async () => {
 
       {activeTab === 'results' && (
   <>
-    <div className="ep-filters">
+<div className="ep-filters" style={{ opacity: running ? 0 : 1, pointerEvents: running ? 'none' : 'auto', transition: 'opacity .3s' }}>
       {[{ key: 'all', label: 'All', count: tests.length }, { key: 'pass', label: 'Passed', count: pass }, { key: 'fail', label: 'Failed', count: fail }, { key: 'skip', label: 'Warn/Skip', count: skip }].map(f => (
         <button key={f.key} className={`ep-filter${filter === f.key ? ' on' : ''}`} onClick={() => setFilter(f.key)}>
           {f.key === 'pass' && <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>}
@@ -8332,7 +8930,7 @@ const downloadPdf = async () => {
     </div>
 
     {/* ── PAGINATION ── */}
-    {shown.length > 0 && (
+   {shown.length > 0 && !running && (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         flexWrap: 'wrap', gap: 12,
@@ -8646,6 +9244,7 @@ function DetailSidebar({ item, onClose, onView, onDelete, deleting }) {
   );
 }
 
+
 function ProjectDropdown({ projects, filterProject, setFilterProject }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -8861,8 +9460,10 @@ function ProjectDropdown({ projects, filterProject, setFilterProject }) {
   );
 }
 
+
+// History Page
 function HistoryPanel({ goTo, setGeneration }) {
-  const { t } = useLang();
+  const { t, lang, setLanguage } = useLang();
   const [histories,     setHistories]     = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [search,        setSearch]        = useState('');
@@ -8873,6 +9474,8 @@ function HistoryPanel({ goTo, setGeneration }) {
   const [sortDir,       setSortDir]       = useState('desc');
   const [selected,      setSelected]      = useState(null);
   const [deleting,      setDeleting]      = useState(null);
+  const [currentPage,   setCurrentPage]   = useState(1);  // ← ICI UNE SEULE FOIS
+  const ITEMS_PER_PAGE = 10; 
 
 useEffect(() => {
   Promise.all([api.get('/generations'), api.get('/projects')])
@@ -8904,6 +9507,10 @@ useEffect(() => {
       return sortDir === 'desc' ? vb - va : va - vb;
     });
 
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const safePage   = Math.min(currentPage, totalPages || 1);
+  const paginated  = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+
   const toggleSort = (key) => { if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { setSortKey(key); setSortDir('desc'); } };
 
  const handleView = (item) => {
@@ -8914,6 +9521,7 @@ useEffect(() => {
   console.log('[HistoryPanel handleView] item.test_cases length:', item.test_cases?.length);
   console.log('[HistoryPanel handleView] parsedResult:', parsedResult);
   setGeneration({
+      fresh: false,
     url: item.url, framework: item.framework, test_type: item.test_type,
     generation: { 
       id: item.id, 
@@ -9000,7 +9608,8 @@ useEffect(() => {
     <div className="panel">
       <div className="hp2-header">
         <div><h1 className="p-title">{t('generation')} <span className="g">{t('history')}</span></h1><p className="p-sub">{t('historyDesc')}</p></div>
-        <button className="btn-primary" onClick={() => goTo('generate')}><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New Generation</button>
+        <button className="btn-primary" onClick={() => goTo('generate')}><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New Generation
+</button>
       </div>
 
       {histories.length > 0 && (
@@ -9050,7 +9659,7 @@ useEffect(() => {
                 <p>{search||filterFw!=='all'?'Try adjusting your search or filters':t('noHistoryDesc')}</p>
               </div>
             ) : (
-              filtered.map((item, i) => {
+              paginated.map((item, i) => {
                 const fw    = FW_CONFIG[item.framework]   || FW_CONFIG.Selenium;
                 const type  = TYPE_CONFIG[item.test_type] || TYPE_CONFIG.smoke;
                 const total = (item.pass_count||0)+(item.fail_count||0)+(item.skip_count||0);
@@ -9077,6 +9686,24 @@ useEffect(() => {
               })
             )}
           </div>
+          {totalPages > 1 && (
+            <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:8, marginTop:20, padding:'12px 0' }}>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
+                style={{ padding:'6px 16px', borderRadius:8, background:'var(--card)', border:'1px solid var(--border)', color: safePage === 1 ? 'var(--muted)' : 'var(--text)', cursor: safePage === 1 ? 'default' : 'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700 }}>
+                Prev
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button key={i} onClick={() => setCurrentPage(i + 1)}
+                  style={{ width:32, height:32, borderRadius:8, background: safePage === i+1 ? 'var(--indigo)' : 'var(--card)', border: safePage === i+1 ? '1px solid var(--indigo2)' : '1px solid var(--border)', color: safePage === i+1 ? '#fff' : 'var(--muted)', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700 }}>
+                  {i + 1}
+                </button>
+              ))}
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+                style={{ padding:'6px 16px', borderRadius:8, background:'var(--card)', border:'1px solid var(--border)', color: safePage === totalPages ? 'var(--muted)' : 'var(--text)', cursor: safePage === totalPages ? 'default' : 'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700 }}>
+                Next
+              </button>
+            </div>
+          )}
         </div>
         {selected && (<DetailSidebar item={selected} onClose={() => setSelected(null)} onView={handleView} onDelete={handleDelete} deleting={deleting} />)}
       </div>
@@ -9084,9 +9711,7 @@ useEffect(() => {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AccountPanel
-// ─────────────────────────────────────────────────────────────────────────────
+
 function FloatField({ label, value, onChange, type = 'text', icon, autoCompleteType }) {
   const [showPwd, setShowPwd] = useState(false);
   const isPassword = type === 'password';
@@ -9122,9 +9747,11 @@ function FloatField({ label, value, onChange, type = 'text', icon, autoCompleteT
   );
 }
 
-function AccountPanel({ user }) {
+//Account Page 
+function AccountPanel({ user, setPage, setProjectStep }) {
   const { setUser } = useAuth();
-  const { t } = useLang();
+  const { t, lang, setLanguage } = useLang();
+  const [showChangePwd, setShowChangePwd] = useState(false);
   const [name,       setName]       = useState(user?.name  || '');
   const [email,      setEmail]      = useState(user?.email || '');
   const [currPwd,    setCurrPwd]    = useState('');
@@ -9133,27 +9760,112 @@ function AccountPanel({ user }) {
   const [msg,        setMsg]        = useState('');
   const [error,      setError]      = useState('');
   const [loading,    setLoading]    = useState(false);
-  const [stats, setStats] = useState({ total: 0, projects: 0, avgRate: 0,  totalPass: 0, publicCount: 0, internalCount: 0 });
-const [statsLoading, setStatsLoading] = useState(true);
+  const [stats, setStats] = useState({ generations_count:0, projects_count:0, avg_pass_rate:0, alerts_count:0, last_login:null });
+  const [statsLoading, setStatsLoading] = useState(true);
+  // Après le useState de stats, ajoute :
+const [recentActivity, setRecentActivity] = useState([]);
+const [showLoginHistory, setShowLoginHistory] = useState(false);
+const [showSessions,     setShowSessions]     = useState(false);
+const [showDanger,       setShowDanger]        = useState(false);
+const [sessionCount,     setSessionCount]      = useState(1);
+const [phone,    setPhone]    = useState(user?.phone    || '');
+const [company,  setCompany]  = useState(user?.company  || '');
+const [position, setPosition] = useState(user?.position || '');
 
+// Dans le useEffect existant, ajoute la fetch des générations :
 useEffect(() => {
-  api.get('/profile')
-    .then(res => {
-      setStats({
-        generations_count: res.data.generations_count || 0,
-        projects_count:    res.data.projects_count    || 0,
-      });
-    })
-    .catch(console.error)
-    .finally(() => setStatsLoading(false));
+  const timeAgo = (dateStr) => {
+    const diff = (Date.now() - new Date(dateStr)) / 1000;
+    if (diff < 60)     return `${Math.floor(diff)}s ago`;
+    if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  Promise.all([
+    api.get('/profile'),
+    api.get('/generations'),
+    api.get('/projects'),   // ← NOUVEAU
+  ]).then(([profileRes, genRes, projRes]) => {
+    setStats({
+      generations_count: profileRes.data.generations_count || 0,
+      projects_count:    profileRes.data.projects_count    || 0,
+      avg_pass_rate:     profileRes.data.avg_pass_rate     || 0,
+      alerts_count:      profileRes.data.alerts_count      || 0,
+      last_login:        profileRes.data.last_login        || null, 
+    });
+
+    setSessionCount(profileRes.data.session_count || 1);
+
+    const gens  = Array.isArray(genRes.data)  ? genRes.data  : [];
+    const projs = Array.isArray(projRes.data) ? projRes.data : [];
+
+    // Activités depuis générations
+    const TYPE_ICONS = {
+      smoke:       { icon: <svg width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>, color: 'rgba(34,197,94,.12)', border: 'rgba(34,197,94,.25)' },
+      functional:  { icon: <svg width="16" height="16" fill="none" stroke="#818cf8" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>, color: 'rgba(99,102,241,.12)', border: 'rgba(99,102,241,.25)' },
+      performance: { icon: <svg width="16" height="16" fill="none" stroke="#8b5cf6" strokeWidth="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>, color: 'rgba(139,92,246,.12)', border: 'rgba(139,92,246,.25)' },
+      security:    { icon: <svg width="16" height="16" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>, color: 'rgba(239,68,68,.12)', border: 'rgba(239,68,68,.25)' },
+      regression:  { icon: <svg width="16" height="16" fill="none" stroke="#f97316" strokeWidth="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.14"/></svg>, color: 'rgba(249,115,22,.12)', border: 'rgba(249,115,22,.25)' },
+      api:         { icon: <svg width="16" height="16" fill="none" stroke="#10b981" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>, color: 'rgba(16,185,129,.12)', border: 'rgba(16,185,129,.25)' },
+      seo:         { icon: <svg width="16" height="16" fill="none" stroke="#06b6d4" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>, color: 'rgba(6,182,212,.12)', border: 'rgba(6,182,212,.25)' },
+    };
+
+    const genActivities = gens.map(g => {
+      const isOk = (g.pass_rate || 0) >= 80;
+      const cfg  = TYPE_ICONS[g.test_type] || TYPE_ICONS.smoke;
+      const typeLabel = { smoke:'Smoke', functional:'Functional', performance:'Performance', security:'Security', regression:'Regression', api:'API', seo:'SEO' };
+      return {
+        icon:       cfg.icon,
+        color:      cfg.color,
+        border:     cfg.border,
+        label:      `${typeLabel[g.test_type] || 'Test'} run on ${g.url}`,
+        time:       timeAgo(g.created_at),
+        created_at: g.created_at,
+      };
+    });
+
+    // Activités depuis projets  ← NOUVEAU
+    const projActivities = projs.map(p => ({
+      icon:  <svg width="16" height="16" fill="none" stroke="#818cf8" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+      color:      'rgba(99,102,241,.12)',
+      border:     'rgba(99,102,241,.25)',
+      label:      `Project "${p.name}" created`,
+      time:       timeAgo(p.created_at),
+      created_at: p.created_at,
+    }));
+
+    // Mixer + trier par date + garder 3 ← NOUVEAU
+    const all = [...genActivities, ...projActivities]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 4);
+
+    setRecentActivity(all);
+  })
+  .catch(console.error)
+  .finally(() => setStatsLoading(false));
 }, []);
 
+
+
+
   const saveProfile = async () => {
-    setLoading(true); setMsg(''); setError('');
-    try { const res = await api.put('/profile/update', { name, email }); setUser(res.data.user); setMsg(t('profileUpdated')); }
-    catch (err) { setError(err.response?.data?.message || t('errorOccurred')); }
-    setLoading(false);
-  };
+  setLoading(true); setMsg(''); setError('');
+  try {
+    const res = await api.put('/profile/update', { 
+      name, 
+      email,
+      phone,    // ← AJOUTE
+      company,  // ← AJOUTE
+      position, // ← AJOUTE
+    });
+    setUser(res.data.user);
+    setMsg(t('profileUpdated'));
+  }
+  catch (err) { setError(err.response?.data?.message || t('errorOccurred')); }
+  setLoading(false);
+};
 
   const changePassword = async () => {
     if (newPwd !== confirmPwd) { setError(t('passwordMismatch')); return; }
@@ -9163,6 +9875,8 @@ useEffect(() => {
     setLoading(false);
   };
 
+
+
   const IconEyeOn  = (<svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>);
   const IconEyeOff = (<svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>);
 
@@ -9170,7 +9884,26 @@ useEffect(() => {
   const IconUser   = (<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>);
   const IconMail   = (<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>);
   const IconLock   = (<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>);
-  const IconShield = (<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>);
+  const IconShield = (<svg width="16" height="16" fill="none" stroke="#f97316" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>);
+
+const revokeAllSessions = async () => {
+  setLoading(true);
+  try {
+    await api.post('/auth/logout');
+    setUser(null);
+  } catch(err) { setError('Failed to revoke sessions'); }
+  setLoading(false);
+};
+
+const deactivateAccount = async () => {
+  if (!window.confirm('Are you sure? This cannot be undone.')) return;
+  setLoading(true);
+  try {
+    await api.delete('/profile/delete');
+    setUser(null);
+  } catch(err) { setError('Failed to deactivate account'); }
+  setLoading(false);
+};
 
   return (
     <div className="panel">
@@ -9178,156 +9911,492 @@ useEffect(() => {
       {msg   && (<div className="ac2-feedback ac2-feedback--ok"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>{msg}</div>)}
       {error && (<div className="ac2-feedback ac2-feedback--err"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>{error}</div>)}
       <div className="ac2-hero">
-        <div className="ac2-avatar-wrap">
-          <div className="ac2-avatar">{user?.avatar ? <img  key={user.avatar} src={user.avatar} alt="avatar" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%' }}/> : <span>{user?.name?.[0]?.toUpperCase()||'U'}</span>}</div>
-          <input 
-  type="file" 
-  id="avatar-upload" 
-  accept="image/*" 
-  style={{ display: 'none' }} 
-  onChange={async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append('avatar', file);
-    try {
-      const res = await api.post('/profile/avatar', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      const updatedUser = res.data.user ?? { ...user, avatar: res.data.avatar };
-      if (updatedUser.avatar) {
-        updatedUser.avatar = updatedUser.avatar + '?t=' + Date.now();
-      }
-      setUser(updatedUser);
-    } catch(err) {
-      console.error(err);
+  <div className="ac2-avatar-wrap" style={{ position:'relative', flexShrink:0 }}>
+  <div className="ac2-avatar" style={{ width:90, height:90, fontSize:32 }}>
+    {user?.avatar
+      ? <img key={user.avatar} src={user.avatar} alt="avatar"
+          style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%' }}/>
+      : <span>{user?.name?.[0]?.toUpperCase() || 'U'}</span>
     }
-  }} 
-/>
-          <button className="ac2-avatar-btn" onClick={() => document.getElementById('avatar-upload').click()}><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
-        </div>
-
- <div className="ac2-hero-info" style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-  
-  {/* Colonne gauche : nom, email, badge */}
-  <div>
-    <div className="ac2-hero-name">{user?.name || 'User'}</div>
-    <div className="ac2-hero-email">{user?.email || '—'}</div>
-    
-<div className="ac2-hero-badge">
-  <span className="ac2-badge-dot"/>
-  {(() => {
-    const role = user?.onboarding_data?.role;
-    const labels = {
-      developer: 'Developer',
-      tester:    'QA / Tester',
-      lead:      'Tech Lead',
-      other:     'Explorer',
-    };
-    return labels[role] || 'QA Engineer';
-  })()}
-</div>
   </div>
-
-  {/* Colonne droite : stats */}
-  <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      padding: '16px 28px', borderRadius: 14,
-      background: 'rgba(201,162,39,.08)', border: '1px solid rgba(201,162,39,.2)',
-      minWidth: 110
-    }}>
-      <svg width="18" height="18" fill="none" stroke="#c9a227" strokeWidth="2" viewBox="0 0 24 24" style={{ marginBottom: 6 }}>
-        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-      </svg>
-      <span style={{ fontSize: 28, fontWeight: 800, color: '#c9a227', lineHeight: 1 }}>
-        {statsLoading ? '…' : stats.generations_count}
-      </span>
-      <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, fontWeight: 600 }}>Generations</span>
-    </div>
-
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      padding: '16px 28px', borderRadius: 14,
-      background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)',
-      minWidth: 110
-    }}>
-      <svg width="18" height="18" fill="none" stroke="#818cf8" strokeWidth="2" viewBox="0 0 24 24" style={{ marginBottom: 6 }}>
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-      </svg>
-      <span style={{ fontSize: 28, fontWeight: 800, color: '#818cf8', lineHeight: 1 }}>
-        {statsLoading ? '…' : stats.projects_count}
-      </span>
-      <span style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, fontWeight: 600 }}>Projects</span>
-    </div>
+  {/* Camera overlay */}
+  <div
+    onClick={() => document.getElementById('avatar-upload').click()}
+    style={{
+      position:'absolute', bottom:0, right:0,
+      width:28, height:28, borderRadius:'50%',
+      background:'#6366f1', border:'2px solid var(--bg, #0f1117)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      cursor:'pointer', transition:'background .2s'
+    }}
+    onMouseEnter={e => e.currentTarget.style.background='#4f46e5'}
+    onMouseLeave={e => e.currentTarget.style.background='#6366f1'}
+  >
+    <svg width="13" height="13" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
   </div>
-
+  <input type="file" id="avatar-upload" accept="image/*" style={{ display:'none' }}
+    onChange={async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const fd = new FormData(); fd.append('avatar', file);
+      try {
+        const res = await api.post('/profile/avatar', fd, { headers:{ 'Content-Type':'multipart/form-data' } });
+        const updatedUser = res.data.user ?? { ...user, avatar: res.data.avatar };
+        if (updatedUser.avatar) updatedUser.avatar = updatedUser.avatar + '?t=' + Date.now();
+        setUser(updatedUser);
+      } catch(err) { console.error(err); }
+    }}
+  />
 </div>
-      </div>
-      <div className="ac2-grid">
-        <div className="ac2-card">
-          <div className="ac2-card-head"><div className="ac2-card-head-icon">{IconUser}</div><div><div className="ac2-card-title">{t('profileInformation')}</div><div className="ac2-card-sub">Update your display name and email</div></div></div>
-          <div className="ac2-card-body">
-            <FloatField label={t('fullName')} value={name} onChange={setName} type="text" icon={IconUser} />
-            <FloatField label={t('emailAddress')} value={email} onChange={setEmail} type="email" icon={IconMail} />
-            <button className="ac2-btn" onClick={saveProfile} disabled={loading}>{loading ? (<><span className="spinner"/> {t('saving')}</>) : (<><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>{t('saveChanges')}</>)}</button>
+
+  {/* Hero info */}
+  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+    {/* Row 1 : nom + stats */}
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+
+      {/* Left : identity */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="ac2-hero-name">{user?.name || 'User'}</span>
+          <div className="ac2-hero-badge">
+            <span className="ac2-badge-dot"/>
+            {(() => {
+              const role = user?.onboarding_data?.role;
+              const labels = { developer:'Developer', tester:'QA / Tester', lead:'Tech Lead', other:'Explorer' };
+              return labels[role] || 'QA Engineer';
+            })()}
           </div>
         </div>
-        <div className="ac2-card">
-          <div className="ac2-card-head"><div className="ac2-card-head-icon">{IconShield}</div><div><div className="ac2-card-title">{t('changePassword')}</div><div className="ac2-card-sub">Keep your account secure</div></div></div>
-          <div className="ac2-card-body">
-            <FloatField 
-  label={t('currentPassword')} 
-  value={currPwd} 
-  onChange={setCurrPwd} 
-  type="password" 
-  icon={IconLock} 
-  autoCompleteType="current-password"
-/>
-<FloatField label={t('newPassword')} value={newPwd} onChange={setNewPwd} type="password" icon={IconLock} autoCompleteType="new-password" />
-<FloatField label={t('confirmNewPassword')} value={confirmPwd} onChange={setConfirmPwd} type="password" icon={IconLock} autoCompleteType="new-password" />
-            {newPwd.length > 0 && (
-              <div className="ac2-strength">
-                <div className="ac2-strength-bars">{[1,2,3,4].map(n => (<div key={n} className={`ac2-strength-bar ${newPwd.length>=n*3?(n<=1?'weak':n<=2?'fair':n<=3?'good':'strong'):''}`}/>))}</div>
-                <span className="ac2-strength-label">{newPwd.length<4?'Weak':newPwd.length<7?'Fair':newPwd.length<10?'Good':'Strong'}</span>
-              </div>
-            )}
-            <button className="ac2-btn ac2-btn--indigo" onClick={changePassword} disabled={loading}>{loading ? (<><span className="spinner"/> {t('updating')}</>) : (<>{IconShield}{t('updatePassword')}</>)}</button>
-          </div>
+        <div className="ac2-hero-email">{user?.email || '—'}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+          <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Member since {user?.created_at 
+  ? new Date(user.created_at).toLocaleDateString('en-US', {month:'short', year:'numeric'}) 
+  : '—'}
+          </span>
+          <span style={{ color: 'var(--muted)' }}>|</span>
+          <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+       Last login: {stats.last_login || '—'}
+          </span>
+        </div>
+        
+      </div>
+
+      {/* Right : 4 stat cards */}
+      <div style={{ display:'flex', gap:10, flexShrink:0, flexWrap:'wrap' }}>
+        {/* Test Runs */}
+        <div style={{
+          display:'flex', flexDirection:'column', alignItems:'center', padding:'18px 26px',
+          borderRadius:12, background:'rgba(201,162,39,.08)', border:'1px solid rgba(201,162,39,.2)', minWidth:110
+        }}>
+          <svg width="16" height="16" fill="none" stroke="#c9a227" strokeWidth="2" viewBox="0 0 24 24" style={{marginBottom:6}}>
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+          <span style={{ fontSize:30, fontWeight:800, color:'#c9a227', lineHeight:1 }}>
+            {statsLoading ? '…' : stats.generations_count ?? 0}
+          </span>
+          <span style={{ fontSize:10, color:'var(--muted)', marginTop:4, fontWeight:600 }}>Test Runs</span>
+        </div>
+        {/* Projects */}
+        <div style={{
+          display:'flex', flexDirection:'column', alignItems:'center', padding:'18px 26px' ,
+          borderRadius:12, background:'rgba(99,102,241,.08)', border:'1px solid rgba(99,102,241,.2)', minWidth:110
+        }}>
+          <svg width="16" height="16" fill="none" stroke="#818cf8" strokeWidth="2" viewBox="0 0 24 24" style={{marginBottom:6}}>
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span style={{ fontSize:30, fontWeight:800, color:'#818cf8', lineHeight:1 }}>
+            {statsLoading ? '…' : stats.projects_count ?? 0}
+          </span>
+          <span style={{ fontSize:10, color:'var(--muted)', marginTop:4, fontWeight:600 }}>Projects</span>
+        </div>
+        {/* Success Rate */}
+        <div style={{
+          display:'flex', flexDirection:'column', alignItems:'center', padding:'18px 26px',
+          borderRadius:12, background:'rgba(34,197,94,.08)', border:'1px solid rgba(34,197,94,.2)', minWidth:110
+        }}>
+          <svg width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2" viewBox="0 0 24 24" style={{marginBottom:6}}>
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <span style={{ fontSize:30, fontWeight:800, color:'#22c55e', lineHeight:1 }}>
+            {statsLoading ? '…' : `${stats.avg_pass_rate ?? 0}%`}
+          </span>
+          <span style={{ fontSize:10, color:'var(--muted)', marginTop:4, fontWeight:600 }}>Success Rate</span>
+        </div>
+        {/* Alerts */}
+        <div style={{
+          display:'flex', flexDirection:'column', alignItems:'center', padding:'18px 26px',
+          borderRadius:12, background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)', minWidth:110
+        }}>
+          <svg width="16" height="16" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24" style={{marginBottom:6}}>
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span style={{ fontSize:30, fontWeight:800, color:'#ef4444', lineHeight:1 }}>
+            {statsLoading ? '…' : stats.alerts_count ?? 0}
+          </span>
+          <span style={{ fontSize:10, color:'var(--muted)', marginTop:4, fontWeight:600 }}>Alerts</span>
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+  <div className="ac2-grid" style={{ alignItems: 'flex-start' }}>
+
+  {/* Card 1 : Personal Information */}
+  <div className="ac2-card">
+    <div className="ac2-card-head">
+      <div className="ac2-card-head-icon">{IconUser}</div>
+      <div>
+        <div className="ac2-card-title">{t('profileInformation')}</div>
+        <div className="ac2-card-sub">Update your personal details</div>
+      </div>
+    </div>
+    <div className="ac2-card-body">
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
+        {/* Full Name */}
+        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+          <label style={{ fontSize:11, color:'var(--muted)', fontWeight:600 }}>Full Name</label>
+          <div style={{ position:'relative' }}>
+            <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            <input value={name} onChange={e => setName(e.target.value)} style={{ background:'rgba(255,255,255,.04)', border:'1px solid var(--border)', borderRadius:8, padding:'9px 12px 9px 32px', fontSize:13, color:'var(--text)', outline:'none', width:'100%' }}/>
+          </div>
+        </div>
+        {/* Phone */}
+<div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+  <label style={{ fontSize:11, color:'var(--muted)', fontWeight:600 }}>Phone Number</label>
+  <div style={{ position:'relative' }}>
+    <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.82a16 16 0 0 0 6.29 6.29l1.17-1.17a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    <input 
+      value={phone} 
+      onChange={e => setPhone(e.target.value)}
+      placeholder="+216 XX XXX XXX"
+      style={{ background:'rgba(255,255,255,.04)', border:'1px solid var(--border)', borderRadius:8, padding:'9px 12px 9px 32px', fontSize:13, color:'var(--text)', outline:'none', width:'100%' }}
+    />
+  </div>
+</div>
+        {/* Company */}
+<div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+  <label style={{ fontSize:11, color:'var(--muted)', fontWeight:600 }}>Company</label>
+  <div style={{ position:'relative' }}>
+    <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <input 
+      value={company} 
+      onChange={e => setCompany(e.target.value)}
+      placeholder="Your company"
+      style={{ background:'rgba(255,255,255,.04)', border:'1px solid var(--border)', borderRadius:8, padding:'9px 12px 9px 32px', fontSize:13, color:'var(--text)', outline:'none', width:'100%' }}
+    />
+  </div>
+</div>
+        {/* Email */}
+        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+          <label style={{ fontSize:11, color:'var(--muted)', fontWeight:600 }}>Email</label>
+          <div style={{ position:'relative' }}>
+            <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <input value={email} onChange={e => setEmail(e.target.value)} type="email" style={{ background:'rgba(255,255,255,.04)', border:'1px solid var(--border)', borderRadius:8, padding:'9px 12px 9px 32px', fontSize:13, color:'var(--text)', outline:'none', width:'100%' }}/>
+          </div>
+        </div>
+        {/* Position */}
+<div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+  <label style={{ fontSize:11, color:'var(--muted)', fontWeight:600 }}>Position</label>
+  <div style={{ position:'relative' }}>
+    <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+    <input 
+      value={position} 
+      onChange={e => setPosition(e.target.value)}
+      placeholder="Your position"
+      style={{ background:'rgba(255,255,255,.04)', border:'1px solid var(--border)', borderRadius:8, padding:'9px 12px 9px 32px', fontSize:13, color:'var(--text)', outline:'none', width:'100%' }}
+    />
+  </div>
+</div>
+</div>
+      <button onClick={saveProfile} disabled={loading} style={{ width:'100%', padding:'11px', borderRadius:10, background:'linear-gradient(135deg,#b8860b,#c9a227)', border:'none', color:'#000', fontWeight:700, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        {loading ? 'Saving…' : 'Save Changes'}
+      </button>
+    </div>
+  </div>
+
+  {/* Card 2 : Security Settings */}
+  <div className="ac2-card">
+  <div className="ac2-card-head">
+    <div className="ac2-card-head-icon">{IconShield}</div>
+    <div>
+      <div className="ac2-card-title">Security Settings</div>
+      <div className="ac2-card-sub">Manage your account security</div>
+    </div>
+  </div>
+  <div className="ac2-card-body" style={{ padding:0 }}>
+
+    {/* Change Password */}
+    <div onClick={() => setShowChangePwd(prev => !prev)}
+      style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid var(--border)', cursor:'pointer', transition:'background .15s' }}
+      onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.03)'}
+      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+      <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+        <div style={{ width:36, height:36, borderRadius:10, background:'rgba(99,102,241,.12)', border:'1px solid rgba(99,102,241,.2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{IconLock}</div>
+        <div>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>Change Password</div>
+          <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>Update your password regularly</div>
+        </div>
+      </div>
+      <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ transform: showChangePwd ? 'rotate(90deg)' : 'none', transition:'transform .2s' }}><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    {showChangePwd && (
+      <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', background:'rgba(255,255,255,.02)' }}>
+        <FloatField label={t('currentPassword')} value={currPwd} onChange={setCurrPwd} type="password" icon={IconLock} autoCompleteType="current-password" />
+        <FloatField label={t('newPassword')} value={newPwd} onChange={setNewPwd} type="password" icon={IconLock} autoCompleteType="new-password" />
+        <FloatField label={t('confirmNewPassword')} value={confirmPwd} onChange={setConfirmPwd} type="password" icon={IconLock} autoCompleteType="new-password" />
+        {newPwd.length > 0 && (
+          <div className="ac2-strength">
+            <div className="ac2-strength-bars">{[1,2,3,4].map(n => (<div key={n} className={`ac2-strength-bar ${newPwd.length>=n*3?(n<=1?'weak':n<=2?'fair':n<=3?'good':'strong'):''}`}/>))}</div>
+            <span className="ac2-strength-label">{newPwd.length<4?'Weak':newPwd.length<7?'Fair':newPwd.length<10?'Good':'Strong'}</span>
+          </div>
+        )}
+        <button className="ac2-btn ac2-btn--indigo" onClick={changePassword} disabled={loading} style={{ marginTop:12 }}>
+          {loading ? (<><span className="spinner"/> {t('updating')}</>) : (<>{IconShield}{t('updatePassword')}</>)}
+        </button>
+      </div>
+    )}
+
+    {/* Login History */}
+    <div onClick={() => setShowLoginHistory(prev => !prev)}
+      style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid var(--border)', cursor:'pointer', transition:'background .15s' }}
+      onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.03)'}
+      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+      <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+        <div style={{ width:36, height:36, borderRadius:10, background:'rgba(201,162,39,.1)', border:'1px solid rgba(201,162,39,.2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          <svg width="16" height="16" fill="none" stroke="#c9a227" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>Login History</div>
+          <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>View your recent login activity</div>
+        </div>
+      </div>
+      <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ transform: showLoginHistory ? 'rotate(90deg)' : 'none', transition:'transform .2s' }}><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    {showLoginHistory && (
+      <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', background:'rgba(255,255,255,.02)' }}>
+        <div style={{ display:'flex', gap:10 }}>
+          <div style={{ flex:1, background:'rgba(255,255,255,.03)', border:'1px solid var(--border)', borderRadius:10, padding:'10px 14px' }}>
+            <div style={{ fontSize:10, color:'var(--muted)', fontWeight:600, marginBottom:4 }}>IP ADDRESS</div>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{user?.last_login_ip || '—'}</div>
+          </div>
+          <div style={{ flex:1, background:'rgba(255,255,255,.03)', border:'1px solid var(--border)', borderRadius:10, padding:'10px 14px' }}>
+            <div style={{ fontSize:10, color:'var(--muted)', fontWeight:600, marginBottom:4 }}>LAST LOGIN</div>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>
+              {user?.last_login_at
+                ? new Date(user.last_login_at).toLocaleDateString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
+                : '—'}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Active Sessions */}
+    <div onClick={() => setShowSessions(prev => !prev)}
+      style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid var(--border)', cursor:'pointer', transition:'background .15s' }}
+      onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.03)'}
+      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+      <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+        <div style={{ width:36, height:36, borderRadius:10, background:'rgba(34,197,94,.1)', border:'1px solid rgba(34,197,94,.2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          <svg width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>Active Sessions</div>
+          <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>Manage your active sessions</div>
+        </div>
+      </div>
+      <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ transform: showSessions ? 'rotate(90deg)' : 'none', transition:'transform .2s' }}><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    {showSessions && (
+      <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', background:'rgba(255,255,255,.02)' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+          <div style={{ fontSize:12, color:'var(--muted)' }}>
+            <span style={{ color:'#22c55e', fontWeight:700, fontSize:18 }}>{sessionCount}</span> active session{sessionCount > 1 ? 's' : ''}
+          </div>
+          <button onClick={revokeAllSessions} disabled={loading}
+            style={{ fontSize:12, fontWeight:600, color:'#ef4444', background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)', borderRadius:8, padding:'6px 14px', cursor:'pointer' }}>
+            Revoke All
+          </button>
+        </div>
+        <div style={{ fontSize:11, color:'var(--muted)' }}>Revoking all sessions will log you out from all devices.</div>
+      </div>
+    )}
+
+    {/* Danger Zone */}
+    <div onClick={() => setShowDanger(prev => !prev)}
+      style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', cursor:'pointer', transition:'background .15s' }}
+      onMouseEnter={e => e.currentTarget.style.background='rgba(239,68,68,.03)'}
+      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+      <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+        <div style={{ width:36, height:36, borderRadius:10, background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          <svg width="16" height="16" fill="none" stroke="#ef4444" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div>
+          <div style={{ fontSize:13, fontWeight:600, color:'#ef4444' }}>Danger Zone</div>
+          <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>Deactivate your account</div>
+        </div>
+      </div>
+      <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ transform: showDanger ? 'rotate(90deg)' : 'none', transition:'transform .2s' }}><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    {showDanger && (
+      <div style={{ padding:'16px 20px', background:'rgba(239,68,68,.03)' }}>
+        <div style={{ fontSize:12, color:'var(--muted)', marginBottom:12, lineHeight:1.6 }}>
+          Deactivating your account will <strong style={{ color:'#ef4444' }}>permanently delete</strong> all your data, projects and generations. This action cannot be undone.
+        </div>
+        <button onClick={deactivateAccount} disabled={loading}
+          style={{ width:'100%', padding:'11px', borderRadius:10, background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', color:'#ef4444', fontWeight:700, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+          Deactivate Account
+        </button>
+      </div>
+    )}
+
+  </div>
+</div>
+
+  {/* Card 3 : Recent Activity — à DROITE de Security */}
+  <div className="ac2-card">
+    <div className="ac2-card-head" style={{ justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+       <div className="ac2-card-head-icon" style={{ background:'rgba(139,92,246,.12)', border:'1px solid rgba(139,92,246,.25)' }}>
+<svg width="16" height="16" fill="none" stroke="#10b981" strokeWidth="1.8" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <div>
+          <div className="ac2-card-title">Recent Activity</div>
+          <div className="ac2-card-sub">Your latest actions</div>
+        </div>
+      </div>
+      
+    </div>
+    <div className="ac2-card-body" style={{ padding:0 }}>
+      {recentActivity.length === 0 ? (
+        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>
+          No activity yet
+        </div>
+      ) : recentActivity.map((item, i, arr) => (
+        <div key={i} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px', borderBottom: i < arr.length-1 ? '1px solid var(--border)' : 'none', transition:'background .15s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.02)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+          <div style={{ width:8, height:8, borderRadius:'50%', background: item.border, border:`2px solid ${item.color}`, flexShrink:0, boxShadow: `0 0 6px ${item.border}` }}/>
+          <div style={{ width:34, height:34, borderRadius:9, flexShrink:0, background:item.color, border:`1px solid ${item.border}`, display:'flex', alignItems:'center', justifyContent:'center' }}>{item.icon}</div>
+          <div>
+            <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{item.label}</div>
+            <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>{item.time}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+
+</div>
+
+
+{/* ── Quick Actions ── */}
+<div style={{ marginTop: 16, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', boxShadow: 'var(--shadow)' }}>
+  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+    <svg width="18" height="18" fill="none" stroke="#c9a227" strokeWidth="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Quick Actions</span>
+  </div>
+  <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16, marginLeft: 28 }}>Shortcuts to common tasks</p>
+  <div style={{ display: 'flex', gap: 12 }}>
+     {[
+      { label: 'Create Project', sub: 'Start a new test project', color: '#818cf8', bg: 'rgba(99,102,241,.08)', border: 'rgba(99,102,241,.2)',
+        action: () => { setProjectStep('create'); setPage('generate'); },
+        icon: <svg width="22" height="22" fill="none" stroke="#818cf8" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg> },
+      { label: 'Run Tests', sub: 'Execute your tests', color: '#22c55e', bg: 'rgba(34,197,94,.08)', border: 'rgba(34,197,94,.2)',
+        action: () => { setProjectStep('list'); setPage('generate'); },
+        icon: <svg width="22" height="22" fill="none" stroke="#22c55e" strokeWidth="1.8" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> },
+      { label: 'View Reports', sub: 'Explore test reports', color: '#c9a227', bg: 'rgba(201,162,39,.08)', border: 'rgba(201,162,39,.2)',
+        action: () => setPage('reports'),
+        icon: <svg width="22" height="22" fill="none" stroke="#c9a227" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
+      { label: 'Settings', sub: 'Manage preferences', color: '#94a3b8', bg: 'rgba(148,163,184,.08)', border: 'rgba(148,163,184,.2)',
+        action: () => setPage('settings'),
+        icon: <svg width="22" height="22" fill="none" stroke="#94a3b8" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
+    ].map((item, i) => (
+      <div key={i} onClick={item.action}
+        style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', borderRadius: 12, background: item.bg, border: `1px solid ${item.border}`, cursor: 'pointer', transition: 'all .2s' }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,.2)'; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
+        {item.icon}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{item.label}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{item.sub}</div>
+        </div>
+        <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    ))}
+  </div>
+</div>
+</div>
+
+
   );
+
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SettingsPanel
-// ─────────────────────────────────────────────────────────────────────────────
 
+// Settings Page 
+// Settings Page — redesigned to match the Nextest UI photo
 function SettingsPanel({ theme, setTheme }) {
-  const { t, setLanguage: applyLang } = useLang();
+  const { t, setLanguage: applyLanguage } = useLang();
   const { logout } = useAuth();
-  const [notifs,    setNotifs]    = useState(true);
-  const [weekly,    setWeekly]    = useState(false);
-  const [framework, setFramework] = useState('Selenium');
-  const [language,  setLanguage]  = useState('en');
-  const [msg,       setMsg]       = useState('');
-  const [loading,   setLoading]   = useState(false);
 
-  // Danger Zone states
-  const [showDeleteHistory, setShowDeleteHistory] = useState(false);
-  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
-  const [confirmText,       setConfirmText]       = useState('');
-  const [dangerLoading,     setDangerLoading]     = useState(false);
-  const [dangerMsg,         setDangerMsg]         = useState('');
+  // ── states ──────────────────────────────────────────────────────────────────
+  const [notifs,       setNotifs]       = useState(true);
+  const [testAlerts,   setTestAlerts]   = useState(true);
+  const [weekly,       setWeekly]       = useState(true);
+  const [productUpd,   setProductUpd]   = useState(false);
+  const [compact,      setCompact]      = useState(false);
+  const [sidebarPos,   setSidebarPos]   = useState('Left');
+  const [framework,    setFramework]    = useState('Playwright');
+  const [testType,     setTestType]     = useState('E2E');
+  const [aiModel,      setAiModel]      = useState('GPT-4o');
+  const [testDir,      setTestDir]      = useState('tests/');
+  const [language,     setLanguage]     = useState('en');
+  const [timezone,     setTimezone]     = useState('(UTC+01:00) Europe/Paris');
+  const [dateFormat,   setDateFormat]   = useState('MM/DD/YYYY');
+  const [timeFormat,   setTimeFormat]   = useState('24-hour');
+  const [autoSave,     setAutoSave]     = useState(true);
+  const [confirmRun,   setConfirmRun]   = useState(true);
+  const [deleteConf,   setDeleteConf]   = useState(true);
+  const [beta,         setBeta]         = useState(false);
+  const [slackConn,    setSlackConn]    = useState(false);
+  const [jiraConn,     setJiraConn]     = useState(false);
+  const [githubConn,   setGithubConn]   = useState(false);
+  const [msg,          setMsg]          = useState('');
+  const [loading,      setLoading]      = useState(false);
 
   useEffect(() => {
     api.get('/settings').then(res => {
-      setNotifs(res.data.email_notifications);
-      setWeekly(res.data.weekly_report);
-      setFramework(res.data.default_framework);
-      if (!theme || theme === 'light') setTheme(res.data.theme || 'light');
-      setLanguage(res.data.language || 'en');
+      setNotifs(res.data.email_notifications ?? true);
+      setTestAlerts(res.data.test_alerts ?? true);
+      setWeekly(res.data.weekly_report ?? true);
+      setProductUpd(res.data.product_updates ?? false);
+      setCompact(res.data.compact_mode ?? false);
+      setSidebarPos(res.data.sidebar_position ?? 'Left');
+      setFramework(res.data.default_framework ?? 'Playwright');
+      setTestType(res.data.default_test_type ?? 'E2E');
+      setAiModel(res.data.default_ai_model ?? 'GPT-4o');
+      setTestDir(res.data.default_test_dir ?? 'tests/');
+      setLanguage(res.data.language ?? 'en');
+      setTimezone(res.data.timezone ?? '(UTC+01:00) Europe/Paris');
+      setDateFormat(res.data.date_format ?? 'MM/DD/YYYY');
+      setTimeFormat(res.data.time_format ?? '24-hour');
+      setAutoSave(res.data.auto_save ?? true);
+      setConfirmRun(res.data.confirm_before_run ?? true);
+      setDeleteConf(res.data.delete_confirmation ?? true);
+      setBeta(res.data.beta_features ?? false);
+      if (!theme || theme === 'light') setTheme(res.data.theme ?? 'light');
     });
   }, []);
 
@@ -9336,427 +10405,394 @@ function SettingsPanel({ theme, setTheme }) {
     try {
       await api.put('/settings/update', {
         email_notifications: notifs,
+        test_alerts: testAlerts,
         weekly_report: weekly,
+        product_updates: productUpd,
+        compact_mode: compact,
+        sidebar_position: sidebarPos,
         default_framework: framework,
+        default_test_type: testType,
+        default_ai_model: aiModel,
+        default_test_dir: testDir,
         theme,
-        language
+        language,
+        timezone,
+        date_format: dateFormat,
+        time_format: timeFormat,
+        auto_save: autoSave,
+        confirm_before_run: confirmRun,
+        delete_confirmation: deleteConf,
+        beta_features: beta,
       });
-      applyLang(language);
+      applyLanguage(language);
       setMsg(t('settingsSaved'));
       setTimeout(() => setMsg(''), 3000);
     } catch (err) { console.error(err); }
     setLoading(false);
   };
 
-const handleDeleteHistory = async () => {
-  if (confirmText !== 'CONFIRM') return;
-  setDangerLoading(true);
-  try {
-    await api.delete('/generations/all');
-    setDangerLoading(false);
-    setShowDeleteHistory(false);
-    setConfirmText('');
-    setDangerMsg('✓ All history deleted successfully.');
-    document.querySelector('.dash-root .content')?.scrollTo({ top: 0, behavior: 'smooth' }); // ← ICI
-    setTimeout(() => setDangerMsg(''), 8000);
-  } catch (err) {
-    setDangerLoading(false);
-    setShowDeleteHistory(false);
-    setDangerMsg('✗ Error deleting history. Please try again.');
-    document.querySelector('.dash-root .content')?.scrollTo({ top: 0, behavior: 'smooth' }); // ← ET ICI
-  }
-};
+  // ── small helpers ────────────────────────────────────────────────────────────
+  const Toggle = ({ on, onToggle }) => (
+    <div
+      onClick={onToggle}
+      style={{
+        width: 44, height: 24, borderRadius: 12,
+        background: on ? '#6366f1' : 'rgba(255,255,255,0.1)',
+        position: 'relative', cursor: 'pointer',
+        transition: 'background .2s', flexShrink: 0,
+        border: on ? '1px solid #818cf8' : '1px solid rgba(255,255,255,0.08)',
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: 3,
+        left: on ? 23 : 3,
+        width: 16, height: 16, borderRadius: '50%',
+        background: '#fff',
+        transition: 'left .2s',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+      }} />
+    </div>
+  );
 
- const handleDeleteAccount = async () => {
-  if (confirmText !== 'CONFIRM') return;
-  setDangerLoading(true);
-  try {
-    await api.delete('/profile/delete');
-    logout();
-  } catch (err) {
-    setDangerLoading(false);
-    setShowDeleteAccount(false);
-    setDangerMsg('✗ Error deleting account. Please try again.');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-};
+  const SetSelect = ({ value, onChange, options }) => (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      style={{
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 8, color: '#94a3b8',
+        fontSize: 12, fontWeight: 600,
+        padding: '7px 28px 7px 10px',
+        fontFamily: 'inherit', cursor: 'pointer',
+        outline: 'none', appearance: 'none',
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'right 8px center',
+      }}
+    >
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
 
-  const LANGS = [
-    { code: 'en', label: 'English',  flag: '🇬🇧' },
-    { code: 'fr', label: 'Français', flag: '🇫🇷' },
-    { code: 'ar', label: 'العربية', flag: '🇹🇳' },
-  ];
-
-  return (
-    <div className="panel">
-      <div className="p-header">
-        <div>
-          <h1 className="p-title">{t('appSettings')} <span className="g">{t('settings')}</span></h1>
-          <p className="p-sub">{t('customize')}</p>
+  // Section card with colored icon header
+  const SectionCard = ({ icon, iconBg, iconColor, title, subtitle, children }) => (
+    <div style={{
+      background: 'rgba(255,255,255,0.02)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      borderRadius: 16, overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '16px 20px',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+      }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: 9,
+          background: iconBg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          <span style={{ color: iconColor, fontSize: 16 }}>{icon}</span>
         </div>
-        <button className="btn-primary" onClick={saveSettings} disabled={loading}>
-          {loading ? <><span className="spinner"/>{t('saving')}</> : <>{t('saveSettings')}</>}
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>{title}</div>
+          <div style={{ fontSize: 11, color: '#475569', marginTop: 1 }}>{subtitle}</div>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+
+  // Row inside a section
+  const SetRow = ({ label, desc, children, noBorder }) => (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '13px 20px', gap: 12,
+      borderTop: noBorder ? 'none' : '1px solid rgba(255,255,255,0.04)',
+    }}>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#cbd5e1' }}>{label}</div>
+        {desc && <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>{desc}</div>}
+      </div>
+      {children}
+    </div>
+  );
+
+  // ── render ───────────────────────────────────────────────────────────────────
+  return (
+    <div className="panel" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+
+      {/* Page header */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-start',
+        justifyContent: 'space-between', marginBottom: 28,
+      }}>
+        <div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#e2e8f0', margin: 0 }}>
+            Settings
+          </h1>
+          <p style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>
+            Manage your preferences and customize your experience
+          </p>
+        </div>
+        <button
+          onClick={saveSettings}
+          disabled={loading}
+          style={{
+            padding: '10px 20px', borderRadius: 10,
+            background: '#6366f1', border: 'none',
+            color: '#fff', fontSize: 13, fontWeight: 700,
+            cursor: 'pointer', display: 'flex', alignItems: 'center',
+            gap: 8, fontFamily: 'inherit',
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading
+            ? <><span className="spinner" /> Saving…</>
+            : <>
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                  <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                </svg>
+                Save Settings
+              </>}
         </button>
       </div>
 
-      {msg && <div className="success-msg">✓ {msg}</div>}
-      {dangerMsg && (
-  <div className={dangerMsg.startsWith('✓') ? 'success-msg' : 'error-msg'} style={{ marginBottom: 16 }}>
-    {dangerMsg}
-  </div>
-)}
-
-      {/* Existing sections */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-        <div className="set-group">
-          <div className="set-group-title">{t('notifications')}</div>
-          <div className="set-row">
-            <div>
-              <div className="set-name">{t('emailNotif')}</div>
-              <div className="set-desc">{t('emailNotifDesc')}</div>
-            </div>
-            <div className={`toggle${notifs ? ' on' : ''}`} onClick={() => setNotifs(p => !p)}>
-              <span className="toggle-knob"/>
-            </div>
-          </div>
-          <div className="set-row">
-            <div>
-              <div className="set-name">{t('weeklyReport')}</div>
-              <div className="set-desc">{t('weeklyReportDesc')}</div>
-            </div>
-            <div className={`toggle${weekly ? ' on' : ''}`} onClick={() => setWeekly(p => !p)}>
-              <span className="toggle-knob"/>
-            </div>
-          </div>
-        </div>
-        <div className="set-group">
-          <div className="set-group-title">{t('exportDefaults')}</div>
-          <div className="set-row">
-            <div>
-              <div className="set-name">{t('defaultFramework')}</div>
-              <div className="set-desc">{t('defaultFrameworkDesc')}</div>
-            </div>
-            <select className="set-select" value={framework} onChange={e => setFramework(e.target.value)}>
-              <option>Selenium</option>
-              <option>Cypress</option>
-              <option>Playwright</option>
-              <option>Both</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
-        <div className="set-group">
-          <div className="set-group-title">{t('appearance')}</div>
-          <div style={{ padding: '16px 20px' }}>
-            <div className="set-name" style={{ marginBottom: 4 }}>{t('theme')}</div>
-            <div className="set-desc" style={{ marginBottom: 14 }}>{t('themeDesc')}</div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              {[{ key: 'light', emoji: '☀️', label: 'Light' }, { key: 'dark', emoji: '🌙', label: 'Dark' }, { key: 'system', emoji: '💻', label: 'System' }].map(th => (
-                <div key={th.key} onClick={() => { setTheme(th.key); api.put('/settings/update', { theme: th.key }); }}
-                  style={{ flex: 1, padding: '14px 12px', borderRadius: 12, cursor: 'pointer', border: theme === th.key ? '2px solid var(--gold)' : '1.5px solid var(--border)', background: theme === th.key ? 'var(--goldbg)' : 'var(--bg)', transition: 'all .2s', textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, marginBottom: 6 }}>{th.emoji}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: theme === th.key ? 'var(--gold)' : 'var(--muted)' }}>{th.label}</div>
-                  {theme === th.key && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)', margin: '6px auto 0' }}/>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="set-group">
-          <div className="set-group-title">{t('language')}</div>
-          <div style={{ padding: '16px 20px' }}>
-            <div className="set-name" style={{ marginBottom: 4 }}>{t('interfaceLang')}</div>
-            <div className="set-desc" style={{ marginBottom: 14 }}>{t('langDesc')}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {LANGS.map(l => (
-                <div key={l.code} onClick={() => setLanguage(l.code)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, cursor: 'pointer', border: language === l.code ? '2px solid var(--gold)' : '1.5px solid var(--border)', background: language === l.code ? 'var(--goldbg)' : 'var(--bg)', transition: 'all .2s' }}>
-                  <span style={{ fontSize: 20 }}>{l.flag}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: language === l.code ? 'var(--gold)' : 'var(--muted)', flex: 1 }}>{l.label}</span>
-                  {language === l.code && <svg width="16" height="16" fill="none" stroke="var(--gold)" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ══ DANGER ZONE ══ */}
-      <div style={{
-        border: '1.5px solid rgba(239,68,68,0.2)',
-        borderRadius: 16,
-        overflow: 'hidden',
-        boxShadow: '0 4px 24px rgba(239,68,68,0.08)'
-      }}>
-        {/* Header */}
+      {msg && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '16px 24px',
-          background: 'rgba(239,68,68,0.06)',
-          borderBottom: '1px solid rgba(239,68,68,0.15)'
+          background: 'rgba(16,185,129,0.08)', color: '#10b981',
+          border: '1px solid rgba(16,185,129,0.2)', borderRadius: 10,
+          padding: '12px 16px', fontSize: 13, fontWeight: 600, marginBottom: 20,
         }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'rgba(239,68,68,0.1)',
-            border: '1px solid rgba(239,68,68,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <svg width="18" height="18" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-              <line x1="12" y1="9" x2="12" y2="13"/>
-              <line x1="12" y1="17" x2="12.01" y2="17"/>
+          ✓ {msg}
+        </div>
+      )}
+
+      {/* ── ROW 1 — Appearance + Notifications ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+
+        {/* Appearance */}
+        <SectionCard
+          icon={
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9" strokeDasharray="2 4" strokeLinecap="round"/>
             </svg>
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#ef4444' }}>Danger Zone</div>
-            <div style={{ fontSize: 11, color: 'rgba(239,68,68,0.6)', marginTop: 1 }}>
-              These actions are irreversible. Please be careful.
-            </div>
-          </div>
-        </div>
+          }
+          iconBg="rgba(99,102,241,0.15)"
+          iconColor="#818cf8"
+          title="Appearance"
+          subtitle="Customize how Nextest looks for you."
+        >
+          <SetRow noBorder label="Theme" desc="Choose your preferred theme">
+            <SetSelect
+              value={theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'System'}
+              onChange={v => {
+                const k = v === 'Dark' ? 'dark' : v === 'Light' ? 'light' : 'system';
+                setTheme(k);
+                api.put('/settings/update', { theme: k });
+              }}
+              options={['Light', 'Dark', 'System']}
+            />
+          </SetRow>
+          <SetRow label="Compact Mode" desc="Display more content in less space">
+            <Toggle on={compact} onToggle={() => setCompact(p => !p)} />
+          </SetRow>
+          <SetRow label="Sidebar Position" desc="Choose sidebar position">
+            <SetSelect value={sidebarPos} onChange={setSidebarPos} options={['Left', 'Right']} />
+          </SetRow>
+        </SectionCard>
 
-        
-
-        {/* Delete Account Row */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 24px',
-          gap: 20, flexWrap: 'wrap'
-        }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-              Delete My Account
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
-              Permanently delete your account, all projects, and data.<br/>
-              <strong style={{ color: 'rgba(239,68,68,0.7)' }}>This action cannot be undone.</strong>
-            </div>
-          </div>
-          <button
-            onClick={() => { setShowDeleteAccount(true); setShowDeleteHistory(false); setConfirmText(''); }}
-            style={{
-              padding: '10px 20px', borderRadius: 10,
-              background: 'rgba(239,68,68,0.08)',
-              border: '1.5px solid rgba(239,68,68,0.3)',
-              color: '#ef4444', fontSize: 12, fontWeight: 700,
-              cursor: 'pointer', fontFamily: 'inherit',
-              transition: 'all .2s', flexShrink: 0,
-              letterSpacing: '.5px', textTransform: 'uppercase'
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; e.currentTarget.style.borderColor = '#ef4444'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; }}
-          >
-            Delete Account
-          </button>
-        </div>
-      </div>
-
-      {showDeleteAccount && createPortal(
-  <div
-    onClick={() => { setShowDeleteHistory(false); setShowDeleteAccount(false); setConfirmText(''); }}
-    style={{
-      position: 'fixed', inset: 0, zIndex: 99999,
-      background: 'rgba(0,0,0,0.6)',
-      backdropFilter: 'blur(6px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}
-  >
-    <div
-      onClick={e => e.stopPropagation()}
-      className="danger-modal-inner"
-      style={{
-        width: 500,
-        borderRadius: 18,
-        overflow: 'hidden',
-        boxShadow: '0 24px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(239,68,68,.12)',
-        animation: 'dFadeUp .2s ease both',
-        fontFamily: "'DM Sans', sans-serif",
-      }}
-    >
-      {/* Top accent line */}
-      <div style={{ height: 3, background: 'linear-gradient(90deg, transparent, #ef4444, transparent)' }} />
-
-      {/* Header */}
-      <div style={{
-  padding: '24px 28px 18px',
-  background: theme === 'light' ? '#ffffff' : '#0d1526',
-  borderBottom: `1px solid ${theme === 'light' ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.05)'}`,
-  display: 'flex', alignItems: 'center', gap: 14,
-}}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-          background: 'rgba(239,68,68,.1)',
-          border: '1px solid rgba(239,68,68,.2)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {showDeleteHistory ? (
-            <svg width="20" height="20" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-1 14H6L5 6"/>
-              <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+        {/* Notifications */}
+        <SectionCard
+          icon={
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
             </svg>
-          ) : (
-            <svg width="20" height="20" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="12" cy="8" r="4"/>
-              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+          }
+          iconBg="rgba(234,179,8,0.12)"
+          iconColor="#eab308"
+          title="Notifications"
+          subtitle="Manage how you receive notifications."
+        >
+          <SetRow noBorder label="Email Notifications" desc="Receive updates via email">
+            <Toggle on={notifs} onToggle={() => setNotifs(p => !p)} />
+          </SetRow>
+          <SetRow label="Test Alerts" desc="Get notified about test failures and issues">
+            <Toggle on={testAlerts} onToggle={() => setTestAlerts(p => !p)} />
+          </SetRow>
+          <SetRow label="Weekly Report" desc="Receive a summary of your tests">
+            <Toggle on={weekly} onToggle={() => setWeekly(p => !p)} />
+          </SetRow>
+          <SetRow label="Product Updates" desc="Receive updates about new features">
+            <Toggle on={productUpd} onToggle={() => setProductUpd(p => !p)} />
+          </SetRow>
+        </SectionCard>
+      </div>
+
+      {/* ── ROW 2 — Language & Region + Test Defaults ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+
+        {/* Language & Region */}
+        <SectionCard
+          icon={
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="2" y1="12" x2="22" y2="12"/>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
             </svg>
-          )}
-        </div>
-        <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: theme === 'light' ? '#0f1729' : '#e2e8f0', marginBottom: 3 }}>
-  {showDeleteHistory ? 'Delete all history?' : 'Delete your account?'}
-</div>
-<div style={{ fontSize: 12, color: theme === 'light' ? '#64748b' : '#475569', fontWeight: 500 }}>
-  This action is permanent and cannot be reversed
-</div>
-        </div>
-        <button
-          onClick={() => { setShowDeleteHistory(false); setShowDeleteAccount(false); setConfirmText(''); }}
-          style={{
-            width: 30, height: 30, borderRadius: 8,
-            background: 'rgba(255,255,255,.04)',
-            border: '1px solid rgba(255,255,255,.06)',
-            color: theme === 'light' ? '#94a3b8' : '#475569', cursor: 'pointer',
+          }
+          iconBg="rgba(59,130,246,0.12)"
+          iconColor="#60a5fa"
+          title="Language & Region"
+          subtitle="Set your language and regional preferences."
+        >
+          <SetRow noBorder label="Language" desc="Choose your preferred language">
+            <SetSelect
+              value={language === 'fr' ? 'Français' : language === 'ar' ? 'العربية' : 'English'}
+              onChange={v => setLanguage(v === 'Français' ? 'fr' : v === 'العربية' ? 'ar' : 'en')}
+              options={['English', 'Français', 'العربية']}
+            />
+          </SetRow>
+          <SetRow label="Timezone" desc="Set your timezone">
+            <SetSelect
+              value={timezone}
+              onChange={setTimezone}
+              options={['(UTC+01:00) Europe/Paris', '(UTC+00:00) UTC', '(UTC-05:00) New York']}
+            />
+          </SetRow>
+          <SetRow label="Date Format" desc="Choose date format">
+            <SetSelect value={dateFormat} onChange={setDateFormat} options={['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']} />
+          </SetRow>
+          <SetRow label="Time Format" desc="Choose time format">
+            <SetSelect value={timeFormat} onChange={setTimeFormat} options={['24-hour', '12-hour']} />
+          </SetRow>
+        </SectionCard>
 
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 17, lineHeight: 1, transition: 'all .15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#e2e8f0'; e.currentTarget.style.background = 'rgba(255,255,255,.08)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'rgba(255,255,255,.04)'; }}
-        >×</button>
+        {/* Test Defaults */}
+        <SectionCard
+          icon={
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          }
+          iconBg="rgba(34,197,94,0.12)"
+          iconColor="#4ade80"
+          title="Test Defaults"
+          subtitle="Configure default settings for tests."
+        >
+          <SetRow noBorder label="Default Framework" desc="Pre-selected for new test generations">
+            <SetSelect value={framework} onChange={setFramework} options={['Playwright', 'Selenium', 'Cypress', 'Both']} />
+          </SetRow>
+          <SetRow label="Default Test Type" desc="Type de test par défaut">
+            <SetSelect value={testType} onChange={setTestType} options={['E2E', 'Unit', 'Integration']} />
+          </SetRow>
+          <SetRow label="Default AI Model" desc="Modèle IA par défaut pour la génération">
+            <SetSelect value={aiModel} onChange={setAiModel} options={['GPT-4o', 'Claude 3.5', 'Gemini']} />
+          </SetRow>
+          <SetRow label="Default Test Directory" desc="Dossier par défaut pour les tests">
+            <input
+              value={testDir}
+              onChange={e => setTestDir(e.target.value)}
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8, color: '#94a3b8',
+                fontSize: 12, fontWeight: 600,
+                padding: '7px 10px', fontFamily: 'monospace',
+                outline: 'none', width: 80,
+              }}
+            />
+          </SetRow>
+        </SectionCard>
       </div>
 
-      {/* Body */}
-      <div style={{ padding: '24px 28px', background: theme === 'light' ? '#f4f6fb' : '#080f1e' }}>
+      {/* ── ROW 3 — Integrations + General ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
+        {/* Integrations */}
+        <SectionCard
+          icon={
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          }
+          iconBg="rgba(16,185,129,0.12)"
+          iconColor="#34d399"
+          title="Integrations"
+          subtitle="Manage your connected tools."
+        >
+          {[
+            { key: 'slack',  state: slackConn,  set: setSlackConn,  label: 'Slack Notifications', desc: 'Send alerts to Slack channels' },
+            { key: 'jira',   state: jiraConn,   set: setJiraConn,   label: 'Jira Integration',    desc: 'Sync test results to Jira' },
+            { key: 'github', state: githubConn, set: setGithubConn, label: 'GitHub Integration',  desc: 'Sync with your repositories' },
+          ].map(({ key, state, set, label, desc }, i) => (
+            <SetRow key={key} noBorder={i === 0} label={label} desc={desc}>
+              <button
+                onClick={() => set(p => !p)}
+                style={{
+                  padding: '6px 14px', borderRadius: 8,
+                  background: state ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${state ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  color: state ? '#818cf8' : '#64748b',
+                  fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', gap: 6, transition: 'all .2s',
+                }}
+              >
+                {state ? (
+                  <>
+                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                    Connected
+                  </>
+                ) : (
+                  <>
+                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                    </svg>
+                    Connect
+                  </>
+                )}
+              </button>
+            </SetRow>
+          ))}
+        </SectionCard>
 
-        {/* Description */}
-        <p style={{ fontSize: 13.5, color: theme === 'light' ? '#475569' : '#64748b', lineHeight: 1.75, marginBottom: 18 }}>
-
-          {showDeleteHistory
-            ? 'This will permanently delete all your test generations, execution results, and scripts. Your account will remain active.'
-            : 'This will permanently delete your account, all projects, generations, and associated data. You will be logged out immediately.'}
-        </p>
-
-        {/* Warning */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '12px 16px', borderRadius: 10, marginBottom: 22,
-          background: 'rgba(239,68,68,.06)',
-          border: '1px solid rgba(239,68,68,.15)',
-        }}>
-          <svg width="14" height="14" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-          <span style={{ fontSize: 12.5, color: '#ef4444', fontWeight: 600 }}>
-            {showDeleteHistory
-              ? 'All generations and their results will be permanently removed.'
-              : 'Your account and all associated data will be permanently removed.'}
-          </span>
-        </div>
-
-        {/* Input */}
-        <div style={{ marginBottom: 22 }}>
-          <div style={{ fontSize: 12, color: '#475569', marginBottom: 9, fontWeight: 500 }}>
-            Type{' '}
-            <code style={{
-              color: '#ef4444', background: 'rgba(239,68,68,.1)',
-              padding: '1px 7px', borderRadius: 5,
-              fontFamily: 'monospace', fontSize: 12, fontWeight: 700,
-            }}>CONFIRM</code>
-            {' '}to proceed
-          </div>
-          <input
-            autoFocus
-            value={confirmText}
-            onChange={e => setConfirmText(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && confirmText === 'CONFIRM') {
-                showDeleteHistory ? handleDeleteHistory() : handleDeleteAccount();
-              }
-              if (e.key === 'Escape') {
-                setShowDeleteHistory(false); setShowDeleteAccount(false); setConfirmText('');
-              }
-            }}
-            placeholder="CONFIRM"
-            style={{
-              width: '100%', padding: '12px 16px', borderRadius: 10,
-              background: theme === 'light' ? '#ffffff' : 'rgba(255,255,255,.03)',
-
-              border: `1.5px solid ${confirmText === 'CONFIRM' ? '#10b981' : 'rgba(239,68,68,.15)'}`,
-              color: confirmText === 'CONFIRM' ? '#10b981' : (theme === 'light' ? '#0f1729' : '#e2e8f0'),
-
-              fontSize: 14, fontFamily: 'monospace', fontWeight: 700,
-              outline: 'none', transition: 'border-color .2s, color .2s',
-              boxShadow: confirmText === 'CONFIRM' ? '0 0 0 3px rgba(16,185,129,.08)' : 'none',
-            }}
-          />
-        </div>
-
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => { setShowDeleteHistory(false); setShowDeleteAccount(false); setConfirmText(''); }}
-            style={{
-  flex: 1, padding: '12px', borderRadius: 10,
-  background: theme === 'light' ? 'rgba(0,0,0,.04)' : 'rgba(255,255,255,.04)',
-  border: `1px solid ${theme === 'light' ? 'rgba(0,0,0,.1)' : 'rgba(255,255,255,.07)'}`,
-  color: '#64748b', fontSize: 13, fontWeight: 700,
-  cursor: 'pointer', fontFamily: 'inherit', transition: 'all .18s',
-}}
-            onMouseEnter={e => { e.currentTarget.style.color = '#e2e8f0'; e.currentTarget.style.background = 'rgba(255,255,255,.07)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.background = 'rgba(255,255,255,.04)'; }}
-          >Cancel</button>
-
-          <button
-            onClick={showDeleteHistory ? handleDeleteHistory : handleDeleteAccount}
-            disabled={confirmText !== 'CONFIRM' || dangerLoading}
-            style={{
-              flex: 2, padding: '12px', borderRadius: 10,
-              background: confirmText === 'CONFIRM'
-                ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
-                : 'rgba(239,68,68,.06)',
-              border: `1px solid ${confirmText === 'CONFIRM' ? 'rgba(220,38,38,.6)' : 'rgba(239,68,68,.12)'}`,
-              color: confirmText === 'CONFIRM' ? '#fff' : 'rgba(239,68,68,.25)',
-              fontSize: 13, fontWeight: 800,
-              cursor: confirmText === 'CONFIRM' ? 'pointer' : 'not-allowed',
-              fontFamily: 'inherit', transition: 'all .22s',
-              letterSpacing: '.8px', textTransform: 'uppercase',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              boxShadow: confirmText === 'CONFIRM' ? '0 4px 16px rgba(220,38,38,.35)' : 'none',
-            }}
-            onMouseEnter={e => {
-              if (confirmText === 'CONFIRM') {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(220,38,38,.5)';
-              }
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = confirmText === 'CONFIRM' ? '0 4px 16px rgba(220,38,38,.35)' : 'none';
-            }}
-          >
-            
-{dangerLoading ? (
-  <><span className="spinner" /> Deleting…</>
-) : confirmText === 'CONFIRM' && !dangerLoading ? (
-  <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg> Delete History</>
-            ) : showDeleteHistory ? (
-              <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg> Delete History</>
-            ) : (
-              <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Delete Account</>
-            )}
-          </button>
-        </div>
+        {/* General */}
+        <SectionCard
+          icon={
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+            </svg>
+          }
+          iconBg="rgba(148,163,184,0.1)"
+          iconColor="#94a3b8"
+          title="General"
+          subtitle="Other general preferences."
+        >
+          <SetRow noBorder label="Auto Save" desc="Automatically save your changes">
+            <Toggle on={autoSave} onToggle={() => setAutoSave(p => !p)} />
+          </SetRow>
+          <SetRow label="Confirm Before Run" desc="Ask for confirmation before running tests">
+            <Toggle on={confirmRun} onToggle={() => setConfirmRun(p => !p)} />
+          </SetRow>
+          <SetRow label="Delete Confirmation" desc="Show confirmation dialog for important actions">
+            <Toggle on={deleteConf} onToggle={() => setDeleteConf(p => !p)} />
+          </SetRow>
+          <SetRow label="Beta Features" desc="Enable access to beta features">
+            <Toggle on={beta} onToggle={() => setBeta(p => !p)} />
+          </SetRow>
+        </SectionCard>
       </div>
-    </div>
-  </div>,
-  document.body
-)}
+
     </div>
   );
 }
@@ -9988,6 +11024,8 @@ function ReportsPanel({ goTo, setGeneration }) {
   const [expandedId, setExpandedId] = useState(null);
   const [pdfLoadingId, setPdfLoadingId] = useState(null);
   const [dateFilter, setDateFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);  // ← ICI
+  const ITEMS_PER_PAGE = 5;    
 
   useEffect(() => {
     try {
@@ -9995,6 +11033,10 @@ function ReportsPanel({ goTo, setGeneration }) {
       setReports(JSON.parse(raw));
     } catch { setReports([]); }
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterType, dateFilter]);
 
   const TYPE_CONFIG = {
     smoke:       { label: 'Smoke',       color: '#64748b', icon: '🔍' },
@@ -10090,6 +11132,12 @@ function ReportsPanel({ goTo, setGeneration }) {
     })
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+const paginated = filtered.slice(
+  (currentPage - 1) * ITEMS_PER_PAGE,
+  currentPage * ITEMS_PER_PAGE
+);
+
 // ── Dynamic KPI calculations ──────────────────────────────────────
   const kpiNow = Date.now();
   const KPI_WEEK = 7 * 86400000;
@@ -10133,7 +11181,7 @@ function ReportsPanel({ goTo, setGeneration }) {
   // ── Group by date ──
   const groups = { Today: [], Yesterday: [], 'This Week': [], Earlier: [] };
   const now = new Date();
-  filtered.forEach(r => {
+  paginated.forEach(r => {
     const d = new Date(r.date);
     const diffDays = Math.floor((now - d) / 86400000);
     if (diffDays === 0) groups['Today'].push(r);
@@ -10750,7 +11798,8 @@ function ReportsPanel({ goTo, setGeneration }) {
       {/* Right — Action buttons vertical */}
       <div style={{ display:'flex', flexDirection:'column', gap:8, minWidth:140 }}>
         {report.generationData && (
-          <button onClick={() => { setGeneration(report.generationData); goTo('execution'); }}
+          <button onClick={() => { setGeneration({ ...report.generationData, fresh: false }); goTo('execution'); }}
+
             style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 16px', borderRadius:9, background:'linear-gradient(135deg,var(--indigo),#4f46e5)', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 4px 14px rgba(99,102,241,.3)', whiteSpace:'nowrap' }}>
             <IconEye size={13} stroke={2}/> View Full Results
           </button>
@@ -10792,15 +11841,80 @@ function ReportsPanel({ goTo, setGeneration }) {
 
    {/* Pagination info */}
     {filtered.length > 0 && (
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', background:'var(--card)', border:'1px solid var(--border)', borderRadius:10, marginTop:8 }}>
-        <span style={{ fontSize:12, color:'var(--muted)' }}>
-          Showing <span style={{ color:'var(--text)', fontWeight:700 }}>1</span> to <span style={{ color:'var(--text)', fontWeight:700 }}>{filtered.length}</span> of <span style={{ color:'var(--indigo2)', fontWeight:700 }}>{filtered.length}</span> reports
-        </span>
-        <span style={{ fontSize:11, color:'var(--muted)' }}>
-          {filtered.length} / page
-        </span>
-      </div>
-    )}
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: 10, marginTop: 8
+  }}>
+    {/* Info texte */}
+    <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+      Showing{' '}
+      <span style={{ color: 'var(--text)', fontWeight: 700 }}>
+        {(currentPage - 1) * ITEMS_PER_PAGE + 1}
+      </span>{' '}
+      to{' '}
+      <span style={{ color: 'var(--text)', fontWeight: 700 }}>
+        {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)}
+      </span>{' '}
+      of{' '}
+      <span style={{ color: 'var(--indigo2)', fontWeight: 700 }}>
+        {filtered.length}
+      </span>{' '}
+      reports
+    </span>
+
+    {/* Boutons pagination */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {/* Prev */}
+      <button
+        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+        disabled={currentPage === 1}
+        style={{
+          padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+          cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+          background: 'var(--card)', border: '1px solid var(--border)',
+          color: currentPage === 1 ? 'var(--muted)' : 'var(--text)',
+          opacity: currentPage === 1 ? 0.5 : 1, transition: 'all .15s',
+        }}
+      >
+        ← Prev
+      </button>
+
+      {/* Numéros de pages */}
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+  <button
+    key={p}
+    onClick={() => setCurrentPage(p)}
+    style={{
+      width: 32, height: 32, borderRadius: 8, fontSize: 12, fontWeight: 700,
+      cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+      background: currentPage === p ? 'linear-gradient(135deg,var(--indigo),#4f46e5)' : 'var(--card)',
+      border: currentPage === p ? 'none' : '1px solid var(--border)',
+      color: currentPage === p ? '#fff' : 'var(--text)',
+      boxShadow: currentPage === p ? '0 4px 12px rgba(99,102,241,.3)' : 'none',
+    }}
+  >
+    {p}
+  </button>
+))}
+
+      {/* Next */}
+      <button
+        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+        disabled={currentPage === totalPages}
+        style={{
+          padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+          cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+          background: 'var(--card)', border: '1px solid var(--border)',
+          color: currentPage === totalPages ? 'var(--muted)' : 'var(--text)',
+          opacity: currentPage === totalPages ? 0.5 : 1, transition: 'all .15s',
+        }}
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+)}
   </div>
 )}  
       </>
@@ -10830,6 +11944,8 @@ function saveReportToStorage({ url, framework, testType, passCount, failCount, s
       }
     }
 
+    
+
     // Nouveau rapport
     const newReport = {
       id: Date.now(),
@@ -10849,6 +11965,148 @@ function saveReportToStorage({ url, framework, testType, passCount, failCount, s
     console.error('[saveReport]', err);
   }
 }
+
+
+function DocsPanel() {
+  const [active, setActive] = useState('overview');
+
+  const sections = [
+    { id: 'overview',    label: 'Overview',         Icon: IconLayoutDashboard },
+    { id: 'smoke',       label: 'Smoke Test',       Icon: IconEye },
+    { id: 'functional',  label: 'Functional Test',  Icon: IconClick },
+    { id: 'performance', label: 'Performance Test', Icon: IconBolt },
+    { id: 'security',    label: 'Security Test',    Icon: IconShieldLock },
+    { id: 'regression',  label: 'Regression Test',  Icon: IconRefresh },
+    { id: 'api',         label: 'API Test',         Icon: IconLink },
+    { id: 'seo',         label: 'SEO Test',         Icon: IconSeeding },
+  ];
+
+  const content = {
+    overview: {
+      title: 'NexTest — Documentation',
+      desc: 'NexTest is an AI-powered test automation platform. Generate, execute, and analyze tests for any web application in seconds.',
+      items: [
+        { Icon: IconRobot,        color:'#6366f1', bg:'rgba(99,102,241,.12)', title:'AI-Powered Generation',     desc:'LLaMA 3 generates test cases automatically from your URL — no manual scripting required.' },
+        { Icon: IconWorld,        color:'#10b981', bg:'rgba(16,185,129,.12)', title:'Public & Internal Projects', desc:'Test public websites or internal apps with credential injection and JWT token support.' },
+        { Icon: IconChartBar,     color:'#8b5cf6', bg:'rgba(139,92,246,.12)', title:'Reports & Analytics',       desc:'PDF, HTML, CSV exports. Real-time pass rate charts, heatmaps, and AI insights.' },
+        { Icon: IconBellRinging,  color:'#f59e0b', bg:'rgba(245,158,11,.12)', title:'Alerts & Notifications',    desc:'Get notified when tests fail. Alert pipeline with 15s polling and badge count.' },
+      ]
+    },
+    smoke:       { color:'#64748b', badge:'Quick · ~30s',      Icon: IconEye,         title:'Smoke Test',       desc:'Validates that key UI elements are visible and present in the DOM. The fastest way to confirm a page is up and functional.',                                              frameworks:[{n:'Selenium',c:'#43B02A'},{n:'Cypress',c:'#00BFA5'},{n:'Playwright',c:'#E2574C'}], steps:['NexTest scrapes the target URL and detects DOM elements','AI generates visibility checks for nav, buttons, forms, images','Tests run in headless browser and report pass/fail per element'], when:'Use after every deployment to catch critical UI regressions instantly.' },
+    functional:  { color:'#6366f1', badge:'Medium · ~1min',    Icon: IconClick,       title:'Functional Test',  desc:'Tests real user interactions — fill forms, click buttons, navigate pages, assert text content. Powered by Playwright with AI-generated steps.',                           frameworks:[{n:'Playwright',c:'#E2574C'}],                                                      steps:['LLaMA 3 generates click/fill/navigate/assert steps based on page structure','Playwright executes each step in a real browser with screenshots on fail','AI analysis provides root cause and fix for every failure'],    when:'Use to validate login flows, form submissions, and user journeys.' },
+    performance: { color:'#8b5cf6', badge:'Advanced · ~3min',  Icon: IconBolt,        title:'Performance Test', desc:'Measures Core Web Vitals (LCP, FCP, TTI, Load Time) and resource sizes. Also supports k6 load/stress/spike/soak testing.',                                              frameworks:[{n:'Playwright',c:'#E2574C'},{n:'k6',c:'#7D64FF'}],                                 steps:['Playwright captures Web Vitals via browser performance APIs','k6 generates load scripts and runs concurrent virtual users','Results scored out of 100 with actionable recommendations'],                           when:'Use before releases to ensure your app meets performance budgets.' },
+    security:    { color:'#ef4444', badge:'Critical · ~5min',  Icon: IconShieldLock,  title:'Security Test',    desc:'Checks for common vulnerabilities — XSS, auth bypass, missing headers, session issues, and information exposure.',                                                     frameworks:[{n:'Pytest',c:'#3776AB'}],                                                          steps:['Scans authentication routes, input fields, and HTTP headers','Tests for XSS injection, unauthorized access, and insecure cookies','Reports severity (critical/high/medium/low) per finding'],                        when:'Use before production releases and after security patches.' },
+    regression:  { color:'#f97316', badge:'Thorough · ~3min',  Icon: IconRefresh,     title:'Regression Test',  desc:'Ensures existing features still work after code changes. Covers navigation, content, authentication, and functionality.',                                              frameworks:[{n:'Playwright',c:'#E2574C'}],                                                      steps:['AI generates a test suite covering all major page routes','Playwright validates each page loads correctly with expected content','Pass/fail per category: navigation, form, auth, UI'],                               when:'Run after every sprint or major code change to prevent regressions.' },
+    api:         { color:'#10b981', badge:'Technical · ~2min', Icon: IconApi,         title:'API Test',         desc:'Tests REST API endpoints — status codes, response payloads, authentication, CRUD operations, and edge cases.',                                                        frameworks:[{n:'Pytest',c:'#3776AB'},{n:'Postman',c:'#FF6C37'}],                                steps:['LLaMA 3 discovers endpoints and generates CRUD test cases','Tests run with real HTTP requests and JWT token injection','Validates status codes, response schema, and error handling'],                               when:'Use to validate your API contract before frontend integration.' },
+    seo:         { color:'#06b6d4', badge:'Public · ~1min',    Icon: IconSeeding,     title:'SEO Test',         desc:'Audits meta tags, headings, page speed, robots.txt, sitemap, Open Graph, and structured data for SEO compliance.',                                                    frameworks:[{n:'BeautifulSoup',c:'#06b6d4'}],                                                   steps:['Fetches page HTML and analyzes SEO elements','Checks title, meta description, H1, canonical, OG tags, sitemap','Scores the page out of 100 with priority-ranked recommendations'],                                 when:'Use before launching new pages or after content changes.' },
+  };
+
+  const current = content[active];
+
+  return (
+    <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
+
+      {/* LEFT NAV */}
+      <div style={{ width:220, flexShrink:0, borderRight:'1px solid var(--border)', padding:'24px 0', background:'var(--bg)', overflowY:'auto' }}>
+        <div style={{ padding:'0 16px 12px', fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase', color:'var(--muted)' }}>
+          Contents
+        </div>
+        {sections.map(({ id, label, Icon }) => (
+          <button key={id} onClick={() => setActive(id)}
+            style={{
+              display:'flex', alignItems:'center', gap:10,
+              width:'100%', padding:'9px 16px',
+              border:'none', borderRadius:0,
+              borderLeft: active===id ? '3px solid #6366f1' : '3px solid transparent',
+              background: active===id ? 'rgba(99,102,241,.1)' : 'transparent',
+              color: active===id ? '#818cf8' : 'var(--muted)',
+              fontSize:13, fontWeight: active===id ? 700 : 500,
+              cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'all .15s',
+            }}>
+            <Icon size={15} />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* CONTENT */}
+      <div style={{ flex:1, padding:'36px 48px', overflowY:'auto' }}>
+
+        {active === 'overview' ? (
+          <>
+            <h1 style={{ fontSize:28, fontWeight:700, color:'var(--text)', marginBottom:10 }}>{current.title}</h1>
+            <p style={{ fontSize:14, color:'var(--muted)', lineHeight:1.8, marginBottom:32, maxWidth:580 }}>{current.desc}</p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+              {current.items.map(({ Icon, color, bg, title, desc }) => (
+                <div key={title}
+                  style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:14, padding:'22px 24px', transition:'border-color .2s' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor='rgba(99,102,241,.4)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor='var(--border)'}>
+                  <div style={{ width:40, height:40, borderRadius:10, background:bg, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:14 }}>
+                    <Icon size={20} color={color} />
+                  </div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--text)', marginBottom:6 }}>{title}</div>
+                  <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.7 }}>{desc}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Header */}
+            <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:28 }}>
+              <div style={{ width:52, height:52, borderRadius:14, background:`${current.color}18`, border:`1px solid ${current.color}35`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <current.Icon size={24} color={current.color} />
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <h1 style={{ fontSize:24, fontWeight:700, color:'var(--text)', margin:0 }}>{current.title}</h1>
+                <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, color:current.color, background:`${current.color}18`, border:`1px solid ${current.color}35` }}>
+                  {current.badge}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ fontSize:14, color:'var(--muted)', lineHeight:1.8, marginBottom:32, maxWidth:600 }}>{current.desc}</p>
+
+            {/* Frameworks */}
+            <div style={{ marginBottom:32 }}>
+              <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:12 }}>Supported Frameworks</div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                {current.frameworks.map(fw => (
+                  <span key={fw.n} style={{ fontSize:12, fontWeight:700, padding:'5px 14px', borderRadius:20, color:fw.c, background:`${fw.c}15`, border:`1px solid ${fw.c}30` }}>{fw.n}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Steps */}
+            <div style={{ marginBottom:32 }}>
+              <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:16 }}>How it works</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                {current.steps.map((step, i) => (
+                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
+                    <div style={{ width:28, height:28, borderRadius:'50%', flexShrink:0, background:`${current.color}15`, border:`1px solid ${current.color}30`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:current.color }}>
+                      {i+1}
+                    </div>
+                    <div style={{ fontSize:13, color:'var(--sub)', lineHeight:1.7, paddingTop:4 }}>{step}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* When to use */}
+            <div style={{ background:`${current.color}08`, border:`1px solid ${current.color}20`, borderRadius:12, padding:'16px 20px', display:'flex', gap:12, alignItems:'flex-start' }}>
+              <IconBulb size={20} color={current.color} style={{ flexShrink:0, marginTop:2 }} />
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:current.color, marginBottom:6, letterSpacing:1.5, textTransform:'uppercase' }}>When to use</div>
+                <div style={{ fontSize:13, color:'var(--sub)', lineHeight:1.7 }}>{current.when}</div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 export default function Dashboard() {
 
   const [page, setPage]= useState('dashboard');
@@ -10867,6 +12125,19 @@ export default function Dashboard() {
   const [collapsed, setCollapse]= useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifCount, setNotifCount] = useState(0);
+
+  const [alertUnread, setAlertUnread] = useState(0);
+
+useEffect(() => {
+  const fetchUnread = () => {
+    api.get('/alerts/unread-count')
+      .then(res => setAlertUnread(res.data.count || 0))
+      .catch(() => {});
+  };
+  fetchUnread();
+  const interval = setInterval(fetchUnread, 15000);
+  return () => clearInterval(interval);
+}, []);
 
 const [notifs, setNotifs] = useState([]);
   
@@ -10889,6 +12160,8 @@ const headerRef = useRef(null);
   const [selectedPageUrl, setSelectedPageUrl] = useState('');
   const [selectedTestType, setSelectedTestType] = useState('');   // ← AJOUTE ICI
   const [selectedFramework, setSelectedFramework] = useState('');
+  const [selectedUsername, setSelectedUsername] = useState('');
+  const [selectedPassword, setSelectedPassword] = useState(''); 
   const [projectStep,     setProjectStep]   = useState('list');
 
   const { user, logout } = useAuth();
@@ -10900,7 +12173,7 @@ const headerRef = useRef(null);
     } catch { setNotifs([]); }
   }
 }, [user?.id]);
-  const { t }            = useLang();
+  const { t, lang, setLanguage } = useLang();
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('nextest-theme', theme); }, [theme]);
 // ← AJOUTE CES DEUX useEffect ICI
@@ -10933,17 +12206,35 @@ useEffect(() => {
   
   const handleGenerateNav = () => { setProjectStep('list'); setCurrentProject(null); setSelectedPageUrl(''); setPage('generate'); };
 
+  //les elements qui exist dans le side bar 
   const NAV_MAIN = [
     { id: 'dashboard', label: t('dashboard'),     badge: null     },
-    { id: 'generate',  label: 'Projects',          badge: t('new') },
+    { id: 'generate',  label: 'Projects',         },
     { id: 'execution', label: t('testExecution'), badge: null     },
+     { id: 'scheduled', label: 'Scheduled Tasks', badge: null },
+    { id: 'flaky', label: 'Flaky Tests', badge: null },
+    { id: 'alerts', label: 'Alerts', badge: alertUnread > 0 ? alertUnread : null },
     { id: 'reports', label: 'Reports', badge: null },
     { id: 'history',   label: t('history'),       badge: null     },
+
     
   ];
+  
   const NAV_USER = [{ id: 'account', label: t('account') }, { id: 'settings', label: t('settings') }];
-  const LABELS   = { dashboard: t('dashboard'), generate: t('newGeneration'), execution: t('testExecution'), history: t('history'), account: t('account'), settings: t('settings') };
 
+
+const LABELS = {
+  dashboard: t('dashboard'),
+  generate:  'Projects',
+  execution: t('testExecution'),
+  history:   t('history'),
+  account:   t('account'),
+  settings:  t('settings'),
+  flaky:     'Flaky Tests',
+  alerts:    'Alerts',
+  reports:   'Reports', 
+  docs: 'Documentation',  
+};
   return (
     <div className="dash-root" style={{ position:'fixed', top:0, left:0, right:0, bottom:0, width:'100vw', height:'100vh', display:'flex', flexDirection:'row', overflow:'hidden' }}>
       <aside className={`sidebar${collapsed?' collapsed':''}`}>
@@ -10951,21 +12242,49 @@ useEffect(() => {
         <button className="s-toggle" onClick={() => setCollapse(p=>!p)}>
           <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">{collapsed ? <path d="M9 18l6-6-6-6"/> : <path d="M15 18l-6-6 6-6"/>}</svg>
         </button>
-        <nav className="s-nav">
-          <div className="s-group">
-            {!collapsed && <div className="s-label">{t('main')}</div>}
-            {NAV_MAIN.map(it => (<SItem key={it.id} {...it} active={page===it.id} collapsed={collapsed} onClick={it.id==='generate'?handleGenerateNav:setPage} />))}
-          </div>
-          <div className="s-divider" />
-          <div className="s-group">
-            {!collapsed && <div className="s-label">{t('user')}</div>}
-            {NAV_USER.map(it => (<SItem key={it.id} {...it} active={page===it.id} collapsed={collapsed} onClick={setPage} />))}
-          </div>
-        </nav>
-        <div className="s-footer">
-          <button className="s-item s-logout" onClick={logout} title={t('logout')}><span className="s-icon">{IC.logout}</span>{!collapsed && <span className="s-label-txt">{t('logout')}</span>}</button>
-        </div>
-      </aside>
+     <nav className="s-nav">
+  <div className="s-group">
+    {!collapsed && <div className="s-label">{t('main')}</div>}
+    {NAV_MAIN.map(it => (
+      <SItem key={it.id} {...it} active={page===it.id} collapsed={collapsed}
+        onClick={
+          it.id === 'generate'  ? handleGenerateNav :
+          it.id === 'execution' ? () => {
+            if (generation) setGeneration(g => ({ ...g, fresh: false }));
+            setPage('execution');
+          } :
+          setPage
+        }
+      />
+    ))}
+  </div>
+
+  <div className="s-divider" />
+
+  <div className="s-group">
+    {!collapsed && <div className="s-label">{t('user')}</div>}
+    {NAV_USER.map(it => (<SItem key={it.id} {...it} active={page===it.id} collapsed={collapsed} onClick={setPage} />))}
+  </div>
+
+  <div className="s-divider" />
+
+  {/* ← Help déplacé ici, juste après User (Settings) */}
+  <div className="s-group">
+    {!collapsed && <div className="s-label">Help</div>}
+    <SItem id="docs" label="Documentation" active={page==='docs'} collapsed={collapsed} onClick={setPage} />
+  </div>
+</nav>
+
+{/* Le footer logout reste séparé, tout en bas, comme avant */}
+<div style={{ marginTop: '16px' }}>
+  <div className="s-footer">
+    <button className="s-item s-logout" onClick={logout} title={t('logout')}>
+      <span className="s-icon">{IC.logout}</span>
+      {!collapsed && <span className="s-label-txt">{t('logout')}</span>}
+    </button>
+  </div>
+</div>
+</aside>
 
       <div className="main">
         <header className="header">
@@ -11034,6 +12353,8 @@ useEffect(() => {
 
   
           <div className="h-right">
+              <LanguageSwitcher lang={lang || 'en'} setLang={setLanguage} theme={theme} />
+
             <ThemeToggle theme={theme} setTheme={setTheme} />
             <div style={{ position: 'relative' }}>
   <button
@@ -11060,6 +12381,7 @@ useEffect(() => {
 
 {notifOpen && (
   <NotifPanel
+   isDark={theme === 'dark'}
     notifs={notifs}
     onClose={() => setNotifOpen(false)}
    onDelete={(id) => {
@@ -11119,10 +12441,12 @@ onClearAll={() => {
           {page === 'generate' && (
             <>
               {projectStep === 'list' && (<ProjectsListPanel onNewProject={() => setProjectStep('create')} onSelectProject={(project) => { setCurrentProject(project); setProjectStep('detail'); }} />)}
-              {projectStep === 'detail' && (<ProjectDetailPanel project={currentProject} onBack={() => setProjectStep('list')} onNewGeneration={(url, testType, framework) => {
+              {projectStep === 'detail' && (<ProjectDetailPanel project={currentProject} onBack={() => setProjectStep('list')} onNewGeneration={(url, testType, framework, username, password) => {
   setSelectedPageUrl(url || '');
   setSelectedTestType(testType || '');
   setSelectedFramework(framework || '');
+  setSelectedUsername(username || '');
+  setSelectedPassword(password || '');
   setProjectStep('generate');
 }} setGeneration={setGeneration} goTo={setPage} />)}
               {projectStep === 'create' && (
@@ -11138,13 +12462,24 @@ onClearAll={() => {
                   <button onClick={() => setProjectStep('detail')} style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:11, fontWeight:700, color:'var(--muted)', background:'none', border:'none', cursor:'pointer', padding:'0 0 20px', transition:'color .18s', letterSpacing:'.5px', textTransform:'uppercase' }} onMouseEnter={e=>e.currentTarget.style.color='var(--indigo2)'} onMouseLeave={e=>e.currentTarget.style.color='var(--muted)'}>
                     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>Back to project
                   </button>
-                  <GeneratePanel goTo={(p) => { setProjectStep('list'); setPage(p); }} setGeneration={setGeneration} project={currentProject} initialUrl={selectedPageUrl} initialTestType={selectedTestType}initialFramework={selectedFramework} onGenerationSaved={(notif) => {
+                  <GeneratePanel goTo={(p) => { 
+  setProjectStep('list'); 
+  setPage(p); 
+}}  setGeneration={setGeneration} project={currentProject} initialUrl={selectedPageUrl} initialTestType={selectedTestType} initialFramework={selectedFramework} initialUsername={selectedUsername}
+    initialPassword={selectedPassword}   onGenerationSaved={(notif) => {
+  if (!notif?.url) return;
   const newNotif = { ...notif, id: Date.now(), date: new Date().toISOString() };
- setNotifs(prev => {
-  const updated = [newNotif, ...prev];
-  localStorage.setItem(`nextest-notifs-${user?.id}`, JSON.stringify(updated));
-  return updated;
-});
+  setNotifs(prev => {
+    const isDup = prev.some(n =>
+      n.url === notif.url &&
+      n.framework === notif.framework &&
+      Date.now() - new Date(n.date).getTime() < 10000
+    );
+    if (isDup) return prev;
+    const updated = [newNotif, ...prev];
+    localStorage.setItem(`nextest-notifs-${user?.id}`, JSON.stringify(updated));
+    return updated;
+  });
   setNotifCount(c => c + 1);
   // sound
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -11163,10 +12498,38 @@ onClearAll={() => {
               )}
             </>
           )}
-          {page === 'execution' && <ExecutionPanel generation={generation} />}
+          {page === 'execution' && (
+  <ExecutionPanel
+    generation={generation}
+    onGenerationSaved={(notif) => {
+      const newNotif = { ...notif, id: Date.now(), date: new Date().toISOString() };
+      setNotifs(prev => {
+        const updated = [newNotif, ...prev];
+        localStorage.setItem(`nextest-notifs-${user?.id}`, JSON.stringify(updated));
+        return updated;
+      });
+      setNotifCount(c => c + 1);
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(520, ctx.currentTime);
+      osc.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+    }}
+  />
+)}
           {page === 'reports' && <ReportsPanel goTo={setPage} setGeneration={setGeneration} />}
+          {page === 'docs' && <DocsPanel />}
+          {page === 'scheduled' && <ScheduledTasksPanel projects={searchProjects} />}
+          {page === 'flaky' && <FlakyTestsPanel />}
+          {page === 'alerts' && <AlertsPanel />}
           {page === 'history'   && <HistoryPanel   goTo={setPage} setGeneration={setGeneration} />}
-          {page === 'account'   && <AccountPanel   user={user} />}
+          {page === 'account' && <AccountPanel user={user} setPage={setPage} setProjectStep={setProjectStep} />}
           {page === 'settings'  && <SettingsPanel  theme={theme} setTheme={setTheme} />}
         </div>
       </div>
@@ -11175,212 +12538,345 @@ onClearAll={() => {
   );
 }
 
-function NotifPanel({ notifs, onClose, onDelete, onClearAll, goTo, setGeneration, histories = [] }) {
+function NotifPanel({ notifs, onClose, onDelete, onClearAll, goTo, setGeneration, histories = [], isDark = true }) {
   const [page, setPage] = useState(0);
-  const PER_PAGE = 4;
+  const PER_PAGE = 3;
   const totalPages = Math.ceil(notifs.length / PER_PAGE);
   const visible = notifs.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+
+  const t = isDark ? {
+    bg:'#0d1526', border:'rgba(255,255,255,.08)', borderSub:'rgba(255,255,255,.04)',
+    borderTop:'rgba(255,255,255,.05)', headerBorder:'rgba(255,255,255,.06)',
+    shadow:'0 20px 60px rgba(0,0,0,.5)', title:'#e2e8f0', url:'#94a3b8',
+    time:'#334155', emptyIcon:'#334155', emptyText:'#334155',
+    badgeBg:'rgba(255,255,255,.04)', badgeColor:'#64748b', rowHover:'rgba(255,255,255,.02)',
+    countBg:'rgba(99,102,241,.15)', countColor:'#a5b4fc', countBorder:'rgba(99,102,241,.25)',
+    closeBtn:'rgba(255,255,255,.05)', closeBorder:'rgba(255,255,255,.08)', closeColor:'#64748b',
+    emailColor:'#475569', pagColor:'#334155', pagBtn:'#64748b', pagDisabled:'#1e293b',
+    viewBtn:'#818cf8', viewBg:'rgba(99,102,241,.1)', viewBorder:'rgba(99,102,241,.2)',
+    delBg:'rgba(239,68,68,.08)', delBorder:'rgba(239,68,68,.15)', delColor:'#f87171',
+    stripeBg:'rgba(255,255,255,.06)',
+  } : {
+    bg:'#ffffff', border:'rgba(0,0,0,.08)', borderSub:'rgba(0,0,0,.05)',
+    borderTop:'rgba(0,0,0,.06)', headerBorder:'rgba(0,0,0,.07)',
+    shadow:'0 20px 60px rgba(0,0,0,.12)', title:'#0f172a', url:'#475569',
+    time:'#94a3b8', emptyIcon:'#cbd5e1', emptyText:'#94a3b8',
+    badgeBg:'rgba(0,0,0,.04)', badgeColor:'#64748b', rowHover:'rgba(0,0,0,.02)',
+    countBg:'rgba(99,102,241,.1)', countColor:'#6366f1', countBorder:'rgba(99,102,241,.2)',
+    closeBtn:'rgba(0,0,0,.04)', closeBorder:'rgba(0,0,0,.08)', closeColor:'#94a3b8',
+    emailColor:'#94a3b8', pagColor:'#94a3b8', pagBtn:'#64748b', pagDisabled:'#cbd5e1',
+    viewBtn:'#6366f1', viewBg:'rgba(99,102,241,.08)', viewBorder:'rgba(99,102,241,.15)',
+    delBg:'rgba(239,68,68,.06)', delBorder:'rgba(239,68,68,.12)', delColor:'#ef4444',
+    stripeBg:'rgba(0,0,0,.06)',
+  };
 
   const timeAgoNotif = (iso) => {
     const diff = (Date.now() - new Date(iso)) / 1000;
     if (diff < 60)    return `${Math.floor(diff)}s ago`;
     if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
+
+  const getRate = (n) => {
+    const total = (n.passCount || 0) + (n.failCount || 0);
+    return total > 0 ? Math.round((n.passCount / total) * 100) : 0;
+  };
+  const rc = (rate) => rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+
+  const FW  = { Selenium:'Se', Cypress:'Cy', Playwright:'Pl', k6:'k6', Pytest:'Py', Postman:'Po', Requests:'RQ' };
+  const FWC = { Selenium:'#43B02A', Cypress:'#00BFA5', Playwright:'#E2574C', k6:'#7D64FF', Pytest:'#3776AB', Postman:'#FF6C37', Requests:'#06b6d4' };
+
+  const handleView = (n) => {
+    const match = [...histories]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .find(h => h.url === n.url && h.framework === n.framework);
+    if (match && setGeneration) {
+      setGeneration({
+        url: match.url, framework: match.framework, test_type: match.test_type,
+        generation: { id: match.id, url: match.url, framework: match.framework, load_time_ms: match.load_time_ms, test_type: match.test_type },
+        result: {
+          test_type: match.test_type || 'smoke',
+          test_cases: match.test_cases || [],
+          test_cases_selenium: match.test_cases_selenium || [],
+          test_cases_cypress: match.test_cases_cypress || [],
+          script: match.script || '',
+          script_selenium: match.script_selenium || '',
+          script_playwright: match.script_playwright || '',
+          script_cypress: match.script_cypress || '',
+          execution_results: match.execution_results || [],
+          performance: match.performance_data || match.performance || null,
+        },
+      });
+    }
+    goTo('execution'); onClose();
   };
 
   return (
-<div style={{
-  position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-  width: 320, background: 'var(--card)', border: '1px solid var(--border)',
-  borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-  zIndex: 9999, overflow: 'visible', animation: 'dFadeUp .2s var(--ease) both'
-}}>
+    <>
+      <style>{`
+        @keyframes npIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:none; } }
+        .np-row:hover { background: ${t.rowHover} !important; }
+        .np-del { opacity:0; transition: opacity .15s; }
+        .np-row:hover .np-del { opacity:1; }
+      `}</style>
 
-  {/* Triangle arrow */}
-  <div style={{
-    position: 'absolute', top: -6, right: 14,
-    width: 12, height: 12,
-    background: 'var(--card)',
-    border: '1px solid var(--border)',
-    borderBottom: 'none', borderRight: 'none',
-    transform: 'rotate(45deg)',
-    zIndex: 1
-  }} />
-
-  {/* Content wrapper */}
-  <div style={{ position: 'relative', zIndex: 2, borderRadius: 14, overflow: 'hidden' }}>
-
-  {/* Header */}
+      {/* ── OUTER: handles position + arrow ── */}
       <div style={{
-        background: 'linear-gradient(135deg,#0a0f1e,#1e2a4a)',
-        padding: '12px 16px', borderBottom: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+        position: 'absolute', top: 'calc(100% + 10px)', right: 0,
+        width: 360,
+        zIndex: 9999,
+        animation: 'npIn .18s ease both',
+        fontFamily: "'DM Sans', sans-serif",
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981' }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>
-            Notifications <span style={{ color: '#64748b' }}>({notifs.length})</span>
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {notifs.length > 0 && (
-            <button onClick={onClearAll} style={{
-              background: 'none', border: 'none', color: '#ef4444',
-              fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-              letterSpacing: '.5px', textTransform: 'uppercase'
-            }}>Delete all</button>
-          )}
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', color: '#64748b',
-            cursor: 'pointer', fontSize: 16, lineHeight: 1
-          }}>✕</button>
-        </div>
-      </div>
-      
-      {/* List */}
-      <div style={{ maxHeight: 340, overflowY: 'auto' }}>
-        {notifs.length === 0 ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', color: '#64748b', fontSize: 12 }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
-            No notifications yet
+
+        {/* Arrow */}
+        <div style={{
+          position: 'absolute',
+          top: -6,
+          right: 18,
+          width: 12,
+          height: 12,
+          background: t.bg,
+          border: `1px solid ${t.border}`,
+          borderRight: 'none',
+          borderBottom: 'none',
+          transform: 'rotate(45deg)',
+          zIndex: 10,
+        }} />
+
+        {/* ── INNER: rounded box with clipped content ── */}
+        <div style={{
+          background: t.bg,
+          border: `1px solid ${t.border}`,
+          borderRadius: 14,
+          boxShadow: t.shadow,
+          overflow: 'hidden',
+        }}>
+
+          {/* ── HEADER ── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 16px',
+            borderBottom: `1px solid ${t.headerBorder}`,
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ position:'relative', display:'inline-flex' }}>
+                <span style={{ width:8, height:8, borderRadius:'50%', background:'#10b981', display:'block' }} />
+                <span style={{
+                  position:'absolute', inset:-2, borderRadius:'50%',
+                  background:'rgba(16,185,129,.3)',
+                  animation:'pulse 2s infinite',
+                }} />
+              </span>
+              <span style={{ fontSize:13, fontWeight:700, color:t.title }}>Notifications</span>
+              {notifs.length > 0 && (
+                <span style={{
+                  fontSize:10, fontWeight:800, padding:'1px 7px', borderRadius:20,
+                  background: t.countBg, color: t.countColor,
+                  border: `1px solid ${t.countBorder}`,
+                }}>{notifs.length}</span>
+              )}
+            </div>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              {notifs.length > 0 && (
+                <button onClick={onClearAll} style={{
+                  fontSize:10, fontWeight:700, color:'#ef4444',
+                  background:'none', border:'none', cursor:'pointer',
+                  fontFamily:'inherit', letterSpacing:'.5px',
+                }}>DELETE ALL</button>
+              )}
+              <button onClick={onClose} style={{
+                background: t.closeBtn, border: `1px solid ${t.closeBorder}`,
+                borderRadius:7, width:26, height:26, display:'flex',
+                alignItems:'center', justifyContent:'center',
+                color: t.closeColor, cursor:'pointer',
+              }}>
+                <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
           </div>
-        ) : (
-          visible.map((n, i) => (
-            <div key={n.id} style={{
-              padding: '12px 16px',
-              borderBottom: '1px solid var(--border)',
-              background: i === 0 && page === 0 ? 'rgba(99,102,241,.04)' : 'transparent',
-              transition: 'background .15s'
-            }}>
-              {/* Top row */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-                <span style={{ fontSize: 18, flexShrink: 0 }}>
-                  {(() => {
-  const total = (n.passCount || 0) + (n.failCount || 0);
-  const rate = total > 0 ? Math.round((n.passCount / total) * 100) : 0;
-  return rate >= 80 ? '✅' : '❌';
-})()}
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {n.url}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                    {n.framework} · {n.testType} ·{' '}
-                    <span style={{ color: '#10b981', fontWeight: 700 }}>{n.passCount} pass</span>
-                    {n.failCount > 0 && (
-                      <span style={{ color: '#ef4444', fontWeight: 700 }}> · {n.failCount} fail</span>
+
+          {/* ── EMPTY ── */}
+          {notifs.length === 0 && (
+            <div style={{ padding:'40px 16px', textAlign:'center' }}>
+              <div style={{
+                width:52, height:52, borderRadius:14,
+                background: isDark ? 'rgba(99,102,241,.08)' : 'rgba(99,102,241,.06)',
+                border: `1px solid ${isDark ? 'rgba(99,102,241,.15)' : 'rgba(99,102,241,.12)'}`,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                margin:'0 auto 12px',
+              }}>
+                <svg width="22" height="22" fill="none" stroke="#818cf8" strokeWidth="1.8" viewBox="0 0 24 24">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+              </div>
+              <div style={{ fontSize:13, fontWeight:700, color:t.title, marginBottom:4 }}>All caught up</div>
+              <div style={{ fontSize:11, color:t.emptyText }}>Test results will appear here</div>
+            </div>
+          )}
+
+          {/* ── LIST ── */}
+          {visible.map((n) => {
+            const rate  = getRate(n);
+            const color = rc(rate);
+            const total = (n.passCount || 0) + (n.failCount || 0);
+            const fw    = FW[n.framework] || n.framework?.slice(0,2) || '?';
+            const fwc   = FWC[n.framework] || '#64748b';
+            const isOk  = rate >= 80;
+
+            return (
+              <div key={n.id} className="np-row" style={{
+                padding: '12px 16px',
+                borderBottom: `1px solid ${t.borderSub}`,
+                position: 'relative',
+              }}>
+                {/* status stripe */}
+                <div style={{
+                  position:'absolute', left:0, top:10, bottom:10,
+                  width:2.5, borderRadius:'0 2px 2px 0',
+                  background: color,
+                }} />
+
+                <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+
+                  {/* Icon */}
+                  <div style={{
+                    width:34, height:34, borderRadius:10, flexShrink:0,
+                    background: isOk ? 'rgba(16,185,129,.1)' : 'rgba(239,68,68,.1)',
+                    border: `1px solid ${isOk ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)'}`,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                    {isOk ? (
+                      <svg width="15" height="15" fill="none" stroke="#10b981" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path d="M20 6L9 17l-5-5"/>
+                      </svg>
+                    ) : (
+                      <svg width="15" height="15" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                      </svg>
                     )}
                   </div>
+
+                  {/* Content */}
+                  <div style={{ flex:1, minWidth:0 }}>
+
+                    {/* URL + time */}
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:4 }}>
+                      <span style={{
+                        fontSize:12, fontWeight:600, color:t.url,
+                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1,
+                      }}>
+                        {n.url?.replace(/https?:\/\//, '')}
+                      </span>
+                      <span style={{ fontSize:10, color:t.time, flexShrink:0 }}>
+                        {timeAgoNotif(n.date)}
+                      </span>
+                    </div>
+
+                    {/* Badges + rate */}
+                    <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:6 }}>
+                      <span style={{
+                        fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:5,
+                        color:fwc, background:`${fwc}15`, border:`1px solid ${fwc}25`,
+                      }}>{fw}</span>
+                      {n.testType && (
+                        <span style={{
+                          fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:5,
+                          color:t.badgeColor, background:t.badgeBg,
+                          textTransform:'uppercase', letterSpacing:'.3px',
+                        }}>{n.testType}</span>
+                      )}
+                      <span style={{
+                        marginLeft:'auto', fontSize:11, fontWeight:800,
+                        color, fontFamily:'monospace',
+                      }}>{rate}%</span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ height:3, borderRadius:3, background:t.stripeBg, display:'flex', overflow:'hidden', marginBottom:5 }}>
+                      <div style={{ width:`${total > 0 ? (n.passCount||0)/total*100 : 0}%`, background:'#10b981' }} />
+                      <div style={{ width:`${total > 0 ? (n.failCount||0)/total*100 : 0}%`, background:'#ef4444' }} />
+                    </div>
+
+                    {/* Email hint */}
+                    <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:5 }}>
+                      <svg width="9" height="9" fill="none" stroke={t.emailColor} strokeWidth="2" viewBox="0 0 24 24">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline points="22,6 12,13 2,6"/>
+                      </svg>
+                      <span style={{ fontSize:9, color:t.emailColor }}>Report sent · check your email</span>
+                    </div>
+
+                    {/* Stats + actions */}
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                      <span style={{ fontSize:10, color:t.emailColor }}>
+                        <span style={{ color:'#10b981', fontWeight:700 }}>{n.passCount||0} pass</span>
+                        {(n.failCount||0) > 0 && <span style={{ color:'#ef4444', fontWeight:700 }}> · {n.failCount} fail</span>}
+                      </span>
+                      <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                        <button onClick={() => handleView(n)} style={{
+                          fontSize:10, fontWeight:700, color:t.viewBtn,
+                          background:t.viewBg, border:`1px solid ${t.viewBorder}`,
+                          borderRadius:6, padding:'3px 9px', cursor:'pointer', fontFamily:'inherit',
+                          display:'flex', alignItems:'center', gap:4,
+                        }}>
+                          <svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                          </svg>
+                          View results
+                        </button>
+                        <button className="np-del" onClick={() => onDelete(n.id)} style={{
+                          width:22, height:22, borderRadius:6, display:'flex',
+                          alignItems:'center', justifyContent:'center',
+                          background:t.delBg, border:`1px solid ${t.delBorder}`,
+                          color:t.delColor, cursor:'pointer',
+                        }}>
+                          <svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
-                <button onClick={() => onDelete(n.id)} style={{
-                  background: 'none', border: 'none', color: '#475569',
-                  cursor: 'pointer', flexShrink: 0, padding: 2,
-                  display: 'flex', alignItems: 'center', transition: 'color .15s'
-                }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#475569'}
-                >
-                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path d="M18 6L6 18M6 6l12 12"/>
-                  </svg>
-                </button>
               </div>
+            );
+          })}
 
-              {/* Email hint */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 8px', borderRadius: 6, marginBottom: 8,
-                background: 'rgba(99,102,241,.07)', border: '1px solid rgba(99,102,241,.15)'
-              }}>
-                <svg width="11" height="11" fill="none" stroke="#818cf8" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                  <polyline points="22,6 12,13 2,6"/>
-                </svg>
-                <span style={{ fontSize: 10, color: '#a5b4fc' }}>
-                  Report & results sent · check your email.
-                </span>
-              </div>
-
-              {/* Date + actions */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 10, color: '#475569' }}>
-                  🕐 {timeAgoNotif(n.date)}
-                </span>
-                <button onClick={() => {
-  const match = [...histories].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .find(h => h.url === n.url && h.framework === n.framework);
-  if (match && setGeneration) {
-    setGeneration({
-      url: match.url,
-      framework: match.framework,
-      test_type: match.test_type,
-      generation: {
-        id: match.id, url: match.url,
-        framework: match.framework,
-        load_time_ms: match.load_time_ms,
-        test_type: match.test_type,
-      },
-      result: {
-        test_type: match.test_type || 'smoke',
-        test_cases: match.test_cases || [],
-        test_cases_selenium: match.test_cases_selenium || [],
-        test_cases_cypress: match.test_cases_cypress || [],
-        script: match.script || '',
-        script_selenium: match.script_selenium || '',
-        script_playwright: match.script_playwright || '',
-        script_cypress: match.script_cypress || '',
-        execution_results: match.execution_results || [],
-        performance: match.performance_data || match.performance || null,
-      },
-    });
-  }
-  goTo('execution');
-  onClose();
-}} style={{
-  fontSize: 10, fontWeight: 700, color: 'var(--indigo2)',
-  background: 'none', border: 'none', cursor: 'pointer',
-  fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4
-}}>
-  View results
-</button>
-              </div>
+          {/* ── PAGINATION ── */}
+          {totalPages > 1 && (
+            <div style={{
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              padding:'8px 16px',
+              borderTop:`1px solid ${t.borderTop}`,
+            }}>
+              <button onClick={() => setPage(p => Math.max(0, p-1))} disabled={page===0}
+                style={{
+                  fontSize:11, fontWeight:700,
+                  color: page===0 ? t.pagDisabled : t.pagBtn,
+                  background:'none', border:'none',
+                  cursor: page===0 ? 'default' : 'pointer',
+                  fontFamily:'inherit',
+                }}>Prev</button>
+              <span style={{ fontSize:10, color:t.pagColor }}>{page+1} / {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages-1, p+1))} disabled={page===totalPages-1}
+                style={{
+                  fontSize:11, fontWeight:700,
+                  color: page===totalPages-1 ? t.pagDisabled : t.pagBtn,
+                  background:'none', border:'none',
+                  cursor: page===totalPages-1 ? 'default' : 'pointer',
+                  fontFamily:'inherit',
+                }}>Next </button>
             </div>
-          ))
-        )}
-      </div>
+          )}
 
-     {/* Pagination */}
-      {totalPages > 1 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 16px', borderTop: '1px solid var(--border)',
-          background: 'var(--bg)'
-        }}>
-          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6,
-              padding: '4px 10px', color: page === 0 ? 'var(--muted)' : 'var(--text)',
-              cursor: page === 0 ? 'default' : 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
-            Prev
-          </button>
-          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-            {page + 1} / {totalPages}
-          </span>
-          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}
-            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6,
-              padding: '4px 10px', color: page === totalPages - 1 ? 'var(--muted)' : 'var(--text)',
-              cursor: page === totalPages - 1 ? 'default' : 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
-            Next
-          </button>
-        </div>
-      )}
-
-    </div> {/* fin content wrapper */}
-  </div>
-     
+        </div>{/* ── fin INNER box ── */}
+      </div>{/* ── fin OUTER ── */}
+    </>
   );
 }
-      
- 

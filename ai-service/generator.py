@@ -5,9 +5,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Constants
-# ─────────────────────────────────────────────────────────────────────────────
 
 SMOKE_MAX_STEPS = 50
 SMOKE_MIN_STEPS = 3
@@ -611,7 +608,15 @@ def _generate_section_steps(
 
     strategy = strategies.get(section_name, f"SECTION: {section_name.upper()}\nTest all listed elements.\n")
 
-    system_prompt = _SYSTEM_BASE + f"\n{strategy}"
+    system_prompt = _SYSTEM_BASE + f"\n{strategy}" + """
+CRITICAL SELECTOR RULES:
+- ONLY use selectors from the elements list provided above
+- NEVER invent selectors like '.hero', 'a.btn', '.banner', '[class*=hero]'
+- If an element has selector 'a[href*='sandbox']' → use EXACTLY 'a[href*='sandbox']'
+- DO NOT use any selector that is not explicitly listed in the ELEMENTS TO TEST section
+- If you are unsure about a selector, use check_visible with the exact selector provided
+"""
+    
 
     user_prompt = f"""Generate functional test steps for the {section_name.upper()} section.
 URL: {url}
@@ -1382,9 +1387,6 @@ def _build_scripts(steps: list, url: str, framework: str) -> dict:
     return s
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN ENTRY POINT
-# ─────────────────────────────────────────────────────────────────────────────
 
 def generate_tests(
     scraped:       dict,
@@ -1393,6 +1395,7 @@ def generate_tests(
     password:      str = None,
     test_type:     str = "smoke",
     user_scenario: str = None,
+    doc_text:      str = "",    
 ) -> dict:
 
     if test_type not in TEST_TYPE_PROFILES:
@@ -1434,9 +1437,9 @@ def generate_tests(
             "coverage_report":     None,
         }
 
-    # ── FUNCTIONAL / REGRESSION : section-based full coverage ────────────────
+   
 
-    # ── SMOKE : deterministic, no LLM ────────────────────────────────────────
+    # ── SMOKE :
     if test_type == "smoke":
         print(f"[DEBUG] ENTERING SMOKE BRANCH")
         steps = _build_smoke_steps(scraped)
@@ -1458,7 +1461,7 @@ def generate_tests(
             "coverage_report":     None,
         }
 
-    # ── FUNCTIONAL / REGRESSION : section-based full coverage ────────────────
+    # ── FUNCTIONAL / REGRESSION : section-based full coverage
 
     if page_profile == "static" and not user_scenario:
         print(f"[GEN v13] static page — no interactions found")
