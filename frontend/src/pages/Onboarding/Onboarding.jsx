@@ -4,63 +4,60 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import './Onboarding.css';
 
+import {
+  Code2, Bug, LayoutGrid, User,
+  Flame, CheckCircle2, Zap, CircleDot, Leaf, Theater,
+  BarChart3, RefreshCw, Shield, RotateCcw,
+  Webhook, Search, Bot, Gauge, Send, Globe,
+  ArrowLeft, ArrowRight, Check, Rocket
+} from 'lucide-react';
 
 
 const ROLES = [
   {
     id: 'developer',
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
-      </svg>
-    ),
+    icon: <Code2 size={22} strokeWidth={1.8} />,
     name: 'Developer',
     desc: 'I write code and want to automate my tests',
   },
   {
     id: 'tester',
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11m0 0H5m4 0h10m-10 0v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-4m0 0H9"/>
-      </svg>
-    ),
+    icon: <Bug size={22} strokeWidth={1.8} />,
     name: 'QA / Tester',
     desc: 'I focus on quality assurance and test coverage',
   },
   {
     id: 'lead',
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-      </svg>
-    ),
+    icon: <LayoutGrid size={22} strokeWidth={1.8} />,
     name: 'Tech Lead',
     desc: 'I manage teams and care about overall quality',
   },
   {
     id: 'other',
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-      </svg>
-    ),
+    icon: <User size={22} strokeWidth={1.8} />,
     name: 'Other',
     desc: 'Student, researcher, or just exploring',
   },
 ];
 
 const INTERESTS = [
-  { id: 'smoke',      label: 'Smoke testing',   icon: '🔥' },
-  { id: 'functional', label: 'Functional tests', icon: '✅' },
-  { id: 'performance',label: 'Performance',      icon: '⚡' },
-  { id: 'selenium',   label: 'Selenium',         icon: '🟢' },
-  { id: 'cypress',    label: 'Cypress',          icon: '🌿' },
-  { id: 'playwright', label: 'Playwright',       icon: '🎭' },
-  { id: 'reports',    label: 'Reports',          icon: '📊' },
-  { id: 'ci',         label: 'CI/CD',            icon: '🔄' },
-  { id: 'security',   label: 'Security',         icon: '🛡️' },
-  { id: 'regression', label: 'Regression',       icon: '🔁' },
+  { id: 'smoke',       label: 'Smoke testing',    icon: <Flame size={14} /> },
+  { id: 'functional',  label: 'Functional tests', icon: <CheckCircle2 size={14} /> },
+  { id: 'performance', label: 'Performance',      icon: <Zap size={14} /> },
+  { id: 'selenium',    label: 'Selenium',         icon: <CircleDot size={14} /> },
+  { id: 'cypress',     label: 'Cypress',          icon: <Leaf size={14} /> },
+  { id: 'playwright',  label: 'Playwright',       icon: <Theater size={14} /> },
+  { id: 'reports',     label: 'Reports',          icon: <BarChart3 size={14} /> },
+  { id: 'ci',          label: 'CI/CD',            icon: <RefreshCw size={14} /> },
+  { id: 'security',    label: 'Security',         icon: <Shield size={14} /> },
+  { id: 'regression',  label: 'Regression',       icon: <RotateCcw size={14} /> },
+  // --- nouveaux ---
+  { id: 'api',         label: 'API Testing',      icon: <Webhook size={14} /> },
+  { id: 'seo',         label: 'SEO Testing',      icon: <Search size={14} /> },
+  { id: 'automation',  label: 'Automation',       icon: <Bot size={14} /> },
+  { id: 'k6',          label: 'k6',               icon: <Gauge size={14} /> },
+  { id: 'requests',    label: 'Requests',         icon: <Globe size={14} /> },
+  { id: 'postman',     label: 'Postman',          icon: <Send size={14} /> },
 ];
 
 const EXP_LEVELS = [
@@ -81,12 +78,30 @@ const ROLE_LABELS = {
 function NexLogo() {
   return (
     <div className="ob-logo">
-      <div className="ob-gem">
-        <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
-          <circle cx="22" cy="22" r="17" stroke="#060e1e" strokeWidth="2" fill="none" opacity="0.6"/>
-          <polyline points="13,22 20,30 32,14" stroke="#060e1e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </div>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90" width="40" height="40" style={{ flexShrink: 0 }}>
+        <defs>
+          <linearGradient id="hexGradOb" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#8a6a00"/>
+            <stop offset="40%" stopColor="#C9A227"/>
+            <stop offset="100%" stopColor="#E8C84A"/>
+          </linearGradient>
+          <filter id="glowOb">
+            <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <polygon points="45,8 77,27 77,63 45,82 13,63 13,27"
+          fill="rgba(201,162,39,0.08)" stroke="url(#hexGradOb)" strokeWidth="2"/>
+        <circle cx="45" cy="8"  r="2.5" fill="#C9A227" opacity="0.8"/>
+        <circle cx="77" cy="27" r="2.5" fill="#C9A227" opacity="0.8"/>
+        <circle cx="77" cy="63" r="2.5" fill="#C9A227" opacity="0.8"/>
+        <circle cx="45" cy="82" r="2.5" fill="#C9A227" opacity="0.8"/>
+        <circle cx="13" cy="63" r="2.5" fill="#C9A227" opacity="0.8"/>
+        <circle cx="13" cy="27" r="2.5" fill="#C9A227" opacity="0.8"/>
+        <text x="45" y="56" textAnchor="middle"
+          fontFamily="Georgia, serif" fontSize="36" fontWeight="700"
+          fill="#C9A227" filter="url(#glowOb)">N</text>
+      </svg>
       <div>
         <div className="ob-brand-name">NEXTEST</div>
         <div className="ob-brand-sub">TEST AUTOMATION</div>
@@ -94,7 +109,6 @@ function NexLogo() {
     </div>
   );
 }
-
 function StepBar({ step, total }) {
   return (
     <div className="ob-step-bar">
@@ -126,9 +140,8 @@ function StepRole({ selected, onSelect, onNext, onSkip }) {
             <span className="ob-role-desc">{role.desc}</span>
             {selected === role.id && (
               <span className="ob-role-check">
-                <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
-                  <path d="M20 6L9 17l-5-5"/>
-                </svg>
+                <Check size={11} strokeWidth={3} />
+                  
               </span>
             )}
           </button>
@@ -142,10 +155,8 @@ function StepRole({ selected, onSelect, onNext, onSkip }) {
           disabled={!selected}
           onClick={onNext}
         >
-          Continue
-          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            <path d="M5 12h14M12 5l7 7-7 7"/>
-          </svg>
+           Continue
+          <ArrowRight size={13} strokeWidth={2.5} />
         </button>
       </div>
     </div>
@@ -190,16 +201,12 @@ function StepInterests({ interests, exp, onToggleInterest, onSelectExp, onNext, 
 
       <div className="ob-actions">
         <button className="ob-btn-back" onClick={onBack}>
-          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            <path d="M19 12H5M12 5l-7 7 7 7"/>
-          </svg>
+          <ArrowLeft size={13} strokeWidth={2.5} />
           Back
         </button>
         <button className="ob-btn-next" onClick={onNext}>
           Continue
-          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            <path d="M5 12h14M12 5l7 7-7 7"/>
-          </svg>
+          <ArrowRight size={13} strokeWidth={2.5} />
         </button>
       </div>
     </div>
@@ -271,9 +278,7 @@ function StepReady({ role, interests, exp, onBack, onFinish, loading }) {
           ) : (
             <>
               Go to Dashboard
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
+              <ArrowRight size={13} strokeWidth={2.5} />
             </>
           )}
         </button>

@@ -1398,7 +1398,7 @@ Rules:
                 "Content-Type": "application/json"
             },
             json={
-                "model": "llama-3.3-70b-versatile",
+                "model": "llama-3.1-8b-instant",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 600,
                 "temperature": 0.3
@@ -3390,9 +3390,9 @@ def build_functional_results_table(elements, tests: list):
         t.get('selector') or
         t.get('selector_used') or
         t.get('value') or
-        t.get('step_meta', {}).get('selector') or
-        t.get('step_meta', {}).get('value') or
-        t.get('step_meta', {}).get('selector_used') or
+        (t.get('step_meta') or {}).get('selector') or
+        (t.get('step_meta') or {}).get('value') or
+        (t.get('step_meta') or {}).get('selector_used') or
         t.get('target') or
         _extract_functional_selector(t)
         )

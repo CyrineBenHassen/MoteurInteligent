@@ -8,7 +8,7 @@ const api = axios.create({
   },
 });
 
-// Intercepteur : ajoute le token automatiquement à chaque requête
+// Intercepteur
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('nextest_token') || localStorage.getItem('token');
   if (token) {
@@ -17,7 +17,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Intercepteur réponse : si 401 rediriger vers login
+// Intercepteur réponse
 api.interceptors.response.use(
   (response) => response,
   (error) => {

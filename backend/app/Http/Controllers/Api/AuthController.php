@@ -54,6 +54,11 @@ class AuthController extends Controller
         ]);
     }
 
+    
+    if (!$user->is_active) {
+        $user->update(['is_active' => true]);
+    }
+
     $user->tokens()->delete();
     $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -63,7 +68,7 @@ class AuthController extends Controller
         'last_login_at' => now(),
     ]);
 
-    // toArray() APRÈS
+    // toArray()
     $userData = $user->toArray();
     if (!empty($userData['avatar']) && !str_starts_with($userData['avatar'], 'http')) {
         $userData['avatar'] = asset('storage/' . $userData['avatar']);
@@ -76,7 +81,6 @@ class AuthController extends Controller
         'token_type'   => 'Bearer',
     ]);
 }
-
     # Logout
     public function logout(Request $request)
     {
@@ -94,7 +98,7 @@ public function me(Request $request)
     $user = $request->user();
     $data = $user->toArray();
     
-    // Ajoute cette conversion
+    
     if (!empty($data['avatar']) && !str_starts_with($data['avatar'], 'http')) {
         $data['avatar'] = asset('storage/' . $data['avatar']);
     }

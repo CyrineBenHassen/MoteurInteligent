@@ -24,7 +24,7 @@ def _extract_pages_from_doc(doc_text: str) -> list:
     print("[REGRESSION_GENERATOR] Extracting pages from doc_text via LLM...")
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system",
@@ -63,6 +63,10 @@ def _discover_pages(base_url: str, paths: list) -> list:
     print(f"[REGRESSION_GENERATOR] Probing pages on {base_url}...")
 
     for path in paths:
+        if path.startswith("/api/"):
+            print(f"[REGRESSION_GENERATOR]   ⊘ {path} → skipped (API route, not a navigable page)")
+            continue
+
         url = f"{base_url}{path}"
         try:
             resp = requests.get(url, verify=False, timeout=5, allow_redirects=True)
@@ -151,7 +155,7 @@ Return ONLY the JSON array."""
 
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system",

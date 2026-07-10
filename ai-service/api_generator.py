@@ -1,7 +1,3 @@
-# api_generator.py — NexTest API Test Generator
-# Uses Groq LLaMA3 to generate intelligent API test cases
-# Architecture: same as /chat endpoint in main.py
-
 import os, json, re
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -809,13 +805,48 @@ def _build_postman_collection(test_cases: list, base_url: str, token: str) -> di
 
 
 def _generate_endpoints_with_llama(base_url: str, username: str = "", password: str = "", doc_text: str = "") -> list:
-    """Generate generic API endpoints using LLaMA for any unknown app."""
-    doc_context = f"\nUse this documentation to extract real API endpoints:\n{doc_text[:2000]}" if doc_text else ""
-    system_prompt = (
-        "You are an expert API QA engineer. Generate REST API test endpoints for any web application.\n"
-        "Return ONLY valid JSON array, no markdown, no explanation.\n"
-    )
-    user_prompt = f"""Generate 8 common REST API test endpoints for: {base_url}{doc_context}
+    """Generate API endpoints — strictly from doc_text if provided, otherwise generic fallback."""
+
+    if doc_text:
+        # ── MODE 1 : doc fourni → extraction stricte, aucun endpoint inventé ──
+        system_prompt = (
+            "You are an expert API QA engineer. Extract REST API endpoints STRICTLY from the "
+            "documentation provided. Return ONLY valid JSON array, no markdown, no explanation.\n"
+            "CRITICAL: You must ONLY use endpoint paths that are explicitly written in the documentation. "
+            "NEVER invent, guess, or generate an endpoint path that is not literally present in the doc text."
+        )
+        user_prompt = f"""Documentation:
+{doc_text[:3000]}
+
+Base URL: {base_url}
+
+Extract ALL API endpoints mentioned in this documentation (look for lines like "GET /api/...", "POST /api/...").
+For each endpoint found, generate a test case.
+
+For each endpoint provide:
+- method: the HTTP method exactly as written in the doc (GET/POST/PUT/DELETE)
+- path: the EXACT path as written in the doc, character for character
+- name: descriptive test name in English
+- category: infer from the path (e.g. "dashboard", "dossiers", "users", "commissions", "auth")
+- priority: "high" for GET list/detail endpoints, "medium" for others
+- description: what this endpoint does, based on doc context
+- body: null for GET/DELETE, a plausible minimal JSON body for POST/PUT if the doc gives hints, else null
+- expect_status: 200 for GET, 401 if testing without auth
+- expect_field: "data" if the endpoint returns a list/object, else null
+- skip_auth: false (unless doc says endpoint is public)
+
+Also add ONE negative test: same GET endpoint from the list but with skip_auth=true and expect_status=401,
+to verify the endpoint requires authentication.
+
+Return ONLY a JSON array, no markdown, no explanation. Do not add any endpoint not present in the documentation above."""
+
+    else:
+        # ── MODE 2 : pas de doc → générique classique (comportement actuel) ──
+        system_prompt = (
+            "You are an expert API QA engineer. Generate REST API test endpoints for any web application.\n"
+            "Return ONLY valid JSON array, no markdown, no explanation.\n"
+        )
+        user_prompt = f"""Generate 8 common REST API test endpoints for: {base_url}
 
 IMPORTANT RULES:
 - Do NOT generate login endpoints that require captcha
@@ -885,7 +916,7 @@ Return ONLY the JSON array."""
                 raw = raw[4:]
         raw = raw.strip()
         endpoints = json.loads(raw)
-        print(f"[API_GEN] LLaMA generated {len(endpoints)} endpoints for {base_url}")
+        print(f"[API_GEN] LLaMA generated {len(endpoints)} endpoints for {base_url} (doc={'yes' if doc_text else 'no'})")
         return endpoints
     except Exception as e:
         print(f"[API_GEN] LLaMA endpoint generation failed: {e}")
@@ -984,9 +1015,9 @@ def generate_api_tests(
                             ep["body"]["password"] = password
                     all_endpoints.append(ep)
 
-        if doc_text:
-            print(f"[API_GEN] Doc provided — using LLaMA to extract endpoints from doc")
-            all_endpoints = _generate_endpoints_with_llama(base_url, username, password, doc_text)
+        if doc_text and not found_known:
+             print(f"[API_GEN] Doc provided, no known domain matched — using LLaMA to extract endpoints from doc")
+             all_endpoints = _generate_endpoints_with_llama(base_url, username, password, doc_text)
         elif not found_known or not all_endpoints:
             print(f"[API_GEN] No known endpoints — using LLaMA to generate for {base_url}")
             all_endpoints = _generate_endpoints_with_llama(base_url, username, password)

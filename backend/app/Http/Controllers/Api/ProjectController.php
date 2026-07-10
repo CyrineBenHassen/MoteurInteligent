@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Api;  // ← Api ici
+namespace App\Http\Controllers\Api;  
 
 use App\Http\Controllers\Controller;
-use App\Models\Project;              // ← ajoute l'import du model
+use App\Models\Project;              
 use Illuminate\Http\Request;
 
 class ProjectController extends Controller
@@ -12,7 +12,7 @@ class ProjectController extends Controller
 public function index()
 {
     $projects = Project::where('user_id', auth()->id())
-        ->withCount('generations')  // ← c'est tout ce qu'il manque
+        ->withCount('generations')  
         ->orderBy('created_at', 'desc')
         ->get();
 
@@ -28,7 +28,7 @@ public function store(Request $request)
         'description' => $request->description,
     ]);
 
-    $project->loadCount('generations');  // ← déjà présent chez toi, bien
+    $project->loadCount('generations');  
 
     return response()->json($project, 201);
 }

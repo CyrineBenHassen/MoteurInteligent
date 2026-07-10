@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\TestFlagController;
 use App\Http\Controllers\FlakyTestController;
 use App\Http\Controllers\ScheduledTaskController;
+use App\Http\Controllers\ChatbotController;
 
 
 
@@ -30,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
     Route::post('/profile/avatar',  [ProfileController::class, 'updateAvatar']);
     Route::delete('/profile/delete', [ProfileController::class, 'deleteAccount']);
+    Route::put('/profile/deactivate', [ProfileController::class, 'deactivate']);
     Route::get('/profile', [ProfileController::class, 'show']);
 
 
@@ -47,6 +49,9 @@ Route::middleware('auth:sanctum')->group(function () {
    Route::get('/flaky-tests', [FlakyTestController::class, 'index']);
 Route::post('/flaky-tests/rerun', [FlakyTestController::class, 'rerun']);
 Route::get('/flaky-tests/details', [FlakyTestController::class, 'details']);
+Route::delete('/flaky-tests', [FlakyTestController::class, 'destroy']);
+Route::delete('/flaky-tests/url', [FlakyTestController::class, 'destroyByUrl']);
+
 
 Route::post('/flaky-tests/record', [FlakyTestController::class, 'record']);
 Route::post('/flaky-tests/flag', [TestFlagController::class, 'store']);
@@ -87,6 +92,7 @@ Route::delete('/alerts/{id}',       [\App\Http\Controllers\Api\AlertController::
 Route::get('/projects/{projectId}/tested-urls', [GenerationController::class, 'testedUrlsForProject']);
 
 
+
 // routes/api.php — dans le groupe middleware('auth:sanctum') existant
 Route::get('/scheduled-tasks',              [ScheduledTaskController::class, 'index']);
 Route::post('/scheduled-tasks',             [ScheduledTaskController::class, 'store']);
@@ -95,4 +101,7 @@ Route::delete('/scheduled-tasks/{scheduledTask}',  [ScheduledTaskController::cla
 Route::post('/scheduled-tasks/{scheduledTask}/run',     [ScheduledTaskController::class, 'runNow']);
 Route::patch('/scheduled-tasks/{scheduledTask}/status', [ScheduledTaskController::class, 'updateStatus']);
 });
+
+// Chatbot — public, pas d'auth requise
+Route::post('/chatbot/ask', [ChatbotController::class, 'ask']);
 

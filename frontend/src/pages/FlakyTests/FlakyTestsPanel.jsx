@@ -8,7 +8,7 @@ import {
 import {
   IconFlame, IconActivity, IconBolt, IconCircleX, IconCircleCheck,
   IconEye, IconSearch, IconChevronDown, IconAlertTriangle, IconWorld,
-  IconShield, IconClick, IconApi,
+  IconShield, IconClick, IconApi,IconTrash 
 } from '@tabler/icons-react';
 
 
@@ -18,7 +18,7 @@ const STATUS_CONFIG = {
   flaky:    { label: 'Flaky',    color: '#f97316' },
   critical: { label: 'Critical', color: '#ef4444' },
   broken:   { label: 'Broken',   color: '#ef4444' },
-  muted:    { label: 'Muted',    color: '#64748b' },
+  muted:    { label: 'Ignored',    color: '#64748b' },
 };
 
 function FlakyKpiCard({ icon, color, label, value }) {
@@ -138,6 +138,43 @@ fetchData();
       setActionLoading(null);
     }
   };
+const handleDeleteUrl = async (url, projectId) => {
+  setActionLoading(url);
+  try {
+    await api.delete('/flaky-tests/url', {
+      data: { project_id: projectId, url },
+    });
+
+    // Retire directement les tests de cette URL du state local, sans refetch
+    setTests(prev => prev.filter(t => t.url !== url));
+
+    setDetailsMap(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => { if (k.startsWith(`${url}|`)) delete next[k]; });
+      return next;
+    });
+    if (expandedKey === url) setExpandedKey(null);
+  } catch (err) {
+    console.error('[DeleteUrl]', err);
+  } finally {
+    setActionLoading(null);
+  }
+};
+const handleDelete = async (test) => {
+  const key = keyOf(test);
+  setActionLoading(key);
+  try {
+    await api.delete('/flaky-tests', {
+      data: { project_id: test.project_id, url: test.url, test_type: test.test_type, test_name: test.test_name },
+    });
+    invalidateDetails(test);
+    fetchData();
+  } catch (err) {
+    console.error('[Delete]', err);
+  } finally {
+    setActionLoading(null);
+  }
+};
 
 
   const fetchDetails = async (test) => {
@@ -160,7 +197,7 @@ fetchDetailsRef.current = fetchDetails;
 
 
 
-  // ── Charts dérivés des vraies données ──
+
   const urlStats = {};
   tests.forEach(t => {
     if (!urlStats[t.url]) urlStats[t.url] = { url: t.url, totalScore: 0, count: 0 };
@@ -361,6 +398,20 @@ const typeCfg = TYPE_CONFIG[urlTests[0]?.test_type] || { icon: <IconWorld size={
 
                       <StatusBadge status={worstStatus} />
 
+                      <button
+  onClick={(e) => { e.stopPropagation(); handleDeleteUrl(url, urlTests[0]?.project_id); }}
+  disabled={actionLoading === url}
+  title="Delete"
+  style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+    background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)',
+    color: '#ef4444', cursor: 'pointer',
+  }}
+>
+  <IconTrash size={13} stroke={2} />
+</button>
+
                       <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2.5" viewBox="0 0 24 24"
                         style={{ flexShrink: 0, transition: 'transform .2s', transform: isUrlOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                         <path d="M6 9l6 6 6-6"/>
@@ -418,17 +469,27 @@ const typeCfg = TYPE_CONFIG[urlTests[0]?.test_type] || { icon: <IconWorld size={
 
                             <StatusBadge status={cas.status} />
 
-                            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                              
+   <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+  {cas.status === 'muted' ? (
+<button onClick={() => handleUnflag(casFull)} disabled={isActing} style={{ fontSize: 10, fontWeight: 700, padding: '0 8px', height: 26, borderRadius: 6, background: 'rgba(100,116,139,.1)', border: '1px solid rgba(100,116,139,.25)', color: '#64748b', cursor: 'pointer' }}>Unignore</button>  ) : (
+<button onClick={() => handleFlag(casFull, 'muted')} disabled={isActing} style={{ fontSize: 10, fontWeight: 700, padding: '0 8px', height: 26, borderRadius: 6, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer' }}>Ignore</button>  )}
 
-                              {cas.status === 'muted' ? (
-                                <button onClick={() => handleUnflag(casFull)} disabled={isActing} style={{ fontSize: 10, fontWeight: 700, padding: '0 8px', height: 26, borderRadius: 6, background: 'rgba(100,116,139,.1)', border: '1px solid rgba(100,116,139,.25)', color: '#64748b', cursor: 'pointer' }}>Unmute</button>
-                              ) : (
-                                <button onClick={() => handleFlag(casFull, 'muted')} disabled={isActing} style={{ fontSize: 10, fontWeight: 700, padding: '0 8px', height: 26, borderRadius: 6, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer' }}>Mute</button>
-                              )}
+  <button onClick={() => handleFlag(casFull, 'stable')} disabled={isActing} style={{ fontSize: 10, fontWeight: 700, padding: '0 8px', height: 26, borderRadius: 6, background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', color: '#10b981', cursor: 'pointer' }}>Stable</button>
 
-                              <button onClick={() => handleFlag(casFull, 'stable')} disabled={isActing} style={{ fontSize: 10, fontWeight: 700, padding: '0 8px', height: 26, borderRadius: 6, background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', color: '#10b981', cursor: 'pointer' }}>Stable</button>
-                            </div>
+  <button
+    onClick={() => handleDelete(casFull)}
+    disabled={isActing}
+    title="Delete"
+    style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      width: 26, height: 26, borderRadius: 6,
+      background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)',
+      color: '#ef4444', cursor: 'pointer',
+    }}
+  >
+    <IconTrash size={13} stroke={2} />
+  </button>
+</div>
                           </div>
                         );
                       })

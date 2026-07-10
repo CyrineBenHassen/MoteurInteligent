@@ -30,6 +30,7 @@ class ScheduledTaskController extends Controller
             'project_id'    => 'required|exists:projects,id',
             'url'           => 'required|url',
             'test_type'     => 'required|string',
+            'framework'     => 'nullable|string',
             'schedule_type' => 'required|string',
             'cron'          => 'required|string',
             'notify_email'  => 'boolean',
@@ -58,6 +59,7 @@ class ScheduledTaskController extends Controller
             'project_id'    => 'required|exists:projects,id',
             'url'           => 'required|url',
             'test_type'     => 'required|string',
+            'framework'     => 'nullable|string',
             'schedule_type' => 'required|string',
             'cron'          => 'required|string',
             'notify_email'  => 'boolean',
@@ -168,10 +170,10 @@ public function executeScheduledTask(ScheduledTask $task): int
             default => 120,
         };
 
-        $framework = match($testType) {
+        $framework = $task->framework ?: match($testType) {
             'api'         => 'Pytest',
             'performance' => 'k6',
-            'security', 'seo' => 'Requests + BeautifulSoup',
+            'security', 'seo' => null,
             default       => 'Selenium',
         };
 
@@ -211,8 +213,8 @@ public function executeScheduledTask(ScheduledTask $task): int
             $rate = $total > 0 ? (int) round(($pass / $total) * 100) : 0;
         }
 
-        if (!empty($testCases) && $pass === 0 && $fail === 0
-            && in_array($testType, ['smoke', 'functional', 'regression'])) {
+        if (!empty($testCases)
+    && in_array($testType, ['smoke', 'functional', 'regression'])) {
             $runResponse = Http::timeout(300)->post('http://127.0.0.1:8001/run', [
                 'script'     => $result['script'] ?? '',
                 'framework'  => $framework ?? 'Selenium',

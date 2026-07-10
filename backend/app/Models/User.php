@@ -20,10 +20,10 @@ class User extends Authenticatable
         'phone',
         'company',
         'position', 
-        'onboarding_completed',  // ← ajoute
+        'onboarding_completed',  
         'onboarding_data',
-        'last_login_ip',    // ← AJOUTE
-        'last_login_at',    // ← AJOUTE 
+        'last_login_ip',    
+        'last_login_at',    
     ];
 
     protected $hidden = [

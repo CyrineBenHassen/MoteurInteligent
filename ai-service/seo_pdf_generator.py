@@ -1,3 +1,5 @@
+from matplotlib.pyplot import rc
+from numpy import fix
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.colors import HexColor, white
@@ -9,7 +11,15 @@ from reportlab.platypus import (
 from io import BytesIO
 from datetime import datetime
 
-# ── Color Palette ─────────────────────────────────────────────────────────────
+from xml.sax.saxutils import escape as _xml_escape
+
+def _esc(text):
+    """Escape HTML/XML special chars so ReportLab doesn't try to parse them as tags."""
+    if not isinstance(text, str):
+        return text
+    return _xml_escape(text)
+
+#Color Palette
 NAVY        = HexColor('#0a0f1e')
 GREEN       = HexColor('#10b981')
 GREEN_BG    = HexColor('#d1fae5')
@@ -32,7 +42,7 @@ TEAL_BG     = HexColor('#ccfbf1')
 SEO_GREEN   = HexColor('#16a34a')   # accent couleur SEO
 SEO_BG      = HexColor('#dcfce7')
 
-# ── Category colors ───────────────────────────────────────────────────────────
+#Category colors
 CAT_COLORS = {
     'security':      '#ef4444',
     'accessibility': '#8b5cf6',
@@ -52,7 +62,7 @@ PRIORITY_COLORS = {
 }
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+#Helpers
 def _ps(name, **kwargs):
     return ParagraphStyle(name, **kwargs)
 
@@ -113,7 +123,7 @@ def _stat_card(value, label, val_color, bg_color):
     return t
 
 
-# ── SECTION 1 — SEO Scenarios (planned checks) ───────────────────────────────
+#SECTION 1 — SEO Scenarios (planned checks)
 def _build_seo_scenarios(elements, test_cases, url):
     elements.append(_section_header('SEO Test Scenarios', '#16a34a'))
     elements.append(Spacer(1, 4))
@@ -126,16 +136,24 @@ def _build_seo_scenarios(elements, test_cases, url):
     elements.append(Spacer(1, 8))
 
     EXPECTED_MAP = {
-        'security':      'Secure connection — HTTPS enforced',
-        'accessibility': 'Page reachable — HTTP 200 response',
-        'meta':          'Tag present and within optimal length',
-        'structure':     'Correct heading hierarchy in HTML',
-        'mobile':        'Viewport configured for mobile devices',
-        'technical':     'Technical SEO element present and valid',
-        'social':        'Social sharing metadata configured',
-        'content':       'Content meets SEO quantity threshold',
-        'performance':   'Page loads within 3000ms threshold',
-    }
+        'HTTPS Enabled':                    'Site must be served over HTTPS',
+        'Page Accessible':                  'Page must return HTTP 200',
+        'Title Tag Present':                'A &lt;title&gt; tag must exist',
+        'Title Length Optimal':             'Title length must be between 30–60 characters',
+        'Meta Description Present':         'A meta description tag must exist',
+        'Meta Description Length Optimal':  'Meta description must be between 70–160 characters',
+        'Single H1 Tag':                    'Exactly one &lt;h1&gt; tag must be present',
+        'H2 Tags Present':                  'At least one &lt;h2&gt; tag should exist',
+        'All Images Have Alt Text':         'Every &lt;img&gt; must have a non-empty alt attribute',
+        'Viewport Meta Tag':                'A responsive viewport meta tag must be present',
+        'Canonical URL Defined':            'A canonical &lt;link&gt; tag must be defined',
+        'Open Graph Tags Present':          'og:title and og:description must be present',
+        'Schema Markup Present':            'Structured data (JSON-LD) should be present',
+        'robots.txt Found':                 'A valid /robots.txt must exist',
+        'sitemap.xml Found':                'A valid /sitemap.xml must exist',
+        'Sufficient Word Count':            'Page must contain at least 300 words',
+        'Fast Page Load (<3000ms)':         'Page must load in under 3000ms',
+}
 
     hdr = [
         _p('<font color="#ffffff"><b>#</b></font>',
@@ -166,7 +184,7 @@ def _build_seo_scenarios(elements, test_cases, url):
         cc      = CAT_COLORS.get(cat, '#64748b')
         impact  = IMPACT_MAP.get(cat, 'MEDIUM')
         ic      = IMPACT_COLORS.get(impact, '#f59e0b')
-        expected = EXPECTED_MAP.get(cat, 'Check passes successfully')
+        expected = EXPECTED_MAP.get(tc['name'], 'Check passes successfully')
 
         rows.append([
             _p(f'<font color="#64748b"><b>{i+1}</b></font>',
@@ -200,7 +218,7 @@ def _build_seo_scenarios(elements, test_cases, url):
     elements.append(Spacer(1, 16))
 
 
-# ── SECTION 2 — Results by Category ──────────────────────────────────────────
+#SECTION 2 — Results by Category
 def _build_category_summary(elements, test_cases):
     elements.append(Spacer(1, 8))
     elements.append(_section_header('Results by Category', '#16a34a'))
@@ -272,7 +290,7 @@ def _build_category_summary(elements, test_cases):
     elements.append(Spacer(1, 16))
 
 
-# ── SECTION 3 — Detailed Results ──────────────────────────────────────────────
+#SECTION 3 — Detailed Results
 def _build_detailed_results(elements, test_cases):
     elements.append(_section_header('Detailed SEO Test Results', '#0d9488'))
     elements.append(Spacer(1, 4))
@@ -349,7 +367,7 @@ def _build_detailed_results(elements, test_cases):
     elements.append(Spacer(1, 16))
 
 
-# ── SECTION 4 — LLaMA Analysis per test ──────────────────────────────────────
+# SECTION 4 — LLaMA Analysis per test
 def _build_llama_analysis(elements, test_cases):
     elements.append(Spacer(1, 8))
     elements.append(_section_header('LLaMA Analysis — Root Cause & Fix per Check', INDIGO))
@@ -391,10 +409,11 @@ def _build_llama_analysis(elements, test_cases):
         sc     = '#10b981' if status == 'pass' else '#ef4444'
         sl     = 'PASS' if status == 'pass' else 'FAIL'
 
-        rc    = ai.get('root_cause', '—')
-        fix   = ai.get('fix', '—')
+        rc    = _esc(ai.get('root_cause', '—'))
+        fix   = _esc(ai.get('fix', '—'))
         rc_s  = rc[:70] + '…' if len(rc) > 70 else rc
         fix_s = fix[:70] + '…' if len(fix) > 70 else fix
+        
 
         rows.append([
             _p(f'<font color="#64748b"><b>{i+1}</b></font>',
@@ -429,7 +448,7 @@ def _build_llama_analysis(elements, test_cases):
     elements.append(Spacer(1, 16))
 
 
-# ── SECTION 5 — AI Recommendations ───────────────────────────────────────────
+#SECTION 5 — AI Recommendations
 def _build_ai_recommendations(elements, ai_result, seo_score, url):
     elements.append(Spacer(1, 8))
     elements.append(_section_header('AI Recommendations', INDIGO))
@@ -544,7 +563,7 @@ def _build_ai_recommendations(elements, ai_result, seo_score, url):
         elements.append(Spacer(1, 16))
 
 
-# ── SECTION 6 — Final Verdict ─────────────────────────────────────────────────
+#SECTION 6 — Final Verdict
 def _build_final_verdict(elements, summary, seo_score, test_cases):
     pass_count = summary.get('passed', 0)
     fail_count = summary.get('failed', 0)
@@ -607,7 +626,7 @@ def _build_final_verdict(elements, summary, seo_score, test_cases):
     elements.append(Spacer(1, 20))
 
 
-# ── MAIN ──────────────────────────────────────────────────────────────────────
+#MAIN
 def generate_seo_pdf(generation_data: dict) -> bytes:
     buffer = BytesIO()
 
@@ -632,7 +651,7 @@ def generate_seo_pdf(generation_data: dict) -> bytes:
 
     elements = []
 
-    # ── HEADER ────────────────────────────────────────────────────────────────
+    #HEADER
     header_data = [[
         _p('<font color="#16a34a"><b>NEX</b></font><font color="#ffffff">TEST</font>',
            _ps('SLogo', fontSize=24, fontName='Helvetica-Bold')),
@@ -655,7 +674,7 @@ def generate_seo_pdf(generation_data: dict) -> bytes:
             fontName='Helvetica-Bold', spaceAfter=2)))
     elements.append(Spacer(1, 14*mm))
 
-    # ── INFO BOX ──────────────────────────────────────────────────────────────
+    #INFO BOX
     def il(txt):
         return _p(f'<font color="#64748b">{txt}</font>',
                   _ps(f'IL{txt}', fontSize=8, fontName='Helvetica-Bold', leading=12))
@@ -685,7 +704,7 @@ def generate_seo_pdf(generation_data: dict) -> bytes:
     elements.append(info_tbl)
     elements.append(Spacer(1, 20))
 
-    # ── STAT CARDS ────────────────────────────────────────────────────────────
+    #STAT CARDS
     stats_data = [[
         _stat_card(pass_count,       'PASSED',    '#10b981', GREEN_BG),
         _stat_card(fail_count,       'FAILED',    '#ef4444', RED_BG),
@@ -704,7 +723,7 @@ def generate_seo_pdf(generation_data: dict) -> bytes:
     elements.append(outer)
     elements.append(Spacer(1, 20))
 
-    # ── ALL SECTIONS ──────────────────────────────────────────────────────────
+    # ALL SECTIONS
     _build_seo_scenarios(elements, test_cases, url)
     _build_category_summary(elements, test_cases)
     _build_detailed_results(elements, test_cases)

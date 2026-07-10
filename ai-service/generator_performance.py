@@ -37,12 +37,16 @@ DEFAULT_THRESHOLDS = {
 
 # Poids pour le score global (inspiré de Lighthouse)
 METRIC_WEIGHTS = {
-    "fcp_ms":        0.10,
-    "lcp_ms":        0.25,
-    "tti_ms":        0.30,
-    "load_time_ms":  0.20,
-    "total_size_kb": 0.10,
-    "dom_size":      0.05,
+    "fcp_ms":         0.10,
+    "lcp_ms":         0.20,
+    "tti_ms":         0.25,
+    "load_time_ms":   0.15,
+    "total_size_kb":  0.08,
+    "dom_size":       0.04,
+    "request_count":  0.08,
+    "js_size_kb":     0.06,
+    "css_size_kb":    0.02,
+    "image_size_kb":  0.02,
 }
 
 # Types de sites reconnus
@@ -237,13 +241,22 @@ def _metric_score(value: float, good: float, poor: float) -> int:
     """Calcule un score 0-100 pour une métrique."""
     if value is None:
         return 50  # neutre si non mesuré
+
+    # Garde-fou : seuil "good" invalide (0 ou négatif) → seuil corrompu, score neutre
+    if good <= 0:
+        print(f"[PERF] Invalid 'good' threshold ({good}) — returning neutral score")
+        return 50
+
     if value <= good:
-        # Interpolation linéaire 100 → 90
         ratio = value / good
         return max(90, int(100 - ratio * 10))
     if value >= poor:
         return 0
+
     # Entre good et poor : interpolation 90 → 0
+    if poor == good:
+        # Bornes identiques, pas d'interpolation possible
+        return 0
     ratio = (value - good) / (poor - good)
     return int(90 * (1 - ratio))
 
@@ -657,12 +670,34 @@ def generate_performance_tests(
     )
 
     # Merge thresholds — LLaMA a priorité
+    # Merge thresholds — LLaMA a priorité, avec garde-fou contre les valeurs aberrantes
     final_thresholds = dict(base_thresholds)
     for k, v in llama_result.get("thresholds", {}).items():
-        if isinstance(v, dict) and "good" in v and "poor" in v:
-            if k in final_thresholds:
-                final_thresholds[k]["good"] = v["good"]
-                final_thresholds[k]["poor"] = v["poor"]
+        if not (isinstance(v, dict) and "good" in v and "poor" in v):
+            continue
+        if k not in final_thresholds:
+            continue
+        base_good = base_thresholds[k]["good"]
+        base_poor = base_thresholds[k]["poor"]
+        try:
+            new_good = float(v["good"])
+            new_poor = float(v["poor"])
+        except (TypeError, ValueError):
+            continue  # valeur non numérique renvoyée par LLaMA → on garde le seuil de base
+
+        # Rejette si LLaMA dévie de plus de 3x le seuil de base (probable hallucination)
+        if not (base_good / 3 <= new_good <= base_good * 3):
+            print(f"[PERF] Rejected LLaMA threshold for '{k}': good={new_good} (base={base_good})")
+            continue
+        if not (base_poor / 3 <= new_poor <= base_poor * 3):
+            print(f"[PERF] Rejected LLaMA threshold for '{k}': poor={new_poor} (base={base_poor})")
+            continue
+        if new_good >= new_poor:
+            print(f"[PERF] Rejected LLaMA threshold for '{k}': good >= poor")
+            continue
+
+        final_thresholds[k]["good"] = new_good
+        final_thresholds[k]["poor"] = new_poor
 
     # 5. Score global Lighthouse-style
     global_score = _compute_global_score(metrics, final_thresholds)

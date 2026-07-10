@@ -1,3 +1,4 @@
+import os
 from unittest import result
 from urllib.request import Request
 
@@ -43,8 +44,416 @@ import json
 import asyncio
 from fastapi.responses import StreamingResponse
 
-
 from alert_recorder import record_results
+
+from groq import Groq
+
+#for the chatboot 
+from chatbot import router as chatbot_router
+
+
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+_groq_client_smoke = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+
+
+
+def _generate_smoke_summary(results: list, url: str) -> dict:
+    """Génère summary + recommendations + action_plan pour les smoke tests,
+    au même format que le résultat SEO (ai.summary / ai.recommendations / ai.action_plan)."""
+    if not _groq_client_smoke or not results:
+        return {}
+
+    fail_lines = []
+    for r in results:
+        if r.get("status") == "fail":
+            detail = r.get("reason") or r.get("suite") or r.get("error") or "—"
+            fail_lines.append(f"- {r.get('name','')}: {detail}")
+
+    # ── Cas 100% pass : demander des recommandations PROACTIVES au lieu de [] ──
+    if not fail_lines:
+        pass_count = sum(1 for r in results if r.get("status") == "pass")
+        pass_names = [r.get("name", "") for r in results if r.get("status") == "pass"]
+        checks_text = "\n".join(f"- {n}" for n in pass_names)
+
+        prompt = f"""You are a senior QA automation engineer. All {pass_count} smoke checks passed on {url}. No failures to analyze.
+
+Passed checks:
+{checks_text}
+
+Since everything passed, suggest 2-3 PROACTIVE improvements a QA engineer should still consider (e.g. edge cases not covered, monitoring gaps, test coverage expansion, performance/security angles not yet tested).
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview confirming all checks passed and overall site health",
+  "recommendations": [
+    {{"priority": "low|medium", "category": "coverage|performance|security|monitoring", "issue": "gap or opportunity not currently tested", "fix": "concrete suggestion"}}
+  ],
+  "action_plan": ["optional next step 1", "optional next step 2"]
+}}
+
+Rules:
+- Max 3 items in recommendations, priority should be low or medium (nothing is broken).
+- Be specific to the checks listed above, no generic filler, no markdown fences."""
+
+        try:
+            response = _groq_client_smoke.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=800,
+            )
+            raw = response.choices[0].message.content.strip()
+            raw = raw.replace("```json", "").replace("```", "").strip()
+            return json.loads(raw)
+        except Exception as e:
+            print(f"[SMOKE AI SUMMARY - proactive] error: {e}")
+            return {
+                "summary": f"All {pass_count} smoke checks passed on {url}. Critical elements (navigation, content, auth entry points) are all functioning as expected.",
+                "recommendations": [],
+                "action_plan": [],
+            }
+
+    checks_text = "\n".join(fail_lines)
+    prompt = f"""You are a senior QA automation engineer. Analyze these FAILED smoke test results for {url}.
+
+Failed checks:
+{checks_text}
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview mentioning how many issues were found and overall site health",
+  "recommendations": [
+    {{"priority": "high|medium|low", "category": "navigation|forms|performance|accessibility|content|security", "issue": "what failed", "fix": "concrete actionable fix"}}
+  ],
+  "action_plan": ["step 1", "step 2", "step 3"]
+}}
+
+Rules:
+- Max 6 items in recommendations, ordered by priority (high first).
+- Max 3 items in action_plan.
+- Be specific, no generic filler, no markdown fences."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+                model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        return json.loads(raw)
+    except Exception as e:
+        print(f"[SMOKE AI SUMMARY] error: {e}")
+        return {}
+ 
+ 
+def _generate_functional_analyses(results: list) -> dict:
+    """Root cause + fix — n'analyse que les FAIL (les pass ont un message générique, pas besoin de LLaMA)."""
+    if not _groq_client_smoke or not results:
+        return {}
+
+    # ── Ne garder que les index des FAIL — évite de saturer le prompt/tokens ──
+    fail_indices = [i for i, r in enumerate(results) if r.get("status") == "fail"]
+    if not fail_indices:
+        return {}
+
+    lines = []
+    for i in fail_indices:
+        r = results[i]
+        meta = r.get("step_meta") or {}
+        action = meta.get("action", "—")
+        selector = meta.get("selector", "—")
+        detail = r.get("reason") or r.get("error") or r.get("reason_skip") or "—"
+        lines.append(f"{i}. [FAIL] {r.get('name','')} — action={action} selector={selector} — {detail}")
+    checks_text = "\n".join(lines)
+
+    prompt = f"""You are a QA automation expert reviewing FAILED Playwright/Selenium functional test steps.
+For each failed test below, write a specific root_cause and fix using the actual data shown.
+
+Respond ONLY with a valid JSON object mapping index (as string) to root_cause and fix.
+Example: {{"{fail_indices[0]}": {{"root_cause": "...", "fix": "..."}}}}
+
+Failed Tests:
+{checks_text}
+
+Rules:
+- CRITICAL: Copy selector/action values EXACTLY as given. Never invent a different selector.
+- root_cause = specific problem using the actual selector/action/detail shown.
+- fix = concrete actionable step (selector fix, add explicit wait, fix backend validation, etc).
+- Max 20 words per sentence. No generic filler like "no action required"."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=2500,   # ← augmenté, suffisant même pour ~15-20 fails
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(raw)
+        result = {int(k): v for k, v in parsed.items()}
+        print(f"[FUNCTIONAL AI] {len(result)}/{len(fail_indices)} fails analyzed")
+        return result
+    except Exception as e:
+        print(f"[FUNCTIONAL AI] error: {e}")
+        return {}
+
+
+def _generate_functional_summary(results: list, url: str) -> dict:
+    """Summary + recommendations + action_plan pour functional — même format que SEO/smoke."""
+    if not _groq_client_smoke or not results:
+        return {}
+
+    fail_lines = []
+    for r in results:
+        if r.get("status") == "fail":
+            meta = r.get("step_meta") or {}
+            action = meta.get("action", "—")
+            detail = r.get("reason") or r.get("error") or "—"
+            fail_lines.append(f"- {r.get('name','')} ({action}): {detail}")
+
+    if not fail_lines:
+        pass_count = sum(1 for r in results if r.get("status") == "pass")
+        return {
+            "summary": f"All {pass_count} functional steps passed on {url}. Forms, navigation, and interactive elements behave as expected.",
+            "recommendations": [],
+            "action_plan": [],
+        }
+
+    checks_text = "\n".join(fail_lines)
+    prompt = f"""You are a senior QA automation engineer. Analyze these FAILED functional test steps for {url}.
+
+Failed steps:
+{checks_text}
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview mentioning how many issues were found and overall functional health",
+  "recommendations": [
+    {{"priority": "high|medium|low", "category": "forms|navigation|auth|ui|assertion", "issue": "what failed", "fix": "concrete actionable fix"}}
+  ],
+  "action_plan": ["step 1", "step 2", "step 3"]
+}}
+
+Rules:
+- Max 6 items in recommendations, ordered by priority (high first).
+- Max 3 items in action_plan.
+- Be specific, no generic filler, no markdown fences."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        return json.loads(raw)
+    except Exception as e:
+        print(f"[FUNCTIONAL AI SUMMARY] error: {e}")
+        return {}
+    
+def _generate_regression_analyses(results: list) -> dict:
+    """Root cause + fix — n'analyse que les FAIL."""
+    if not _groq_client_smoke or not results:
+        return {}
+
+    fail_indices = [i for i, r in enumerate(results) if r.get("status") == "fail"]
+    if not fail_indices:
+        return {}
+
+    lines = []
+    for i in fail_indices:
+        r = results[i]
+        detail = r.get("reason") or r.get("error") or "—"
+        lines.append(f"{i}. [FAIL] {r.get('name','')} — page={r.get('page','—')} — {detail}")
+    checks_text = "\n".join(lines)
+
+    prompt = f"""You are a QA automation expert reviewing FAILED regression test results.
+For each failed test below, write a specific root_cause and fix using the actual data shown.
+
+Respond ONLY with a valid JSON object mapping index (as string) to root_cause and fix.
+Example: {{"{fail_indices[0]}": {{"root_cause": "...", "fix": "..."}}}}
+
+Failed Tests:
+{checks_text}
+
+Rules:
+- CRITICAL: Copy page/URL/status values EXACTLY as given. Never invent a different value.
+- root_cause = specific problem using the actual page/detail shown.
+- fix = concrete actionable step.
+- Max 20 words per sentence. No generic filler like "no action required"."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=2000,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(raw)
+        result = {int(k): v for k, v in parsed.items()}
+        print(f"[REGRESSION AI] {len(result)}/{len(fail_indices)} fails analyzed")
+        return result
+    except Exception as e:
+        print(f"[REGRESSION AI] error: {e}")
+        return {}
+
+
+def _generate_regression_summary(results: list, url: str) -> dict:
+    """Summary + recommendations + action_plan — même format que SEO/functional."""
+    if not _groq_client_smoke or not results:
+        return {}
+
+    fail_lines = []
+    for r in results:
+        if r.get("status") == "fail":
+            detail = r.get("reason") or r.get("error") or "—"
+            fail_lines.append(f"- {r.get('name','')} ({r.get('page','—')}): {detail}")
+
+    if not fail_lines:
+        pass_count = sum(1 for r in results if r.get("status") == "pass")
+        return {
+            "summary": f"All {pass_count} regression tests passed on {url}. No functionality broke after recent changes.",
+            "recommendations": [],
+            "action_plan": [],
+        }
+
+    checks_text = "\n".join(fail_lines)
+    prompt = f"""You are a senior QA automation engineer. Analyze these FAILED regression test results for {url}.
+
+Failed tests:
+{checks_text}
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview mentioning how many regressions were found and overall stability",
+  "recommendations": [
+    {{"priority": "high|medium|low", "category": "navigation|auth|api|content", "issue": "what broke", "fix": "concrete actionable fix"}}
+  ],
+  "action_plan": ["step 1", "step 2", "step 3"]
+}}
+
+Rules:
+- Max 6 items in recommendations, ordered by priority (high first).
+- Max 3 items in action_plan.
+- Be specific, no generic filler, no markdown fences."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        return json.loads(raw)
+    except Exception as e:
+        print(f"[REGRESSION AI SUMMARY] error: {e}")
+        return {} 
+    
+    
+def _generate_api_summary(results: list, url: str) -> dict:
+    """Summary + recommendations + action_plan pour API — même format que regression/functional."""
+    if not _groq_client_smoke or not results:
+        return {}
+
+    fail_lines = []
+    for r in results:
+        if r.get("status") == "fail":
+            detail = r.get("reason") or r.get("error") or "—"
+            fail_lines.append(f"- {r.get('method','')} {r.get('name','')}: {detail}")
+
+    if not fail_lines:
+        pass_count = sum(1 for r in results if r.get("status") == "pass")
+        return {
+            "summary": f"All {pass_count} API tests passed on {url}. All endpoints respond correctly with expected status codes.",
+            "recommendations": [],
+            "action_plan": [],
+        }
+
+    checks_text = "\n".join(fail_lines)
+    prompt = f"""You are a senior QA automation engineer. Analyze these FAILED API test results for {url}.
+
+Failed endpoints:
+{checks_text}
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview mentioning how many endpoints failed and overall API health",
+  "recommendations": [
+    {{"priority": "high|medium|low", "category": "auth|validation|crud|performance", "issue": "what failed", "fix": "concrete actionable fix"}}
+  ],
+  "action_plan": ["step 1", "step 2", "step 3"]
+}}
+
+Rules:
+- Max 6 items in recommendations, ordered by priority (high first).
+- Max 3 items in action_plan.
+- Be specific, no generic filler, no markdown fences."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        return json.loads(raw)
+    except Exception as e:
+        print(f"[API AI SUMMARY] error: {e}")
+        return {}
+    
+         
+def _generate_smoke_analyses(results: list) -> dict:
+    if not _groq_client_smoke or not results:
+        return {}
+
+    lines = []
+    for i, r in enumerate(results):
+        status = "PASS" if r.get("status") == "pass" else ("FAIL" if r.get("status") == "fail" else "SKIP")
+        detail = r.get("reason") or r.get("suite") or r.get("error") or r.get("reason_skip") or "—"
+        lines.append(f"{i}. [{status}] {r.get('name','')} — {detail}")
+    checks_text = "\n".join(lines)
+
+    prompt = f"""You are a QA automation expert. For each smoke test result below, write a specific root_cause and fix using the actual data shown.
+
+Respond ONLY with a valid JSON object mapping index to root_cause and fix.
+Example: {{"0": {{"root_cause": "...", "fix": "..."}}}}
+
+Smoke Test Results:
+{checks_text}
+
+Rules:
+- CRITICAL: Copy numeric values (ms, counts) EXACTLY as given. Never invent a different number.
+- PASS: root_cause = mention the actual element/check that succeeded. fix = a tip to keep it robust.
+- FAIL: root_cause = specific problem using the actual detail shown. fix = concrete actionable step (selector fix, config change, etc).
+- SKIP: root_cause = why the element is optional/absent. fix = whether it needs attention or can stay skipped.
+- Max 20 words per sentence. No generic filler like "no action required"."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=1500,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(raw)
+        return {int(k): v for k, v in parsed.items()}
+    except Exception as e:
+        print(f"[SMOKE AI] error: {e}")
+        return {}
 
 from runner_performance import run_performance, run_k6_performance
 
@@ -56,7 +465,110 @@ _api_lock = threading.Lock()
 executor = ThreadPoolExecutor(max_workers=8)
 
 app = FastAPI(title="NexTest AI Service")
+app.include_router(chatbot_router)
 
+
+def _generate_security_analyses(results: list) -> dict:
+    """Root cause + fix — analyse les FAIL et WARN (comme functional/regression)."""
+    if not _groq_client_smoke or not results:
+        return {}
+
+    target_indices = [i for i, r in enumerate(results) if r.get("status") in ("fail", "warn")]
+    if not target_indices:
+        return {}
+
+    lines = []
+    for i in target_indices:
+        r = results[i]
+        detail = r.get("reason") or r.get("error") or "—"
+        lines.append(f"{i}. [{r.get('status','').upper()}] {r.get('name','')} — category={r.get('category','—')} severity={r.get('severity','—')} — {detail}")
+    checks_text = "\n".join(lines)
+
+    prompt = f"""You are a security testing expert reviewing FAILED and WARNING security test results.
+For each test below, write a specific root_cause and fix using the actual data shown.
+
+Respond ONLY with a valid JSON object mapping index (as string) to root_cause and fix.
+Example: {{"{target_indices[0]}": {{"root_cause": "...", "fix": "..."}}}}
+
+Security Test Results:
+{checks_text}
+
+Rules:
+- CRITICAL: Copy category/severity/detail values EXACTLY as given. Never invent a different value.
+- root_cause = specific security problem using the actual detail shown.
+- fix = concrete actionable remediation step.
+- Max 20 words per sentence. No generic filler like "no action required"."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=2000,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(raw)
+        result = {int(k): v for k, v in parsed.items()}
+        print(f"[SECURITY AI] {len(result)}/{len(target_indices)} analyzed")
+        return result
+    except Exception as e:
+        print(f"[SECURITY AI] error: {e}")
+        return {}
+
+
+def _generate_security_summary(results: list, url: str) -> dict:
+    """Summary + recommendations + action_plan — même format que regression/functional."""
+    if not _groq_client_smoke or not results:
+        return {}
+
+    issue_lines = []
+    for r in results:
+        if r.get("status") in ("fail", "warn"):
+            detail = r.get("reason") or r.get("error") or "—"
+            issue_lines.append(f"- [{r.get('status').upper()}] {r.get('name','')} ({r.get('category','—')}): {detail}")
+
+    if not issue_lines:
+        pass_count = sum(1 for r in results if r.get("status") == "pass")
+        return {
+            "summary": f"All {pass_count} security tests passed on {url}. No vulnerabilities or warnings detected.",
+            "recommendations": [],
+            "action_plan": [],
+        }
+
+    checks_text = "\n".join(issue_lines)
+    prompt = f"""You are a senior application security engineer. Analyze these security test results (FAIL/WARN) for {url}.
+
+Findings:
+{checks_text}
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview mentioning how many vulnerabilities/warnings were found and overall security posture",
+  "recommendations": [
+    {{"priority": "high|medium|low", "category": "auth|xss|session|navigation|headers|info_exposure", "issue": "what was found", "fix": "concrete actionable fix"}}
+  ],
+  "action_plan": ["step 1", "step 2", "step 3"]
+}}
+
+Rules:
+- Max 6 items in recommendations, ordered by priority (high first).
+- Max 3 items in action_plan.
+- Be specific, no generic filler, no markdown fences."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        return json.loads(raw)
+    except Exception as e:
+        print(f"[SECURITY AI SUMMARY] error: {e}")
+        return {}
 #Doc file
 def get_doc_text(data: dict) -> str:
     """Extrait le doc_text si présent, sinon retourne ''"""
@@ -250,11 +762,42 @@ async def run_tests(data: dict):
 
     #Combiner pré-calculés + résultats runner
     all_results = pre_results + run_result.get("results", [])
+    
+    ai_summary = None 
+
+    if test_type in ("smoke", "functional"):
+        analyses_fn = _generate_smoke_analyses if test_type == "smoke" else _generate_functional_analyses
+        summary_fn  = _generate_smoke_summary  if test_type == "smoke" else _generate_functional_summary
+
+        ai_analyses = await loop.run_in_executor(
+            executor, lambda: analyses_fn(all_results)
+        )
+        for idx, r in enumerate(all_results):
+            ai = ai_analyses.get(idx, {})
+            severity = "low" if r["status"] == "pass" else (
+                "high" if r.get("priority") == "high" else "medium"
+            )
+            r["ai_analysis"] = {
+                "severity":   severity,
+                "root_cause": ai.get("root_cause", r.get("reason") or r.get("suite") or "—"),
+                "fix":        ai.get("fix", "No action needed." if r["status"] == "pass" else "Investigate this failure."),
+            }
+
+        base_url_for_summary = to_run[0].get("base_url", "") if to_run else ""
+        ai_summary = await loop.run_in_executor(
+            executor, lambda: summary_fn(all_results, base_url_for_summary)
+        )
+        print(f"[SMOKE AI SUMMARY] recommendations count = {len(ai_summary.get('recommendations', []))}")
+        print(f"[SMOKE AI SUMMARY] full content = {json.dumps(ai_summary, indent=2)}")
+
     pass_count  = sum(1 for r in all_results if r["status"] == "pass")
     fail_count  = sum(1 for r in all_results if r["status"] == "fail")
     skip_count  = sum(1 for r in all_results if r["status"] == "skip")
-    executed    = pass_count + fail_count
-    pass_rate   = round(pass_count / executed * 100) if executed else 0
+    total       = len(all_results)
+    pass_rate   = round(pass_count / total * 100) if total else 0
+    
+    
+    print(f"[SMOKE AI] ai_summary keys = {list(ai_summary.keys()) if ai_summary else None}")
 
     return {
         "results":    all_results,
@@ -265,6 +808,7 @@ async def run_tests(data: dict):
         "total":      len(all_results),
         "duration_s": run_result.get("duration_s", 0),
         "raw_output": "",
+        "ai":         ai_summary, 
     }
 
 #Analyzer
@@ -282,60 +826,6 @@ def analyze(data: dict):
     result = analyze_error(error, script, framework)
     return {"framework": framework, "original_error": error, "analysis": result}
 
-#Chatboot
-@app.post("/chat")
-def chat(data: dict):
-    message = data.get("message", "")
-    lang    = data.get("lang", "fr")
-    history = data.get("history", [])
-
-    if not message:
-        return {"error": "message is required"}
-
-    system_prompt = (
-        "Tu es l'assistant IA de NexTest, un outil de génération automatique de tests web.\n"
-        "NexTest utilise LLaMA 3 via Groq pour analyser les pages web et générer des scripts de test.\n\n"
-        "FONCTIONNALITÉS DE NEXTEST :\n"
-        "- Scraping automatique du DOM\n"
-        "- Génération par sections : header, hero, search, forms, content, footer, workflow\n"
-        "- Frameworks : Selenium (.py), Playwright (.py), Cypress (.js), Both\n"
-        "- Types de tests : smoke, functional, regression, performance\n"
-        "- Performance : mesure LCP, FCP, TTI, Load Time, DOM Size, Resource Size\n"
-        "- Score global Lighthouse-style (0-100) + recommandations LLaMA\n"
-        "- Projets Public ou Internal\n"
-        "- Export rapports : CSV, HTML, PDF\n\n"
-        f"Réponds {'en français' if lang == 'fr' else 'in English'}, "
-        "de manière concise. Max 5 phrases."
-    )
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        *history[-6:],
-        {"role": "user", "content": message},
-    ]
-
-    try:
-        from openai import OpenAI 
-        from dotenv import load_dotenv
-        import os
-        load_dotenv()
-
-        groq_client = OpenAI(
-            base_url="https://api.groq.com/openai/v1",
-            api_key=os.getenv("GROQ_API_KEY"),
-        )
-
-        resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=1000,
-        )
-
-        return {"reply": resp.choices[0].message.content.strip()}
-
-    except Exception as e:
-        return {"error": str(e)}
 
 #Rapport
 @app.post("/generate-pdf")
@@ -369,6 +859,9 @@ def generate_pdf_report(data: dict):
         print(traceback.format_exc())
         return {"error": str(e), "traceback": traceback.format_exc()}
     
+
+
+
 #Generate interne
 @app.post("/generate-internal")
 def generate_internal(data: dict):
@@ -406,6 +899,18 @@ def generate_internal(data: dict):
     print(f"[INTERNAL] scraped is_login={scraped.get('is_login_page')} | is_dashboard={scraped.get('is_dashboard')} | url={scraped.get('url')}")
     print(f"[INTERNAL] sidebar_items={len(scraped.get('sidebar_items', []))} | stat_cards={len(scraped.get('stat_cards', []))} | headings={len(scraped.get('headings', []))}")
 
+    # ── Login échoué (credentials invalides OU captcha sans fallback token) ────
+    login_result = scraped.get("login_result")
+    if login_result and not login_result.get("success", True):
+        error_code = "captcha_blocked" if login_result.get("captcha_blocked") else "login_failed"
+        return {
+            "error":         error_code,
+            "error_message": login_result.get("error_message", "Login failed"),
+            "url":           url,
+            "scraped":       scraped,
+        }
+
+    # ── Erreur de scraping classique (page injoignable, timeout, etc.) ─────────
     if "error" in scraped:
         return {
             "error":   f"Scraping failed: {scraped['error']}",
@@ -492,10 +997,19 @@ def generate_api(data: dict):
         for tc in test_cases:
             tc["generation_id"] = generation_id
             tc["project_id"]    = project_id
-        run_result = run_api_tests(test_cases, jwt_token)
+        run_result = run_api_tests(
+            test_cases,
+            jwt_token,
+            username=username,
+            password=password,
+            base_url=base_api_url,
+            )
 
         execution_results = run_result.get("results", [])
-        
+
+        # ── AI summary global (comme regression/functional) ───────────────────
+        ai_summary = _generate_api_summary(execution_results, url)
+
         record_results(
     results=execution_results,
     base_url=url,
@@ -518,6 +1032,7 @@ def generate_api(data: dict):
                 "fail_count":        run_result["fail_count"],
                 "skip_count":        run_result["skip_count"],
                 "pass_rate":         run_result["pass_rate"],
+                "ai":                ai_summary,
             },
         }
     finally:
@@ -573,7 +1088,17 @@ def generate_security(data: dict):
         tc["project_id"]    = project_id
     run_result = run_security_tests(test_cases, jwt_token)
     execution_results = run_result.get("results", [])
+    ai_analyses = _generate_security_analyses(execution_results)
+    for idx, r in enumerate(execution_results):
+        ai = ai_analyses.get(idx, {})
+        severity = "low" if r["status"] == "pass" else ("high" if r.get("severity") in ("critical", "high") else "medium")
+        r["ai_analysis"] = {
+            "severity":   severity,
+            "root_cause": ai.get("root_cause", r.get("reason") or "—"),
+            "fix":        ai.get("fix", "No action needed." if r["status"] == "pass" else "Investigate this finding."),
+        }
 
+    ai_summary = _generate_security_summary(execution_results, url)
     pass_count = run_result["pass_count"]
     fail_count = run_result["fail_count"]
     warn_count = run_result.get("warn_count", 0)
@@ -610,6 +1135,7 @@ def generate_security(data: dict):
             "pass_rate":         pass_rate,
             "test_type":         "security",
             "framework":         framework,
+            "ai":                ai_summary,
         },
     }
 
@@ -629,6 +1155,18 @@ def run_security(data: dict):
     jwt_token = token if token else _CACHED_TOKEN
 
     run_result = run_security_tests(test_cases, jwt_token)
+    
+    ai_analyses = _generate_security_analyses(run_result["results"])
+    for idx, r in enumerate(run_result["results"]):
+        ai = ai_analyses.get(idx, {})
+        severity = "low" if r["status"] == "pass" else ("high" if r.get("severity") in ("critical", "high") else "medium")
+        r["ai_analysis"] = {
+            "severity":   severity,
+            "root_cause": ai.get("root_cause", r.get("reason") or "—"),
+            "fix":        ai.get("fix", "No action needed." if r["status"] == "pass" else "Investigate this finding."),
+        }
+    base_url_rs = test_cases[0].get("frontend_url", "") if test_cases else ""
+    ai_summary = _generate_security_summary(run_result["results"], base_url_rs)
 
     return {
         "results":    run_result["results"],
@@ -637,6 +1175,7 @@ def run_security(data: dict):
         "fail_count": run_result["fail_count"],
         "pass_rate":  run_result["pass_rate"],
         "total":      run_result["total"],
+        "ai":         ai_summary,
     }
 @app.post("/generate-regression")
 def generate_regression(data: dict):
@@ -669,6 +1208,20 @@ def generate_regression(data: dict):
         password=data.get("password", ""),
     )
     execution_results = run_result.get("results", [])
+
+    # ── AI analysis (root_cause + fix par test, comme SEO/functional) ────────
+    ai_analyses = _generate_regression_analyses(execution_results)
+    for idx, r in enumerate(execution_results):
+        ai = ai_analyses.get(idx, {})
+        severity = "low" if r["status"] == "pass" else "high"
+        r["ai_analysis"] = {
+            "severity":   severity,
+            "root_cause": ai.get("root_cause", r.get("reason") or "—"),
+            "fix":        ai.get("fix", "No action needed." if r["status"] == "pass" else "Investigate this failure."),
+        }
+
+    ai_summary = _generate_regression_summary(execution_results, url)
+
     pass_count = run_result["pass_count"]
     fail_count = run_result["fail_count"]
     skip_count = run_result["skip_count"]
@@ -697,65 +1250,71 @@ def generate_regression(data: dict):
             "skip_count":        skip_count,
             "pass_rate":         pass_rate,
             "test_type":         "regression",
+            "ai":                ai_summary,
         },
     }
+
+
 @app.post("/generate-functional")
 def generate_functional(data: dict):
     url = data.get("url", "")
- 
+
     if not url:
         return {"error": "URL is required"}
- 
+
     # ── Extraire base_url (scheme + host + port) ──────────────────────────────
     from urllib.parse import urlparse
     parsed   = urlparse(url)
     base_url = f"{parsed.scheme}://{parsed.netloc}"
- 
+
     print(f"[FUNCTIONAL] target_url={url} | base_url={base_url}")
- 
+
     username = data.get("username", "")
     password = data.get("password", "")
     doc_text = get_doc_text(data)
     gen_result = generate_functional_tests(
-    base_url   = base_url,
-    target_url = url,
-    username   = username,
-    password   = password,
-    doc_text   = doc_text,
-)
- 
+        base_url   = base_url,
+        target_url = url,
+        username   = username,
+        password   = password,
+        doc_text   = doc_text,
+    )
+
     test_cases = gen_result.get("test_cases", [])
- 
+
     if not test_cases:
         return {"error": "No functional test cases generated"}
- 
+
     print(f"[FUNCTIONAL] {len(test_cases)} tests generated for {gen_result.get('page')} — running...")
- 
+
     # ── 2. Playwright exécute les tests ───────────────────────────────────────
     generation_id = data.get("generation_id")
     project_id    = data.get("project_id")
     for tc in test_cases:
         tc["generation_id"] = generation_id
         tc["project_id"]    = project_id
+
     run_result        = run_functional_tests(test_cases=test_cases, base_url=base_url, username=username, password=password)
     execution_results = run_result.get("results", [])
- 
+
+    ai_summary = _generate_functional_summary(execution_results, url)
+
     pass_count = run_result["pass_count"]
     fail_count = run_result["fail_count"]
     skip_count = run_result["skip_count"]
     pass_rate  = run_result["pass_rate"]
- 
+
     print(f"[FUNCTIONAL] DONE | {pass_count} pass / {fail_count} fail | {pass_rate}%")
-    
+
     record_results(
-    results=execution_results,
-    base_url=url,
-    test_type="functional",
-    framework="Playwright",
-    generation_id=generation_id,
-    project_id=project_id,
-)
- 
+        results=execution_results,
+        base_url=url,
+        test_type="functional",
+        framework="Playwright",
+        generation_id=generation_id,
+        project_id=project_id,
+    )
+
     return {
         "url":       url,
         "framework": "Playwright",
@@ -771,9 +1330,9 @@ def generate_functional(data: dict):
             "pass_rate":         pass_rate,
             "test_type":         "functional",
             "category_stats":    run_result.get("category_stats", {}),
+            "ai":                ai_summary,
         },
     }
-    
     
     # ── Performance Test Endpoint
 @app.post("/generate-performance")
@@ -1038,7 +1597,7 @@ async def generate_stream(request: FastAPIRequest):
         headers={
             "Cache-Control":    "no-cache",
             "Connection":       "keep-alive",
-            "X-Accel-Buffering": "no",   # IMPORTANT si tu as Nginx
+            "X-Accel-Buffering": "no",   
         }
     )
 

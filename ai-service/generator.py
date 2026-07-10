@@ -66,6 +66,30 @@ CRITICALITY = {
 }
 
 
+CATEGORY_MAP = {
+    "body":         "structure",
+    "heading":      "structure",
+    "main_content": "structure",
+    "auth":         "security",
+    "cta":          "action",
+    "navigation":   "navigation",
+    "nav_link":     "navigation",
+    "input_field":  "form",
+    "search":       "form",
+    "footer":       "navigation",
+    "hero":         "content",
+    "logo":         "branding",
+    "pagination":   "navigation",
+    "section":      "content",
+    "image":        "accessibility",
+    "lang_switch":  "accessibility",
+    "icon":         "content",
+    "http_status":  "technical",
+    "ssl":          "security",
+    "performance":  "performance",
+}
+
+
 def _joined(key: str) -> str:
     return ", ".join(FLEX.get(key, [key]))
 
@@ -204,6 +228,18 @@ def _extract_sections(scraped: dict) -> dict:
                     "css": css, "text": "search",
                     "type": "search_input", "section": "search", "priority": "high",
                 })
+                
+    for rc in scraped.get("results_containers", []):
+        css = rc.get("css_selector", "").strip()
+        if css:
+            _add("search", {
+                "css": css,
+                "text": rc.get("text", "results")[:50],
+                "type": "results_container",
+                "section": "search",
+                "priority": "high",
+                "is_empty_state": rc.get("is_empty_state", False),
+            })
 
     # ── FORMS: all inputs + forms + submit buttons ────────────────────────────
     skip_types = {"hidden", "submit", "button", "reset"}
@@ -354,15 +390,12 @@ def _define_workflows(sections: dict, scraped: dict) -> list:
     nav_links = [n for n in nav_links if n.get("type") == "nav_link"]
     if nav_links:
         first_nav = nav_links[0]
-        base_url  = scraped.get("url", "")
-        base_slug = base_url.rstrip("/").split("/")[-1] or "/"
         workflows.append({
-            "name": f"Navigate to {first_nav['text']} then back",
+            "name": f"Navigate to {first_nav['text']}",
             "type": "nav_back_flow",
             "steps": [
-                {"action": "click",         "css": first_nav["css"], "desc": f"Click {first_nav['text']}"},
-                {"action": "check_url",     "value": first_nav["slug"], "desc": "Verify destination URL"},
-                {"action": "navigate_back", "value": base_url,          "desc": "Return to homepage"},
+                {"action": "click",     "css": first_nav["css"], "desc": f"Click {first_nav['text']}"},
+                {"action": "check_url", "value": first_nav["slug"], "desc": "Verify destination URL"},
             ],
         })
 
@@ -455,7 +488,7 @@ def _call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> s
             api_key=os.getenv("GROQ_API_KEY"),
         )
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             max_tokens=max_tokens,
             temperature=0.2,
             messages=[
@@ -528,7 +561,117 @@ _STEP_SCHEMA = """{
     "selector_target": "<CSS selector to check>"
   }
 }"""
+def _validate_step_against_elements(step: dict, elements: list) -> bool:
+    """
+    Rejette un step si son selector (ou celui de son assertion) ne correspond
+    à AUCUN élément réellement détecté par le scraper pour cette section.
+    Empêche le LLM d'halluciner des éléments absents (ex: lang switcher
+    inexistant sur des sites qui n'en ont pas).
+    """
+    valid_css = {e["css"] for e in elements if e.get("css")}
+    sel = (step.get("selector") or "").strip()
+    if sel and sel not in valid_css:
+        return False
 
+    assertion = step.get("assertion")
+    if assertion:
+        target = (assertion.get("selector_target") or "").strip()
+        if target and target not in valid_css:
+            return False
+    return True
+def _validate_step(step: dict) -> bool:
+    """Rejette les steps avec selector ou assertion.selector_target vides, ou selectors génériques inventés."""
+    sel = (step.get("selector") or "").strip()
+
+    # Rejette les selectors CSS trop génériques/inventés (non spécifiques au DOM scrapé)
+    GENERIC_PATTERNS = {
+        "a.btn", ".btn", ".logo", ".lang-switch", ".hero", ".banner",
+        "a.nav-link", ".nav-link", ".cta", ".submit-btn", "button.btn",
+    }
+    if sel.strip() in GENERIC_PATTERNS:
+        return False
+
+    # Le LLM hallucine parfois un selector/assertion pointant vers le dropdown
+    # toggle (#pll_switcher) au lieu du vrai lien de langue — jamais valide.
+    if "pll_switcher" in sel.lower():
+        return False
+
+    if step.get("action") in ("click", "fill", "check_visible") and not sel:
+        return False
+
+    assertion = step.get("assertion")
+    if assertion:
+        atype = assertion.get("type")
+        target = (assertion.get("selector_target") or "").strip()
+        avalue = (assertion.get("value") or "").strip()
+        if atype in ("element_visible", "element_exists", "text_contains", "element_not_visible"):
+            if not target:
+                return False
+            if target.strip() in GENERIC_PATTERNS:
+                return False
+        if atype == "url_contains":
+            if not avalue:
+                return False
+            if "pll_switcher" in avalue.lower():
+                return False
+    return True
+
+
+def _build_search_fallback_steps(elements: list, start_id: int = 1) -> list:
+    """
+    Fallback SANS LLM pour la section search — utilisé uniquement si Groq échoue.
+    Génère: check_visible → fill → submit, avec assertion sur results_container si dispo,
+    sinon url_contains.
+    """
+    search_input = next((e for e in elements if e.get("type") == "search_input"), None)
+    results_elem = next((e for e in elements if e.get("type") == "results_container"), None)
+
+    if not search_input:
+        return []
+
+    steps = []
+    sid = start_id
+
+    steps.append({
+        "id": sid, "name": "Check search input visibility",
+        "action": "check_visible", "selector": search_input["css"], "value": "",
+        "expected": "Search input is visible", "category": "functional",
+        "priority": "high", "section": "search", "assertion": None,
+    })
+    sid += 1
+
+    steps.append({
+        "id": sid, "name": "Fill search input with 'test'",
+        "action": "fill", "selector": search_input["css"], "value": "test",
+        "expected": "Search query entered successfully", "category": "functional",
+        "priority": "high", "section": "search",
+        "assertion": {"type": "input_value", "value": "test", "selector_target": search_input["css"]},
+    })
+    sid += 1
+
+    if results_elem:
+        assertion_name = (
+            "Verify no-results message is shown" if results_elem.get("is_empty_state")
+            else "Verify search results are shown"
+        )
+        steps.append({
+            "id": sid, "name": assertion_name,
+            "action": "submit_search", "selector": search_input["css"], "value": "",
+            "expected": "Results container is visible after search", "category": "functional",
+            "priority": "high", "section": "search",
+            "assertion": {"type": "element_visible", "value": "", "selector_target": results_elem["css"]},
+        })
+    else:
+        steps.append({
+            "id": sid, "name": "Submit search form",
+            "action": "submit_search", "selector": search_input["css"], "value": "",
+            "expected": "URL updates after search submission", "category": "functional",
+            "priority": "high", "section": "search",
+            "assertion": {"type": "url_contains", "value": "test", "selector_target": ""},
+        })
+
+    print(f"[GEN] Section 'search': fallback used (no-LLM) — {len(steps)} steps")
+    return steps
 
 def _generate_section_steps(
     section_name:  str,
@@ -578,10 +721,18 @@ def _generate_section_steps(
         "search": (
             "SECTION: SEARCH\n"
             "Generate a COMPLETE search workflow:\n"
-            "  1. check_visible on search input\n"
-            "  2. fill search input with 'test' → assert input_value\n"
+            "  1. check_visible on the search_input element → assertion: null\n"
+            "  2. fill the search_input with 'test' → assert input_value = 'test'\n"
             "  3. click submit or press Enter equivalent (click the search input's form or button)\n"
-            "     → assert element_visible on results or url_contains 'search' or '?s='\n"
+            "\n"
+            "  FOR STEP 3's ASSERTION — check the elements list above:\n"
+            "  - IF an element with type 'results_container' is listed:\n"
+            "      → use assertion type 'element_visible' with selector_target = that EXACT selector\n"
+            "      → if that element has is_empty_state=true, name the step\n"
+            "        'Verify no-results message is shown' instead of 'Verify results shown'\n"
+            "  - IF NO 'results_container' element is listed:\n"
+            "      → assertion MUST be type 'url_contains' with value 'test'\n"
+            "      → NEVER leave selector_target empty, NEVER invent a results selector\n"
         ),
         "forms": (
             "SECTION: FORMS\n"
@@ -651,10 +802,17 @@ CRITICAL:
             parsed = _safe_parse(raw)
             steps  = parsed.get("steps", [])
             if steps:
-                # Ensure section field is set
                 for s in steps:
                     s.setdefault("section", section_name)
-                return steps
+                valid = [s for s in steps if _validate_step(s)]
+                before_elem_check = len(valid)
+                valid = [s for s in valid if _validate_step_against_elements(s, elements)]
+                if before_elem_check < len(steps):
+                    print(f"[GEN] Section '{section_name}': dropped {len(steps)-before_elem_check} invalid step(s)")
+                if len(valid) < before_elem_check:
+                    print(f"[GEN] Section '{section_name}': dropped {before_elem_check-len(valid)} hallucinated step(s) (selector not in scraped elements)")
+                if valid:
+                    return valid
         except Exception as e:
             print(f"[GEN] Section '{section_name}' attempt {attempt+1} failed: {e}")
             time.sleep(1)
@@ -680,15 +838,14 @@ def _generate_workflow_steps(
         workflow_lines.append("")
 
     system_prompt = (
-        _SYSTEM_BASE
-        + "\nSECTION: WORKFLOWS\n"
-        "Generate multi-step user journey tests.\n"
-        "For search_flow: fill input → click/submit → assert results visible\n"
-        "For nav_back_flow: click nav link → assert URL → navigate to original URL → assert homepage loaded\n"
-        "For form_negative: click submit without filling → assert error element visible\n"
-        "For lang_flow: click lang switch → assert URL contains lang code or page content changed\n"
-    )
-
+    _SYSTEM_BASE
+    + "\nSECTION: WORKFLOWS\n"
+    "Generate multi-step user journey tests.\n"
+    "For search_flow: fill input → click/submit → assert results visible\n"
+    "For nav_back_flow: click nav link → assert URL\n"
+    "For form_negative: click submit without filling → assert error element visible\n"
+    "For lang_flow: click lang switch → assert URL contains lang code or page content changed\n"
+)
     user_prompt = f"""Generate workflow test steps.
 URL: {url}
 IDs start at: {start_id}
@@ -718,7 +875,12 @@ CRITICAL:
             if steps:
                 for s in steps:
                     s.setdefault("section", "workflow")
-                return steps
+                valid = [s for s in steps if _validate_step(s)]
+                if len(valid) < len(steps):
+                    print(f"[GEN] Section 'workflow': dropped {len(steps)-len(valid)} invalid step(s)")
+
+                if valid:
+                    return valid
         except Exception as e:
             print(f"[GEN] Workflow attempt {attempt+1} failed: {e}")
             time.sleep(1)
@@ -812,68 +974,13 @@ def _make_smoke_step(name, selector, check_type, reason, optional=None):
         "tier": meta.get("tier",3), "score": meta.get("score",40),
         "optional": meta.get("optional",True) if optional is None else optional,
         "reason": reason, "action": "check_visible", "value": "",
-        "assertion": None, "category": "smoke",
+        "assertion": None, "category": CATEGORY_MAP.get(check_type, "smoke"),
         "priority": "high" if meta.get("tier",3)==1 else "medium",
         "expected": reason, "description": reason, "section": "smoke",
     }
 
 
-    candidates = []
-    url = scraped.get("url","")
-
-    candidates.append(_make_smoke_step("Page body rendered","body","body","body element present",False))
-
-    heading_sel = _scraper_best_heading(scraped)
-    candidates.append(_make_smoke_step("Page heading visible", heading_sel, "heading",
-        "Heading present — correct page loaded", False))
-
-    content_sel = _scraper_best_main_content(scraped)
-    candidates.append(_make_smoke_step("Main content area present", content_sel, "main_content",
-        "Content container present", False))
-
-    auth_found, auth_sel = _scraper_has_auth(scraped)
-    if auth_found:
-        candidates.append(_make_smoke_step("Auth entry point present", auth_sel, "auth",
-            "Auth element detected", False))
-
-    nav_found, nav_sel = _scraper_has_nav(scraped)
-    if nav_found:
-        candidates.append(_make_smoke_step("Navigation present", nav_sel, "navigation",
-            "Navigation detected"))
-        for link in _scraper_real_nav_links(scraped, max_links=4):
-            candidates.append(_make_smoke_step(
-                f"Nav link: {link['text'][:40]}", link["css"], "nav_link",
-                f"Nav link '{link['text']}' present"))
-
-    search_found, search_sel = _scraper_has_search(scraped)
-    if search_found:
-        candidates.append(_make_smoke_step("Search bar present", search_sel, "search",
-            "Search component detected"))
-
-    logo_found, logo_sel = _scraper_has_logo(scraped)
-    if logo_found:
-        candidates.append(_make_smoke_step("Brand logo visible", logo_sel, "logo",
-            "Logo detected"))
-
-    footer_found, footer_sel = _scraper_has_footer(scraped)
-    if footer_found:
-        candidates.append(_make_smoke_step("Footer present", footer_sel, "footer",
-            "Footer detected"))
-
-    candidates.sort(key=lambda x: x.get("score",0), reverse=True)
-    seen, unique = set(), []
-    for c in candidates:
-        key = c["selector"][:120]
-        if key not in seen:
-            seen.add(key); unique.append(c)
-
-    final = unique[:SMOKE_MAX_STEPS]
-    if len(final) < SMOKE_MIN_STEPS:
-        final = unique[:SMOKE_MIN_STEPS]
-
-    for i, step in enumerate(final, 1):
-        step["id"] = i; step["base_url"] = url
-    return final
+    
 def _build_smoke_steps(scraped: dict) -> list:
     candidates = []
     url = scraped.get("url", "")
@@ -916,7 +1023,7 @@ def _build_smoke_steps(scraped: dict) -> list:
         "action":      "check_visible",
         "value":       "",
         "assertion":   None,
-        "category":    "smoke",
+        "category": "technical",
         "priority":    "high",
         "expected":    "HTTP 200 OK",
         "description": f"HTTP response is {http_status}",
@@ -936,7 +1043,7 @@ def _build_smoke_steps(scraped: dict) -> list:
         "action":      "check_visible",
         "value":       "",
         "assertion":   None,
-        "category":    "smoke",
+        "category": "security",
         "priority":    "high",
         "expected":    "URL starts with https://",
         "description": "URL must use HTTPS",
@@ -956,7 +1063,7 @@ def _build_smoke_steps(scraped: dict) -> list:
         "action":      "check_visible",
         "value":       "",
         "assertion":   None,
-        "category":    "smoke",
+        "category": "performance",
         "priority":    "high",
         "expected":    f"< {LOAD_THRESHOLD}ms",
         "description": f"Page loaded in {load_time_ms}ms",
@@ -1298,7 +1405,12 @@ def _build_playwright_script(steps: list, url: str) -> str:
             else:
                 lines.append(f"    expect(page.locator('{selector}').first).to_be_visible(timeout=15000)")
         elif action == "click":
-            lines += [f"    page.locator('{selector}').first.click()",
+            lines += [f"    loc = page.locator('{selector}').first",
+                      f"    loc.scroll_into_view_if_needed()",
+                      f"    try:",
+                      f"        loc.click(timeout=10000)",
+                      f"    except Exception:",
+                      f"        loc.click(force=True, timeout=5000)",
                       f"    page.wait_for_load_state('domcontentloaded')"]
             if assertion:
                 if assertion.get("type") == "url_contains":
@@ -1501,6 +1613,8 @@ def generate_tests(
                 scraped=scraped,
                 start_id=current_id,
             )
+            if not sec_steps and sec_name == "search":
+                sec_steps = _build_search_fallback_steps(elems, start_id=current_id)
 
         if sec_steps:
             print(f"[GEN v13] Section '{sec_name}': {len(sec_steps)} steps")
@@ -1545,6 +1659,18 @@ def generate_tests(
           f"coverage={coverage_report['coverage_percentage']}% "
           f"({coverage_report['total_tested_elements']}/{coverage_report['total_detected_elements']})")
 
+
+       # ── Détecte l'échec total de génération (ex: rate limit LLM) ──────────────
+    if not unique_steps:
+        return {
+            "test_cases": [],
+            "test_case_selenium": [],
+            "test_cases_cypress": [],
+            "test_type": test_type,
+            "page_profile": page_profile,
+            "error": "AI generation failed — no test steps could be generated. This usually means the LLM API hit a rate limit or returned an error. Please retry in a few minutes.",
+            "downgraded": True,
+        }
     # 6. Build scripts
     scripts = _build_scripts(unique_steps, url, framework)
 

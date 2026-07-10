@@ -8,9 +8,18 @@ import {
   IconDots, IconAlertTriangle, IconCircleCheck,
 } from '@tabler/icons-react';
 
-//------------------------------------------------------------------------------
-// Config
-//------------------------------------------------------------------------------
+import CalendarView from './CalendarView';
+
+
+const FRAMEWORKS_BY_TYPE = {
+  smoke:       ['Selenium', 'Cypress', 'Playwright'],
+  functional:  ['Playwright'],
+  performance: ['Playwright', 'k6'],
+  security:    ['Pytest'],
+  regression:  ['Playwright'],
+  api:         ['Pytest', 'Postman'],
+  seo:         ['BeautifulSoup'],
+};
 
 const TEST_TYPE_CONFIG = {
   smoke:       { label: 'Smoke',       color: '#64748b', bg: 'rgba(100,116,139,.1)', border: 'rgba(100,116,139,.25)' },
@@ -33,9 +42,7 @@ const SCHEDULE_PRESETS = [
 const SCHEDULE_LABEL = { hourly: 'Hourly', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', custom: 'Custom' };
 const SCHEDULE_COLOR = { hourly: '#0ea5e9', daily: '#6366f1', weekly: '#8b5cf6', monthly: '#f97316', custom: '#c9a227' };
 
-//------------------------------------------------------------------------------
-// Small shared primitives
-//------------------------------------------------------------------------------
+
 
 function Toggle({ on, onToggle, size = 'md' }) {
   const w = size === 'sm' ? 36 : 44;
@@ -109,13 +116,11 @@ function StatusBadge({ status }) {
 }
 
 function LastRunBadge({ status }) {
-  if (!status) return <span style={{ fontSize: 11, color: 'var(--muted)' }}>—</span>;
-  const ok = status === 'pass';
-  const color = ok ? '#10b981' : '#ef4444';
+  if (!status || status !== 'pass') return null;
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color }}>
-      {ok ? <IconCircleCheck size={13} stroke={2.2} /> : <IconAlertTriangle size={13} stroke={2.2} />}
-      {ok ? 'Passed' : 'Failed'}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#10b981' }}>
+      <IconCircleCheck size={13} stroke={2.2} />
+      Passed
     </span>
   );
 }
@@ -134,9 +139,7 @@ const fmtDate = (iso) => {
   return `${when} · ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
 };
 
-//------------------------------------------------------------------------------
-// KPI cards
-//------------------------------------------------------------------------------
+
 
 function KpiCard({ icon, val, lbl, color, bg, border }) {
   return (
@@ -160,9 +163,7 @@ function KpiCard({ icon, val, lbl, color, bg, border }) {
   );
 }
 
-//------------------------------------------------------------------------------
-// Row actions dropdown
-//------------------------------------------------------------------------------
+
 
 function RowActions({ task, onEdit, onRunNow, onDelete, onToggleStatus, running }) {
   const [open, setOpen] = useState(false);
@@ -256,10 +257,8 @@ const menuBtnStyle = (disabled) => ({
 const menuHover = (e, color, bg) => { e.currentTarget.style.background = bg; e.currentTarget.style.color = color; };
 const menuLeave = (e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#e2e8f0'; };
 
-//------------------------------------------------------------------------------
-// Delete confirm modal
-//------------------------------------------------------------------------------
 
+// Delete confirm modal
 function DeleteTaskModal({ task, onConfirm, onCancel, loading }) {
   if (!task) return null;
   return createPortal(
@@ -293,10 +292,7 @@ function DeleteTaskModal({ task, onConfirm, onCancel, loading }) {
   );
 }
 
-//------------------------------------------------------------------------------
 // New / Edit Task modal
-//------------------------------------------------------------------------------
-
 function NewTaskModal({ open, onClose, onSave, projects, editingTask }) {
   const isEdit = !!editingTask;
   const [name, setName] = useState('');
@@ -312,12 +308,13 @@ function NewTaskModal({ open, onClose, onSave, projects, editingTask }) {
   const [url, setUrl] = useState('');
   const [testedUrls, setTestedUrls] = useState([]);
   const [urlLoading, setUrlLoading] = useState(false);
-  const [showUrlList, setShowUrlList] = useState(false);
+  const [urlMode, setUrlMode] = useState('existing');
 
   const [scheduleHour, setScheduleHour] = useState(9);
   const [scheduleMinute, setScheduleMinute] = useState(0);
   const [weekDay, setWeekDay] = useState(1);
   const [monthDay, setMonthDay] = useState(1);
+  const [framework, setFramework] = useState('');
 
   const buildCron = (type, h, m, wDay, mDay) => {
     switch (type) {
@@ -342,6 +339,7 @@ function NewTaskModal({ open, onClose, onSave, projects, editingTask }) {
       setNotifyEmail(!!editingTask.notify_email);
       setStatus(editingTask.status || 'active');
       setUrl(editingTask.url || '');
+      setFramework(editingTask.framework || '');
 
       const parts = (editingTask.cron || '0 9 * * *').split(' ');
       const [cMin, cHour, cMonthDay, , cWeekDay] = parts;
@@ -354,6 +352,7 @@ function NewTaskModal({ open, onClose, onSave, projects, editingTask }) {
       setTestType('smoke'); setScheduleType('daily'); setCron('0 9 * * *');
       setNotifyEmail(true); setStatus('active');
       setUrl('');
+      setFramework('');
       setScheduleHour(9); setScheduleMinute(0); setWeekDay(1); setMonthDay(1);
     }
     setNameError('');
@@ -364,20 +363,32 @@ function NewTaskModal({ open, onClose, onSave, projects, editingTask }) {
     setUrlLoading(true);
     api.get(`/projects/${projectId}/tested-urls`, { params: { test_type: testType } })
       .then(res => {
-        setTestedUrls(res.data.urls || []);
-        if (!isEdit && res.data.urls?.length && !url) {
-          setUrl(res.data.urls[0]);
+        const urls = res.data.urls || [];
+        setTestedUrls(urls);
+        if (!isEdit) {
+          if (urls.length) {
+            setUrlMode('existing');
+            if (!url) setUrl(urls[0]);
+          } else {
+            setUrlMode('new');
+          }
         }
       })
       .catch(() => setTestedUrls([]))
       .finally(() => setUrlLoading(false));
   }, [projectId, testType, open]); // eslint-disable-line
-
   useEffect(() => {
     if (scheduleType !== 'custom') {
       setCron(buildCron(scheduleType, scheduleHour, scheduleMinute, weekDay, monthDay));
     }
   }, [scheduleHour, scheduleMinute, weekDay, monthDay, scheduleType]); // eslint-disable-line
+
+  useEffect(() => {
+    const available = FRAMEWORKS_BY_TYPE[testType] || [];
+    if (!available.includes(framework)) {
+      setFramework(available[0] || '');
+    }
+  }, [testType]); // eslint-disable-line
 
   
 
@@ -401,8 +412,9 @@ const submit = async () => {
       name: name.trim(),
       description: description.trim(),
       project_id: Number(projectId),
-      url: url.trim(),                                                 
+      url: url.trim(),
       test_type: testType,
+      framework: framework,
       schedule_type: scheduleType,
       cron: cron,
       notify_email: notifyEmail,
@@ -493,47 +505,68 @@ const submit = async () => {
             )}
           </div>
 
-          {/* ← NOUVEAU BLOC ICI */}
-          <div style={{ marginBottom: 24, position: 'relative' }}>
+          
+          <div style={{ marginBottom: 24 }}>
             <label style={labelStyle}>Target URL *</label>
-            <input
-              value={url}
-              onChange={e => { setUrl(e.target.value); setShowUrlList(true); }}
-              onFocus={() => setShowUrlList(true)}
-              onBlur={() => setTimeout(() => setShowUrlList(false), 150)}
-              placeholder="https://example.com"
-              style={inputStyle}
-            />
-            {urlLoading && (
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>Loading tested URLs…</div>
-            )}
-            {showUrlList && testedUrls.length > 0 && (
-              <div style={{
-                position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 10,
-                background: '#131c30', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10,
-                maxHeight: 180, overflowY: 'auto', boxShadow: '0 12px 30px rgba(0,0,0,.5)',
-              }}>
-                {testedUrls.map((u, i) => (
-                  <div key={i}
-                    onMouseDown={() => { setUrl(u); setShowUrlList(false); }}
-                    style={{
-                      padding: '9px 14px', fontSize: 12.5, color: '#e2e8f0', cursor: 'pointer',
-                      borderBottom: i < testedUrls.length - 1 ? '1px solid rgba(255,255,255,.06)' : 'none',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,.1)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                    {u}
-                  </div>
-                ))}
+
+            {testedUrls.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                {[
+                  { key: 'existing', label: 'Choose existing URL' },
+                  { key: 'new', label: 'Type a new URL' },
+                ].map(m => {
+                  const active = urlMode === m.key;
+                  return (
+                    <button key={m.key} type="button"
+                      onClick={() => {
+                        setUrlMode(m.key);
+                        if (m.key === 'existing' && testedUrls.length) setUrl(testedUrls[0]);
+                        if (m.key === 'new') setUrl('');
+                      }}
+                      style={{
+                        flex: 1, padding: '8px 12px', borderRadius: 9, fontSize: 12, fontWeight: 700,
+                        cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+                        background: active ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,.02)',
+                        border: `1.5px solid ${active ? '#6366f1' : 'rgba(255,255,255,.08)'}`,
+                        color: active ? '#818cf8' : '#64748b',
+                      }}>
+                      {m.label}
+                    </button>
+                  );
+                })}
               </div>
             )}
+
+            {urlLoading && (
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>Loading tested URLs…</div>
+            )}
+
+            {urlMode === 'existing' && testedUrls.length > 0 ? (
+              <div style={{ position: 'relative' }}>
+                <select value={url} onChange={e => setUrl(e.target.value)}
+                  style={{ ...inputStyle, appearance: 'none', cursor: 'pointer', paddingRight: 36, colorScheme: 'dark' }}>
+                  {testedUrls.map((u, i) => (
+                    <option key={i} value={u} style={{ background: '#0d1526', color: '#e2e8f0' }}>{u}</option>
+                  ))}
+                </select>
+                <IconChevronDown size={14} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+              </div>
+            ) : (
+              <input
+                value={url}
+                onChange={e => setUrl(e.target.value)}
+                placeholder="https://example.com"
+                style={inputStyle}
+              />
+            )}
+
             {!urlLoading && testedUrls.length === 0 && projectId && (
               <div style={{ fontSize: 11, color: '#475569', marginTop: 6 }}>
                 No tests run yet for this project + type — enter the URL manually.
               </div>
             )}
           </div>
-          {/* ← FIN NOUVEAU BLOC */}
+          
 
           {/* Test Configuration */}
           {sectionHead('02', 'Test Configuration', 'Choose which test suite to run on schedule')}
@@ -555,7 +588,20 @@ const submit = async () => {
               );
             })}
           </div>
+<div style={{ marginBottom: 24 }}>
+            <label style={labelStyle}>Framework *</label>
+            <div style={{ position: 'relative' }}>
+              <select value={framework} onChange={e => setFramework(e.target.value)}
+                style={{ ...inputStyle, appearance: 'none', cursor: 'pointer', paddingRight: 36, colorScheme: 'dark' }}>
+                {(FRAMEWORKS_BY_TYPE[testType] || []).map(fw => (
+                  <option key={fw} value={fw} style={{ background: '#0d1526', color: '#e2e8f0' }}>{fw}</option>
+                ))}
+              </select>
+              <IconChevronDown size={14} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+            </div>
+          </div>
 
+         
           {/* Schedule Configuration */}
           {sectionHead('03', 'Schedule Configuration', 'How often should this task run?')}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 14 }}>
@@ -599,13 +645,13 @@ const submit = async () => {
                   </select>
                   <span style={{ color: '#64748b', fontWeight: 700 }}>:</span>
                   <select value={scheduleMinute} onChange={e => setScheduleMinute(Number(e.target.value))}
-                    style={{ ...inputStyle, colorScheme: 'dark', cursor: 'pointer' }}>
-                    {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => (
-                      <option key={m} value={m} style={{ background: '#0d1526', color: '#e2e8f0' }}>
-                        {String(m).padStart(2, '0')}
-                      </option>
-                    ))}
-                  </select>
+  style={{ ...inputStyle, colorScheme: 'dark', cursor: 'pointer' }}>
+  {Array.from({ length: 60 }, (_, i) => i).map(m => (
+    <option key={m} value={m} style={{ background: '#0d1526', color: '#e2e8f0' }}>
+      {String(m).padStart(2, '0')}
+    </option>
+  ))}
+</select>
                 </div>
               </div>
 
@@ -707,9 +753,7 @@ const submit = async () => {
   );
 }
 
-//------------------------------------------------------------------------------
-// Main page
-//------------------------------------------------------------------------------
+
 
 export default function ScheduledTasksPanel({ projects = [] }) {
   const [tasks, setTasks] = useState([]);
@@ -722,6 +766,7 @@ export default function ScheduledTasksPanel({ projects = [] }) {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
+  const [view, setView] = useState('table');
 
   useEffect(() => {
     api.get('/scheduled-tasks')
@@ -848,83 +893,103 @@ export default function ScheduledTasksPanel({ projects = [] }) {
             }}>{f.label}</button>
           ))}
         </div>
-      </div>
+         
+  <div style={{ display: 'flex', gap: 6 }}>
+    {['table', 'calendar'].map(v => (
+      <button key={v} onClick={() => setView(v)} style={{
+        padding: '8px 14px', borderRadius: 9, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+        border: view === v ? '1.5px solid rgba(99,102,241,.4)' : '1.5px solid var(--border)',
+        background: view === v ? 'rgba(99,102,241,.12)' : 'var(--card)',
+        color: view === v ? '#818cf8' : 'var(--muted)', transition: 'all .15s', textTransform: 'capitalize',
+      }}>{v}</button>
+    ))}
+  </div>
+</div>
+    
 
-      {/* TABLE */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 0.9fr 1.2fr 1.2fr 0.8fr 50px',
-          gap: 10, padding: '12px 20px', background: 'var(--bg)', borderBottom: '1px solid var(--border)',
-        }}>
-          {['Task Name', 'Project', 'Test Type', 'Schedule', 'Next Run', 'Last Run', 'Status', 'Actions'].map(h => (
-            <div key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
-          ))}
-        </div>
-
-        {loading ? (
-          <div style={{ padding: '40px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} style={{ height: 16, borderRadius: 4, background: 'var(--border)', opacity: .5, width: `${80 - i * 10}%` }} />
+    {/* TABLE OR CALENDAR */}
+      {view === 'table' ? (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 0.9fr 1.2fr 1.2fr 0.8fr 50px',
+            gap: 10, padding: '12px 20px', background: 'var(--bg)', borderBottom: '1px solid var(--border)',
+          }}>
+            {['Task Name', 'Project', 'Test Type', 'Schedule', 'Next Run', 'Last Run', 'Status', 'Actions'].map(h => (
+              <div key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
             ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: '56px 24px', textAlign: 'center' }}>
-            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--indigo-bg)', border: '1px solid var(--indigo-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-              <IconCalendarTime size={24} stroke={1.6} color="#818cf8" />
+
+          {loading ? (
+            <div style={{ padding: '40px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} style={{ height: 16, borderRadius: 4, background: 'var(--border)', opacity: .5, width: `${80 - i * 10}%` }} />
+              ))}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
-              {search || filter !== 'all' ? 'No tasks match your filters' : 'No scheduled tasks yet'}
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: '56px 24px', textAlign: 'center' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--indigo-bg)', border: '1px solid var(--indigo-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <IconCalendarTime size={24} stroke={1.6} color="#818cf8" />
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+                {search || filter !== 'all' ? 'No tasks match your filters' : 'No scheduled tasks yet'}
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>
+                {search || filter !== 'all' ? 'Try adjusting your search or filter.' : 'Create one to automate recurring test runs.'}
+              </div>
             </div>
-            <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>
-              {search || filter !== 'all' ? 'Try adjusting your search or filter.' : 'Create one to automate recurring test runs.'}
+          ) : filtered.map((task, i) => (
+            <div key={task.id} style={{
+              display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 0.9fr 1.2fr 1.2fr 0.8fr 50px',
+              gap: 10, padding: '14px 20px', alignItems: 'center',
+              borderBottom: i < filtered.length - 1 ? '1px solid var(--border3, var(--border))' : 'none',
+              transition: 'background .15s', opacity: task.status === 'paused' ? .72 : 1,
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.name}</div>
+                {task.description && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.description}</div>}
+                {task.notify_email && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: 10, color: '#818cf8' }}>
+                    <IconMail size={10} /> Email via n8n
+                  </div>
+                )}
+              </div>
+
+              <div style={{ fontSize: 12.5, color: 'var(--sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{projectName(task.project_id)}</div>
+
+              <div><TypeBadge type={task.test_type} /></div>
+
+              <div><ScheduleBadge type={task.schedule_type} /></div>
+
+              <div style={{ fontSize: 11.5, color: 'var(--sub)' }}>{task.status === 'active' ? fmtDate(task.next_run) : <span style={{ color: 'var(--muted)' }}>Paused</span>}</div>
+
+              <div>
+                <div style={{ fontSize: 11.5, color: 'var(--sub)', marginBottom: 2 }}>{fmtDate(task.last_run)}</div>
+                <LastRunBadge status={task.last_status} />
+              </div>
+
+              <div><StatusBadge status={task.status} /></div>
+
+              <RowActions
+                task={task}
+                running={runningId === task.id}
+                onEdit={(t) => { setEditingTask(t); setModalOpen(true); }}
+                onRunNow={handleRunNow}
+                onDelete={(t) => setDeleteTarget(t)}
+                onToggleStatus={handleToggleStatus}
+              />
             </div>
-          </div>
-        ) : filtered.map((task, i) => (
-          <div key={task.id} style={{
-            display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 0.9fr 1.2fr 1.2fr 0.8fr 50px',
-            gap: 10, padding: '14px 20px', alignItems: 'center',
-            borderBottom: i < filtered.length - 1 ? '1px solid var(--border3, var(--border))' : 'none',
-            transition: 'background .15s', opacity: task.status === 'paused' ? .72 : 1,
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.name}</div>
-              {task.description && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.description}</div>}
-              {task.notify_email && (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: 10, color: '#818cf8' }}>
-                  <IconMail size={10} /> Email via n8n
-                </div>
-              )}
-            </div>
-
-            <div style={{ fontSize: 12.5, color: 'var(--sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{projectName(task.project_id)}</div>
-
-            <div><TypeBadge type={task.test_type} /></div>
-
-            <div><ScheduleBadge type={task.schedule_type} /></div>
-
-            <div style={{ fontSize: 11.5, color: 'var(--sub)' }}>{task.status === 'active' ? fmtDate(task.next_run) : <span style={{ color: 'var(--muted)' }}>Paused</span>}</div>
-
-            <div>
-              <div style={{ fontSize: 11.5, color: 'var(--sub)', marginBottom: 2 }}>{fmtDate(task.last_run)}</div>
-              <LastRunBadge status={task.last_status} />
-            </div>
-
-            <div><StatusBadge status={task.status} /></div>
-
-            <RowActions
-              task={task}
-              running={runningId === task.id}
-              onEdit={(t) => { setEditingTask(t); setModalOpen(true); }}
-              onRunNow={handleRunNow}
-              onDelete={(t) => setDeleteTarget(t)}
-              onToggleStatus={handleToggleStatus}
-            />
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <CalendarView
+          tasks={tasks}
+          TEST_TYPE_CONFIG={TEST_TYPE_CONFIG}
+          onTaskClick={(t) => { setEditingTask(t); setModalOpen(true); }}
+        />
+      )}
 
       {/* MODALS */}
       <NewTaskModal

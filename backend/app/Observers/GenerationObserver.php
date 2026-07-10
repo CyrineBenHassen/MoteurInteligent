@@ -5,7 +5,6 @@ namespace App\Observers;
 use App\Models\Generation;
 use App\Models\TestExecution;
 use App\Http\Controllers\FlakyTestController;
-use Illuminate\Http\Request;
 
 class GenerationObserver
 {
@@ -41,11 +40,16 @@ class GenerationObserver
         }
 
         if (!empty($rows)) {
+            $controller = new FlakyTestController();
+
+            // ── ÉTAPE 1 : capturer l'état AVANT insertion
+            $previousStates = $controller->capturePreviousStates($generation, $rows);
+
+            // ── ÉTAPE 2 : insérer les nouvelles exécutions
             TestExecution::insert($rows);
 
-            // ── Détection alerte après insertion ──
-            $controller = new FlakyTestController();
-            $controller->detectAndAlert($generation, $rows);
+            // ── ÉTAPE 3 : comparer avec l'état capturé plus haut
+            $controller->detectAndAlert($generation, $rows, $previousStates);
         }
     }
 

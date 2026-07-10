@@ -17,9 +17,32 @@ function stableCSS(el, fallback) {
             && !/^(css|sc|wp)-/.test(c)
             && !/--/.test(c)
         );
-    if (classes.length) return tag + '.' + classes[0];
-    if (el.type && el.type !== 'text') return tag + "[type='" + el.type + "']";
-    return fallback || tag;
+    if (classes.length) {
+        const candidate = tag + '.' + classes[0];
+        if (document.querySelectorAll(candidate).length === 1) return candidate;
+    }
+    // Fallback : chemin complet unique (nth-child en remontant jusqu'à un id ou body)
+    // Corrige le bug où deux éléments similaires dans des conteneurs différents
+    // (ex: 20 boutons "Add to basket") recevaient le même sélecteur local.
+    let path = [];
+    let node = el;
+    while (node && node.nodeType === 1 && node !== document.body) {
+        let sel = node.tagName.toLowerCase();
+        if (node.id && !/^\\d/.test(node.id)) {
+            path.unshift('#' + node.id);
+            break;
+        }
+        const parent = node.parentElement;
+        if (parent) {
+            const siblings = Array.from(parent.children);
+            const idx = siblings.indexOf(node) + 1;
+            if (siblings.length > 1) sel += ':nth-child(' + idx + ')';
+        }
+        path.unshift(sel);
+        node = node.parentElement;
+    }
+    const fullPath = path.join(' > ');
+    return fullPath || fallback || tag;
 }
 """
 
@@ -403,7 +426,36 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
             };
         })"""
         )
-
+        
+        # ── SEARCH RESULTS CONTAINER (pour assertions post-recherche) ────────
+        results_containers = safe_eval(
+            "[class*='result'], [id*='result'], [class*='resultat'], "
+            "[class*='search-results'], [class*='no-result'], [class*='no-results'], "
+            "[class*='aucun'], [class*='empty-state'], [class*='not-found'], "
+            "ul[class*='list'], [class*='listing'], [role='list']",
+            _STABLE_CSS_JS + """
+        els => {
+            const seen = new Set();
+            return els.slice(0, 10).map(el => {
+                const css     = stableCSS(el, '[class*=result]');
+                if (seen.has(css)) return null;
+                seen.add(css);
+                const text    = (el.innerText || '').trim().slice(0, 100);
+                const visible = el.offsetParent !== null;
+                const cls     = (el.className || '').toString().toLowerCase();
+                const isEmpty = /no-result|no-results|aucun|not-found|empty/.test(cls)
+                             || /aucun résultat|no results|not found/i.test(text);
+                return {
+                    css_selector: css,
+                    text,
+                    visible,
+                    is_empty_state: isEmpty,
+                };
+            }).filter(Boolean).filter(r => r.visible);
+        }"""
+        )
+        print(f"[SCRAPER] results_containers: {len(results_containers)}")
+        
         # ── IMAGES AUDIT (visibility + alt) ──────────────────────────────────
         images_audit = safe_eval(
             "img",
@@ -709,8 +761,8 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
                         id:   el.id||'',
                         name: el.name||'',
                         css_selector: el.id ? '#'+el.id :
-                                      el.type === 'submit' ? "input[type='submit']" : 
-                                      el.tagName.toLowerCase() === 'a' ? "a.btn" : 'button'
+                                        (el.tagName.toLowerCase() === 'input' && el.type === 'submit') ? "input[type='submit']" :
+                                        el.tagName.toLowerCase() === 'a' ? "a.btn" : 'button'
                     })).filter(b => b.text);
             }""")
             if raw_buttons_data:
@@ -751,5 +803,6 @@ def scrape_page(url: str, wait_time: int = 2000) -> dict:
             "footer_data":        footer_data,        # footer + contact + emails + phones
             "content_sections":   content_sections,   # sections/piliers/cards/articles
             "headings":           headings,            # H2, H3 titres réels
-            "cards":              cards,               # cards/items avec liens
+            "cards":              cards, 
+            "results_containers": results_containers,
         }

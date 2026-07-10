@@ -34,15 +34,15 @@ def run_performance(url: str) -> dict:
         t_nav_start = time.time()
         try:
             page_cold.goto(url, timeout=_NAV_TIMEOUT, wait_until="networkidle")
-        except PWTimeout:
+        except Exception:
             try:
                 page_cold.goto(url, timeout=_NAV_TIMEOUT, wait_until="load")
-            except PWTimeout:
-                try:
-                    page_cold.goto(url, timeout=_NAV_TIMEOUT, wait_until="domcontentloaded")
-                except Exception as e:
-                    browser.close()
-                    return _error_metrics(url, str(e))
+            except Exception:
+                    try:
+                        page_cold.goto(url, timeout=_NAV_TIMEOUT, wait_until="domcontentloaded")
+                    except Exception as e:
+                        browser.close()
+                        return _error_metrics(url, str(e))
 
         t_nav_end = time.time()
         wall_load_time = int((t_nav_end - t_nav_start) * 1000)

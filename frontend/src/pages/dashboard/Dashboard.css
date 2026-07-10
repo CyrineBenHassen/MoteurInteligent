@@ -1481,6 +1481,8 @@
   display: flex; align-items: center; gap: 10px;
   margin-bottom: 16px; flex-wrap: wrap;
   animation: hFadeUp .45s var(--ease) .1s both;
+  position: relative;
+  z-index: 30;
 }
 .dash-root .hp2-search {
   flex: 1; min-width: 220px;
@@ -1533,7 +1535,11 @@
 }
 
 /* ── Main layout ── */
-.dash-root .hp2-layout { display: flex; gap: 16px; align-items: flex-start; }
+.dash-root .hp2-layout {
+  display: flex; gap: 16px; align-items: flex-start;
+  position: relative;
+  z-index: 1;
+}
 
 .dash-root .hp2-table-wrap {
   flex: 1; min-width: 0;
@@ -4001,3 +4007,41 @@
   height: 100%;
 }
 
+.dash-root.reduce-motion *,
+.dash-root.reduce-motion *::before,
+.dash-root.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* ── Fix: spacing between cpv5 sections ── */
+.dash-root .cpv5-left {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dash-root .cpv5-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dash-root .cpv5-sec-num {
+  font-family: var(--D);
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--indigo), #4F46E5);
+  box-shadow: 0 4px 12px rgba(99,102,241,.35);
+}

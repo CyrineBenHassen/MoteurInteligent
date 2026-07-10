@@ -13,7 +13,7 @@ function pwStrength(pw) {
   return s;
 }
 
-// œil barré = password caché (par défaut)
+// œil barré = password caché
 const EyeOff = () => (
   <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>

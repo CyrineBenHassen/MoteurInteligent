@@ -14,9 +14,9 @@ class FlakyTestController extends Controller
 {
     private const WINDOW_SIZE = 10;
 
-    /* ------------------------------------------------------------------ */
+   
     /*  Calcul du statut flaky pour un groupe d'exécutions                 */
-    /* ------------------------------------------------------------------ */
+
    private function computeStatus(iterable $window, string $key, $flags): array
 {
     $window = collect($window)->reverse()->values();
@@ -35,14 +35,13 @@ class FlakyTestController extends Controller
         $score = max($score, 30); // minimum 30% si déjà pass+fail
     }
     if ($n >= 1 && $fails > 0 && $passes === 0) {
-        $score = 0; // tout fail = pas flaky, juste cassé
-    }
-
+    $statusLabel = 'critical';
+} else {
     $statusLabel = 'stable';
     if ($score > 50)     $statusLabel = 'critical';
     elseif ($score > 20) $statusLabel = 'flaky';
     elseif ($score > 0)  $statusLabel = 'warning';
-
+}
     if ($flag = $flags->get($key)) {
         $statusLabel = $flag->status;
     }
@@ -57,9 +56,9 @@ class FlakyTestController extends Controller
     ];
 }
 
-    /* ------------------------------------------------------------------ */
+    
     /*  Créer une alerte en DB                                             */
-    /* ------------------------------------------------------------------ */
+    
     private function createAlert(array $data, string $newStatus, string $previousStatus): Alert
     {
         $messages = [
@@ -84,9 +83,37 @@ class FlakyTestController extends Controller
         ]);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Appel webhook n8n                                                  */
-    /* ------------------------------------------------------------------ */
+    private function notifyN8nWebhookBatch(array $alerts): void
+{
+    $url = env('N8N_FLAKY_WEBHOOK_URL');
+    if (!$url || empty($alerts)) return;
+
+    try {
+        Http::timeout(10)->post($url, [
+            'batch'        => true,
+            'alert_count'  => count($alerts),
+            'triggered_at' => now()->toIso8601String(),
+            'alerts'       => collect($alerts)->map(fn($a) => [
+                'alert_id'        => $a->id,
+                'status'          => $a->status,
+                'previous_status' => $a->previous_status,
+                'test_name'       => $a->test_name,
+                'url'             => $a->url,
+                'test_type'       => $a->test_type,
+                'framework'       => $a->framework,
+                'flakiness_score' => $a->flakiness_score,
+                'message'         => $a->message,
+                'project_id'      => $a->project_id,
+            ])->all(),
+        ]);
+
+        foreach ($alerts as $a) {
+            $a->update(['notified_n8n' => true]);
+        }
+    } catch (\Throwable $e) {
+        Log::warning('n8n batch webhook failed: ' . $e->getMessage());
+    }
+}
     private function notifyN8nWebhook(Alert $alert): void
     {
         $url = env('N8N_FLAKY_WEBHOOK_URL');
@@ -113,9 +140,9 @@ class FlakyTestController extends Controller
         }
     }
 
-    /* ------------------------------------------------------------------ */
+    
     /*  INDEX — liste des flaky tests                                      */
-    /* ------------------------------------------------------------------ */
+    
 public function index(Request $request)
 {
     $query = TestExecution::query()->orderByDesc('executed_at');
@@ -127,39 +154,64 @@ public function index(Request $request)
 
     $executions = $query->get();
 
-    $groups = $executions->groupBy(fn($e) =>
-        ($e->project_id ?? '') . '|' . $e->url . '|' . $e->test_type
+    // ── ÉTAPE 1 : calcul individuel par test_name (précision du score préservée)
+    $testGroups = $executions->groupBy(fn($e) =>
+        ($e->project_id ?? '') . '|' . $e->url . '|' . $e->test_type . '|' . $e->test_name
     );
 
     $flags = TestFlag::all()->keyBy(fn($f) =>
         ($f->project_id ?? '') . '|' . $f->url . '|' . $f->test_type . '|' . $f->test_name
     );
 
-    $tests = [];
-
-    foreach ($groups as $key => $group) {
+    $individual = [];
+    foreach ($testGroups as $key => $group) {
         $window = $group->take(self::WINDOW_SIZE);
         $stats  = $this->computeStatus($window, $key, $flags);
         $last   = $window->first();
 
-        $generationCount = $group->pluck('generation_id')->unique()->count();
-
-        $tests[] = array_merge($stats, [
-            'test_name'        => $last->url,
-            'url'              => $last->url,
-            'test_type'        => $last->test_type,
-            'project_id'       => $last->project_id,
-            'framework'        => $last->framework,
-            'generation_id'    => $last->generation_id,
-            'last_execution'   => $last->executed_at,
-            'generation_count' => $generationCount,
+        $individual[] = array_merge($stats, [
+            'test_name'      => $last->test_name,
+            'url'            => $last->url,
+            'test_type'      => $last->test_type,
+            'project_id'     => $last->project_id,
+            'framework'      => $last->framework,
+            'generation_id'  => $last->generation_id,
+            'last_execution' => $last->executed_at,
         ]);
+    }
+
+    // ── ÉTAPE 2 : agréger par URL+type = une ligne parent
+    $statusRank = ['stable' => 0, 'warning' => 1, 'flaky' => 2, 'critical' => 3];
+
+    $parentGroups = collect($individual)->groupBy(fn($t) =>
+        ($t['project_id'] ?? '') . '|' . $t['url'] . '|' . $t['test_type']
+    );
+
+    $tests = [];
+    foreach ($parentGroups as $key => $cases) {
+        $worst = $cases->sortByDesc(fn($c) => $statusRank[$c['status']] ?? 0)->first();
+
+        $tests[] = [
+            'url'              => $worst['url'],
+            'test_type'        => $worst['test_type'],
+            'test_name'        => $worst['test_name'], // fallback pour compat frontend
+            'project_id'       => $worst['project_id'],
+            'framework'        => $worst['framework'],
+            'status'           => $worst['status'],
+            'flakiness_score'  => (int) round($cases->avg('flakiness_score')),
+            'total_runs'       => $cases->sum('total_runs'),
+            'passes'           => $cases->sum('passes'),
+            'fails'            => $cases->sum('fails'),
+            'skips'            => $cases->sum('skips'),
+            'generation_id'    => $worst['generation_id'],
+            'last_execution'   => $cases->max('last_execution'),
+            'generation_count' => $cases->pluck('generation_id')->unique()->count(),
+        ];
     }
 
     if ($request->filled('search')) {
         $s = mb_strtolower($request->query('search'));
         $tests = array_values(array_filter($tests, fn($t) =>
-            str_contains(mb_strtolower($t['test_name']), $s) ||
             str_contains(mb_strtolower($t['url']), $s)
         ));
     }
@@ -188,9 +240,9 @@ public function index(Request $request)
     ]);
 }
 
-    /* ------------------------------------------------------------------ */
+    
     /*  RECORD — enregistre une exécution + détecte changement de statut  */
-    /* ------------------------------------------------------------------ */
+    
     public function record(Request $request)
     {
         $data = $request->validate([
@@ -222,7 +274,7 @@ public function index(Request $request)
             ? $this->computeStatus($previousWindow, $key, $flags)
             : null;
 
-        // ── Insertion ──
+        //Insertion
         TestExecution::create([
             'generation_id' => $data['generation_id'],
             'project_id'    => $data['project_id'] ?? null,
@@ -234,7 +286,7 @@ public function index(Request $request)
             'executed_at'   => now(),
         ]);
 
-        // ── Statut APRÈS l'insertion ──
+        //Statut APRÈS l'insertion
         $newWindow = TestExecution::where('url', $data['url'])
             ->where('test_type', $data['test_type'])
             ->where('test_name', $data['test_name'])
@@ -247,8 +299,8 @@ public function index(Request $request)
         $newStatus     = $newStats['status'];
         $previousStatus = $previousStats['status'] ?? 'stable';
 
-        // ── Détection du changement ──
-        if ($newStatus !== $previousStatus || in_array($newStatus, ['flaky', 'critical', 'warning'])) {
+        //Détection du changement
+        if ($newStatus !== $previousStatus) {
             $alertData = [
                 'project_id'      => $data['project_id'] ?? null,
                 'url'             => $data['url'],
@@ -260,18 +312,17 @@ public function index(Request $request)
 
             $alert = $this->createAlert($alertData, $newStatus, $previousStatus);
 
-            // Notifier n8n seulement si statut préoccupant (pas pour "stable")
-            if (in_array($newStatus, ['warning', 'flaky', 'critical'])) {
-                $this->notifyN8nWebhook($alert);
-            }
+        // Notifier n8n pour tout changement de statut significatif, y compris le retour à la stabilité
+if (in_array($newStatus, ['warning', 'flaky', 'critical', 'stable'])) {
+    $this->notifyN8nWebhook($alert);
+}
+           
         }
 
         return response()->json(['recorded' => true]);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  RERUN                                                              */
-    /* ------------------------------------------------------------------ */
+    
     public function rerun(Request $request)
     {
         $data = $request->validate([
@@ -311,9 +362,9 @@ public function index(Request $request)
         ]);
     }
 
-    /* ------------------------------------------------------------------ */
+    
     /*  FLAG / UNFLAG                                                      */
-    /* ------------------------------------------------------------------ */
+    
     public function flag(Request $request)
     {
         $data = $request->validate([
@@ -351,56 +402,139 @@ public function index(Request $request)
         return response()->json(['unflagged' => true]);
     }
 
+public function destroy(Request $request)
+{
+    $data = $request->validate([
+        'project_id' => 'nullable|integer',
+        'url'        => 'required|string',
+        'test_type'  => 'required|string',
+        'test_name'  => 'required|string',
+    ]);
 
-    public function detectAndAlert(Generation $generation, array $rows): void
+    TestExecution::where('url', $data['url'])
+        ->where('test_type', $data['test_type'])
+        ->where('test_name', $data['test_name'])
+        ->where('project_id', $data['project_id'] ?? null)
+        ->delete();
+
+    TestFlag::where('url', $data['url'])
+        ->where('test_type', $data['test_type'])
+        ->where('test_name', $data['test_name'])
+        ->where('project_id', $data['project_id'] ?? null)
+        ->delete();
+
+    Alert::where('url', $data['url'])
+        ->where('test_type', $data['test_type'])
+        ->where('test_name', $data['test_name'])
+        ->where('project_id', $data['project_id'] ?? null)
+        ->delete();
+
+    return response()->json(['deleted' => true]);
+}
+
+
+/*  Capture l'état flaky de chaque test AVANT l'insertion des nouvelles */
+
+public function capturePreviousStates(Generation $generation, array $rows): array
 {
     $flags = TestFlag::all()->keyBy(fn($f) =>
         ($f->project_id ?? '') . '|' . $f->url . '|' . $f->test_type . '|' . $f->test_name
     );
 
-    // Grouper par url + test_type (notre nouvelle logique)
-    $key = ($generation->project_id ?? '') . '|' . $generation->url . '|' . $generation->test_type;
+    $states = [];
+    $testNames = collect($rows)->pluck('test_name')->unique();
 
-    // Statut AVANT insertion (les rows qu'on vient d'insérer)
-    $countInserted = count($rows);
+    foreach ($testNames as $testName) {
+        $key = ($generation->project_id ?? '') . '|' . $generation->url . '|' . $generation->test_type . '|' . $testName;
 
-    $allWindow = TestExecution::where('url', $generation->url)
-        ->where('test_type', $generation->test_type)
-        ->where('project_id', $generation->project_id)
-        ->orderByDesc('executed_at')
-        ->take(self::WINDOW_SIZE)
-        ->get();
+        $window = TestExecution::where('url', $generation->url)
+            ->where('test_type', $generation->test_type)
+            ->where('test_name', $testName)
+            ->where('project_id', $generation->project_id)
+            ->orderByDesc('executed_at')
+            ->take(self::WINDOW_SIZE)
+            ->get();
 
-    // Statut AVANT = fenêtre sans les nouveaux
-    $previousWindow = $allWindow->skip($countInserted > self::WINDOW_SIZE ? 0 : $countInserted);
-    $previousStats  = $previousWindow->count() > 0
-        ? $this->computeStatus($previousWindow, $key, $flags)
-        : null;
+        $states[$testName] = $window->count() > 0
+            ? $this->computeStatus($window, $key, $flags)
+            : null;
+    }
 
-    // Statut APRÈS = fenêtre complète
-    $newStats       = $this->computeStatus($allWindow, $key, $flags);
-    $newStatus      = $newStats['status'];
-    $previousStatus = $previousStats['status'] ?? 'stable';
+    return $states;
+}
 
-    // Créer alerte si changement ou statut préoccupant
-    if ($newStatus !== $previousStatus || in_array($newStatus, ['flaky', 'critical', 'warning'])) {
-        $alertData = [
-            'project_id'      => $generation->project_id,
-            'url'             => $generation->url,
-            'test_type'       => $generation->test_type,
-            'test_name'       => ucfirst($generation->test_type) . ' tests — ' . $generation->url,
-            'framework'       => $generation->framework,
-            'flakiness_score' => $newStats['flakiness_score'],
-        ];
 
-        $alert = $this->createAlert($alertData, $newStatus, $previousStatus);
+/*  DETECT AND ALERT — utilise maintenant l'état capturé AVANT insert   */
 
-        if (in_array($newStatus, ['warning', 'flaky', 'critical'])) {
-            $this->notifyN8nWebhook($alert);
+public function detectAndAlert(Generation $generation, array $rows, array $previousStates = []): void
+{
+    $flags = TestFlag::all()->keyBy(fn($f) =>
+        ($f->project_id ?? '') . '|' . $f->url . '|' . $f->test_type . '|' . $f->test_name
+    );
+
+    $alertsToNotify = [];
+    $testNames = collect($rows)->pluck('test_name')->unique();
+
+    foreach ($testNames as $testName) {
+        $key = ($generation->project_id ?? '') . '|' . $generation->url . '|' . $generation->test_type . '|' . $testName;
+
+        $newWindow = TestExecution::where('url', $generation->url)
+            ->where('test_type', $generation->test_type)
+            ->where('test_name', $testName)
+            ->where('project_id', $generation->project_id)
+            ->orderByDesc('executed_at')
+            ->take(self::WINDOW_SIZE)
+            ->get();
+
+        $newStats       = $this->computeStatus($newWindow, $key, $flags);
+        $newStatus      = $newStats['status'];
+        $previousStatus = $previousStates[$testName]['status'] ?? 'stable';
+
+        if ($newStatus !== $previousStatus) {
+            $alertData = [
+                'project_id'      => $generation->project_id,
+                'url'             => $generation->url,
+                'test_type'       => $generation->test_type,
+                'test_name'       => $testName,
+                'framework'       => $generation->framework,
+                'flakiness_score' => $newStats['flakiness_score'],
+            ];
+
+            $alert = $this->createAlert($alertData, $newStatus, $previousStatus);
+
+            if (in_array($newStatus, ['warning', 'flaky', 'critical', 'stable'])) {
+                $alertsToNotify[] = $alert;
+            }
         }
+    }
+
+    if (!empty($alertsToNotify)) {
+        $this->notifyN8nWebhookBatch($alertsToNotify);
     }
 }
 
+
+public function destroyByUrl(Request $request)
+{
+    $data = $request->validate([
+        'project_id' => 'nullable|integer',
+        'url'        => 'required|string',
+    ]);
+
+    TestExecution::where('url', $data['url'])
+        ->where('project_id', $data['project_id'] ?? null)
+        ->delete();
+
+    TestFlag::where('url', $data['url'])
+        ->where('project_id', $data['project_id'] ?? null)
+        ->delete();
+
+    Alert::where('url', $data['url'])
+        ->where('project_id', $data['project_id'] ?? null)
+        ->delete();
+
+    return response()->json(['deleted' => true]);
+}
 public function details(Request $request)
 {
     $request->validate([

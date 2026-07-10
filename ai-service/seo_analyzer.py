@@ -5,6 +5,7 @@ import time
 import re
 
 
+
 def analyze_seo(url: str) -> dict:
     """
     Full SEO analysis of a given public URL.
@@ -45,7 +46,7 @@ def analyze_seo(url: str) -> dict:
         "passed": [],
     }
 
-    # --- HTTPS check ---
+    #HTTPS check
     parsed = urlparse(url)
     results["https"] = parsed.scheme == "https"
     if results["https"]:
@@ -53,7 +54,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["issues"].append("Site is not using HTTPS")
 
-    # --- Fetch page ---
+    #Fetch page
     try:
         start = time.time()
         response = requests.get(url, timeout=15, headers={
@@ -81,7 +82,7 @@ def analyze_seo(url: str) -> dict:
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # --- Title ---
+    #Title
     title_tag = soup.find("title")
     if title_tag and title_tag.text.strip():
         results["title"] = title_tag.text.strip()
@@ -95,7 +96,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["issues"].append("Missing <title> tag")
 
-    # --- Meta description ---
+    #Meta description
     meta_desc = soup.find("meta", attrs={"name": "description"})
     if meta_desc and meta_desc.get("content", "").strip():
         results["meta_description"] = meta_desc["content"].strip()
@@ -109,7 +110,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["issues"].append("Missing meta description")
 
-    # --- Meta keywords ---
+    #Meta keywords
     meta_kw = soup.find("meta", attrs={"name": "keywords"})
     if meta_kw and meta_kw.get("content", "").strip():
         results["meta_keywords"] = meta_kw["content"].strip()
@@ -117,7 +118,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["warnings"].append("Meta keywords not found (optional but recommended)")
 
-    # --- Headings ---
+    #Headings
     results["h1_tags"] = [h.text.strip() for h in soup.find_all("h1")]
     results["h2_tags"] = [h.text.strip() for h in soup.find_all("h2")]
     results["h3_tags"] = [h.text.strip() for h in soup.find_all("h3")]
@@ -134,7 +135,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["passed"].append(f"{len(results['h2_tags'])} H2 tags found")
 
-    # --- Images ---
+    #Images
     images = soup.find_all("img")
     results["images_total"] = len(images)
     for img in images:
@@ -149,7 +150,7 @@ def analyze_seo(url: str) -> dict:
     elif results["images_missing_alt"] > 0:
         results["issues"].append(f"{results['images_missing_alt']} image(s) missing alt attribute")
 
-    # --- Links ---
+    #Links
     base_domain = parsed.netloc
     all_links = soup.find_all("a", href=True)
     for link in all_links:
@@ -166,7 +167,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["warnings"].append("No internal links found")
 
-    # --- Viewport meta ---
+    #Viewport meta
     viewport = soup.find("meta", attrs={"name": "viewport"})
     if viewport:
         results["has_viewport_meta"] = True
@@ -174,7 +175,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["issues"].append("Missing viewport meta tag (not mobile-friendly)")
 
-    # --- Canonical ---
+    #Canonical
     canonical = soup.find("link", attrs={"rel": "canonical"})
     if canonical and canonical.get("href"):
         results["has_canonical"] = True
@@ -183,7 +184,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["warnings"].append("No canonical URL defined")
 
-    # --- Open Graph tags ---
+    #Open Graph tags
     og_title = soup.find("meta", attrs={"property": "og:title"})
     og_desc = soup.find("meta", attrs={"property": "og:description"})
     if og_title or og_desc:
@@ -194,7 +195,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["warnings"].append("No Open Graph (og:) tags found — affects social media sharing")
 
-    # --- Schema markup ---
+    #Schema markup
     schema = soup.find("script", attrs={"type": "application/ld+json"})
     if schema:
         results["has_schema_markup"] = True
@@ -202,7 +203,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["warnings"].append("No Schema.org structured data found")
 
-    # --- Word count ---
+    #Word count
     body_text = soup.get_text(separator=" ", strip=True)
     words = re.findall(r'\b\w+\b', body_text)
     results["word_count"] = len(words)
@@ -211,7 +212,7 @@ def analyze_seo(url: str) -> dict:
     else:
         results["passed"].append(f"Good word count: {results['word_count']} words")
 
-    # --- Robots.txt ---
+    #Robots.txt
     try:
         robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
         r = requests.get(robots_url, timeout=5, verify=False)
@@ -223,7 +224,7 @@ def analyze_seo(url: str) -> dict:
     except:
         results["warnings"].append("Could not check robots.txt")
 
-    # --- Sitemap ---
+    #Sitemap
     try:
         sitemap_url = f"{parsed.scheme}://{parsed.netloc}/sitemap.xml"
         r = requests.get(sitemap_url, timeout=5, verify=False)

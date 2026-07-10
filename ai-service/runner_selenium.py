@@ -5,6 +5,7 @@ import re
 import time
 import base64
 import os
+import subprocess
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -74,7 +75,6 @@ def run_selenium_real(script: str, test_cases: list = None) -> dict:
 def _setup_driver() -> webdriver.Chrome:
     opts = Options()
     opts.add_argument("--headless=new")
-    opts.add_argument("--headless")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-gpu")
@@ -91,11 +91,13 @@ def _setup_driver() -> webdriver.Chrome:
     opts.add_experimental_option("excludeSwitches", ["enable-automation"])
     opts.add_experimental_option("useAutomationExtension", False)
 
-    # Pointe vers ton Chrome installé
     opts.binary_location = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
 
-    service = Service(ChromeDriverManager().install())
-    driver  = webdriver.Chrome(service=service, options=opts)
+    service = Service()
+    if os.name == "nt":
+        service.creation_flags = subprocess.CREATE_NO_WINDOW
+
+    driver = webdriver.Chrome(service=service, options=opts)
     driver.set_page_load_timeout(30)
     driver.implicitly_wait(3)
     return driver

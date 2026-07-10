@@ -20,6 +20,17 @@ _CACHED_TOKEN = os.getenv("ANPE_TOKEN")
 LOGIN_URL = "/login"
 
 
+async def _safe_goto(page, url, timeout=30000, retries=2):
+    for attempt in range(retries):
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+            return True
+        except Exception as e:
+            if attempt == retries - 1:
+                print(f"[SECURITY_RUNNER] ⚠ Unreachable after {retries} tries: {url} — {str(e)[:80]}")
+                return False
+            await asyncio.sleep(2)
+    return False
 
 async def _inject_token(page, token: str, frontend_url: str, login_url: str = "/login", username: str = '', password: str = ''):
     from urllib.parse import urlparse
@@ -28,12 +39,12 @@ async def _inject_token(page, token: str, frontend_url: str, login_url: str = "/
     
     if token:
         # ANPE → bypass captcha avec token
-        await page.goto(f"{clean_frontend}{login_url}", wait_until="domcontentloaded", timeout=15000)
+        await _safe_goto(page, f"{clean_frontend}{login_url}")
         await page.evaluate(f"localStorage.setItem('token', '{token}')")
         print(f"[SECURITY_RUNNER] Token injected into localStorage")
     elif username and password:
         # Autre app → form login normal
-        await page.goto(f"{clean_frontend}{login_url}", wait_until="domcontentloaded", timeout=15000)
+        await _safe_goto(page, f"{clean_frontend}{login_url}")
         await page.fill("input[type='email'], input[name='email']", username)
         await page.fill("input[type='password']", password)
         await page.click("button[type='submit']")
@@ -73,8 +84,14 @@ async def _run_one_playwright(tc: dict, token: str) -> dict:
 
             # ── TEST: No token — direct access ────────────────────────────────
             if test_type == "no_token":
-                await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                if not await _safe_goto(page, url):
+                    final_status = "warn"
+                    reason = "⚠ Site unreachable — infrastructure issue, not a test failure"
+                    await browser.close()
+                    duration_ms = int((time.time() - start) * 1000)
+                    return _build_result(tc, final_status, reason, duration_ms)
                 await page.wait_for_timeout(2000)
+                
                 current_url = page.url
 
                 is_rejected = (

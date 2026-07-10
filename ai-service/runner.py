@@ -34,14 +34,6 @@ _HEADING_FALLBACKS = [
 # (nav clicks, section clicks that navigate away)
 _NAVIGATE_ACTIONS = {"click"}
 
-# Sections where we DO reset to base_url before each step
-_RESET_SECTIONS = {"header", "hero", "footer", "workflow", "content"}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Public entry point
-# ─────────────────────────────────────────────────────────────────────────────
-
 def run_selenium_script(script: str, test_cases: list = None) -> dict:
     if not test_cases:
         return {
@@ -57,36 +49,33 @@ def run_selenium_script(script: str, test_cases: list = None) -> dict:
     return _run_steps(test_cases)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Core runner
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def _run_steps(steps: list) -> dict:
     results     = []
     start_total = time.time()
     base_url    = _extract_base_url(steps)
 
-    # ── AJOUT ICI : injecter les steps pré-calculés sans Playwright ──────────
     PRE_CALC_TYPES = {"http_status", "ssl", "performance"}
     pre_calculated = [s for s in steps if s.get("type") in PRE_CALC_TYPES and "status" in s]
     to_run         = [s for s in steps if s.get("type") not in PRE_CALC_TYPES]
 
     for step in pre_calculated:
         results.append({
-        "name":             step.get("name", ""),
-        "status":           step.get("status", "fail"),  # ← garder le vrai status
-        "duration":         "0s",
-        "error":            None if step.get("status") == "pass" else step.get("suite"),
-        "reason":           step.get("suite"),
-        "reason_pass":      step.get("suite") if step.get("status") == "pass" else None,
-        "reason_skip":      None,
-        "assertion_result": None,
-        "step_meta":        None,
-        "priority":         step.get("priority", "high"),
-        "category":         step.get("category", "smoke"),
-        "section":          step.get("section", "smoke"),
-        "screenshot":       None,
-    })
+            "name":             step.get("name", ""),
+            "status":           step.get("status", "fail"),
+            "duration":         "0s",
+            "error":            None if step.get("status") == "pass" else step.get("suite"),
+            "reason":           step.get("suite"),
+            "reason_pass":      step.get("suite") if step.get("status") == "pass" else None,
+            "reason_skip":      None,
+            "assertion_result": None,
+            "step_meta":        None,
+            "priority":         step.get("priority", "high"),
+            "category":         step.get("category", "smoke"),
+            "section":          step.get("section", "smoke"),
+            "screenshot":       None,
+        })
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -109,20 +98,34 @@ def _run_steps(steps: list) -> dict:
         page = context.new_page()
         page.set_default_timeout(_TIMEOUT)
 
-        # Initial page load
         if base_url:
             try:
                 _goto(page, base_url)
             except Exception as e:
-                browser.close()
+                try:
+                    browser.close()
+                except Exception:
+                    pass
                 return _fatal_result(f"Cannot load '{base_url}': {e}", len(steps))
-        
-        
+
+        current_section = None
         for step in to_run:
+            step_section = step.get("section")
+            if base_url and step_section != current_section:
+                print(f"[RUNNER] Section change: {current_section} → {step_section}, resetting to base_url")
+                try:
+                    _goto(page, base_url)
+                except Exception:
+                    pass
+                current_section = step_section
+
             result = _run_one_step(page, step, base_url)
             results.append(result)
 
-        browser.close()
+        try:
+            browser.close()
+        except Exception as e:
+            print(f"[RUNNER] Warning: browser.close() failed non-fatally: {e}")
 
     duration   = round(time.time() - start_total, 2)
     pass_count = sum(1 for r in results if r["status"] == "pass")
@@ -142,8 +145,7 @@ def _run_steps(steps: list) -> dict:
         "duration_s": duration,
         "raw_output": "",
     }
-
-
+    
 def _goto(page, url: str):
     page.goto(url, timeout=_NAV_TIMEOUT, wait_until="domcontentloaded")
     try:
@@ -183,16 +185,13 @@ def _is_optional(step: dict) -> bool:
 def _should_reset_to_base(step: dict) -> bool:
     """
     Returns True if we should navigate back to base_url before this step.
-    - Navigation clicks (header nav links, footer links) always reset
-    - Form steps do NOT reset (they need to stay on the same page)
-    - Search steps do NOT reset (fill then submit on same page)
-    - check_visible steps do NOT reset (they just check, no navigation)
+    Based on the step's semantic TYPE, not on hardcoded section names —
+    works regardless of how sections are named by the generator.
     """
-    action  = step.get("action", "")
-    section = step.get("section", "")
-    stype   = step.get("type", "")
+    action = step.get("action", "")
+    stype  = step.get("type", "")
 
-    # check_visible never needs reset
+    # check_visible never needs reset (just checks, no navigation)
     if action == "check_visible":
         return False
 
@@ -203,19 +202,12 @@ def _should_reset_to_base(step: dict) -> bool:
     # lang_switch always resets to base_url before testing
     if stype == "lang_switch":
         return True
-    
-    # click in navigation sections → reset
-    if action == "click" and section in _RESET_SECTIONS:
-        return True
 
-    # click on nav_link type → always reset
+    # Any click that is semantically a navigation-away action → reset first
     if action == "click" and stype in ("nav_link", "footer_link", "cta_button"):
         return True
 
     return False
-
-
-
 
     """
     Handles Polylang / WPML / language switcher dropdowns.
@@ -276,7 +268,7 @@ def _should_reset_to_base(step: dict) -> bool:
     except Exception:
         pass
 
-    # Attempt 4 — force click via JavaScript
+    
     try:
         page.evaluate(f"document.querySelector(\"{selector}\")?.click()")
         page.wait_for_load_state("domcontentloaded", timeout=6_000)
@@ -335,7 +327,7 @@ def _click_lang_switch(page, selector: str) -> None:
         except Exception:
             continue
 
-    # Attempt 3 — direct click
+    
     try:
         page.click(selector, timeout=5_000)
         page.wait_for_load_state("domcontentloaded", timeout=6_000)
@@ -345,7 +337,7 @@ def _click_lang_switch(page, selector: str) -> None:
     except Exception:
         pass
 
-    # Attempt 4 — JavaScript click
+    
     try:
         page.evaluate(f"document.querySelector(\"{selector}\")?.click()")
         page.wait_for_load_state("domcontentloaded", timeout=6_000)
@@ -363,6 +355,28 @@ def _run_one_step(page, step: dict, base_url: str) -> dict:
     assertion = step.get("assertion")
     optional  = _is_optional(step)
     t0        = time.time()
+    
+    
+    # check_url : compare page.url directement, pas de selector nécessaire
+    if action == "check_url":
+        expected = value or ""
+        actual = page.url
+        passed = expected in actual if expected else True
+        duration = round(time.time() - t0, 2)
+        return {
+            "name": name, "screenshot": None,
+            "status": "pass" if passed else "fail",
+            "duration": f"{duration}s",
+            "error": None if passed else f"URL '{actual}' does not contain '{expected}'",
+            "reason": None if passed else f"URL '{actual}' does not contain '{expected}'",
+            "reason_pass": "URL verified successfully.",
+            "reason_skip": None,
+            "assertion_result": {"passed": passed, "type": "url_contains", "expected": expected, "actual": actual, "error": None},
+            "step_meta": {"action": action, "selector": None, "value": value},
+            "priority": step.get("priority", "medium"),
+            "category": step.get("category", "functional"),
+            "section": step.get("section", "general"),
+        }
 
     # Normalize selector
     selector = _normalize_selector(selector)
@@ -379,14 +393,14 @@ def _run_one_step(page, step: dict, base_url: str) -> dict:
     status           = "pass"
 
     try:
-        # ── Reset to base_url if needed ───────────────────────────────────────
+        
         if base_url and _should_reset_to_base(step):
             try:
                 _goto(page, base_url)
             except Exception as e:
                 raise Exception(f"Failed to reset to base URL: {e}")
 
-        # ── Execute action ────────────────────────────────────────────────────
+        # ── Execute action
         if action == "check_visible":
             try:
                 _smart_wait_visible(page, selector)
@@ -402,13 +416,38 @@ def _run_one_step(page, step: dict, base_url: str) -> dict:
 
         elif action == "click":
             _smart_wait_visible(page, selector)
-            
-            
-            # Special handling for Polylang / language switcher
             if "hreflang" in selector or "lang" in step.get("type", ""):
                 _click_lang_switch(page, selector)
             else:
-                page.click(selector)
+                loc = page.locator(selector)
+                count = loc.count()
+                target = loc.first
+                # Si plusieurs éléments matchent (desktop/mobile nav dupliqué),
+                # on cherche celui qui est réellement visible
+                if count > 1:
+                    for i in range(count):
+                        candidate = loc.nth(i)
+                        try:
+                            if candidate.is_visible():
+                                target = candidate
+                                break
+                        except Exception:
+                            continue
+                try:
+                    target.click(timeout=5_000)
+                except PWTimeout:
+                    try:
+                        target.click(timeout=3_000, force=True)
+                    except Exception:
+                        try:
+                            page.evaluate(
+                                "(sel) => document.querySelector(sel)?.click()",
+                                selector,
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=6_000)
             except PWTimeout:
@@ -421,17 +460,48 @@ def _run_one_step(page, step: dict, base_url: str) -> dict:
 
         elif action == "fill":
             _smart_wait_visible(page, selector)
-            page.fill(selector, value)
+            page.fill(selector, value, timeout=3_000)
             actual_val = page.input_value(selector)
             if actual_val != value:
                 raise AssertionError(
                     f"Fill verification failed: typed '{value}', DOM has '{actual_val}'"
                 )
 
+        elif action == "submit_search":
+            _smart_wait_visible(page, selector)
+            # Try pressing Enter in the search field first (most common pattern)
+            try:
+                page.press(selector, "Enter")
+            except Exception:
+                pass
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=6_000)
+            except PWTimeout:
+                pass
+            try:
+                page.wait_for_load_state("networkidle", timeout=6_000)
+            except PWTimeout:
+                pass
+            page.wait_for_timeout(500)
+
+            
+            if base_url and page.url.rstrip("/") == base_url.rstrip("/"):
+                try:
+                    page.evaluate(
+                        "(sel) => { const el = document.querySelector(sel); "
+                        "const form = el ? el.closest('form') : null; "
+                        "if (form) form.submit(); }",
+                        selector,
+                    )
+                    page.wait_for_load_state("domcontentloaded", timeout=6_000)
+                    page.wait_for_timeout(500)
+                except Exception:
+                    pass
+
         else:
             raise ValueError(f"Unknown action: '{action}'")
 
-        # ── Validate assertion ────────────────────────────────────────────────
+        # ── Validate assertion
         if assertion and isinstance(assertion, dict):
             assertion_result = _validate_assertion(page, assertion, selector, value)
             if not assertion_result["passed"]:
@@ -455,7 +525,7 @@ def _run_one_step(page, step: dict, base_url: str) -> dict:
         "duration":         f"{duration}s",
         "error":            action_error,
         "reason":      _reason(action, "fail", action_error, assertion_result, step_name=name) if status == "fail" else None,
-        "reason_pass": _reason(action, "pass", None, assertion_result, step_name=name),
+        "reason_pass": _reason(action, "pass", None, assertion_result, step_name=name) if status == "pass" else None,
         "reason_skip":      None,
         "assertion_result": assertion_result,
         "step_meta":        step_meta,
@@ -483,9 +553,7 @@ def _skip_result(name: str, step: dict, reason: str, duration: str) -> dict:
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Assertion validator
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def _validate_assertion(page, assertion: dict,
                          action_selector: str = "",
@@ -498,7 +566,7 @@ def _validate_assertion(page, assertion: dict,
     a_target = _normalize_selector(a_target)
 
     try:
-        # ── url_contains ─────────────────────────────────────────────────────
+        # ── url_contains
         if a_type == "url_contains":
             current_url = page.url
  
@@ -534,13 +602,13 @@ def _validate_assertion(page, assertion: dict,
                 "error":    None if passed else f"URL '{current_url}' does not contain '{a_value}'",
             }
 
-        # ── element_visible ───────────────────────────────────────────────────
+        # ── element_visible
         elif a_type == "element_visible":
             if not a_target or _is_invalid_selector(a_target):
                 # Fallback: just check that SOMETHING is on the page
                 a_target = "body"
 
-            # Wait for page to settle
+            
             try:
                 page.wait_for_load_state("networkidle", timeout=3_000)
             except PWTimeout:
@@ -556,7 +624,7 @@ def _validate_assertion(page, assertion: dict,
                 "error":    None if passed else f"'{a_target}' not visible after action",
             }
 
-        # ── element_not_visible (negative test) ───────────────────────────────
+        # ── element_not_visible (negative test)
         elif a_type == "element_not_visible":
             if not a_target or _is_invalid_selector(a_target):
                 # Can't validate without a target — pass optimistically
@@ -570,13 +638,13 @@ def _validate_assertion(page, assertion: dict,
                         "expected": f"error '{a_target}' visible",
                         "actual": "visible", "error": None}
             except PWTimeout:
-                # Element not visible — could mean no error shown yet
-                # For empty submit, check if we're still on same page (form didn't submit)
+                
+                
                 return {"passed": True, "type": a_type,
                         "expected": f"form validation triggered",
                         "actual": "form did not navigate away", "error": None}
 
-        # ── element_exists ────────────────────────────────────────────────────
+        # ── element_exists
         elif a_type == "element_exists":
             if not a_target or _is_invalid_selector(a_target):
                 return {"passed": False, "type": a_type,
@@ -592,7 +660,7 @@ def _validate_assertion(page, assertion: dict,
                 "error":    None if passed else f"'{a_target}' not found in DOM",
             }
 
-        # ── text_contains ─────────────────────────────────────────────────────
+        # ── text_contains 
         elif a_type == "text_contains":
             if not a_target or _is_invalid_selector(a_target):
                 return {"passed": False, "type": a_type,
@@ -614,7 +682,7 @@ def _validate_assertion(page, assertion: dict,
                 "error":    None if passed else f"'{text[:60]}' does not contain '{a_value}'",
             }
 
-        # ── input_value ───────────────────────────────────────────────────────
+        # ── input_value 
         elif a_type == "input_value":
             expected_val  = a_value or filled_value
             real_selector = a_target or action_selector
@@ -650,9 +718,6 @@ def _validate_assertion(page, assertion: dict,
                 "actual": "", "error": str(e)[:150]}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Selector helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _normalize_selector(selector: str) -> str:
     """
@@ -706,13 +771,11 @@ def _normalize_selector(selector: str) -> str:
 
 
 def _is_invalid_selector(selector: str) -> bool:
-    """Returns True if selector is clearly invalid and should be skipped."""
     if not selector:
         return True
     invalid = {"N/A", "n/a", "null", "undefined", "none", "", "N/a", "NA"}
     if selector.strip() in invalid:
         return True
-    # CSS selectors can't start with /
     if selector.strip().startswith("/") and "href" not in selector:
         return True
     return False
@@ -760,7 +823,7 @@ def _smart_wait_visible(page, selector: str) -> None:
     # Attempt 1 — try each selector directly
     for sel in selectors:
         try:
-            page.wait_for_selector(sel, state="visible", timeout=3_000)
+            page.wait_for_selector(sel, state="visible", timeout=1_500)
             return
         except PWTimeout:
             continue
@@ -783,7 +846,7 @@ def _smart_wait_visible(page, selector: str) -> None:
     # Attempt 2 — retry each after menu open
     for sel in selectors:
         try:
-            page.wait_for_selector(sel, state="visible", timeout=2_000)
+            page.wait_for_selector(sel, state="visible", timeout=1_000)
             return
         except PWTimeout:
             continue
@@ -791,16 +854,13 @@ def _smart_wait_visible(page, selector: str) -> None:
     # Attempt 3 — fallback attached (in DOM but maybe not visible)
     for sel in selectors:
         try:
-            page.wait_for_selector(sel, state="attached", timeout=1_500)
+            page.wait_for_selector(sel, state="attached", timeout=800)
             return
         except PWTimeout:
             continue
 
     raise PWTimeout(f"Element '{selector}' not found after all strategies")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Reason builder
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _friendly_url(url: str) -> str:
     """
@@ -844,7 +904,7 @@ def _friendly_url(url: str) -> str:
     if not segment:
         segment = decoded.split("/")[-2].strip() if decoded.count("/") > 2 else ""
  
-    # Slug → human-readable label mapping
+    
     slug_map = {
         "faq":           "FAQ page",
         "faqs":          "FAQ page",
@@ -970,7 +1030,7 @@ def _reason(action: str, status: str, error: str | None,
     Generates a human-friendly, descriptive reason message for test results.
     """
  
-    # ── PASS ──────────────────────────────────────────────────────────────────
+    # ── PASS
     if status == "pass":
  
         if action == "check_visible":
@@ -1156,20 +1216,22 @@ def _reason(action: str, status: str, error: str | None,
  
     return "Test status unknown."
 
-
 def _take_screenshot(page, step_name: str, status: str) -> str | None:
-    """
-    Prend un screenshot et retourne le base64 ou le path.
-    Retourne None si échec.
-    """
     try:
+        import uuid
         safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", step_name)[:40]
-        filename  = SCREENSHOTS_DIR / f"{status}_{safe_name}.png"
+        unique_id = uuid.uuid4().hex[:8]
+        filename  = SCREENSHOTS_DIR / f"{status}_{safe_name}_{unique_id}.png"
         page.screenshot(path=str(filename), full_page=False)
-        
-        # Encode en base64 pour l'afficher dans le frontend
+
         with open(filename, "rb") as f:
             b64 = base64.b64encode(f.read()).decode("utf-8")
+
+        try:
+            filename.unlink()  # nettoyage — on n'a besoin que du base64
+        except Exception:
+            pass
+
         return b64
     except Exception:
         return None

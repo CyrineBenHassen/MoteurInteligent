@@ -10,7 +10,7 @@ class Project extends Model {
 
 
     protected $casts = [
-        'pages' => 'array',  // ← ajoute ça
+        'pages' => 'array',  
     ];
 
     public function user() {

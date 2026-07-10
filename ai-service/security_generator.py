@@ -177,6 +177,26 @@ Return ONLY the JSON array. No markdown. No explanation."""
                 "frontend_url":     frontend_url,
                 "login_url": login_url
             })
+            
+            # Fixe les tests navigation (8 et 9) pour garantir nom/URL stables entre les runs
+        # Fixe les tests navigation (8 et 9) pour garantir nom/URL stables ET cohérents entre les runs
+        # Fixe les tests critiques pour garantir URL/test_type stables entre les runs
+        for tc in cleaned:
+            if tc["id"] == 1:
+                tc["test_type"] = "no_token"
+                tc["url"] = f"{frontend_url}/dashboard"
+            if tc["id"] == 2:
+                tc["test_type"] = "no_token"
+                tc["url"] = f"{frontend_url}/reception"
+            if tc["id"] == 3:
+                tc["test_type"] = "expired_token"
+                tc["url"] = f"{frontend_url}/dashboard"
+            if tc["category"] == "navigation" and tc["id"] == 8:
+                tc["name"] = "Direct access to home page without being logged in"
+                tc["url"] = f"{frontend_url}/home"
+            if tc["category"] == "navigation" and tc["id"] == 9:
+                tc["name"] = "Direct access to settings page without being logged in"
+                tc["url"] = f"{frontend_url}/settings"
 
         print(f"[SECURITY_GENERATOR] ✓ {len(cleaned)} security tests generated")
         return {

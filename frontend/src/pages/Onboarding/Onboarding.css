@@ -179,9 +179,7 @@
   font-weight: 300;
 }
 
-/* ════════════════════════════════
-   STEP 1 — Role cards
-   ════════════════════════════════ */
+
 .ob-roles {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -264,9 +262,7 @@
   to   { transform: scale(1); opacity: 1; }
 }
 
-/* ════════════════════════════════
-   STEP 2 — Interests
-   ════════════════════════════════ */
+
 .ob-interests {
   display: flex;
   flex-wrap: wrap;
@@ -299,7 +295,12 @@
   color: var(--gold2);
   box-shadow: 0 0 0 1px rgba(201,162,39,0.15);
 }
-.ob-interest-icon { font-size: 13px; }
+
+.ob-interest-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .ob-exp-label {
   font-size: 11px; font-weight: 700;
@@ -347,9 +348,7 @@
   color: var(--muted);
 }
 
-/* ════════════════════════════════
-   STEP 3 — Summary
-   ════════════════════════════════ */
+
 .ob-summary {
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -400,9 +399,7 @@
   margin-bottom: 28px;
 }
 
-/* ════════════════════════════════
-   Actions row (shared)
-   ════════════════════════════════ */
+
 .ob-actions {
   display: flex;
   align-items: center;
@@ -487,7 +484,7 @@
 }
 .ob-btn-next:disabled::before { display: none; }
 
-/* ── Spinner (reuses dashboard .spinner) ── */
+
 .spinner {
   width: 13px; height: 13px;
   border-radius: 50%;
@@ -499,7 +496,7 @@
 }
 @keyframes dSpin { to { transform: rotate(360deg); } }
 
-/* ── Responsive ── */
+
 @media (max-width: 600px) {
   .ob-card {
     padding: 28px 22px;

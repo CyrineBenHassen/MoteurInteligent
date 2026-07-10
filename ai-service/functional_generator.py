@@ -21,7 +21,7 @@ def _get_page_features(path: str, doc_text: str = "") -> list:
     print(f"[FUNCTIONAL_GENERATOR] Extracting features for {path} from doc_text via LLM...")
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system",
@@ -160,7 +160,7 @@ def generate_functional_tests(base_url: str, target_url: str = None, username: s
 
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system",

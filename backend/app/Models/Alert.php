@@ -24,4 +24,9 @@ class Alert extends Model
         'read'         => 'boolean',
         'notified_n8n' => 'boolean',
     ];
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
 }

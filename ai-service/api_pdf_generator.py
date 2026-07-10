@@ -1,6 +1,4 @@
-# api_pdf_generator.py — NexTest API Test Report Generator
-# Dedicated PDF generator for API tests (Postman / Newman CLI / Pytest)
-# Compatible with api_generator.py + api_runner.py output format
+
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle

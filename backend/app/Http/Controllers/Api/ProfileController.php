@@ -46,9 +46,9 @@ class ProfileController extends Controller
         $user->update([
             'name'  => $request->name,
             'email' => $request->email,
-            'phone'    => $request->phone,    // ← AJOUTE
-            'company'  => $request->company,  // ← AJOUTE
-            'position' => $request->position, // ← AJOUTE
+            'phone'    => $request->phone,    
+            'company'  => $request->company,  
+            'position' => $request->position, 
         ]);
 
         return response()->json([
@@ -108,7 +108,17 @@ class ProfileController extends Controller
         return response()->json(['message' => 'Account deleted successfully']);
     }
 
-    // ─── Private helpers
+    public function deactivate(Request $request)
+{
+    $user = $request->user();
+    $user->update(['is_active' => false]);
+
+    
+    $user->currentAccessToken()->delete();
+
+    return response()->json(['message' => 'Account deactivated']);
+}
+
 
     private function formatUser($user): array
     {

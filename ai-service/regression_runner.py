@@ -259,6 +259,7 @@ def _run_one_regression(page, tc: dict, base_url: str) -> dict:
         "status":      final_status,
         "reason":      reason,
         "duration":    f"{duration_ms}ms",
+        "expected":    expected,
         "description": tc.get("description", ""),
         "priority":    tc.get("priority", "medium"),
     }
@@ -307,6 +308,7 @@ def run_regression_tests(test_cases: list, base_url: str, username: str = "", pa
                     "status":      "pass",
                     "reason":      "Authentication already verified ✓",
                     "duration":    "0ms",
+                    "expected":    tc.get("expected", ""),
                     "description": tc.get("description", ""),
                     "priority":    tc.get("priority", "high"),
                 })

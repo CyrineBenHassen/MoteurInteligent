@@ -1,4 +1,4 @@
-// src/App.jsx
+
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth }  from './context/AuthContext';
 import RegisterPage       from './pages/auth/RegisterPage';
@@ -11,11 +11,11 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage  from './pages/auth/ResetPasswordPage';
 import Onboarding         from './pages/Onboarding/Onboarding';
 
-// ─── Guard : redirige si déjà onboardé, bloque si non connecté ───────────────
+//Guard : redirige si déjà onboardé, bloque si non connecté 
 function OnboardingRoute() {
   const { user, loading } = useAuth();
 
-  if (loading) return null; // attend que /me réponde
+  if (loading) return null;
 
   if (!user) {
     // pas connecté → login
@@ -30,11 +30,11 @@ function OnboardingRoute() {
   return <Onboarding />;
 }
 
-// ─── App ─────────────────────────────────────────────────────────────────────
+//App
 export default function App() {
   return (
-    <BrowserRouter>           {/* ← BrowserRouter EN PREMIER */}
-      <AuthProvider>          {/* ← AuthProvider DEDANS (useNavigate dispo) */}
+    <BrowserRouter>           
+      <AuthProvider>         
         <Routes>
           <Route path="/"                element={<HomePage />} />
           <Route path="/login"           element={<LoginPage />} />

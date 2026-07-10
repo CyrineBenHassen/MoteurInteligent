@@ -46,7 +46,7 @@ private const VALID_TEST_TYPES = ['smoke', 'functional', 'regression', 'performa
 }
 $docText = $this->extractDocText($request);
 
-        // Block localhost
+        
         if (str_contains($url, 'localhost') || str_contains($url, '127.0.0.1')) {
             return response()->json([
                 'error' => 'localhost URLs cannot be tested — please use a public URL.',
@@ -60,8 +60,7 @@ $docText = $this->extractDocText($request);
         ]);
 
         try {
-            // ── Call Python AI service ───────────────────────────────────────
-            // Performance tests prennent plus de temps (mesure réelle + LLaMA)
+            
             $timeout = match($testType) {
     'performance' => 180,
     'functional'  => 300,
@@ -85,19 +84,19 @@ $docText = $this->extractDocText($request);
             $data   = $response->json();
             $result = $data['result'] ?? [];
 
-            // ── PERFORMANCE : traitement spécifique ──────────────────────────
+            
             if ($testType === 'performance') {
                 return $this->handlePerformanceResult($request, $data, $result, $url, $framework);
             }
 
-            // ── SMOKE / FUNCTIONAL / REGRESSION ─────────────────────────────
+            // SMOKE / FUNCTIONAL / REGRESSION
             $wasDowngraded   = $result['downgraded']       ?? false;
             $downgradeReason = $result['downgrade_reason'] ?? null;
             $executionType   = $result['execution_type']   ?? $testType;
 
             $testCases = $result['test_cases'] ?? [];
 
-// Fallback vers smoke si LLaMA n'a rien généré
+
 
             $testCasesSelenium = $result['test_cases_selenium'] ?? [];
             $testCasesCypress  = $result['test_cases_cypress']  ?? [];
@@ -109,7 +108,7 @@ $docText = $this->extractDocText($request);
             $pageType          = $result['page_type']
                               ?? ($testCases[0]['page_type'] ?? 'general');
 
-            // PHP validation
+            
             if ($wasDowngraded) {
                 $validationResult = ['valid' => true, 'errors' => [], 'warnings' => [
                     "Test type downgraded from {$testType} to smoke: {$downgradeReason}",
@@ -126,19 +125,19 @@ $docText = $this->extractDocText($request);
                     'test_type'         => $testType,
                 ], 422);
             }
-
-            // Execute tests
+          // Execute tests
             $pass = $fail = $skip = $rate = 0;
             $executionResults = [];
+            $aiSummary = null;   
             $testCasesToRun = $framework === 'Both' ? $testCasesSelenium : $testCases;
 
             if (!empty($testCasesToRun)) {
                 $runResponse = Http::timeout(600)->post('http://127.0.0.1:8001/run', [
-                    'script'     => $framework === 'Both' ? $scriptSelenium : $script,
-                    'framework'  => 'Selenium',
-                    'test_cases' => $testCasesToRun,
-                    'test_type'  => $testType,
-                ]);
+                'script'     => $framework === 'Both' ? $scriptSelenium : $script,
+                'framework'  => $framework === 'Both' ? 'Selenium' : $framework,   
+                'test_cases' => $testCasesToRun,
+                'test_type'  => $testType,
+            ]);
 
                 if ($runResponse->successful()) {
                     $runData          = $runResponse->json();
@@ -147,6 +146,7 @@ $docText = $this->extractDocText($request);
                     $skip             = $runData['skip_count'] ?? 0;
                     $rate             = $runData['pass_rate']  ?? 0;
                     $executionResults = $runData['results']    ?? [];
+                    $aiSummary        = $runData['ai']         ?? null;   
 
                     
 $executionResultsForDb = array_map(function($r) {
@@ -175,7 +175,7 @@ $executionResultsForDb = array_map(function($r) {
                 'script_selenium'     => $scriptSelenium,
                 'script_playwright'   => $scriptPlaywright,
                 'script_cypress'      => $scriptCypress,
-                'execution_results' => $executionResults,
+                'execution_results'   => $executionResultsForDb,
                 'load_time_ms'        => $scraped['load_time_ms'] ?? 0,
                 'is_spa'              => $scraped['is_spa']       ?? false,
                 'pass_count'          => $pass,
@@ -184,6 +184,7 @@ $executionResultsForDb = array_map(function($r) {
                 'pass_rate'           => $rate,
                 'page_type'           => $pageType,
                 'scraped'             => $scraped,
+                'result'              => $aiSummary ? ['ai' => $aiSummary] : null, 
             ]);
 
             #n8n notification
@@ -200,6 +201,7 @@ $executionResultsForDb = array_map(function($r) {
                     'test_type'         => $testType,
                     'execution_type'    => $executionType,
                     'script_playwright' => $scriptPlaywright,
+                    'ai'                => $aiSummary, 
                 ]),
                 'scraped'             => $scraped,
                 'test_type'           => $testType,
@@ -214,9 +216,7 @@ $executionResultsForDb = array_map(function($r) {
         }
     }
 
-    /**
-     * Handle performance test result specifically.
-     */
+    
     private function handlePerformanceResult(
         Request $request,
         array   $data,
@@ -241,7 +241,7 @@ $executionResultsForDb = array_map(function($r) {
             'pass'         => $pass, 'fail' => $fail, 'skip' => $skip,
         ]);
 
-        // Persist — on stocke les métriques dans execution_results
+        
         $generation = Generation::create([
             'user_id'             => auth()->id(),
             'project_id'          => $request->project_id ?? null,
@@ -279,14 +279,12 @@ $executionResultsForDb = array_map(function($r) {
             'scraped'    => $scraped,
             'test_type'  => 'performance',
             'performance' => $performance,
-            'framework'   => $framework,              // ← AJOUTE ICI
+            'framework'   => $framework,              
              'url'         => $url,
         ]);
     }
 
-    /**
-     * PHP-side contract validation.
-     */
+    
     private function validateTestCases(array $testCases, string $testType): array
     {
         $errors   = [];
@@ -326,9 +324,10 @@ $executionResultsForDb = array_map(function($r) {
         ];
     }
 
-    // ── Unchanged methods ────────────────────────────────────────────────────
+    //Unchanged methods
 public function index()
 {
+    ini_set('memory_limit', '512M');
     $generations = Generation::where('user_id', auth()->id())
         ->orderBy('created_at', 'desc')
         ->get()
@@ -437,7 +436,7 @@ public function downloadPdf($id)
             'summary'           => $fullResult['summary'] ?? [],
         ];
 
-        // SEO : ajouter les champs spécifiques
+        
         if ($testType === 'seo') {
             $payload['seo_score'] = $fullResult['seo_score'] ?? 0;
             $payload['analysis']  = $fullResult['analysis']  ?? [];
@@ -610,7 +609,8 @@ $docText = $this->extractDocText($request);
 
         // Run tests with existing runner
         $executionResults = [];
-        if (!empty($testCases)) {
+$aiSummary = null;
+if (!empty($testCases)) {
             $runResponse = Http::timeout(300)->post('http://127.0.0.1:8001/run', [
                 'script'     => $result['script'] ?? '',
                 'framework'  => $framework,
@@ -625,6 +625,7 @@ $docText = $this->extractDocText($request);
                 $skip             = $runData['skip_count'] ?? 0;
                 $rate             = $runData['pass_rate']  ?? $rate;
                 $executionResults = $runData['results']    ?? [];
+                $aiSummary        = $runData['ai']         ?? null;
             }
         }
 
@@ -653,6 +654,8 @@ $docText = $this->extractDocText($request);
             'pass_rate'           => $rate,
             'page_type' => ($scraped['is_login_page'] ?? false) ? 'login' : 'dashboard',
             'scraped'             => $scraped,
+            'result'              => $aiSummary ? ['ai' => $aiSummary] : null,
+
         ]);
 
         $this->notifyN8n($generation, $pass, $fail, $skip, $rate, $url, $framework, $testType);
@@ -663,6 +666,7 @@ $docText = $this->extractDocText($request);
             'result'     => array_merge($result, [
                 'execution_results' => $executionResults,
                 'test_type'         => $testType,
+                'ai'                => $aiSummary,
             ]),
             'scraped'    => $scraped,
             'test_type'  => $testType,
@@ -694,7 +698,7 @@ public function generateApi(Request $request)
         'anpe_token' => 'nullable|string',  
         'project_id' => 'nullable|integer',
     ]);
-    // ← AJOUTE ICI
+    
     \Log::info('[GENERATE-API] anpe_token received', [
         'anpe_token_preview' => substr($request->anpe_token ?? '', 0, 50),
         'anpe_token_length'  => strlen($request->anpe_token ?? ''),
@@ -738,6 +742,7 @@ public function generateApi(Request $request)
             'pass_rate'         => $result['pass_rate']         ?? 0,
             'page_type'         => 'api',
             'scraped'           => [],
+            'result'            => ['ai' => $result['ai'] ?? null], 
         ]);
 $this->notifyN8n($generation, $result['pass_count'] ?? 0, $result['fail_count'] ?? 0, $result['skip_count'] ?? 0, $result['pass_rate'] ?? 0, $url, $framework, 'api');
 
@@ -830,10 +835,11 @@ $docText = $this->extractDocText($request);
             'execution_results' => $executionResults,
             'pass_count'        => $pass,
             'fail_count'        => $fail,
-            'skip_count'        => $warn,   // warn stocké comme skip
+            'skip_count'        => $warn,   
             'pass_rate'         => $rate,
             'page_type'         => 'api',
             'scraped'           => [],
+            'result'            => ['ai' => $result['ai'] ?? null],
         ]);
 
         $this->notifyN8n($generation, $pass, $fail, $warn, $rate, $url, 'Pytest', 'security');
@@ -894,7 +900,7 @@ $docText = $this->extractDocText($request);
     'url'        => $url,
     'framework'  => $framework,
     'project_id' => $projectId,
-    'doc_text'   => $docText,   // ← AJOUTE
+    'doc_text'   => $docText,   
 ]);
         $data = $response->json();
 
@@ -927,6 +933,7 @@ $docText = $this->extractDocText($request);
     'is_spa'            => false,
     'page_type'         => 'general',
     'scraped'           => [],
+    'result'            => ['ai' => $result['ai'] ?? null],
 ]);
 $this->notifyN8n($generation, $passCount, $failCount, $skipCount, $passRate, $url, $framework, 'regression');
 
@@ -1008,11 +1015,12 @@ public function generateFunctional(Request $request)
             'is_spa'            => false,
             'page_type'         => 'general',
             'scraped'           => [],
+            'result'            => ['ai' => $result['ai'] ?? null],
         ]);
         $this->notifyN8n($generation, $passCount, $failCount, $skipCount, $passRate, $url, $framework, 'functional');
 
         
-        // ── Record flaky alerts ───────────────────────────────────────────────
+        // ── Record flaky alerts
         $this->recordFlakyAlerts($generation, $testCases, 'functional', $framework);
 
         return response()->json([

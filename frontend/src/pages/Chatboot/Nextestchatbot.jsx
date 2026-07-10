@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
-// ─── Language Detection ────────────────────────────────────────────────────────
+//Language Detection 
 function detectLanguage(text) {
   const arMarkers = /[\u0600-\u06FF]/;
   if (arMarkers.test(text)) return 'ar';
@@ -11,337 +11,16 @@ function detectLanguage(text) {
   return frMarkers.some(r => r.test(text)) ? 'fr' : 'en';
 }
 
-// ─── Knowledge Base (Trilingual) ──────────────────────────────────────────────
-const KB = [
-  {
-    tags: ['smoke', 'smoke test', 'smoke testing'],
-    fr: '**Smoke Test** vérifie que les fonctionnalités principales sont dans le DOM. C\'est le plus rapide (~30s). Dans Nextest, choisissez **Smoke** à l\'étape 02 de la génération.',
-    en: '**Smoke Test** checks that the core functionalities are present in the DOM. It\'s the fastest option (~30s). In Nextest, choose **Smoke** at step 02 of the generation wizard.',
-    ar: '**Smoke Test** يتحقق من وجود الوظائف الأساسية في DOM. هو الأسرع (~30 ثانية). في Nextest، اختر **Smoke** في الخطوة 02 من معالج الإنشاء.',
-  },
-  {
-    tags: ['run', 'launch', 'execute', 'generate', 'lancer', 'exécuter', 'générer', 'démarrer', 'start', 'create test', 'generete', 'generat', 'genere'],
-    fr: 'Pour générer des tests :\n1. **Projects** → sélectionnez un projet\n2. Ajoutez une page (URL cible)\n3. Cliquez **Generate** sur la page\n4. Choisissez type de test + framework\n5. Cliquez **Generate Tests ▶**\n\nRésultats dans **Test Execution**.',
-    en: 'To generate tests:\n1. **Projects** → select a project\n2. Add a page (target URL)\n3. Click **Generate** on the page row\n4. Choose test type + framework\n5. Click **Generate Tests ▶**\n\nResults appear in **Test Execution**.',
-    ar: 'لإنشاء الاختبارات:\n1. **Projects** → اختر مشروعاً\n2. أضف صفحة (URL المستهدف)\n3. انقر **Generate** على الصف\n4. اختر نوع الاختبار + الإطار\n5. انقر **Generate Tests ▶**\n\nالنتائج تظهر في **Test Execution**.',
-  },
-  {
-    tags: ['url', 'endpoint', 'page', 'link', 'tester une url', 'test a url', 'add page', 'ajouter une page'],
-    fr: 'Pour tester une URL :\n1. **Projects → votre projet → Add Page**\n2. Entrez l\'URL (`https://monsite.com/login`)\n3. Cliquez **Generate** sur la ligne\n4. Remplissez le formulaire et lancez',
-    en: 'To test a URL:\n1. **Projects → your project → Add Page**\n2. Enter the URL (`https://mysite.com/login`)\n3. Click **Generate** on that row\n4. Fill in the form and run',
-    ar: 'لاختبار URL:\n1. **Projects → مشروعك → Add Page**\n2. أدخل الـ URL (`https://mysite.com/login`)\n3. انقر **Generate** على الصف\n4. املأ النموذج وابدأ',
-  },
-  {
-    tags: ['result', 'results', 'résultat', 'résultats', 'explain', 'expliquer', 'execution', 'assertion', 'pass', 'fail'],
-    fr: 'Dans **Test Execution** :\n✅ **Pass** — assertion réussie\n❌ **Fail** — assertion échouée\n⚠️ **Skip** — non exécuté\n\nCliquez le badge **ASSERTION** pour voir Expected vs Actual. Exportez via **Download Report**.',
-    en: 'In **Test Execution**:\n✅ **Pass** — assertion succeeded\n❌ **Fail** — assertion failed\n⚠️ **Skip** — not executed\n\nClick the **ASSERTION** badge to see Expected vs Actual. Export via **Download Report**.',
-    ar: 'في **Test Execution**:\n✅ **Pass** — الاختبار نجح\n❌ **Fail** — الاختبار فشل\n⚠️ **Skip** — لم يُنفَّذ\n\nانقر شارة **ASSERTION** لرؤية Expected مقابل Actual. صدّر عبر **Download Report**.',
-  },
-  {
-    tags: ['regression', 'régression', 'regression test', 'breaking change'],
-    fr: '**Regression Test** — vérifie que les nouvelles modifs n\'ont pas cassé l\'existant. Disponible pour les projets **Internal**. Durée ~3min.',
-    en: '**Regression Test** — verifies that new changes haven\'t broken existing features. Available for **Internal** projects. Duration ~3min.',
-    ar: '**Regression Test** — يتحقق أن التعديلات الجديدة لم تكسر الميزات الموجودة. متاح لمشاريع **Internal**. المدة ~3 دقائق.',
-  },
-  {
-    tags: ['functional', 'fonctionnel', 'functional test', 'interaction', 'click', 'form'],
-    fr: '**Functional Test** — simule des interactions réelles (clics, formulaires, assertions). Durée ~1min. Idéal pour tester les comportements utilisateur.',
-    en: '**Functional Test** — simulates real interactions (clicks, forms, assertions). Duration ~1min. Ideal for testing user behaviors.',
-    ar: '**Functional Test** — يحاكي التفاعلات الحقيقية (نقرات، نماذج، تأكيدات). المدة ~دقيقة. مثالي لاختبار سلوك المستخدم.',
-  },
-  {
-    tags: ['performance', 'speed', 'vitesse', 'chargement', 'load', 'loading time'],
-    fr: '**Performance Test** — mesure le temps de chargement et les réponses. Durée ~2min. Idéal avant chaque déploiement.',
-    en: '**Performance Test** — measures load times and response speeds. Duration ~2min. Ideal before every deployment.',
-    ar: '**Performance Test** — يقيس أوقات التحميل وسرعة الاستجابة. المدة ~دقيقتان. مثالي قبل كل نشر.',
-  },
-  {
-    tags: ['selenium', 'python', '.py'],
-    fr: '**Selenium** génère des scripts Python (`.py`). Le plus compatible tous navigateurs. Recommandé pour les projets **Public**.',
-    en: '**Selenium** generates Python scripts (`.py`). The most cross-browser compatible framework. Recommended for **Public** projects.',
-    ar: '**Selenium** يُنشئ سكريبتات Python (`.py`). الأكثر توافقاً مع جميع المتصفحات. موصى به لمشاريع **Public**.',
-  },
-  {
-    tags: ['cypress vs playwright', 'playwright vs cypress', 'cypress playwright'],
-    fr: '**Cypress vs Playwright :**\n\n🟡 **Cypress** → JavaScript `.js` · UI de debug intégrée · Idéal E2E moderne · Projets **Public**\n\n🔵 **Playwright** → Python `.py` · Chromium, Firefox, WebKit · Multi-navigateurs · Projets **Internal**\n\n💡 **Conseil :** Cypress si tu veux du JS, Playwright si tu veux du Python multi-browser.',
-    en: '**Cypress vs Playwright:**\n\n🟡 **Cypress** → JavaScript `.js` · Built-in debug UI · Best for modern E2E · **Public** projects\n\n🔵 **Playwright** → Python `.py` · Chromium, Firefox, WebKit · Multi-browser · **Internal** projects\n\n💡 **Tip:** Cypress if you want JS, Playwright if you want Python multi-browser.',
-    ar: '**Cypress مقابل Playwright:**\n\n🟡 **Cypress** → JavaScript `.js` · واجهة تصحيح مدمجة · الأفضل لـ E2E · مشاريع **Public**\n\n🔵 **Playwright** → Python `.py` · Chromium، Firefox، WebKit · متعدد المتصفحات · مشاريع **Internal**\n\n💡 **نصيحة:** Cypress إذا أردت JS، Playwright إذا أردت Python متعدد المتصفحات.',
-  },
-  {
-    tags: ['cypress vs selenium', 'selenium vs cypress', 'cypress selenium'],
-    fr: '**Cypress vs Selenium :**\n\n🟡 **Cypress** → JavaScript `.js` · Plus moderne · UI de debug · Projets **Public**\n\n🟢 **Selenium** → Python `.py` · Plus compatible tous navigateurs · Projets **Public**\n\n💡 **Conseil :** Cypress pour les apps modernes, Selenium pour la compatibilité maximale.',
-    en: '**Cypress vs Selenium:**\n\n🟡 **Cypress** → JavaScript `.js` · More modern · Debug UI · **Public** projects\n\n🟢 **Selenium** → Python `.py` · Most browser compatible · **Public** projects\n\n💡 **Tip:** Cypress for modern apps, Selenium for maximum compatibility.',
-    ar: '**Cypress مقابل Selenium:**\n\n🟡 **Cypress** → JavaScript `.js` · أحدث · واجهة تصحيح · مشاريع **Public**\n\n🟢 **Selenium** → Python `.py` · الأكثر توافقاً · مشاريع **Public**\n\n💡 **نصيحة:** Cypress للتطبيقات الحديثة، Selenium للتوافق الأقصى.',
-  },
-  {
-    tags: ['playwright vs selenium', 'selenium vs playwright', 'playwright selenium'],
-    fr: '**Playwright vs Selenium :**\n\n🔵 **Playwright** → Python `.py` · Multi-browser moderne · Projets **Internal**\n\n🟢 **Selenium** → Python `.py` · Compatible tous navigateurs · Projets **Public**\n\n💡 **Conseil :** Playwright pour APIs/microservices, Selenium pour apps web publiques.',
-    en: '**Playwright vs Selenium:**\n\n🔵 **Playwright** → Python `.py` · Modern multi-browser · **Internal** projects\n\n🟢 **Selenium** → Python `.py` · All browsers compatible · **Public** projects\n\n💡 **Tip:** Playwright for APIs/microservices, Selenium for public web apps.',
-    ar: '**Playwright مقابل Selenium:**\n\n🔵 **Playwright** → Python `.py` · متعدد المتصفحات الحديث · مشاريع **Internal**\n\n🟢 **Selenium** → Python `.py` · متوافق مع جميع المتصفحات · مشاريع **Public**\n\n💡 **نصيحة:** Playwright للـ APIs والـ Microservices، Selenium لتطبيقات الويب العامة.',
-  },
-  {
-    tags: ['compare all', 'tous les frameworks', 'all frameworks', 'quel framework', 'which framework', 'cypress playwright selenium'],
-    fr: '**Cypress vs Playwright vs Selenium :**\n\n🟡 **Cypress** → JS · E2E moderne · Public\n🔵 **Playwright** → Python · Multi-browser · Internal\n🟢 **Selenium** → Python · Compatible max · Public\n⚡ **Both** → génère les 3 en même temps',
-    en: '**Cypress vs Playwright vs Selenium:**\n\n🟡 **Cypress** → JS · Modern E2E · Public\n🔵 **Playwright** → Python · Multi-browser · Internal\n🟢 **Selenium** → Python · Max compatible · Public\n⚡ **Both** → generates all 3 at once',
-    ar: '**Cypress مقابل Playwright مقابل Selenium:**\n\n🟡 **Cypress** → JS · E2E حديث · Public\n🔵 **Playwright** → Python · متعدد المتصفحات · Internal\n🟢 **Selenium** → Python · أقصى توافق · Public\n⚡ **Both** → يُنشئ الثلاثة في آنٍ واحد',
-  },
-  {
-    tags: ['playwright', 'chromium', 'firefox', 'webkit', 'cross browser'],
-    fr: '**Playwright** génère des scripts Python (`.py`). Supporte Chromium, Firefox, WebKit. Recommandé pour les projets **Internal**.',
-    en: '**Playwright** generates Python scripts (`.py`). Supports Chromium, Firefox, and WebKit. Recommended for **Internal** projects.',
-    ar: '**Playwright** يُنشئ سكريبتات Python (`.py`). يدعم Chromium وFirefox وWebKit. موصى به لمشاريع **Internal**.',
-  },
-  {
-    tags: ['project', 'projet', 'public', 'internal', 'new project', 'nouveau projet', 'type'],
-    fr: '2 types de projets :\n🌐 **Public** — apps web, landing pages, interfaces\n🔒 **Internal** — APIs, microservices, infra privée\n\n**Projects → New Project** pour commencer.',
-    en: '2 project types:\n🌐 **Public** — web apps, landing pages, interfaces\n🔒 **Internal** — APIs, microservices, private infrastructure\n\n**Projects → New Project** to get started.',
-    ar: 'نوعان من المشاريع:\n🌐 **Public** — تطبيقات ويب، صفحات هبوط، واجهات\n🔒 **Internal** — APIs، microservices، بنية تحتية خاصة\n\n**Projects → New Project** للبدء.',
-  },
-  {
-    tags: ['history', 'historique', 'past', 'previous', 'log', 'logs'],
-    fr: 'L\'**Historique** liste toutes vos générations. Filtrez par framework, triez par date/pass rate, cliquez une ligne pour les détails.',
-    en: '**History** lists all your past generations. Filter by framework, sort by date/pass rate, click a row for details.',
-    ar: '**History** يعرض جميع عمليات الإنشاء السابقة. صفّ حسب الإطار، رتّب حسب التاريخ/pass rate، انقر صفاً للتفاصيل.',
-  },
-  {
-    tags: ['download', 'télécharger', 'pdf', 'csv', 'html', 'rapport', 'report', 'export'],
-    fr: 'Dans **Execution → Download Report** :\n📊 **CSV** — données brutes\n🌐 **HTML** — rapport visuel\n📄 **PDF** — rapport complet',
-    en: 'In **Execution → Download Report**:\n📊 **CSV** — raw data\n🌐 **HTML** — visual report\n📄 **PDF** — full report',
-    ar: 'في **Execution → Download Report**:\n📊 **CSV** — بيانات خام\n🌐 **HTML** — تقرير مرئي\n📄 **PDF** — تقرير كامل',
-  },
-  {
-    tags: ['theme', 'dark', 'light', 'mode', 'thème', 'appearance', 'apparence'],
-    fr: 'Changez le thème via le **bouton lune/soleil** dans le header, ou via **Settings → Appearance**.',
-    en: 'Change the theme via the **moon/sun button** in the header, or go to **Settings → Appearance**.',
-    ar: 'غيّر الثيم عبر **زر القمر/الشمس** في الهيدر، أو عبر **Settings → Appearance**.',
-  },
-  {
-    tags: ['settings', 'paramètres', 'langue', 'language', 'notification', 'preferences'],
-    fr: 'Dans **Settings** :\n• Notifications email / rapport hebdo\n• Framework par défaut\n• Thème (Dark / Light / System)\n• Langue (English, Français, العربية)',
-    en: 'In **Settings**:\n• Email notifications / weekly report\n• Default framework\n• Theme (Dark / Light / System)\n• Language (English, Français, العربية)',
-    ar: 'في **Settings**:\n• إشعارات البريد / التقرير الأسبوعي\n• الإطار الافتراضي\n• الثيم (Dark / Light / System)\n• اللغة (English, Français, العربية)',
-  },
-  {
-    tags: ['hello', 'bonjour', 'salut', 'hi', 'hey', 'help', 'aide', 'start', 'commencer'],
-    fr: 'Bonjour ! 👋 Je suis **Nextest AI** — posez-moi n\'importe quelle question sur Nextest : tests, frameworks, projets, résultats, exports.',
-    en: 'Hello! 👋 I\'m the **Nextest AI** assistant. Ask me anything about Nextest: tests, frameworks, projects, results, exports!',
-    ar: 'مرحباً! 👋 أنا **Nextest AI** — اسألني أي شيء عن Nextest: اختبارات، أطر عمل، مشاريع، نتائج، تصدير!',
-  },
-  {
-    tags: ['account', 'compte', 'profile', 'profil', 'avatar', 'photo', 'image'],
-    fr: 'Dans **Account** :\n• Modifiez votre **nom** et **email**\n• Changez votre **photo de profil** (cliquez sur l\'avatar)\n• Consultez vos stats : générations et projets',
-    en: 'In **Account**:\n• Edit your **name** and **email**\n• Change your **profile picture** (click the avatar)\n• View your stats: generations and projects',
-    ar: 'في **Account**:\n• عدّل **اسمك** و**بريدك الإلكتروني**\n• غيّر **صورة ملفك الشخصي** (انقر الأفاتار)\n• اعرض إحصائياتك: الإنشاءات والمشاريع',
-  },
-  {
-    tags: ['password', 'mot de passe', 'changer mot de passe', 'change password', 'update password', 'sécurité', 'security'],
-    fr: 'Pour changer votre mot de passe :\n1. **Account** → section **Change Password**\n2. Entrez votre mot de passe actuel\n3. Entrez le nouveau mot de passe\n4. Confirmez et cliquez **Update Password**',
-    en: 'To change your password:\n1. **Account** → **Change Password** section\n2. Enter your current password\n3. Enter the new password\n4. Confirm and click **Update Password**',
-    ar: 'لتغيير كلمة المرور:\n1. **Account** → قسم **Change Password**\n2. أدخل كلمة مرورك الحالية\n3. أدخل كلمة المرور الجديدة\n4. أكّد وانقر **Update Password**',
-  },
-  {
-    tags: ['notification', 'notifications', 'notif', 'badge', 'alerte', 'alert', 'cloche', 'bell'],
-    fr: 'Les **notifications** apparaissent en haut à droite (icône cloche).\n\nChaque génération terminée crée une notification avec :\n✅ Pass / ❌ Fail count\n🔗 URL testée\n⚙️ Framework utilisé\n\nVous pouvez supprimer une notif ou toutes les effacer.',
-    en: 'The **notifications** appear top right (bell icon).\n\nEach completed generation creates a notification with:\n✅ Pass / ❌ Fail count\n🔗 Tested URL\n⚙️ Framework used\n\nYou can delete one or clear all.',
-    ar: 'تظهر **الإشعارات** أعلى اليمين (أيقونة الجرس).\n\nكل إنشاء مكتمل يُنشئ إشعاراً يحتوي على:\n✅ عدد Pass / ❌ عدد Fail\n🔗 URL المختبر\n⚙️ الإطار المستخدم\n\nيمكنك حذف إشعار أو مسح الكل.',
-  },
-  {
-    tags: ['supprimer projet', 'delete project', 'effacer projet', 'remove project', 'supprimer', 'delete'],
-    fr: 'Pour supprimer un projet :\n**Projects** → survolez la carte → cliquez l\'icône 🗑️\n\n⚠️ La suppression est **irréversible** et efface toutes les générations associées.',
-    en: 'To delete a project:\n**Projects** → hover the card → click the 🗑️ icon\n\n⚠️ Deletion is **irreversible** and removes all associated generations.',
-    ar: 'لحذف مشروع:\n**Projects** → مرّر فوق البطاقة → انقر أيقونة 🗑️\n\n⚠️ الحذف **لا رجعة فيه** ويزيل جميع الإنشاءات المرتبطة.',
-  },
-  {
-    tags: ['modifier projet', 'edit project', 'renommer', 'rename', 'update project', 'changer nom projet'],
-    fr: 'Pour modifier un projet :\n**Projects** → survolez la carte → cliquez l\'icône ✏️\n\nVous pouvez modifier :\n• Le **nom** du projet\n• La **description**\n\n⚠️ Le **type** (Public/Internal) ne peut pas être changé après création.',
-    en: 'To edit a project:\n**Projects** → hover the card → click the ✏️ icon\n\nYou can edit:\n• The **name**\n• The **description**\n\n⚠️ The **type** (Public/Internal) cannot be changed after creation.',
-    ar: 'لتعديل مشروع:\n**Projects** → مرّر فوق البطاقة → انقر أيقونة ✏️\n\nيمكنك تعديل:\n• **الاسم**\n• **الوصف**\n\n⚠️ لا يمكن تغيير **النوع** (Public/Internal) بعد الإنشاء.',
-  },
-  {
-    tags: ['search', 'recherche', 'chercher', 'trouver', 'find', 'filter', 'filtrer'],
-    fr: 'Nextest propose une **recherche globale** dans le header :\n• Recherchez par **URL**, **projet**, ou **framework**\n• Les résultats affichent projets et générations\n• Cliquez un résultat pour naviguer directement',
-    en: 'Nextest has a **global search** in the header:\n• Search by **URL**, **project**, or **framework**\n• Results show projects and generations\n• Click a result to navigate directly',
-    ar: 'يوفر Nextest **بحثاً شاملاً** في الهيدر:\n• ابحث بـ **URL** أو **مشروع** أو **إطار**\n• تعرض النتائج المشاريع والإنشاءات\n• انقر نتيجة للانتقال مباشرةً',
-  },
-  {
-    tags: ['dashboard', 'tableau de bord', 'accueil', 'home', 'overview', 'statistiques', 'stats'],
-    fr: 'Le **Dashboard** affiche :\n📊 Scripts générés, apps analysées, couverture moyenne\n📈 Graphique des générations de la semaine\n🍩 Résultats globaux (Pass/Fail/Skip)\n🔗 Top URLs testées\n⚡ Activité récente',
-    en: 'The **Dashboard** shows:\n📊 Scripts generated, apps analyzed, avg coverage\n📈 Weekly generations chart\n🍩 Global results (Pass/Fail/Skip)\n🔗 Top tested URLs\n⚡ Recent activity',
-    ar: 'يعرض **Dashboard**:\n📊 السكريبتات المُنشأة، التطبيقات المحللة، متوسط التغطية\n📈 مخطط إنشاءات الأسبوع\n🍩 النتائج الإجمالية (Pass/Fail/Skip)\n🔗 أكثر URLs اختباراً\n⚡ النشاط الأخير',
-  },
-  {
-    tags: ['theme', 'dark mode', 'light mode', 'mode sombre', 'mode clair', 'apparence', 'appearance', 'couleur'],
-    fr: 'Pour changer le thème :\n• **Header** → bouton 🌙/☀️ (toggle rapide)\n• **Settings → Appearance** → choisissez Dark / Light / System\n\nLe thème est sauvegardé automatiquement.',
-    en: 'To change the theme:\n• **Header** → 🌙/☀️ button (quick toggle)\n• **Settings → Appearance** → choose Dark / Light / System\n\nThe theme is saved automatically.',
-    ar: 'لتغيير الثيم:\n• **Header** → زر 🌙/☀️ (تبديل سريع)\n• **Settings → Appearance** → اختر Dark / Light / System\n\nيُحفظ الثيم تلقائياً.',
-  },
-  {
-    tags: ['langue', 'language', 'français', 'english', 'arabic', 'arabe', 'changer langue', 'change language'],
-    fr: 'Pour changer la langue :\n**Settings → Language**\n\n3 langues disponibles :\n🇬🇧 English\n🇫🇷 Français\n🇹🇳 العربية',
-    en: 'To change the language:\n**Settings → Language**\n\n3 languages available:\n🇬🇧 English\n🇫🇷 Français\n🇹🇳 العربية',
-    ar: 'لتغيير اللغة:\n**Settings → Language**\n\n3 لغات متاحة:\n🇬🇧 English\n🇫🇷 Français\n🇹🇳 العربية',
-  },
-  {
-    tags: ['supprimer historique', 'delete history', 'effacer historique', 'clear history', 'vider historique'],
-    fr: 'Pour supprimer tout l\'historique :\n**Settings → Danger Zone → Delete all history**\n\nTapez **CONFIRM** pour valider.\n\n⚠️ Toutes vos générations seront **définitivement supprimées**.',
-    en: 'To delete all history:\n**Settings → Danger Zone → Delete all history**\n\nType **CONFIRM** to proceed.\n\n⚠️ All your generations will be **permanently deleted**.',
-    ar: 'لحذف كل السجل:\n**Settings → Danger Zone → Delete all history**\n\naكتب **CONFIRM** للمتابعة.\n\n⚠️ ستُحذف جميع إنشاءاتك **نهائياً**.',
-  },
-  {
-    tags: ['supprimer compte', 'delete account', 'effacer compte', 'fermer compte', 'close account'],
-    fr: 'Pour supprimer votre compte :\n**Settings → Danger Zone → Delete Account**\n\nTapez **CONFIRM** pour valider.\n\n⚠️ Action **irréversible** — tous vos projets, générations et données seront supprimés.',
-    en: 'To delete your account:\n**Settings → Danger Zone → Delete Account**\n\nType **CONFIRM** to proceed.\n\n⚠️ **Irreversible** — all your projects, generations and data will be deleted.',
-    ar: 'لحذف حسابك:\n**Settings → Danger Zone → Delete Account**\n\naكتب **CONFIRM** للمتابعة.\n\n⚠️ **لا رجعة فيه** — ستُحذف جميع مشاريعك وإنشاءاتك وبياناتك.',
-  },
-  {
-    tags: ['unit test', 'unit', 'test unitaire', 'unitaire', 'composant', 'component', 'isolation'],
-    fr: '**Unit Test** — teste des fonctions et composants de manière **isolée**.\n\nDisponible pour les projets **Internal**.\nDurée ~15s · Framework : Playwright ou Selenium.',
-    en: '**Unit Test** — tests individual functions and components in **isolation**.\n\nAvailable for **Internal** projects.\nDuration ~15s · Framework: Playwright or Selenium.',
-    ar: '**Unit Test** — يختبر الدوال والمكونات بشكل **معزول**.\n\nمتاح لمشاريع **Internal**.\nالمدة ~15 ثانية · الإطار: Playwright أو Selenium.',
-  },
-  {
-    tags: ['security', 'sécurité', 'security test', 'test sécurité', 'vulnérabilité', 'vulnerability', 'injection', 'auth'],
-    fr: '**Security Test** — détecte les vulnérabilités, problèmes d\'authentification et risques d\'injection.\n\nDisponible pour les projets **Internal**.\nDurée ~5min · Framework : Playwright.',
-    en: '**Security Test** — detects vulnerabilities, auth issues and injection risks.\n\nAvailable for **Internal** projects.\nDuration ~5min · Framework: Playwright.',
-    ar: '**Security Test** — يكتشف الثغرات، مشاكل المصادقة ومخاطر الحقن.\n\nمتاح لمشاريع **Internal**.\nالمدة ~5 دقائق · الإطار: Playwright.',
-  },
-  {
-    tags: ['screenshot', 'capture', 'capture écran', 'photo test', 'image test', 'voir erreur'],
-    fr: 'Les **screenshots** sont capturés automatiquement lors d\'un test **échoué** (Fail).\n\nPour les voir :\n**Test Execution → Results** → cliquez **Show details** sur un test échoué → section **Screenshot on Fail**',
-    en: '**Screenshots** are automatically captured when a test **fails**.\n\nTo view them:\n**Test Execution → Results** → click **Show details** on a failed test → **Screenshot on Fail** section',
-    ar: 'تُلتقط **Screenshots** تلقائياً عند **فشل** الاختبار.\n\nلعرضها:\n**Test Execution → Results** → انقر **Show details** على اختبار فاشل → قسم **Screenshot on Fail**',
-  },
-  {
-    tags: ['pass rate', 'taux de réussite', 'taux', 'score', 'pourcentage', 'percentage', 'résumé'],
-    fr: 'Le **Pass Rate** est calculé automatiquement :\n\n`Pass Rate = (Tests passés / Total tests) × 100`\n\n🟢 ≥ 80% → Bon\n🟡 50-79% → Moyen\n🔴 < 50% → Critique\n\nVisible dans **History**, **Projects** et **Test Execution**.',
-    en: 'The **Pass Rate** is calculated automatically:\n\n`Pass Rate = (Passed tests / Total tests) × 100`\n\n🟢 ≥ 80% → Good\n🟡 50-79% → Medium\n🔴 < 50% → Critical\n\nVisible in **History**, **Projects** and **Test Execution**.',
-    ar: 'يُحسب **Pass Rate** تلقائياً:\n\n`Pass Rate = (الاختبارات الناجحة / إجمالي الاختبارات) × 100`\n\n🟢 ≥ 80% → جيد\n🟡 50-79% → متوسط\n🔴 < 50% → حرج\n\nظاهر في **History** و**Projects** و**Test Execution**.',
-  },
-  {
-    tags: ['both', 'les deux', 'tous les frameworks', 'multi framework', 'selenium et cypress', 'generate all'],
-    fr: 'Le framework **Both** génère les scripts pour **Selenium + Playwright + Cypress** en même temps.\n\nVous pouvez télécharger :\n• `.py` Selenium\n• `.py` Playwright\n• `.js` Cypress\n\nIdéal pour comparer les résultats entre frameworks.',
-    en: 'The **Both** framework generates scripts for **Selenium + Playwright + Cypress** at once.\n\nYou can download:\n• `.py` Selenium\n• `.py` Playwright\n• `.js` Cypress\n\nIdeal for comparing results across frameworks.',
-    ar: 'إطار **Both** يُنشئ سكريبتات لـ **Selenium + Playwright + Cypress** في آنٍ واحد.\n\nيمكنك تنزيل:\n• `.py` Selenium\n• `.py` Playwright\n• `.js` Cypress\n\nمثالي لمقارنة النتائج بين الأطر.',
-  },
-  {
-    tags: ['internal', 'interne', 'api', 'microservice', 'backend', 'privé', 'private'],
-    fr: 'Les projets **Internal** sont conçus pour :\n🔒 APIs REST\n🔒 Microservices\n🔒 Infrastructure privée\n\nTypes de tests disponibles :\n• Smoke · Functional · Performance\n• Unit · Regression · Security\n\nFrameworks : Playwright · Selenium · Cypress',
-    en: '**Internal** projects are designed for:\n🔒 REST APIs\n🔒 Microservices\n🔒 Private infrastructure\n\nAvailable test types:\n• Smoke · Functional · Performance\n• Unit · Regression · Security\n\nFrameworks: Playwright · Selenium · Cypress',
-    ar: 'مشاريع **Internal** مصممة لـ:\n🔒 REST APIs\n🔒 Microservices\n🔒 البنية التحتية الخاصة\n\nأنواع الاختبارات المتاحة:\n• Smoke · Functional · Performance\n• Unit · Regression · Security\n\nالأطر: Playwright · Selenium · Cypress',
-  },
-  {
-    tags: ['public', 'web app', 'landing page', 'interface', 'site web', 'website', 'frontend'],
-    fr: 'Les projets **Public** sont conçus pour :\n🌐 Applications web\n🌐 Landing pages\n🌐 Interfaces utilisateur\n\nTypes de tests disponibles :\n• Smoke · Functional · Performance\n\nFrameworks : Selenium · Cypress · Playwright · Both',
-    en: '**Public** projects are designed for:\n🌐 Web applications\n🌐 Landing pages\n🌐 User interfaces\n\nAvailable test types:\n• Smoke · Functional · Performance\n\nFrameworks: Selenium · Cypress · Playwright · Both',
-    ar: 'مشاريع **Public** مصممة لـ:\n🌐 تطبيقات الويب\n🌐 صفحات الهبوط\n🌐 واجهات المستخدم\n\nأنواع الاختبارات المتاحة:\n• Smoke · Functional · Performance\n\nالأطر: Selenium · Cypress · Playwright · Both',
-  },
-  {
-    tags: ['temps génération', 'generation time', 'durée', 'duration', 'combien de temps', 'how long', 'lent', 'slow'],
-    fr: 'Durées estimées par type de test :\n⚡ **Smoke** → ~30 secondes\n🔬 **Functional** → ~1 minute\n📊 **Performance** → ~3 minutes\n🔧 **Unit** → ~15 secondes\n🔄 **Regression** → ~3 minutes\n🔐 **Security** → ~5 minutes',
-    en: 'Estimated duration by test type:\n⚡ **Smoke** → ~30 seconds\n🔬 **Functional** → ~1 minute\n📊 **Performance** → ~3 minutes\n🔧 **Unit** → ~15 seconds\n🔄 **Regression** → ~3 minutes\n🔐 **Security** → ~5 minutes',
-    ar: 'المدة التقديرية حسب نوع الاختبار:\n⚡ **Smoke** → ~30 ثانية\n🔬 **Functional** → ~دقيقة\n📊 **Performance** → ~3 دقائق\n🔧 **Unit** → ~15 ثانية\n🔄 **Regression** → ~3 دقائق\n🔐 **Security** → ~5 دقائق',
-  },
-  {
-    tags: ['cypress', 'javascript', '.js', 'e2e', 'end to end'],
-    fr: '**Cypress** génère des scripts JavaScript (`.js`). Il inclut une **UI de debug intégrée** et est idéal pour les tests E2E modernes. Recommandé pour les projets **Public**.',
-    en: '**Cypress** generates JavaScript scripts (`.js`). It includes a **built-in debug UI** and is ideal for modern E2E testing. Recommended for **Public** projects.',
-    ar: '**Cypress** يُنشئ سكريبتات JavaScript (`.js`). يتضمن **واجهة تصحيح مدمجة** وهو مثالي لاختبارات E2E الحديثة. موصى به لمشاريع **Public**.',
-  },
-];
-
-// ─── Strict KB-only matching ───────────────────────────────────────────────────
-const NEXTEST_VOCABULARY = new Set([
-  'smoke','functional','regression','assertion','assertions',
-  'test','tests','testing',
-  'cypress','playwright','selenium','framework','frameworks',
-  'chromium','webkit',
-  'nextest','generate','génération','generation','générer',
-  'execution','passrate',
-  'dashboard','historique','paramètres','notifications',
-  'rapport','télécharger','screenshot',
-  'supprimer','renommer','lancer','exécuter','démarrer',
-  'microservice','webapp','couverture','cloche',
-  'nextest','bonjour','salut',
-]);
-
-function tokenize(text) {
-  return text.toLowerCase().replace(/['']/g, "'").split(/[\s,?!.;:()[\]{}]+/).filter(Boolean);
-}
-
-function scoreEntry(entry, tokens) {
-  let score = 0;
-  const joined = tokens.join(' ');
-  for (const tag of entry.tags) {
-    const tagTokens = tokenize(tag);
-    if (tagTokens.length > 1 && joined.includes(tag.toLowerCase())) {
-      score += tagTokens.length * 3;
-    } else {
-      for (const tt of tagTokens) {
-        if (tokens.some(t => t === tt ||
-          (Math.abs(t.length - tt.length) <= 1 && levenshtein(t, tt) <= 1)
-        )) score += 2;
-      }
-    }
-  }
-  return score;
-}
-
-function levenshtein(a, b) {
-  const dp = Array.from({ length: a.length + 1 }, (_, i) =>
-    Array.from({ length: b.length + 1 }, (_, j) => i || j)
-  );
-  for (let i = 1; i <= a.length; i++)
-    for (let j = 1; j <= b.length; j++)
-      dp[i][j] = a[i-1] === b[j-1]
-        ? dp[i-1][j-1]
-        : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
-  return dp[a.length][b.length];
-}
-
-function isNextestRelated(tokens) {
-  return tokens.some(t => {
-    if (NEXTEST_VOCABULARY.has(t)) return true;
-    for (const v of NEXTEST_VOCABULARY) {
-      if (Math.abs(t.length - v.length) <= 1 && levenshtein(t, v) <= 1) return true;
-    }
-    return false;
+async function getBotResponse(message, lang, sessionId) {
+  const res = await fetch('/api/chatbot/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, lang, session_id: sessionId }),
   });
+  const data = await res.json();
+  return { text: data.reply, source: 'ai' };
 }
 
-const GREETING_TOKENS = new Set(['hello','hi','hey','bonjour','salut','help','aide','start','commencer','مرحبا','مرحباً','هلا','ساعدني']);
-
-function findKBAnswer(input, lang) {
-  const tokens = tokenize(input);
-  const isGreeting = tokens.length <= 3 && tokens.every(t => GREETING_TOKENS.has(t));
-  if (!isGreeting && !isNextestRelated(tokens)) return null;
-
-  let best = null, bestScore = 0;
-  for (const entry of KB) {
-    const s = scoreEntry(entry, tokens);
-    if (s > bestScore) { bestScore = s; best = entry; }
-  }
-
-  const minScore = isGreeting ? 1 : 3;
-  if (best && bestScore >= minScore) return best[lang] || best.en;
-  return null;
-}
-
-async function getBotResponse(message, lang) {
-  const kbAnswer = findKBAnswer(message, lang);
-  if (kbAnswer) {
-    await new Promise(r => setTimeout(r, 300 + Math.random() * 200));
-    return { text: kbAnswer, source: 'kb' };
-  }
-
-  const offTopic = {
-    fr: "Je suis uniquement conçu pour répondre aux questions sur **Nextest**.\n\nVoici ce que je peux vous aider avec :\n• Types de tests (Smoke, Functional, Performance…)\n• Frameworks (Cypress, Playwright, Selenium)\n• Projets, résultats, historique\n• Paramètres, exports, notifications",
-    en: "I'm only able to answer questions about **Nextest**.\n\nHere's what I can help with:\n• Test types (Smoke, Functional, Performance…)\n• Frameworks (Cypress, Playwright, Selenium)\n• Projects, results, history\n• Settings, exports, notifications",
-    ar: "أنا مصمم فقط للإجابة على أسئلة **Nextest**.\n\nإليك ما يمكنني مساعدتك به:\n• أنواع الاختبارات (Smoke, Functional, Performance…)\n• الأطر (Cypress, Playwright, Selenium)\n• المشاريع، النتائج، السجل\n• الإعدادات، التصدير، الإشعارات",
-  };
-
-  await new Promise(r => setTimeout(r, 200));
-  return { text: offTopic[lang] || offTopic.en, source: 'kb' };
-}
 
 function renderText(text, isLight) {
   const codeColor = isLight ? '#4338ca' : '#a5b4fc';
@@ -404,6 +83,7 @@ export default function NextestChatbot({ theme = 'dark' }) {
   const [unread,   setUnread]   = useState(0);
   const [pulse,    setPulse]    = useState(true);
   const [uiLang,   setUiLang]   = useState('fr');
+  const [sessionId] = useState(() => crypto.randomUUID()); 
 
   const endRef   = useRef(null);
   const inputRef = useRef(null);
@@ -424,7 +104,7 @@ export default function NextestChatbot({ theme = 'dark' }) {
     setMessages(m => [...m, { id: Date.now(), from: 'user', lang, text: q, time: new Date() }]);
     setTyping(true);
     try {
-      const { text: answer, source } = await getBotResponse(q, lang);
+      const { text: answer, source } = await getBotResponse(q, lang, sessionId);
       setMessages(m => [...m, { id: Date.now() + 1, from: 'bot', lang, source, text: answer, time: new Date() }]);
       setShowSugg(true);
     } catch {
@@ -434,7 +114,7 @@ export default function NextestChatbot({ theme = 'dark' }) {
       setTyping(false);
       if (!open) setUnread(u => u + 1);
     }
-  }, [input, typing, open]);
+  }, [input, typing, open, sessionId]);
 
   const fmt = d => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const currentSuggestions = SUGGESTIONS[uiLang] || SUGGESTIONS.en;

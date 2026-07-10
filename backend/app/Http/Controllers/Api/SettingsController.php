@@ -36,8 +36,8 @@ class SettingsController extends Controller
         'email_notifications',
         'weekly_report',
         'default_framework',
-        'theme',      // ← manquait
-        'language',   // ← manquait
+        'theme',      
+        'language',   
     ])
 );
 

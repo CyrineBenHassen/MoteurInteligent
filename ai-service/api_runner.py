@@ -1,3 +1,5 @@
+from unittest import result
+
 import requests
 import time
 import json
@@ -67,6 +69,9 @@ def _run_one(tc: dict, token: str) -> dict:
             resp = requests.post(url, json=body, headers=headers, verify=False, timeout=15)
             if "users" in url and resp.status_code != 201:
                 print(f"[DEBUG-USER] status={resp.status_code} | body={resp.text[:300]}")
+        elif method == "GET":
+            headers["Content-Type"] = "application/json"
+            resp = requests.get(url, headers=headers, verify=False, timeout=15)
         elif method == "GET":
             headers["Content-Type"] = "application/json"
             resp = requests.get(url, headers=headers, verify=False, timeout=15)
@@ -329,11 +334,28 @@ Return ONLY this JSON:
 
     return results
 
-def run_api_tests(test_cases: list, token: str = "") -> dict:
+def run_api_tests(test_cases: list, token: str = "", username: str = "", password: str = "", base_url: str = "") -> dict:
     """
     Main entry point — called from main.py /run-api endpoint.
     Runs all API test cases and returns results.
     """
+    # ── Auto-login si pas de token mais credentials fournis (apps non-ANPE) ──
+    if not token and username and password and base_url:
+        try:
+            resp = requests.post(
+                f"{base_url}/api/login",
+                json={"email": username, "password": password},
+                verify=False, timeout=15
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                token = data.get("token") or data.get("access_token", "") or data.get("data", {}).get("token", "")
+                print(f"[API_RUNNER] ✓ Auto-login successful via credentials")
+            else:
+                print(f"[API_RUNNER] Auto-login failed: HTTP {resp.status_code}")
+        except Exception as e:
+            print(f"[API_RUNNER] Auto-login failed: {e}")
+
     print(f"[API_RUNNER] Running {len(test_cases)} API tests")
     start_total = time.time()
 
@@ -341,24 +363,12 @@ def run_api_tests(test_cases: list, token: str = "") -> dict:
     created_user_id = None
 
     for i, tc in enumerate(test_cases, 1):
-        # Si on a un ID créé, remplace dans l'URL
+        
         if created_user_id:
             tc = dict(tc)
             if "CREATED_ID" in tc.get("url", ""):
                 tc["url"] = tc["url"].replace("CREATED_ID", created_user_id)
                 tc["path"] = tc.get("path", "").replace("CREATED_ID", created_user_id)
-
-        print(f"[API_RUNNER] [{i}/{len(test_cases)}] {tc.get('method','GET')} {tc.get('url','')}")
-        result = _run_one(tc, token)
-
-        # Capture l'ID créé après un POST create
-        if tc.get("name") == "Create user" and result["status"] == "pass":
-            try:
-                resp_data = json.loads(result.get("response_preview", "{}"))
-                created_user_id = resp_data.get("data", {}).get("id")
-                print(f"[API_RUNNER] Captured created user ID: {created_user_id}")
-            except Exception:
-                pass
 
         print(f"[API_RUNNER] [{i}/{len(test_cases)}] {tc.get('method','GET')} {tc.get('url','')}")
         result = _run_one(tc, token)
@@ -372,7 +382,7 @@ def run_api_tests(test_cases: list, token: str = "") -> dict:
                 created_user_id = id_match.group(1) if id_match else None
                 print(f"[API_RUNNER] Captured created user ID: {created_user_id}")
             except Exception as e:
-                print(f"[API_RUNNER] Failed to capture ID: {e}")
+             print(f"[API_RUNNER] Failed to capture ID: {e}")
 
         results.append(result)
         print(f"[API_RUNNER]   → {result['status'].upper()} ({result.get('duration','—')})")
@@ -390,7 +400,7 @@ def run_api_tests(test_cases: list, token: str = "") -> dict:
 
     print(f"[API_RUNNER] DONE | {pass_count} pass / {fail_count} fail | {pass_rate}% | {duration_total}s")
 
-    # ── Alerts ────────────────────────────────────────────────────────────────
+    #Alerts
     gen_id     = test_cases[0].get("generation_id") if test_cases else None
     project_id = test_cases[0].get("project_id")    if test_cases else None
     base_url   = test_cases[0].get("url", "") if test_cases else ""

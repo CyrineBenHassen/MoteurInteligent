@@ -1,6 +1,5 @@
 
 //Imports
-
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useLang } from '../../context/LanguageContext';
@@ -33,7 +32,9 @@ import {
   IconTrash,
   IconEye,
   IconChevronDown,
-  
+  IconTag,
+  IconAlignLeft,
+
 } from '@tabler/icons-react';
 
 import { IconTrendingUp } from '@tabler/icons-react';
@@ -49,8 +50,17 @@ import { IconActivity } from '@tabler/icons-react';
 import { IconLink } from '@tabler/icons-react';
 
 import { IconSearch, IconBolt, IconChartBar, IconApi, IconCircleDashed, IconShieldCheck, IconSettings2, IconRefresh, IconWorldSearch, IconLayoutDashboard, IconClick, IconShieldLock, IconSeeding, IconBellRinging, IconBulb } from '@tabler/icons-react';
-import * as XLSX from 'xlsx';
 
+import {
+  IconGauge,
+  IconHistory,
+  IconFlask2,
+  IconComponents,
+  IconPlayerPlay,
+  IconSend,
+} from '@tabler/icons-react';
+
+import * as XLSX from 'xlsx';
 import FlakyTestsPanel from '../FlakyTests/FlakyTestsPanel';
 
 import AlertsPanel from '../Alerts/AlertsPanel';
@@ -59,6 +69,9 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 
 import ScheduledTasksPanel from './ScheduledTasksPanel';
 
+import { Calendar, ChevronLeft, ChevronRight, X, LayoutGrid, Code2, ListFilter  } from 'lucide-react';
+
+import { useNavigate } from 'react-router-dom';
 
 
 
@@ -309,7 +322,7 @@ function AssertionBadge({ assertion_result, step_meta }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div>
               <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 3 }}>Expected</div>
-              <div style={{ padding: '5px 8px', borderRadius: 6, fontSize: 10, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--navy)', fontFamily: 'monospace', wordBreak: 'break-all' }}>{expected || '—'}</div>
+            <div style={{ padding: '5px 8px', borderRadius: 6, fontSize: 10, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'monospace', wordBreak: 'break-all' }}>{expected || '—'}</div>
             </div>
             <div>
               <div style={{ fontSize: 9, fontWeight: 700, color: passed ? '#10b981' : '#ef4444', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 3 }}>Actual</div>
@@ -996,15 +1009,15 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     { name: 'Skipped', value: Math.round(totalSkip / grandTotal * 100), color: '#f59e0b' },
   ]);
 
-  // ── Top URLs ──
-  const urlMap = {};
-  gens.forEach(g => {
-    if (!urlMap[g.url]) urlMap[g.url] = { url: g.url, framework: g.framework, tests: 0, pass: 0, date: g.created_at };
-    urlMap[g.url].tests += (g.pass_count||0) + (g.fail_count||0) + (g.skip_count||0);
-    urlMap[g.url].pass  += g.pass_count || 0;
-    urlMap[g.url].date   = g.created_at;
-  });
-  setTopUrls(Object.values(urlMap).sort((a,b) => b.tests - a.tests).slice(0,3));
+  //Top URLs
+const urlMap = {};
+gens.forEach(g => {
+  if (!urlMap[g.url]) urlMap[g.url] = { url: g.url, framework: g.framework, tests: 0, pass: 0, date: g.created_at };
+  urlMap[g.url].tests += (g.pass_count||0) + (g.fail_count||0) + (g.skip_count||0);
+  urlMap[g.url].pass  += g.pass_count || 0;
+  urlMap[g.url].date   = g.created_at;
+});
+setTopUrls(Object.values(urlMap).sort((a,b) => b.tests - a.tests).slice(0,4)); // ← 4 au lieu de 3
 
   // ── Type distribution ──
   const typeCount = {};
@@ -1173,7 +1186,7 @@ if (loading) return (
     iconBg="rgba(99,102,241,0.12)"
     iconBorder="rgba(99,102,241,0.25)"
     accentColor="#6366f1"
-    title={t('activeProjects')}
+    title={t('active Projects')}
     value={stats.projects}
     trend={stats.trendProjects}
     sparkData={[stats.publicCount, stats.internalCount, stats.projects, stats.projects, stats.projects, stats.projects, stats.projects]}
@@ -1290,7 +1303,69 @@ if (loading) return (
 
   <ActivityHeatmap gens={allGens} projects={allProjects} />
 </div>
+<ActivityHeatmap gens={allGens} projects={allProjects} />
+</div>
 
+{/* ── MOST TESTED APP ── */}
+{topUrls.length > 0 && (() => {
+  const top = topUrls[0];
+  const rate = Math.round((top.pass / top.tests) * 100) || 0;
+  const isGood = rate >= 80;
+  const statusColor = isGood ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+  const statusLabel = isGood ? 'Stable' : rate >= 50 ? 'À surveiller' : 'Critique';
+
+  return (
+    <div className="section-box" style={{ marginBottom: 24, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{
+          width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+          background: `${statusColor}18`, border: `1px solid ${statusColor}33`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="20" height="20" fill="none" stroke={statusColor} strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M12 2l3 6.5 7 1-5 5 1.5 7L12 18l-6.5 3.5L7 14.5l-5-5 7-1L12 2z"/>
+          </svg>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--muted)', marginBottom: 3 }}>
+            App la plus testée
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo2)', cursor: 'pointer' }}
+            onClick={() => window.open(top.url, '_blank', 'noopener,noreferrer')}
+            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
+            {top.url}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--C)' }}>{top.tests}</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>tests</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: statusColor, fontFamily: 'var(--C)' }}>{rate}%</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>pass rate</div>
+        </div>
+        <span style={{
+          fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 20,
+          color: statusColor, background: `${statusColor}18`, border: `1px solid ${statusColor}33`,
+        }}>
+          {statusLabel}
+        </span>
+      </div>
+    </div>
+  );
+})()}
+
+<div className="section-box" style={{ marginBottom: 24 }}>
+  <div className="sb-head">
+    <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+  <IconTestPipe size={15} stroke={1.5} style={{ color: '#6366f1' }} />
+  {t('testTypeDistribution')}
+</span>
+  </div>
 <div className="section-box" style={{ marginBottom: 24 }}>
   <div className="sb-head">
     <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1865,11 +1940,14 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
 }
 
 //Détail project 
+//Détail project 
 export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGeneration, goTo }) {
   const [generations, setGenerations] = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [deleting,    setDeleting]    = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [filterTestType, setFilterTestType] = useState('all');
+  const [search, setSearch] = useState('');
   const ITEMS_PER_PAGE = 5;
 
   const isPublic = project?.type === 'public';
@@ -1877,9 +1955,23 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
   const colorBg  = isPublic ? 'rgba(79,134,232,.08)' : 'rgba(139,92,246,.08)';
   const colorBd  = isPublic ? 'rgba(79,134,232,.2)'  : 'rgba(139,92,246,.2)';
 
+  // ── Type config used both by the filter bar and the grouped sections below ──
+  const TYPE_CONFIG = {
+    smoke:       { label: 'Smoke Tests',       color: '#64748b', bg: 'rgba(100,116,139,.1)',  border: 'rgba(100,116,139,.25)', letter: 'S', Icon: IconEye },
+    functional:  { label: 'Functional Tests',  color: '#6366f1', bg: 'rgba(99,102,241,.1)',   border: 'rgba(99,102,241,.25)',  letter: 'F', Icon: IconSettings2 },
+    performance: { label: 'Performance Tests', color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',   border: 'rgba(139,92,246,.25)', letter: 'P', Icon: IconBolt },
+    api:         { label: 'API Tests',         color: '#10b981', bg: 'rgba(16,185,129,.1)',   border: 'rgba(16,185,129,.25)', letter: 'A', Icon: IconApi },
+    regression:  { label: 'Regression Test',  color: '#f97316', bg: 'rgba(249,115,22,.1)',   border: 'rgba(249,115,22,.25)', letter: 'R', Icon: IconRefresh },
+    security:    { label: 'Security Test',    color: '#ef4444', bg: 'rgba(239,68,68,.1)',    border: 'rgba(239,68,68,.25)',  letter: 'S', Icon: IconShieldLock },
+    unit:        { label: 'Unit Tests',        color: '#0ea5e9', bg: 'rgba(14,165,233,.1)',   border: 'rgba(14,165,233,.25)', letter: 'U', Icon: IconTestPipe },
+    seo:         { label: 'SEO Test', color: '#06b6d4', bg: 'rgba(6,182,212,.08)', border: 'rgba(6,182,212,.2)', letter: 'S', Icon: IconSeeding },
+  };
+
   useEffect(() => {
     api.get(`/projects/${project.id}/generations`).then(res => setGenerations(res.data)).catch(console.error).finally(() => setLoading(false));
   }, [project.id]);
+
+  useEffect(() => { setCurrentPage(1); }, [filterTestType, search]);
 
   const handleDelete = async (id) => {
     setDeleting(id);
@@ -1981,7 +2073,14 @@ const avgRate        = totalGen ? Math.round(generations.reduce((s, g) => s + (g
 const totalPass      = generations.reduce((s, g) => s + (g.pass_count || 0), 0);
 const totalFail      = generations.reduce((s, g) => s + (g.fail_count || 0), 0);
 const highPassCount  = generations.filter(g => (g.pass_rate || 0) >= 80).length;
-const urlCards       = generations;
+
+// Types actually present among this project's generations, used to build the filter bar
+const availableTestTypes = [...new Set(generations.map(g => g.test_type || 'smoke'))];
+
+const urlCards = generations
+  .filter(g => filterTestType === 'all' || (g.test_type || 'smoke') === filterTestType)
+  .filter(g => !search.trim() || (g.url || '').toLowerCase().includes(search.trim().toLowerCase()));
+
 const totalPages = Math.ceil(urlCards.length / ITEMS_PER_PAGE);
 
 const paginatedCards = urlCards.slice(
@@ -2074,6 +2173,76 @@ const paginatedCards = urlCards.slice(
         ))}
       </div>
 
+      {/* ── TEST TYPE FILTER BAR ── */}
+      {!loading && generations.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 220px', minWidth: 200,
+            background: 'var(--card)', border: '1.5px solid var(--border)',
+            borderRadius: 10, padding: '8px 12px', transition: 'border-color .2s'
+          }}
+            onFocusCapture={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,.5)'}
+            onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--border)'}
+          >
+            <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search generations by URL…"
+              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit' }}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', display: 'flex', padding: 0 }}>
+                <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setFilterTestType('all')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
+              fontFamily: 'inherit', fontSize: 12, fontWeight: 700, transition: 'all .18s',
+              background: filterTestType === 'all' ? 'var(--indigo-bg, rgba(99,102,241,.12))' : 'var(--card)',
+              border: filterTestType === 'all' ? '1.5px solid rgba(99,102,241,.4)' : '1.5px solid var(--border)',
+              color: filterTestType === 'all' ? '#818cf8' : 'var(--muted)',
+            }}
+          >
+            All
+            <span style={{ padding: '1px 7px', borderRadius: 20, fontSize: 10, background: filterTestType === 'all' ? 'rgba(255,255,255,.1)' : 'var(--bg2)', color: filterTestType === 'all' ? 'currentColor' : 'var(--muted)' }}>
+              {generations.length}
+            </span>
+          </button>
+          {availableTestTypes.map(type => {
+            const tc = TYPE_CONFIG[type] || TYPE_CONFIG.smoke;
+            const count = generations.filter(g => (g.test_type || 'smoke') === type).length;
+            const active = filterTestType === type;
+            return (
+              <button
+                key={type}
+                onClick={() => setFilterTestType(type)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
+                  fontFamily: 'inherit', fontSize: 12, fontWeight: 700, transition: 'all .18s',
+                  background: active ? `${tc.color}18` : 'var(--card)',
+                  border: active ? `1.5px solid ${tc.color}55` : '1.5px solid var(--border)',
+                  color: active ? tc.color : 'var(--muted)',
+                }}
+              >
+                <tc.Icon size={14} stroke={1.8} />
+                {tc.label.replace(' Tests', '').replace(' Test', '')}
+                <span style={{ padding: '1px 7px', borderRadius: 20, fontSize: 10, background: active ? `${tc.color}22` : 'var(--bg2)', color: active ? 'currentColor' : 'var(--muted)' }}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {Array.from({ length: 3 }).map((_, i) => (
@@ -2085,13 +2254,19 @@ const paginatedCards = urlCards.slice(
         </div>
       ) : urlCards.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 32px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, textAlign: 'center' }}>
-          <div style={{ width: 72, height: 72, borderRadius: '50%', background: colorBg, border: `1px solid ${colorBd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, marginBottom: 20 }}>⚡</div>
-          <h3 style={{ fontFamily: 'var(--C)', fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>No generations yet</h3>
-          <p style={{ fontSize: 13, color: 'var(--sub)', lineHeight: 1.7, maxWidth: 300, marginBottom: 24 }}>Start generating tests for this project</p>
-          <button className="btn-primary" onClick={onNewGeneration}>
-            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            New Generation
-          </button>
+          <div style={{ width: 72, height: 72, borderRadius: '50%', background: colorBg, border: `1px solid ${colorBd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, marginBottom: 20 }}>{generations.length === 0 ? '⚡' : '🔍'}</div>
+          <h3 style={{ fontFamily: 'var(--C)', fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>{generations.length === 0 ? 'No generations yet' : 'No results found'}</h3>
+          <p style={{ fontSize: 13, color: 'var(--sub)', lineHeight: 1.7, maxWidth: 300, marginBottom: 24 }}>{generations.length === 0 ? 'Start generating tests for this project' : 'Try adjusting your search or test type filter'}</p>
+          {generations.length === 0 ? (
+            <button className="btn-primary" onClick={onNewGeneration}>
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              New Generation
+            </button>
+          ) : (
+            <button className="btn-primary" onClick={() => { setSearch(''); setFilterTestType('all'); }}>
+              Clear filters
+            </button>
+          )}
         </div>
       ) : (
         <div>
@@ -2104,17 +2279,6 @@ const paginatedCards = urlCards.slice(
     if (!groups[type]) groups[type] = [];
     groups[type].push(item);
   });
-
-  const TYPE_CONFIG = {
-    smoke:       { label: 'Smoke Tests',       color: '#64748b', bg: 'rgba(100,116,139,.1)',  border: 'rgba(100,116,139,.25)', letter: 'S', icon: '🔍' },
-    functional:  { label: 'Functional Tests',  color: '#6366f1', bg: 'rgba(99,102,241,.1)',   border: 'rgba(99,102,241,.25)',  letter: 'F', icon: '⚙️' },
-    performance: { label: 'Performance Tests', color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',   border: 'rgba(139,92,246,.25)', letter: 'P', icon: '⚡' },
-    api:         { label: 'API Tests',         color: '#10b981', bg: 'rgba(16,185,129,.1)',   border: 'rgba(16,185,129,.25)', letter: 'A', icon: '🔗' },
-    regression:  { label: 'Regression Test',  color: '#f97316', bg: 'rgba(249,115,22,.1)',   border: 'rgba(249,115,22,.25)', letter: 'R', icon: '🔄' },
-    security:    { label: 'Security Test',    color: '#ef4444', bg: 'rgba(239,68,68,.1)',    border: 'rgba(239,68,68,.25)',  letter: 'S', icon: '🔒' },
-    unit:        { label: 'Unit Tests',        color: '#0ea5e9', bg: 'rgba(14,165,233,.1)',   border: 'rgba(14,165,233,.25)', letter: 'U', icon: '🧪' },
-    seo:         {label: 'SEO Test', color: '#06b6d4', bg: 'rgba(6,182,212,.08)', border: 'rgba(6,182,212,.2)', letter: 'S', icon: '🔍',},
-  };
 
   return Object.entries(groups).map(([type, items]) => {
     const tc = TYPE_CONFIG[type] || TYPE_CONFIG.smoke;
@@ -2137,7 +2301,7 @@ const paginatedCards = urlCards.slice(
         }}>
           <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: tc.color, borderRadius: '12px 0 0 12px' }} />
           
-          <span style={{ fontSize: 20 }}>{tc.icon}</span>
+          <tc.Icon size={20} stroke={1.6} style={{ color: tc.color, flexShrink: 0 }} />
           
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2292,9 +2456,7 @@ const paginatedCards = urlCards.slice(
   );
 }
 
-
 // CreateProjectPanel Page 
-
 export function CreateProjectPanel({ onProjectCreated }) {
   const [projectType, setProjectType] = useState(null);
   const [name,        setName]        = useState('');
@@ -2304,6 +2466,24 @@ export function CreateProjectPanel({ onProjectCreated }) {
   const inputRef = useRef(null);
 
   const isReady = projectType !== null && name.trim().length > 0;
+  const TAG_ICONS = {
+  Smoke: IconFlame,
+  Functional: IconCircleCheck,
+  Performance: IconGauge,
+  Seo: IconSearch,
+  Regression: IconHistory,
+  Security: IconShieldCheck,
+  API: IconApi,
+};
+
+const FW_ICONS = {
+  Selenium: IconFlask2,
+  Cypress: IconComponents,
+  Playwright: IconPlayerPlay,
+  'Requests + BeautifulSoup': IconCode,
+  K6: IconActivity,
+  Postman: IconSend,
+};
   const SUGGESTIONS = {
     public:   ['Login Flow QA', 'Homepage E2E', 'Checkout Suite', 'Auth Regression'],
     internal: ['API Auth Tests', 'Internal Gateway', 'Microservice Suite', 'CI Security Scan'],
@@ -2328,7 +2508,7 @@ export function CreateProjectPanel({ onProjectCreated }) {
     { n: 1, label: 'Project Type', val: projectType ? (projectType === 'public' ? '🌐 Public Test' : '🔒 Internal Test') : 'Not selected yet', done: !!projectType, active: !projectType },
     { n: 2, label: 'Project Name', val: name.trim() || 'Enter a name…', done: name.trim().length > 0, active: !!projectType && !name.trim() },
     { n: 3, label: 'Description', val: description.trim() ? description.trim().slice(0, 30) + (description.length > 30 ? '…' : '') : 'Optional — skip if not needed', done: description.trim().length > 0, active: !!projectType && name.trim().length > 0 },
-    { n: 4, label: 'Launch Project', val: isReady ? 'Ready to launch →' : 'Complete fields above', done: false, active: isReady },
+    { n: 4, label: 'Launch Project', val: isReady ? 'Ready to launch ' : 'Complete fields above', done: false, active: isReady },
   ];
 
   return (
@@ -2350,21 +2530,68 @@ export function CreateProjectPanel({ onProjectCreated }) {
               </div>
               <div className="cpv5-type-grid">
                 <div className={`cpv5-type-card${projectType === 'public' ? ' selected' : ''}`} style={{ '--tc': '#4f86e8', '--tg': 'rgba(79,134,232,.1)', '--tb': 'rgba(79,134,232,.25)' }} onClick={() => setProjectType('public')}>
-                  <div className="cpv5-type-top"><div className="cpv5-type-icon">🌐</div>{projectType === 'public' && <div className="cpv5-type-check">{CheckIcon}</div>}</div>
+  <div className="cpv5-type-top"><div className="cpv5-type-icon" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:44, height:44, borderRadius:12, background:'rgba(79,134,232,.12)', border:'1px solid rgba(79,134,232,.25)' }}><IconWorld size={24} stroke={1.6} style={{ color:'#4f86e8' }} /></div>{projectType === 'public' && <div className="cpv5-type-check">{CheckIcon}</div>}</div>
                   <div className="cpv5-type-name">Public Test</div>
                   <div className="cpv5-type-desc">Web apps, landing pages & user-facing interfaces</div>
-                  <div className="cpv5-type-tags"><span>Smoke</span><span>Functional</span><span>Performance</span></div>
-                  <div className="cpv5-type-fws"><span style={{ color: '#43B02A' }}>Selenium</span><span style={{ color: '#00BFA5' }}>Cypress</span><span style={{ color: '#E2574C' }}>Playwright</span></div>
+                  <div className="cpv5-type-tags">
+  {['Smoke', 'Functional', 'Performance', 'Seo'].map(tag => {
+    const Icon = TAG_ICONS[tag];
+    return <span key={tag}><Icon size={11} stroke={2} style={{ marginRight: 3, verticalAlign: -1 }} />{tag}</span>;
+  })}
+</div>
+<div className="cpv5-type-fws">
+  {[
+    { name: 'Selenium', color: '#44d128' },
+    { name: 'Cypress', color: '#00BFA5' },
+    { name: 'Playwright', color: '#E2574C' },
+    { name: 'Requests + BeautifulSoup', color: '#FFD43B' },
+  ].map(fw => {
+    const Icon = FW_ICONS[fw.name];
+    return (
+      <span key={fw.name} style={{ color: fw.color }}>
+        <Icon size={12} stroke={2} style={{ marginRight: 4, verticalAlign: -2 }} />{fw.name}
+      </span>
+    );
+  })}
+</div>
                   <div className="cpv5-type-edge" />
                 </div>
-                <div className={`cpv5-type-card${projectType === 'internal' ? ' selected' : ''}`} style={{ '--tc': '#8b5cf6', '--tg': 'rgba(139,92,246,.1)', '--tb': 'rgba(139,92,246,.25)' }} onClick={() => setProjectType('internal')}>
-                  <div className="cpv5-type-top"><div className="cpv5-type-icon">🔒</div>{projectType === 'internal' && <div className="cpv5-type-check">{CheckIcon}</div>}</div>
-                  <div className="cpv5-type-name">Internal Test</div>
-                  <div className="cpv5-type-desc">APIs, microservices & private infrastructure</div>
-                  <div className="cpv5-type-tags"><span>Unit</span><span>Regression</span><span>Security</span></div>
-                  <div className="cpv5-type-fws"><span style={{ color: '#E2574C' }}>Playwright</span><span style={{ color: '#43B02A' }}>Selenium</span></div>
-                  <div className="cpv5-type-edge" />
-                </div>
+               <div className={`cpv5-type-card${projectType === 'internal' ? ' selected' : ''}`} style={{ '--tc': '#8b5cf6', '--tg': 'rgba(139,92,246,.1)', '--tb': 'rgba(139,92,246,.25)' }} onClick={() => setProjectType('internal')}>
+  <div className="cpv5-type-top">
+    <div className="cpv5-type-icon" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:44, height:44, borderRadius:12, background:'rgba(139,92,246,.12)', border:'1px solid rgba(139,92,246,.25)' }}>
+      <IconLock size={24} stroke={1.6} style={{ color:'#8b5cf6' }} />
+    </div>
+    {projectType === 'internal' && <div className="cpv5-type-check">{CheckIcon}</div>}
+  </div>
+  <div className="cpv5-type-name">Private / API Test</div>
+  <div className="cpv5-type-desc">APIs, microservices & private infrastructure</div>
+  <div className="cpv5-type-tags">
+  {['Performance', 'Functional', 'Smoke', 'Regression', 'Security', 'API'].map(tag => {
+    const Icon = TAG_ICONS[tag];
+    return <span key={tag}><Icon size={11} stroke={2} style={{ marginRight: 3, verticalAlign: -1 }} />{tag}</span>;
+  })}
+</div>
+<div className="cpv5-type-fws">
+  {[
+    { name: 'Playwright', color: '#E2574C' },
+    { name: 'Selenium', color: '#43B02A' },
+    { name: 'Cypress', color: '#00BFA5' },
+    { name: 'K6', color: '#7D64FF' },
+    { name: 'Postman', color: '#FF6C37' },
+    { name: 'Requests + BeautifulSoup', color: '#FFD43B' },
+  ].map(fw => {
+    const Icon = FW_ICONS[fw.name];
+    return (
+      <span key={fw.name} style={{ color: fw.color }}>
+        <Icon size={12} stroke={2} style={{ marginRight: 4, verticalAlign: -2 }} />{fw.name}
+      </span>
+    );
+  })}
+</div>
+
+
+  <div className="cpv5-type-edge" />
+</div>
               </div>
             </div>
             <div className="cpv5-section">
@@ -2373,12 +2600,12 @@ export function CreateProjectPanel({ onProjectCreated }) {
                 <div><div className="cpv5-sec-title">Project Name</div><div className="cpv5-sec-sub">Give your project a clear, descriptive name</div></div>
               </div>
               <div className={`cpv5-input-wrap${nameError ? ' error' : ''}${name ? ' filled' : ''}`}>
-                <svg className="cpv5-input-ico" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <IconTag size={15} stroke={2} className="cpv5-input-ico" />
 <input
   ref={inputRef}
   className="cpv5-input"
   type="text"
-  placeholder="e.g. Login Flow QA"
+  placeholder="Auth Service QA"
   value={name}
   maxLength={60}
   onChange={e => { setName(e.target.value); setNameError(''); }}
@@ -2406,10 +2633,11 @@ export function CreateProjectPanel({ onProjectCreated }) {
                   <div className="cpv5-sec-sub">Briefly describe what this project tests</div>
                 </div>
               </div>
-              <div className="cpv5-textarea-wrap">
-                <textarea className="cpv5-textarea" placeholder="e.g. End-to-end tests for the login flow including OAuth and 2FA…" value={description} maxLength={280} rows={4} onChange={e => setDescription(e.target.value)} />
-                {description.length > 0 && <span className="cpv5-textarea-count">{description.length}/280</span>}
-              </div>
+              <div className="cpv5-textarea-wrap" style={{ position: 'relative' }}>
+  <IconAlignLeft size={15} stroke={2} style={{ position: 'absolute', top: 14, left: 14, color: 'var(--muted)' }} />
+  <textarea className="cpv5-textarea" style={{ paddingLeft: 38 }} placeholder="Describe the test scope, target environment, and key scenarios this suite should cover." value={description} maxLength={280} rows={4} onChange={e => setDescription(e.target.value)} />
+  {description.length > 0 && <span className="cpv5-textarea-count">{description.length}/280</span>}
+</div>
               <div className="cpv5-optional-hint"><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>You can always add or edit the description later from project settings.</div>
             </div>
             <button type="submit" className={`cpv5-submit${isReady ? ' colored' : ''}`} disabled={submitting || !isReady} style={projectType ? { '--bc': fwConf.bc, '--bshadow': fwConf.bshadow } : {}}>
@@ -2443,9 +2671,19 @@ export function CreateProjectPanel({ onProjectCreated }) {
             <div className="cpv5-tips-card">
               <div className="cpv5-tips-head"><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>What happens next</div>
               <div className="cpv5-tips-body">
-                {[{ icon: '🔗', text: 'Enter the URL or API endpoint you want to test' }, { icon: '🎯', text: 'Choose your test type: Smoke, Functional, or Performance' }, { icon: '⚡', text: 'Select a framework' }, { icon: '📄', text: 'Download your generated test scripts instantly' }].map((tip, i) => (
-                  <div key={i} className="cpv5-tip-row"><div className="cpv5-tip-icon">{tip.icon}</div><div className="cpv5-tip-text">{tip.text}</div></div>
-                ))}
+                {[
+  { Icon: IconLink,     color: '#4f86e8', text: 'Enter the URL or API endpoint you want to test' },
+  { Icon: IconTarget,   color: '#8b5cf6', text: 'Choose your test type: Smoke, Functional, or Performance' },
+  { Icon: IconBolt,     color: '#f59e0b', text: 'Select a framework' },
+  { Icon: IconFileText, color: '#10b981', text: 'Download your generated test scripts instantly' },
+].map((tip, i) => (
+  <div key={i} className="cpv5-tip-row">
+    <div className="cpv5-tip-icon" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:28, height:28, borderRadius:8, background:`${tip.color}15`, border:`1px solid ${tip.color}30`, flexShrink:0 }}>
+      <tip.Icon size={14} stroke={1.8} style={{ color: tip.color }} />
+    </div>
+    <div className="cpv5-tip-text">{tip.text}</div>
+  </div>
+))}
               </div>
             </div>
           </div>
@@ -2473,9 +2711,6 @@ const [password, setPassword] = useState(initialPassword);
 const [showDocModal, setShowDocModal] = useState(false);
 const [docFiles, setDocFiles] = useState([]);
 const [dragOver, setDragOver] = useState(false);
-
-
-
 
   const [urlValid, setUrlValid] = useState(() => {
   if (!initialUrl) return null;
@@ -2672,7 +2907,7 @@ if (docFiles.length > 0) {
 }
     const genData = res.data;
     genData.fresh = true;
-setGeneration(genData);  // ← 1. set les données
+setGeneration(genData); 
 goTo('execution');  
 
     if (genData.test_type === 'performance' || genData.result?.test_type === 'performance') {
@@ -2934,14 +3169,10 @@ const formatSize = (bytes) => {
 
             
             )}
-    <button type="button" className="gp4-submit" disabled={loading || !isReady}
+   <button type="button" className="gp4-submit" disabled={loading || !isReady}
   onClick={() => {
     if (!isReady) return;
-    if (isInternal && docFiles.length === 0) {
-      setShowDocModal(true);
-    } else {
-      submit({ preventDefault: () => {} });
-    }
+    submit({ preventDefault: () => {} });
   }}>
               {loading ? (<><span className="spinner" /> Analyzing & Generating...</>) : (<><svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Generate Tests{isReady && <span className="gp4-submit-arrow"></span>}</>)}
             </button>
@@ -3199,10 +3430,14 @@ function PerformanceMetricRow({ test, index }) {
 
 //  page of PerformanceExecutionPanel
 function PerformanceExecutionPanel({ generation }) {
- const [activeSection, setActiveSection] = useState('metrics');
+  const [activeSection, setActiveSection] = useState('metrics');
   const [dropdownOpen,  setDropdownOpen]  = useState(false);
   const [pdfLoading,    setPdfLoading]    = useState(false);
   const dropdownRef = useRef(null);
+  const [running, setRunning] = useState(false);
+  const [terminalLines, setTerminalLines] = useState([]);
+  const perfAnimFiredRef = useRef(false);
+
 
   useEffect(() => {
     if (!generation) return;
@@ -3218,7 +3453,74 @@ function PerformanceExecutionPanel({ generation }) {
     saveReportToStorage({ url, framework: generation?.framework || 'Playwright', testType: 'performance', passCount: pass, failCount: fail, skipCount: skip, htmlContent, generationData: generation });
   }, [generation?.generation?.id]);
 
+useEffect(() => {
+  if (!generation) return;
+  if (!generation.fresh) { setRunning(false); return; }
+  if (perfAnimFiredRef.current) return;
+  perfAnimFiredRef.current = true;
 
+  setRunning(true); setTerminalLines([]);
+
+  const url = generation?.generation?.url || generation?.url || '';
+  const currentFramework = generation?.generation?.framework || generation?.framework || 'Playwright';
+  const totalTests = tests.length || 0;
+  const fwLabel = currentFramework === 'Playwright' ? 'Playwright (headless chromium)'
+    : currentFramework === 'k6' ? 'k6 Load Testing Engine'
+    : currentFramework;
+
+  const addLine = (text, type = 'info', delay = 0) =>
+    new Promise(res => setTimeout(() => {
+      setTerminalLines(prev => [...prev, { text, type, time: new Date().toLocaleTimeString('en-US', { hour12: false }) }]);
+      res();
+    }, delay));
+
+  const playAnimation = async () => {
+    await addLine('NexTest AI Engine v2.0 initializing...', 'system', 0);
+    await addLine(`Connecting to ${url}`, 'info', 400);
+    await addLine(`Launching ${fwLabel}...`, 'info', 800);
+    await addLine('Measuring page load & Core Web Vitals...', 'info', 1200);
+    await addLine(`AI analyzing ${totalTests} performance metric(s)...`, 'ai', 1700);
+    await addLine('Collecting network & resource timing...', 'info', 2100);
+    await addLine('Analysis ready — compiling metrics...', 'success', 2500);
+    await addLine('─'.repeat(52), 'divider', 2800);
+
+    for (let i = 0; i < Math.min(tests.length, 8); i++) {
+      await addLine(`Measuring [${i + 1}/${totalTests}] ${tests[i]?.name || `Metric ${i + 1}`}...`, 'running', 3000 + i * 300);
+    }
+    if (totalTests > 8) {
+      await addLine(`... and ${totalTests - 8} more metrics processed`, 'muted', 3000 + 8 * 300);
+    }
+
+    await addLine('─'.repeat(52), 'divider', 3000 + Math.min(totalTests, 8) * 300 + 200);
+
+    const passN = tests.filter(t => t.status === 'pass').length;
+    const failN = tests.filter(t => t.status === 'fail').length;
+    const skipN = tests.filter(t => t.status === 'skip').length;
+
+    tests.slice(0, 6).forEach((t, i) => {
+      const icon = t.status === 'pass' ? '✓' : t.status === 'fail' ? '✗' : '—';
+      const type = t.status === 'pass' ? 'pass' : t.status === 'fail' ? 'fail' : 'skip';
+      setTerminalLines(prev => [...prev, {
+        text: `${icon} ${t.name || `Metric ${i + 1}`}`,
+        type,
+        time: new Date().toLocaleTimeString('en-US', { hour12: false })
+      }]);
+    });
+
+    await addLine('─'.repeat(52), 'divider', 200);
+    await addLine(`Analysis complete — ${passN} within threshold · ${failN} exceeded · ${skipN} skipped`, 'summary', 400);
+    await addLine(`Score: ${score || 0}/100`, (score || 0) >= 75 ? 'success' : 'fail', 600);
+    await addLine('Generating AI recommendations...', 'ai', 800);
+    await addLine('Done ✓', 'success', 1000);
+
+    setTimeout(() => {
+      setRunning(false);
+      generation.fresh = false;
+    }, 1200);
+  };
+
+  playAnimation();
+}, [generation?.generation?.id, generation?.fresh]);
 
 const downloadHtml_Performance = () => {
   const now     = new Date();
@@ -4357,7 +4659,7 @@ const sectionDetailedMetrics = `
           
 
           {/* Score ring is INSIDE the right flex column, AFTER ep-actions */}
-          <PerformanceScoreRing score={score} label={scoreLabel} color={scoreColor} />
+          <PerformanceScoreRing score={running ? 0 : score} label={running ? '···' : scoreLabel} color={running ? '#475569' : scoreColor} />
 
         </div>
         
@@ -4365,7 +4667,7 @@ const sectionDetailedMetrics = `
       
 
       {/* ── SITE ANALYSIS ── */}
-      {analysis && (
+       {!running && analysis && (
         <div style={{ background: 'rgba(99,102,241,.04)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 12, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <span style={{ fontSize: 22, flexShrink: 0 }}>🤖</span>
           <div>
@@ -4377,12 +4679,12 @@ const sectionDetailedMetrics = `
       )}
 
       {/* ── STAT CARDS ── */}
-      <div className="ep-stats" style={{ marginBottom: 24 }}>
+      <div className="ep-stats" style={{ marginBottom: 24, opacity: running ? 0.4 : 1, transition: 'opacity .3s' }}>
         {[
-          { label: 'Passed',  val: pass,       color: '#10B981', bg: 'rgba(16,185,129,.08)',  border: 'rgba(16,185,129,.2)'  },
-          { label: 'Failed',  val: fail,       color: '#EF4444', bg: 'rgba(239,68,68,.08)',   border: 'rgba(239,68,68,.2)'   },
-          { label: 'Warn/Skip', val: skip,       color: '#F59E0B', bg: 'rgba(245,158,11,.08)',  border: 'rgba(245,158,11,.2)'  },
-          { label: 'Score',   val: `${score}`, color: scoreColor, bg: `${scoreColor}12`, border: `${scoreColor}33` },
+          { label: 'Passed',    val: running ? 0 : pass,         color: '#10B981', bg: 'rgba(16,185,129,.08)', border: 'rgba(16,185,129,.2)'},
+          { label: 'Failed',    val: running ? 0 : fail,         color: '#EF4444', bg: 'rgba(239,68,68,.08)',  border: 'rgba(239,68,68,.2)'},
+          { label: 'Warn/Skip', val: running ? 0 : skip,         color: '#F59E0B', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.2)'},
+          { label: 'Score',     val: running ? '—' : `${score}`, color: scoreColor, bg: `${scoreColor}12`,     border: `${scoreColor}33` },
         ].map((s, i) => (
           <div key={s.label} className="ep-stat" style={{ '--sc': s.color, '--sb': s.bg, '--sbo': s.border, '--i': i }}>
             <div className="ep-stat-body"><div className="ep-stat-val" style={{ color: s.color }}>{s.val}</div><div className="ep-stat-lbl">{s.label}</div></div>
@@ -4398,9 +4700,9 @@ const sectionDetailedMetrics = `
   { key: 'lcp_ms',       label: 'LCP',       icon: <IconTarget   size={22} stroke={1.5} style={{ color: '#10b981' }} />, unit: 'ms' },
   { key: 'tti_ms',       label: 'TTI',       icon: <IconBolt     size={22} stroke={1.5} style={{ color: '#f59e0b' }} />, unit: 'ms' },
         ].map(m => {
-          const val   = metrics[m.key] ?? perf?.[m.key] ?? null;
+          const val   = running ? null : (metrics[m.key] ?? perf?.[m.key] ?? null);
           const test  = tests.find(t => t.metric_key === m.key);
-          const color = test?.status === 'pass' ? '#10b981' : test?.status === 'fail' ? '#ef4444' : '#f59e0b';
+          const color = running ? 'var(--muted)' : (test?.status === 'pass' ? '#10b981' : test?.status === 'fail' ? '#ef4444' : '#f59e0b');
           return (
             <div key={m.key} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px', borderTop: `3px solid ${color}` }}>
               <div style={{ fontSize: 20, marginBottom: 8 }}>{m.icon}</div>
@@ -4410,10 +4712,9 @@ const sectionDetailedMetrics = `
           );
         })}
       </div>
-
-      {/* ── TABS ── */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
-        {[{ key: 'metrics', label: '📊 Metrics', count: tests.length }, { key: 'recommendations', label: '💡 Recommendations', count: recs.length }].map(tab => (
+{/* ── TABS ── */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0, opacity: running ? 0.3 : 1, pointerEvents: running ? 'none' : 'auto', transition: 'opacity .3s' }}>
+        {[{ key: 'metrics', label: '📊 Metrics', count: running ? 0 : tests.length }, { key: 'recommendations', label: '💡 Recommendations', count: running ? 0 : recs.length }].map(tab => (
           <button key={tab.key} onClick={() => setActiveSection(tab.key)}
             style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 700, color: activeSection === tab.key ? 'var(--indigo2)' : 'var(--muted)', borderBottom: activeSection === tab.key ? '2px solid var(--indigo2)' : '2px solid transparent', marginBottom: -1, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: 8 }}>
             {tab.label}
@@ -4421,7 +4722,60 @@ const sectionDetailedMetrics = `
           </button>
         ))}
       </div>
-
+{running ? (
+        <div style={{
+          background: '#050a14', border: '1px solid rgba(99,102,241,.25)', borderRadius: 16,
+          overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,.5)',
+          fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+        }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 16px', background:'linear-gradient(135deg,#0a0f1e,#0d1526)', borderBottom:'1px solid rgba(255,255,255,.06)' }}>
+            <div style={{ display:'flex', gap:6 }}>
+              {['#ef4444','#f59e0b','#10b981'].map((c,i) => (
+                <div key={i} style={{ width:12, height:12, borderRadius:'50%', background:c, opacity:.8 }} />
+              ))}
+            </div>
+            <div style={{ flex:1, textAlign:'center', fontSize:11, fontWeight:700, color:'#64748b', letterSpacing:1 }}>
+              NexTest Terminal — Performance Analyzer
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <div style={{ width:7, height:7, borderRadius:'50%', background:'#10b981', animation:'termPulse 1s ease-in-out infinite' }} />
+              <span style={{ fontSize:10, color:'#10b981', fontWeight:700, letterSpacing:1 }}>RUNNING</span>
+            </div>
+          </div>
+          <div style={{ padding:'16px 20px', minHeight:280, maxHeight:380, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}
+            ref={el => { if (el) el.scrollTop = el.scrollHeight; }}>
+            {terminalLines.map((line, i) => {
+              const colors = { system:'#818cf8', info:'#94a3b8', ai:'#c9a227', success:'#10b981', fail:'#ef4444', pass:'#10b981', skip:'#f59e0b', running:'#60a5fa', muted:'#475569', divider:'#1e293b', summary:'#e2e8f0' };
+              const icons  = { system:'⬡', info:'›', ai:'◆', success:'✓', fail:'✗', pass:'✓', skip:'◌', running:'◉', muted:'·', divider:'', summary:'▸' };
+              if (line.type === 'divider') return (
+                <div key={i} style={{ color:'#1e2d47', fontSize:11, userSelect:'none', margin:'4px 0' }}>{line.text}</div>
+              );
+              return (
+                <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, animation:'termFadeIn .3s ease both', fontSize:12, lineHeight:1.6 }}>
+                  <span style={{ color:'#1e3a5f', fontSize:10, flexShrink:0, marginTop:1 }}>{line.time}</span>
+                  <span style={{ color:colors[line.type]||'#94a3b8', flexShrink:0, fontSize:11 }}>{icons[line.type]||'›'}</span>
+                  <span style={{ color:colors[line.type]||'#94a3b8', flex:1 }}>{line.text}</span>
+                </div>
+              );
+            })}
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:4 }}>
+              <span style={{ color:'#1e3a5f', fontSize:10 }}>{new Date().toLocaleTimeString('en-US',{hour12:false})}</span>
+              <span style={{ color:'#6366f1' }}>›</span>
+              <span style={{ display:'inline-block', width:8, height:15, background:'#6366f1', borderRadius:1, animation:'termBlink .8s step-end infinite' }} />
+            </div>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 16px', background:'rgba(99,102,241,.06)', borderTop:'1px solid rgba(99,102,241,.1)' }}>
+            <span style={{ fontSize:10, color:'#6366f1', fontWeight:700 }}>◉ {terminalLines.length} events</span>
+            <span style={{ fontSize:10, color:'#475569', fontWeight:600 }}>{generation?.framework || generation?.generation?.framework || ''} · AI-Powered</span>
+          </div>
+          <style>{`
+            @keyframes termFadeIn { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+            @keyframes termBlink  { 0%,100%{opacity:1} 50%{opacity:0} }
+            @keyframes termPulse  { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+          `}</style>
+        </div>
+      ) : (
+      <>
       {/* ── METRICS TAB ── */}
       {activeSection === 'metrics' && (
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
@@ -4471,10 +4825,12 @@ const sectionDetailedMetrics = `
                   return (<span key={p} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700, color: colors[p], background: `${colors[p]}12`, border: `1px solid ${colors[p]}30`, textTransform: 'capitalize' }}>{count} {p}</span>);
                 })}
               </div>
-              {recs.map((rec, i) => (<RecommendationCard key={i} rec={rec} index={i} />))}
+        {recs.map((rec, i) => (<RecommendationCard key={i} rec={rec} index={i} />))}
             </div>
           )}
         </div>
+      )}
+      </>
       )}
     </div>
   );
@@ -5739,10 +6095,12 @@ useEffect(() => {
 
     if (savedResults.length > 0) {
       if (!generation.fresh) {
-        // Coming from History/Projects — already seen, show instantly
-        setRunResults({ results: savedResults });
-        return;
-      }
+      setRunResults({ 
+        results: savedResults, 
+        ai: generation?.result?.ai || generation?.generation?.ai || null 
+      });
+      return;
+}
 
       // Fresh generation: play the terminal animation, then reveal saved results
       setRunning(true); setRunResults(null); setTerminalLines([]);
@@ -5804,7 +6162,10 @@ useEffect(() => {
         await addLine('Done ✓', 'success', 1000);
 
         setTimeout(() => {
-          setRunResults({ results: savedResults });
+          setRunResults({ 
+  results: savedResults, 
+  ai: generation?.result?.ai || generation?.generation?.ai || null 
+});
           setRunning(false);
           // Fire notification AFTER terminal finishes
           if (onGenerationSaved && !notifFiredRef.current) {
@@ -5879,6 +6240,8 @@ useEffect(() => {
       test_cases: generation.result.test_cases || []
     });
 
+    console.log('[DEBUG RUN] res.data.ai =', res.data.ai);
+
     const results = res.data?.results || [];
     const pass = results.filter(r => r.status === 'pass').length;
     const fail = results.filter(r => r.status === 'fail').length;
@@ -5900,7 +6263,7 @@ useEffect(() => {
     await addLine(`Pass rate: ${results.length > 0 ? Math.round(pass / results.length * 100) : 0}%`, pass / (results.length || 1) >= 0.8 ? 'success' : 'fail', 600);
     await addLine('Generating AI analysis report...', 'ai', 800);
     await addLine('Done ✓', 'success', 1000);
-
+    console.log('[DEBUG RUN] setting runResults with:', res.data);
     setTimeout(() => setRunResults(res.data), 1200);
   } catch (err) {
     console.error('[RUN ERROR]', err.response?.data || err.message);
@@ -5919,7 +6282,9 @@ return execution_results.map((r, i) => ({
   name: r.name,
   status: r.status,
   duration: r.duration || '—',
-  suite: r.suite || r.detail || r.reason_pass || r.reason || r.error || '',
+  suite: r.suite || r.detail || r.reason_pass || r.reason || r.reason_skip || r.error || '',
+  expected:    r.expected || '',
+  description: r.description || '', 
   assertion_result: r.assertion_result || null,
   step_meta: r.step_meta || null,
   category:        r.category || 'api',
@@ -5944,9 +6309,21 @@ return execution_results.map((r, i) => ({
   const fail  = tests.filter(t => t.status === 'fail').length;
   const skip  = tests.filter(t => t.status === 'skip' || t.status === 'warn').length;
   const rate  = tests.length > 0 ? Math.round((pass / tests.length) * 100) : 0;
-const shown = filter === 'all' ? tests 
+  const shown = (filter === 'all' ? tests 
   : filter === 'skip' ? tests.filter(t => t.status === 'skip' || t.status === 'warn')
-  : tests.filter(t => t.status === filter);
+  : tests.filter(t => t.status === filter)
+).slice().sort((a, b) => {
+  // 1. Les échecs d'abord, peu importe le filtre actif
+  const statusOrder = { fail: 0, skip: 1, warn: 1, pass: 2 };
+  const statusDiff = (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
+  if (statusDiff !== 0) return statusDiff;
+
+  // 2. À l'intérieur d'un même statut, trie par sévérité HIGH > MEDIUM > LOW
+  const sevOrder = { high: 0, critical: 0, medium: 1, low: 2 };
+  const sevA = sevOrder[a.ai_analysis?.severity] ?? 1;
+  const sevB = sevOrder[b.ai_analysis?.severity] ?? 1;
+  return sevA - sevB;
+});
 
 const totalPages = Math.ceil(shown.length / rowsPerPage);
 const paginatedShown = shown.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -8530,6 +8907,7 @@ const downloadPdf = async () => {
             <div className="ep-info-chip" style={{ color: ttBadge.color, borderColor: ttBadge.border, background: ttBadge.bg }}>{ttBadge.letter} · {ttBadge.label}</div>
           </div>
         </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 16 }}>
 
                 <div className="ep-actions" style={{ opacity: running ? 0.35 : 1, pointerEvents: running ? 'none' : 'auto', transition: 'opacity .3s' }}>
 
@@ -8596,7 +8974,37 @@ const downloadPdf = async () => {
             )}
           </div>
         </div>
+
+{isSeo && generation?.result?.seo_score !== undefined && (
+  <div style={{
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+    opacity: running ? 0.35 : 1,
+    transition: 'opacity .3s',
+  }}>
+    <div style={{ position: 'relative', width: 90, height: 90 }}>
+      <CircularProgress
+        value={running ? 0 : generation.result.seo_score}
+        size={90}
+        stroke={8}
+        color={running ? 'var(--muted)' : (generation.result.seo_score >= 80 ? '#10b981' : generation.result.seo_score >= 50 ? '#f59e0b' : '#ef4444')}
+      />
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--C)', lineHeight: 1 }}>
+          {running ? 0 : generation.result.seo_score}
+        </span>
+        <span style={{ fontSize: 9, color: 'var(--muted)' }}>/ 100</span>
       </div>
+    </div>
+    <span style={{
+      fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+      color: running ? 'var(--muted)' : (generation.result.seo_score >= 80 ? '#10b981' : generation.result.seo_score >= 50 ? '#f59e0b' : '#ef4444'),
+    }}>
+      SEO Score
+    </span>
+  </div>
+)}
+      </div>
+     </div>
 
       {isBoth && (
         <div className="ep-tabs">
@@ -8626,6 +9034,8 @@ const downloadPdf = async () => {
         ))}
       </div>
 
+ 
+
             <div className="ep-progress-card">
 
         <div className="ep-progress-top">
@@ -8650,20 +9060,39 @@ const downloadPdf = async () => {
 <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0, opacity: running ? 0.3 : 1, pointerEvents: running ? 'none' : 'auto', transition: 'opacity .3s' }}>
 
   {[
-    { key: 'results',         label: '✅ Results',        count: running ? 0 : tests.length },
-    { key: 'scenarios',       label: '📋 Scenarios',       count: running ? 0 : tests.length },
-    { key: 'recommendations', label: '💡 Recommendations', count: running ? 0 :  (() => {
-  const perfRecs = [];
-  if (loadTimeMs > 5000 || loadTimeMs > 3000) perfRecs.push(1);
-  else perfRecs.push(1);
-  if (fail > 0) perfRecs.push(1);
-  if (skip > 0) perfRecs.push(1);
-  if (pass === tests.length && tests.length > 0) perfRecs.push(1);
-  return perfRecs.length;
-})() },
+    {
+      key: 'results',
+      label: 'Results',
+      icon: <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+      count: running ? 0 : tests.length,
+    },
+    {
+      key: 'scenarios',
+      label: 'Scenarios',
+      icon: <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M9 4h9a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1"/><path d="M9 3v4H5V3"/><path d="M9 12h6M9 16h6M9 8h2"/></svg>,
+      count: running ? 0 : tests.length,
+    },
+    {
+      key: 'recommendations',
+      label: 'Recommendations',
+      icon: <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.44 1 1.2 1 2.05V17h6v-2.25c0-.85.4-1.6 1-2.05A7 7 0 0 0 12 2z"/></svg>,
+      count: running ? 0 : (
+        (isSeo || testType === 'smoke' || testType === 'functional' || isRegression || testType === 'api' || isSecurity)
+          ? ((generation?.result?.ai || runResults?.ai || {}).recommendations || []).length
+          : (() => {
+              const perfRecs = [];
+              if (loadTimeMs > 5000 || loadTimeMs > 3000) perfRecs.push(1); else perfRecs.push(1);
+              if (fail > 0) perfRecs.push(1);
+              if (skip > 0) perfRecs.push(1);
+              if (pass === tests.length && tests.length > 0) perfRecs.push(1);
+              return perfRecs.length;
+            })()
+      ),
+    },
   ].map(tab => (
     <button key={tab.key} onClick={() => setActiveTab(tab.key)}
       style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 700, color: activeTab === tab.key ? 'var(--indigo2)' : 'var(--muted)', borderBottom: activeTab === tab.key ? '2px solid var(--indigo2)' : '2px solid transparent', marginBottom: -1, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: 8 }}>
+      {tab.icon}
       {tab.label}
       <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: activeTab === tab.key ? 'var(--indigo-bg)' : 'var(--bg2)', color: activeTab === tab.key ? 'var(--indigo2)' : 'var(--muted)' }}>{tab.count}</span>
     </button>
@@ -8760,6 +9189,41 @@ const downloadPdf = async () => {
                 <div className="ep-row-name">{test.name}</div>
                 <div className="ep-row-suite">{test.suite}</div>
                 {test.assertion_result && <AssertionBadge assertion_result={test.assertion_result} step_meta={test.step_meta} />}
+
+                {/* Sévérité + Catégorie visibles immédiatement, sans clic */}
+<div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+  {test.category && (
+    <span style={{
+      fontSize: 9, fontWeight: 800, padding: '2px 8px', borderRadius: 20,
+      textTransform: 'uppercase', letterSpacing: 0.5,
+      color: 'var(--indigo2)', background: 'var(--indigo-bg)', border: '1px solid var(--indigo-border)',
+    }}>
+      {test.category}
+    </span>
+  )}
+  {test.status === 'fail' && test.ai_analysis?.severity && (
+    <span style={{
+      fontSize: 9, fontWeight: 800, padding: '2px 8px', borderRadius: 20,
+      textTransform: 'uppercase', letterSpacing: 0.5,
+      color: test.ai_analysis.severity === 'high' ? '#ef4444' : test.ai_analysis.severity === 'medium' ? '#f59e0b' : '#10b981',
+      background: test.ai_analysis.severity === 'high' ? 'rgba(239,68,68,.1)' : test.ai_analysis.severity === 'medium' ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.1)',
+      border: `1px solid ${test.ai_analysis.severity === 'high' ? 'rgba(239,68,68,.25)' : test.ai_analysis.severity === 'medium' ? 'rgba(245,158,11,.25)' : 'rgba(16,185,129,.25)'}`,
+    }}>
+      {test.ai_analysis.severity} priority
+    </span>
+  )}
+</div>
+
+{/* Fix visible tout de suite pour les échecs — pas besoin d'ouvrir "Show details" */}
+{test.status === 'fail' && test.ai_analysis?.fix && (
+  <div style={{
+    marginTop: 8, padding: '8px 12px', borderRadius: 8,
+    background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.15)',
+    fontSize: 12, color: '#10b981', lineHeight: 1.5,
+  }}>
+    <strong>Fix:</strong> {test.ai_analysis.fix}
+  </div>
+)}
                
                 {/* Bouton Détails */}
                 <button
@@ -8785,30 +9249,25 @@ const downloadPdf = async () => {
                     fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6
                   }}>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{
-  padding: '2px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700,
-  color: test.status === 'pass' 
-    ? '#10b981' 
-    : test.ai_analysis?.severity === 'high' ? '#ef4444' 
-    : test.ai_analysis?.severity === 'medium' ? '#f59e0b' 
-    : '#10b981',
-  background: test.status === 'pass' 
-    ? 'rgba(16,185,129,.1)' 
-    : test.ai_analysis?.severity === 'high' ? 'rgba(239,68,68,.1)' 
-    : test.ai_analysis?.severity === 'medium' ? 'rgba(245,158,11,.1)' 
-    : 'rgba(16,185,129,.1)',
-  border: `1px solid ${
-    test.status === 'pass' 
-      ? 'rgba(16,185,129,.2)' 
-      : test.ai_analysis?.severity === 'high' ? 'rgba(239,68,68,.2)' 
-      : test.ai_analysis?.severity === 'medium' ? 'rgba(245,158,11,.2)' 
-      : 'rgba(16,185,129,.2)'
-  }`
-}}>
-  {test.status === 'pass' 
-    ? 'LOW' 
-    : (test.ai_analysis?.severity?.toUpperCase() || test.priority?.toUpperCase() || 'MEDIUM')}
-</span>
+  {(() => {
+  const isSkip = test.status === 'skip' || test.status === 'warn';
+  const color = test.status === 'pass' ? '#10b981'
+    : isSkip ? '#94a3b8'
+    : test.ai_analysis?.severity === 'high' ? '#ef4444'
+    : test.ai_analysis?.severity === 'medium' ? '#f59e0b'
+    : '#10b981';
+  const label = test.status === 'pass' ? 'LOW'
+    : isSkip ? 'SKIPPED'
+    : (test.ai_analysis?.severity?.toUpperCase() || test.priority?.toUpperCase() || 'MEDIUM');
+  return (
+    <span style={{
+      padding: '2px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+      color, background: `${color}1a`, border: `1px solid ${color}33`,
+    }}>
+      {label}
+    </span>
+  );
+})()}
 
                     </div>
                     {test.step_meta?.selector && (
@@ -8891,20 +9350,23 @@ const downloadPdf = async () => {
               <div className="ep-row-meta">
                
 <span className="ep-cat-badge" style={{
-  color: test.category === 'functional' ? '#6366f1'
+  color: testType === 'seo' ? '#06b6d4'
+       : test.category === 'functional' ? '#6366f1'
        : test.category === 'performance' ? '#8b5cf6'
        : test.category === 'security' ? '#ef4444'
        : test.category === 'api' ? '#10b981'
        : test.category === 'regression' ? '#f97316'
        : '#64748b',
-  background: test.category === 'functional' ? 'rgba(99,102,241,.1)'
+  background: testType === 'seo' ? 'rgba(6,182,212,.1)'
+            : test.category === 'functional' ? 'rgba(99,102,241,.1)'
             : test.category === 'performance' ? 'rgba(139,92,246,.1)'
             : test.category === 'security' ? 'rgba(239,68,68,.1)'
             : test.category === 'api' ? 'rgba(16,185,129,.1)'
             : test.category === 'regression' ? 'rgba(249,115,22,.1)'
             : 'rgba(100,116,139,.1)',
   border: `1px solid ${
-    test.category === 'functional' ? 'rgba(99,102,241,.2)'
+    testType === 'seo' ? 'rgba(6,182,212,.25)'
+    : test.category === 'functional' ? 'rgba(99,102,241,.2)'
     : test.category === 'performance' ? 'rgba(139,92,246,.2)'
     : test.category === 'security' ? 'rgba(239,68,68,.2)'
     : test.category === 'api' ? 'rgba(16,185,129,.2)'
@@ -8912,8 +9374,9 @@ const downloadPdf = async () => {
     : 'rgba(100,116,139,.2)'
   }`
 }}>
- {test.category === 'security' ? 'S'
+ {testType === 'seo' ? 'S'
  : test.category === 'functional' ? 'F'
+ : test.category === 'security' ? 'S'
  : test.category === 'regression' ? 'R'
  : (test.category === 'api' || testType === 'api') ? 'A'
  : test.category === 'performance' ? 'P'
@@ -9101,64 +9564,274 @@ const downloadPdf = async () => {
 )}
     
 
-{activeTab === 'scenarios' && (
-  <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
-    <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 100px 100px', gap: 12, padding: '12px 20px', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-      {['#', 'Scenario', 'Category', 'Priority', 'Status'].map(h => (
-        <div key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
-      ))}
-    </div>
-    {tests.map((test, i) => (
-      <div key={test.id} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 100px 100px', gap: 12, padding: '14px 20px', borderBottom: '1px solid var(--border)', alignItems: 'center', animation: `dFadeUp .25s var(--ease) ${i * 0.04}s both` }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{test.id || i + 1}</div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{test.name}</div>
-          <div style={{ fontSize: 11, color: 'var(--muted)' }}>{test.suite || 'Test passed successfully.'}</div>
-        </div>
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: test.category === 'functional' ? '#6366f1' : '#64748b', background: test.category === 'functional' ? 'rgba(99,102,241,.1)' : 'rgba(100,116,139,.1)', border: `1px solid ${test.category === 'functional' ? 'rgba(99,102,241,.2)' : 'rgba(100,116,139,.2)'}`, textTransform: 'uppercase', letterSpacing: 1 }}>
-          {test.category || 'smoke'}
-        </span>
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: test.priority === 'high' ? '#ef4444' : test.priority === 'medium' ? '#f59e0b' : '#10b981', background: test.priority === 'high' ? 'rgba(239,68,68,.1)' : test.priority === 'medium' ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.1)', border: `1px solid ${test.priority === 'high' ? 'rgba(239,68,68,.2)' : test.priority === 'medium' ? 'rgba(245,158,11,.2)' : 'rgba(16,185,129,.2)'}`, textTransform: 'uppercase', letterSpacing: 1 }}>
-          {test.priority || 'medium'}
-        </span>
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: test.status === 'pass' ? '#10b981' : test.status === 'fail' ? '#ef4444' : '#f59e0b', background: test.status === 'pass' ? 'rgba(16,185,129,.1)' : test.status === 'fail' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)', border: `1px solid ${test.status === 'pass' ? 'rgba(16,185,129,.2)' : test.status === 'fail' ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}` }}>
-          {test.status === 'pass' ? '✓ PASS' : test.status === 'fail' ? '✗ FAIL' : '— SKIP'}
-        </span>
+{activeTab === 'scenarios' && (() => {
+  const CAT_COLORS = {
+    security: '#ef4444', accessibility: '#8b5cf6', meta: '#3b82f6',
+    structure: '#f97316', mobile: '#0ea5e9', technical: '#6366f1',
+    social: '#ec4899', content: '#10b981', performance: '#f59e0b',
+    functional: '#6366f1', navigation: '#10b981', form: '#8b5cf6',
+    action: '#f97316', authentication: '#6366f1', ui: '#3b82f6',
+  };
+
+  // Description de la condition attendue — indépendante du résultat réel
+  const EXPECTED_MAP_SEO = {
+    'HTTPS Enabled': 'Site must be served over HTTPS',
+    'Page Accessible': 'Page must return HTTP 200',
+    'Title Tag Present': 'A <title> tag must exist',
+    'Title Length Optimal': 'Title length must be between 30–60 characters',
+    'Meta Description Present': 'A meta description tag must exist',
+    'Meta Description Length Optimal': 'Meta description must be between 70–160 characters',
+    'Single H1 Tag': 'Exactly one <h1> tag must be present',
+    'H2 Tags Present': 'At least one <h2> tag should exist',
+    'All Images Have Alt Text': 'Every <img> must have a non-empty alt attribute',
+    'Viewport Meta Tag': 'A responsive viewport meta tag must be present',
+    'Canonical URL Defined': 'A canonical <link> tag must be defined',
+    'Open Graph Tags Present': 'og:title and og:description must be present',
+    'Schema Markup Present': 'Structured data (JSON-LD) should be present',
+    'robots.txt Found': 'A valid /robots.txt must exist',
+    'sitemap.xml Found': 'A valid /sitemap.xml must exist',
+    'Sufficient Word Count': 'Page must contain at least 300 words',
+    'Fast Page Load (<3000ms)': 'Page must load in under 3000ms',
+  };
+
+  // Priorité intrinsèque au scenario, pas dérivée du résultat
+  const INTRINSIC_PRIORITY_SEO = {
+    security: 'high', technical: 'high',
+    meta: 'medium', structure: 'medium', mobile: 'medium', accessibility: 'medium', social: 'medium',
+    content: 'low', performance: 'low',
+  };
+   const isSmokeType = testType === 'smoke';
+
+   const getSmokeExpected = (t) => {
+    const name = (t.name || '').toLowerCase();
+    if (/http status/.test(name))     return 'Server responds with HTTP 200 OK';
+    if (/ssl|https/.test(name))       return 'Site is served over a valid HTTPS connection';
+    if (/load time/.test(name))       return 'Page loads within the acceptable threshold (< 5000ms)';
+    if (/body rendered/.test(name))   return 'The <body> element renders without error';
+    if (/heading visible/.test(name)) return 'A visible heading confirms the correct page loaded';
+    if (/heading:/.test(name))        return 'The heading element is visible with expected text';
+    if (/main content/.test(name))    return 'The main content container is present in the DOM';
+    if (/auth entry/.test(name))      return 'An authentication entry point is reachable';
+    if (/^navigation present/.test(name)) return 'The site navigation menu is present and visible';
+    if (/^nav link/.test(name))       return 'The navigation link is visible in the DOM';
+    if (/search bar/.test(name))      return 'A search input is present and available';
+    if (/brand logo/.test(name))      return 'The brand logo is visible in the header';
+    if (/^footer present/.test(name)) return 'The footer section is present and visible';
+    if (/^footer link/.test(name))    return 'The footer link is visible in the DOM';
+    if (/^cta button/.test(name))     return 'The call-to-action button is visible and clickable';
+    if (/^form present/.test(name))   return 'A form element is present on the page';
+    if (/^input field/.test(name))    return 'The input field is visible and accessible';
+    if (/^section:/.test(name))       return 'The content section is visible';
+    if (/^card:/.test(name))          return 'The card element is visible';
+    if (/^image:/.test(name))         return 'The image is present, loaded and rendered';
+    if (/lang switch/.test(name))     return 'The language switcher is present';
+    if (/pagination/.test(name))      return 'Pagination controls are present (if applicable)';
+    return 'Element is present and visible in the DOM';
+  };
+
+  const getSmokePriority = (t) => {
+    const name = (t.name || '').toLowerCase();
+    if (/http status|ssl|load time|body rendered|heading visible$|main content|auth entry/.test(name)) return 'high';
+    if (/footer|logo|hero|search|cta|navigation present|nav link/.test(name)) return 'medium';
+    if (/image|pagination|lang switch|^card:|^section:/.test(name)) return 'low';
+    return 'medium';
+  };
+
+
+  const getExpected = (t) => isSeo
+  ? (EXPECTED_MAP_SEO[t.name] || 'Check passes according to SEO best practices')
+  : isSmokeType
+  ? getSmokeExpected(t)
+  : isRegression
+  ? (t.expected || t.description || 'Page/element behaves as expected after latest changes')
+  : isFunctional
+  ? (t.expected || t.description || 'Step completes without error')
+  : (testType === 'api')
+  ? (t.expected || t.description || 'API endpoint responds with expected status code')
+  : (t.suite || 'Step completes without error');
+
+  const getPriority = (t) => isSeo
+    ? (INTRINSIC_PRIORITY_SEO[t.category] || 'medium')
+    : isSmokeType
+    ? getSmokePriority(t)
+    : (t.priority || 'medium');
+
+  const PRIORITY_COLORS = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
+
+  // Ordre stable — par catégorie, pas par résultat (un scenario ne "bouge" pas selon pass/fail)
+  const sorted = tests.slice().sort((a, b) => {
+    const sevOrder = { high: 0, medium: 1, low: 2 };
+    return (sevOrder[getPriority(a)] ?? 1) - (sevOrder[getPriority(b)] ?? 1);
+  });
+
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+      <div style={{ padding: '12px 20px', background: 'rgba(99,102,241,.04)', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--muted)', fontStyle: 'italic' }}>
+        Test plan — what this suite checks, independent of execution results. See the <strong style={{ color: 'var(--indigo2)' }}>Results</strong> tab for pass/fail outcomes.
       </div>
-    ))}
-  </div>
-)}
+      <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 130px 100px 90px', gap: 12, padding: '13px 20px', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+        {['#', 'Scenario', 'Category', 'Priority', 'Tested'].map(h => (
+          <div key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
+        ))}
+      </div>
+      {sorted.map((test, i) => {
+        const priority = getPriority(test);
+        const catColor = CAT_COLORS[test.category] || '#64748b';
+        const priColor = PRIORITY_COLORS[priority];
+        const wasTested = test.status === 'pass' || test.status === 'fail';
+        return (
+          <div key={test.id} style={{
+            display: 'grid', gridTemplateColumns: '44px 1fr 130px 100px 90px', gap: 12,
+            padding: '14px 20px', borderBottom: '1px solid var(--border)',
+            alignItems: 'center', animation: `dFadeUp .25s var(--ease) ${i * 0.03}s both`,
+            transition: 'background .15s',
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{test.id || i + 1}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{test.name}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{getExpected(test)}</div>
+            </div>
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+              color: catColor, background: `${catColor}15`, border: `1px solid ${catColor}30`,
+              textTransform: 'uppercase', letterSpacing: 1, width: 'fit-content',
+            }}>
+              {test.category || 'general'}
+            </span>
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+              color: priColor, background: `${priColor}15`, border: `1px solid ${priColor}30`,
+              textTransform: 'uppercase', letterSpacing: 1, width: 'fit-content',
+            }}>
+              {priority}
+            </span>
+            <span style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              fontSize: 10, fontWeight: 700,
+              color: wasTested ? '#10b981' : '#64748b',
+            }}>
+              {wasTested ? (
+                <><svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> Yes</>
+              ) : (
+                '— No'
+              )}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+})()}
 
 {activeTab === 'recommendations' && (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-    {(() => {
-      const perfRecs = [];
-      if (loadTimeMs > 5000) perfRecs.push({ priority: 'critical', category: 'server', title: 'Critical: Page Load Exceeds 5s', description: `Page loads in ${loadTimeMs}ms — very slow. Optimize images, enable CDN caching.`, impact: 'Could reduce load time by 40-60%' });
-      else if (loadTimeMs > 3000) perfRecs.push({ priority: 'high', category: 'server', title: 'Slow Page Load Detected', description: `Page loads in ${loadTimeMs}ms — above the 3000ms threshold. Consider asset optimization.`, impact: 'Improved user experience' });
-      else perfRecs.push({ priority: 'low', category: 'caching', title: 'Performance is Good', description: `Page load time is ${loadTimeMs}ms — within acceptable range. Continue monitoring.`, impact: 'Sustained good user experience' });
-      if (fail > 0) perfRecs.push({ priority: 'high', category: 'javascript', title: `${fail} Test(s) Failed`, description: 'Review failed tests and check selector stability. Elements may have changed.', impact: 'Fix failures to ensure full coverage' });
-      if (skip > 0) perfRecs.push({ priority: 'medium', category: 'network', title: `${skip} Test(s) Skipped`, description: 'Skipped tests may indicate optional or unstable elements. Review selectors.', impact: 'Better test coverage' });
-      if (pass === tests.length && tests.length > 0) perfRecs.push({ priority: 'low', category: 'caching', title: 'All Tests Passed 🎉', description: 'Excellent! All tests passed successfully. Keep monitoring for regressions.', impact: 'Application is stable' });
-      return perfRecs;
-    })().map((rec, i) => (
-      <RecommendationCard key={i} rec={rec} index={i} />
-    ))}
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+    {(isSeo || testType === 'smoke' || testType === 'functional' || isRegression || testType === 'api' || isSecurity) ? (
+  (() => {
+    const aiResult = generation?.result?.ai || runResults?.ai || {};
+    const recs = aiResult.recommendations || [];
+    const summary = aiResult.summary || '';
+    const actionPlan = aiResult.action_plan || [];
+
+    if (!summary && recs.length === 0) {
+      return (
+        <div style={{ textAlign: 'center', padding: '60px 32px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🤖</div>
+          <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>No AI recommendations available</h3>
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>The AI analysis may not have completed for this generation.</p>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {summary && (
+          <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 12, padding: '14px 18px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>🤖</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#818cf8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>AI Summary</div>
+              <p style={{ fontSize: 13, color: 'var(--sub)', margin: 0, lineHeight: 1.7 }}>{summary}</p>
+            </div>
+          </div>
+        )}
+
+        {recs.length > 0 && (
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {['high', 'medium', 'low'].map(p => {
+              const count = recs.filter(r => r.priority === p).length;
+              if (!count) return null;
+              const colors = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
+              return (
+                <span key={p} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700, color: colors[p], background: `${colors[p]}12`, border: `1px solid ${colors[p]}30`, textTransform: 'capitalize' }}>
+                  {count} {p}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {recs.map((rec, i) => (
+          <RecommendationCard key={i} rec={{
+            priority: rec.priority || 'medium',
+            category: rec.category || 'smoke',
+            title: rec.issue || rec.category || 'Smoke Issue',
+            description: rec.fix || '',
+            impact: null,
+          }} index={i} />
+        ))}
+
+        {actionPlan.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Action Plan</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {actionPlan.map((step, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, padding: '9px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--sub)' }}>
+                  <span style={{ color: 'var(--indigo2)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+                  {step}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  })()
+) : (
+      // ── Autres test types : logique générique existante ──
+      (() => {
+        const perfRecs = [];
+        if (loadTimeMs > 5000) perfRecs.push({ priority: 'critical', category: 'server', title: 'Critical: Page Load Exceeds 5s', description: `Page loads in ${loadTimeMs}ms — very slow. Optimize images, enable CDN caching.`, impact: 'Could reduce load time by 40-60%' });
+        else if (loadTimeMs > 3000) perfRecs.push({ priority: 'high', category: 'server', title: 'Slow Page Load Detected', description: `Page loads in ${loadTimeMs}ms — above the 3000ms threshold. Consider asset optimization.`, impact: 'Improved user experience' });
+        else perfRecs.push({ priority: 'low', category: 'caching', title: 'Performance is Good', description: `Page load time is ${loadTimeMs}ms — within acceptable range. Continue monitoring.`, impact: 'Sustained good user experience' });
+        if (fail > 0) perfRecs.push({ priority: 'high', category: 'javascript', title: `${fail} Test(s) Failed`, description: 'Review failed tests and check selector stability. Elements may have changed.', impact: 'Fix failures to ensure full coverage' });
+        if (skip > 0) perfRecs.push({ priority: 'medium', category: 'network', title: `${skip} Test(s) Skipped`, description: 'Skipped tests may indicate optional or unstable elements. Review selectors.', impact: 'Better test coverage' });
+        if (pass === tests.length && tests.length > 0) perfRecs.push({ priority: 'low', category: 'caching', title: 'All Tests Passed 🎉', description: 'Excellent! All tests passed successfully. Keep monitoring for regressions.', impact: 'Application is stable' });
+        return perfRecs;
+      })().map((rec, i) => (
+        <RecommendationCard key={i} rec={rec} index={i} />
+      ))
+    )}
+
   </div>
 )}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// History Panel
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 const FW_CONFIG = {
-  Selenium:   { color: '#43B02A', bg: 'rgba(67,176,42,.12)',  border: 'rgba(67,176,42,.3)',  letters: 'Se' },
-  Cypress:    { color: '#00BFA5', bg: 'rgba(0,191,165,.12)',  border: 'rgba(0,191,165,.3)',  letters: 'Cy' },
-  Playwright: { color: '#E2574C', bg: 'rgba(226,87,76,.12)',  border: 'rgba(226,87,76,.3)',  letters: 'Pl' },
+  Selenium:   { color: '#43B02A', letters: 'Se' },
+  Cypress:    { color: '#00BFA5', letters: 'Cy' },
+  Playwright: { color: '#E2574C', letters: 'Pl' },
+  Pytest:     { color: '#3776AB', letters: 'Py' },
+  Postman:    { color: '#FF6C37', letters: 'Po' },
+  k6:         { color: '#7D64FF', letters: 'k6' },
+  Requests:   { color: '#06b6d4', letters: 'RQ' },
 };
-
 const TYPE_CONFIG = {
   smoke:       { color: '#64748B', bg: 'rgba(100,116,139,.1)', border: 'rgba(100,116,139,.25)', label: 'Smoke',       letter: 'S' },
   functional:  { color: '#6366F1', bg: 'rgba(99,102,241,.1)',  border: 'rgba(99,102,241,.25)',  label: 'Functional',  letter: 'F' },
@@ -9166,7 +9839,6 @@ const TYPE_CONFIG = {
   api:         { color: '#10B981', bg: 'rgba(16,185,129,.1)',  border: 'rgba(16,185,129,.25)',  label: 'API',         letter: 'A' },
   regression:  { color: '#F97316', bg: 'rgba(249,115,22,.1)',  border: 'rgba(249,115,22,.25)',  label: 'Regression',  letter: 'R' },
   security:    { color: '#EF4444', bg: 'rgba(239,68,68,.1)',   border: 'rgba(239,68,68,.25)',   label: 'Security',    letter: 'S' },
-  unit:        { color: '#0EA5E9', bg: 'rgba(14,165,233,.1)',  border: 'rgba(14,165,233,.25)',  label: 'Unit',        letter: 'U' },
   seo: {color: '#06b6d4', bg: 'rgba(6,182,212,.1)', border: 'rgba(6,182,212,.25)', label: 'SEO', letter: 'S',},
 
 };
@@ -9327,12 +9999,15 @@ function ProjectDropdown({ projects, filterProject, setFilterProject }) {
           if (filterProject !== 'all') e.currentTarget.style.background = 'transparent';
         }}
       >
-        <span style={{
-          width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-          background: filterProject === 'all' ? 'rgba(99,102,241,.15)' : 'rgba(255,255,255,.05)',
-          border: filterProject === 'all' ? '1px solid rgba(99,102,241,.25)' : '1px solid rgba(255,255,255,.06)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
-        }}>📁</span>
+        
+<span style={{
+  width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+  background: filterProject === 'all' ? 'rgba(99,102,241,.15)' : 'rgba(255,255,255,.05)',
+  border: filterProject === 'all' ? '1px solid rgba(99,102,241,.25)' : '1px solid rgba(255,255,255,.06)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+}}>
+  <IconFolder size={13} stroke={1.8} style={{ color: '#4f86e8' }} />
+</span>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 11, color: filterProject === 'all' ? '#a5b4fc' : '#e2e8f0' }}>
             All Projects
@@ -9382,12 +10057,14 @@ function ProjectDropdown({ projects, filterProject, setFilterProject }) {
               }}
             >
               <span style={{
-                width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                background: colorBg, border: `1px solid ${colorBd}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
-              }}>
-                {isPublic ? '🌐' : '🔒'}
-              </span>
+  width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+  background: colorBg, border: `1px solid ${colorBd}`,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+}}>
+  {isPublic
+    ? <IconWorld size={13} stroke={1.8} style={{ color }} />
+    : <IconLock size={13} stroke={1.8} style={{ color }} />}
+</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   fontWeight: 700, fontSize: 11,
@@ -9434,9 +10111,14 @@ function ProjectDropdown({ projects, filterProject, setFilterProject }) {
           boxShadow: open ? '0 0 0 3px rgba(99,102,241,.12)' : 'none',
         }}
       >
-        <span style={{ fontSize: 12 }}>
-          {filterProject === 'all' ? '📁' : selected?.type === 'public' ? '🌐' : '🔒'}
-        </span>
+        
+<span style={{ fontSize: 12, display: 'flex' }}>
+  {filterProject === 'all'
+    ? <IconFolder size={13} stroke={1.8} style={{ color: '#4f86e8' }} />
+    : selected?.type === 'public'
+      ? <IconWorld size={13} stroke={1.8} style={{ color: '#4f86e8' }} />
+      : <IconLock size={13} stroke={1.8} style={{ color: '#8b5cf6' }} />}
+</span>
         <span style={{
           flex: 1, textAlign: 'left',
           overflow: 'hidden', textOverflow: 'ellipsis',
@@ -9460,7 +10142,313 @@ function ProjectDropdown({ projects, filterProject, setFilterProject }) {
   );
 }
 
+function FrameworkDropdown({ filterFw, setFilterFw }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
+  useEffect(() => {
+    const handleClickOutside = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const options = ['all', ...Object.keys(FW_CONFIG)];
+  const current = filterFw === 'all' ? null : FW_CONFIG[filterFw];
+
+  return (
+    <div ref={ref} style={{ position:'relative', zIndex: open ? 50 : 1 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:8,
+          background:'var(--card)', border:'1px solid var(--border)', color:'var(--text)',
+          fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', minWidth:140
+        }}
+      >
+        {current
+          ? <span style={{ width:8, height:8, borderRadius:'50%', background:current.color, flexShrink:0 }}/>
+          : <Code2 size={13} style={{ color:'var(--indigo2)', flexShrink:0 }} />
+        }
+        <span style={{ flex:1, textAlign:'left' }}>{filterFw === 'all' ? 'All Frameworks' : filterFw}</span>
+        <svg width="12" height="12" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s' }}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      {open && (
+        <div style={{
+          position:'absolute', top:'calc(100% + 6px)', left:0, minWidth:180, zIndex:9999,
+          background:'var(--card)', border:'1px solid var(--border)', borderRadius:10,
+          boxShadow:'0 12px 32px rgba(0,0,0,.4)', overflow:'hidden'
+        }}>
+          {options.map(fw => {
+            const conf = FW_CONFIG[fw];
+            const active = filterFw === fw;
+            return (
+              <div
+                key={fw}
+                onClick={() => { setFilterFw(fw); setOpen(false); }}
+                style={{
+                  display:'flex', alignItems:'center', gap:8, padding:'10px 14px', cursor:'pointer',
+                  fontSize:12, fontWeight:600, color: active ? 'var(--indigo2)' : 'var(--text)',
+                  background: active ? 'var(--indigo-dim)' : 'transparent'
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,.04)'; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+              >
+                {conf ? (
+                  <span style={{ width:8, height:8, borderRadius:'50%', background:conf.color, flexShrink:0 }}/>
+                ) : (
+                  <span style={{
+                    width:22, height:22, borderRadius:7, flexShrink:0,
+                    background:'rgba(99,102,241,.12)', border:'1px solid rgba(99,102,241,.25)',
+                    display:'flex', alignItems:'center', justifyContent:'center'
+                  }}>
+                    <Code2 size={12} color="var(--indigo2)" />
+                  </span>
+                )}
+                {fw === 'all' ? 'All Frameworks' : fw}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+function TypeDropdown({ filterType, setFilterType }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const options = ['all', ...Object.keys(TYPE_CONFIG)];
+  const current = filterType === 'all' ? null : TYPE_CONFIG[filterType];
+
+  return (
+    <div ref={ref} style={{ position:'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:8,
+          background:'var(--card)', border:'1px solid var(--border)', color:'var(--text)',
+          fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', minWidth:150
+        }}
+      >
+        {current ? (
+          <span style={{
+            width:20, height:20, borderRadius:6, flexShrink:0,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:9, fontWeight:800, color:current.color,
+            background:current.bg, border:`1px solid ${current.border}`
+          }}>
+            {current.letter}
+          </span>
+        ) : (
+          <span style={{
+            width:20, height:20, borderRadius:6, flexShrink:0,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            background:'var(--indigo-dim)', border:'1px solid var(--indigo-border)'
+          }}>
+            <ListFilter size={11} color="var(--indigo2)" />
+          </span>
+        )}
+        <span style={{ flex:1, textAlign:'left' }}>{filterType === 'all' ? 'All Types' : filterType.charAt(0).toUpperCase() + filterType.slice(1)}</span>
+        <svg width="12" height="12" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s' }}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      {open && (
+        <div style={{
+          position:'absolute', top:'calc(100% + 6px)', left:0, minWidth:190, zIndex:9999,
+          background:'var(--card)', border:'1px solid var(--border)', borderRadius:10,
+          boxShadow:'0 12px 32px rgba(0,0,0,.4)', overflow:'hidden'
+        }}>
+          {options.map(type => {
+            const conf = TYPE_CONFIG[type];
+            const active = filterType === type;
+            return (
+              <div
+                key={type}
+                onClick={() => { setFilterType(type); setOpen(false); }}
+                style={{
+                  display:'flex', alignItems:'center', gap:10, padding:'10px 14px', cursor:'pointer',
+                  fontSize:12, fontWeight:600, color: active ? 'var(--indigo2)' : 'var(--text)',
+                  background: active ? 'var(--indigo-dim)' : 'transparent'
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,.04)'; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+              >
+                {conf ? (
+                  <span style={{
+                    width:20, height:20, borderRadius:6, flexShrink:0,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:9, fontWeight:800, color:conf.color,
+                    background:conf.bg, border:`1px solid ${conf.border}`
+                  }}>
+                    {conf.letter}
+                  </span>
+                ) : (
+                  <span style={{
+                    width:22, height:22, borderRadius:7, flexShrink:0,
+                    background:'var(--indigo-dim)', border:'1px solid var(--indigo-border)',
+                    display:'flex', alignItems:'center', justifyContent:'center'
+                  }}>
+                    <ListFilter size={12} color="var(--indigo2)" />
+                  </span>
+                )}
+                {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+function DateDropdown({ filterDate, setFilterDate }) {
+  const [open, setOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(() => filterDate ? new Date(filterDate) : new Date());
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const year  = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  const firstDayOfMonth = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const cells = [];
+  for (let i = 0; i < firstDayOfMonth; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const formatDateStr = (d) => {
+    const mm = String(month + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    return `${year}-${mm}-${dd}`;
+  };
+
+  const selectDay = (d) => {
+    if (!d) return;
+    setFilterDate(formatDateStr(d));
+    setOpen(false);
+  };
+
+  const displayLabel = filterDate
+    ? new Date(filterDate + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+    : 'All Dates';
+
+  return (
+    <div ref={ref} style={{ position:'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:8,
+          background:'var(--card)', border:'1px solid var(--border)', color:'var(--text)',
+          fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', minWidth:150
+        }}
+      >
+        <Calendar size={14} style={{ color:'var(--indigo2)', flexShrink:0 }} />
+        <span style={{ flex:1, textAlign:'left' }}>{displayLabel}</span>
+        {filterDate && (
+          <span
+            onClick={(e) => { e.stopPropagation(); setFilterDate(''); }}
+            style={{ display:'flex', color:'var(--muted)' }}
+          >
+            <X size={13} />
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position:'absolute', top:'calc(100% + 6px)', left:0, width:280, zIndex:9999,
+          background:'var(--card)', border:'1px solid var(--border)', borderRadius:14,
+          boxShadow:'0 16px 40px rgba(0,0,0,.45)', overflow:'hidden', padding:'14px 16px 16px'
+        }}>
+          {/* Header month nav */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+            <button
+              onClick={() => setViewDate(new Date(year, month - 1, 1))}
+              style={{ width:26, height:26, borderRadius:7, background:'var(--bg2)', border:'1px solid var(--border2)', color:'var(--muted)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{monthNames[month]} {year}</div>
+            <button
+              onClick={() => setViewDate(new Date(year, month + 1, 1))}
+              style={{ width:26, height:26, borderRadius:7, background:'var(--bg2)', border:'1px solid var(--border2)', color:'var(--muted)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* Day names */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:2, marginBottom:6 }}>
+            {dayNames.map(d => (
+              <div key={d} style={{ textAlign:'center', fontSize:10, fontWeight:700, color:'var(--muted)', padding:'4px 0' }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Days grid */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:2 }}>
+            {cells.map((d, i) => {
+              if (!d) return <div key={i} />;
+              const dateStr = formatDateStr(d);
+              const isToday    = dateStr === todayStr;
+              const isSelected = dateStr === filterDate;
+              return (
+                <button
+                  key={i}
+                  onClick={() => selectDay(d)}
+                  style={{
+                    width:'100%', aspectRatio:'1', borderRadius:8,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:12, fontWeight: isSelected ? 700 : 500,
+                    background: isSelected ? 'var(--indigo)' : 'transparent',
+                    color: isSelected ? '#fff' : isToday ? 'var(--indigo2)' : 'var(--text)',
+                    border: isToday && !isSelected ? '1px solid var(--indigo-border)' : '1px solid transparent',
+                    cursor:'pointer', transition:'all .15s'
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(99,102,241,.1)'; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          {filterDate && (
+            <button
+              onClick={() => { setFilterDate(''); setOpen(false); }}
+              style={{
+                width:'100%', marginTop:12, padding:'8px', borderRadius:8,
+                background:'var(--bg2)', border:'1px solid var(--border)', color:'var(--muted)',
+                fontSize:11, fontWeight:700, cursor:'pointer'
+              }}
+            >
+              Clear date
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 // History Page
 function HistoryPanel({ goTo, setGeneration }) {
   const { t, lang, setLanguage } = useLang();
@@ -9469,6 +10457,9 @@ function HistoryPanel({ goTo, setGeneration }) {
   const [search,        setSearch]        = useState('');
   const [filterFw,      setFilterFw]      = useState('all');
   const [filterProject, setFilterProject] = useState('all');
+  const [filterDate,    setFilterDate]    = useState('');   
+const [filterRateMin, setFilterRateMin] = useState(''); 
+const [filterType, setFilterType] = useState('all');   
   const [projects,      setProjects]      = useState([]);
   const [sortKey,       setSortKey]       = useState('date');
   const [sortDir,       setSortDir]       = useState('desc');
@@ -9492,12 +10483,15 @@ useEffect(() => {
   const totalPass  = histories.reduce((s, h) => s + (h.pass_count||0), 0);
   const avgRate    = histories.length ? Math.round(histories.reduce((s, h) => s + (h.pass_rate||0), 0) / histories.length) : 0;
 
-  const filtered = histories
+ const filtered = histories
   .filter(h => {
-    const matchSearch = (h.url || '').toLowerCase().includes(search.toLowerCase());
-    const matchFw      = filterFw === 'all' || h.framework === filterFw;
-    const matchProject = filterProject === 'all' || String(h.project_id) === String(filterProject);
-    return matchSearch && matchFw && matchProject;
+    const matchSearch  = (h.url || '').toLowerCase().includes(search.toLowerCase());
+    const matchFw       = filterFw === 'all' || h.framework === filterFw;
+    const matchType      = filterType === 'all' || h.test_type === filterType;
+    const matchProject  = filterProject === 'all' || String(h.project_id) === String(filterProject);
+    const matchDate      = !filterDate || (h.created_at && h.created_at.slice(0, 10) === filterDate);
+    const matchRate       = !filterRateMin || (h.pass_rate || 0) >= Number(filterRateMin);
+    return matchSearch && matchFw && matchType && matchProject && matchDate && matchRate;
   })
     .sort((a, b) => {
       let va, vb;
@@ -9612,13 +10606,26 @@ useEffect(() => {
 </button>
       </div>
 
-      {histories.length > 0 && (
-        <div className="hp2-stats">
-          {[{ icon:'🚀', val:totalGen, lbl:'Total Generations', sc:'var(--gold)' }, { icon:'🔬', val:totalTests, lbl:'Tests Executed', sc:'var(--indigo2)' }, { icon:'✅', val:totalPass, lbl:'Tests Passed', sc:'var(--green)' }, { icon:'🎯', val:`${avgRate}%`, lbl:'Avg Pass Rate', sc:'var(--amber)' }].map((s, i) => (
-            <div key={s.lbl} className="hp2-stat" style={{ '--i':i, '--sc':s.sc }}><div className="hp2-stat-icon">{s.icon}</div><div><div className="hp2-stat-val">{s.val}</div><div className="hp2-stat-lbl">{s.lbl}</div></div></div>
-          ))}
+     {histories.length > 0 && (
+  <div className="hp2-stats">
+    {[
+      { Icon: IconRocket,      val: totalGen,      lbl: 'Total Generations', sc: 'var(--gold)' },
+      { Icon: IconTestPipe,    val: totalTests,    lbl: 'Tests Executed',    sc: 'var(--indigo2)' },
+      { Icon: IconCircleCheck, val: totalPass,     lbl: 'Tests Passed',      sc: 'var(--green)' },
+      { Icon: IconTarget,      val: `${avgRate}%`, lbl: 'Avg Pass Rate',     sc: 'var(--amber)' },
+    ].map((s, i) => (
+      <div key={s.lbl} className="hp2-stat" style={{ '--i': i, '--sc': s.sc }}>
+        <div className="hp2-stat-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.sc }}>
+          <s.Icon size={18} stroke={1.8} />
         </div>
-      )}
+        <div>
+          <div className="hp2-stat-val">{s.val}</div>
+          <div className="hp2-stat-lbl">{s.lbl}</div>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
 
       {histories.length > 0 && (
         <div className="hp2-toolbar">
@@ -9629,15 +10636,63 @@ useEffect(() => {
           </div>
           <ProjectDropdown projects={projects} filterProject={filterProject} setFilterProject={setFilterProject} />
 
-          <div className="hp2-filters">
-            {['all','Selenium','Cypress','Playwright'].map(fw => {
-              const conf = FW_CONFIG[fw];
-              return (<button key={fw} className={`hp2-filter-btn ${filterFw===fw?'on':''}`} onClick={() => setFilterFw(fw)}>{conf && <span style={{ width:8, height:8, borderRadius:'50%', background:filterFw===fw?'#fff':conf.color, display:'inline-block', flexShrink:0 }}/>}{fw==='all'?'All':fw}</button>);
-            })}
-          </div>
-          {[{ key:'date', label:'Date', icon:<svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> }, { key:'rate', label:'Pass Rate', icon:<svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> }, { key:'tests', label:'Tests', icon:<svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/></svg> }].map(s => (
-            <button key={s.key} className={`hp2-sort-btn ${sortKey===s.key?'active':''}`} onClick={() => toggleSort(s.key)}>{s.icon} {s.label}<SortIcon active={sortKey===s.key} dir={sortDir}/></button>
-          ))}
+          <FrameworkDropdown filterFw={filterFw} setFilterFw={setFilterFw} />
+          <TypeDropdown filterType={filterType} setFilterType={setFilterType} />
+          <DateDropdown filterDate={filterDate} setFilterDate={setFilterDate} />
+
+          {/* Input Pass Rate minimum */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, background:'var(--card)', border:'1px solid var(--border)', borderRadius:8, padding:'6px 8px 6px 10px' }}>
+  <IconShieldCheck size={14} stroke={1.8} style={{ color: 'var(--indigo2)', flexShrink: 0 }} />
+  <input
+    type="number"
+    min="0"
+    max="100"
+    placeholder="Pass rate"
+    value={filterRateMin}
+    onChange={e => {
+      const v = e.target.value;
+      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setFilterRateMin(v);
+    }}
+    className="min-rate-input"
+    style={{ background:'transparent', border:'none', color:'var(--text)', fontSize:12, fontFamily:'inherit', outline:'none', width:60 }}
+  />
+  <div style={{ display:'flex', flexDirection:'column', gap:2, flexShrink:0 }}>
+    <button
+      type="button"
+      onClick={() => setFilterRateMin(String(Math.min(100, (Number(filterRateMin)||0) + 1)))}
+      style={{ width:16, height:11, display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:4, cursor:'pointer', color:'var(--muted)', padding:0, transition:'all .15s' }}
+      onMouseEnter={e => { e.currentTarget.style.background='var(--indigo-bg)'; e.currentTarget.style.color='var(--indigo2)'; e.currentTarget.style.borderColor='var(--indigo-border)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background='var(--bg2)'; e.currentTarget.style.color='var(--muted)'; e.currentTarget.style.borderColor='var(--border)'; }}
+    >
+      <svg width="8" height="8" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+    </button>
+    <button
+      type="button"
+      onClick={() => setFilterRateMin(String(Math.max(0, (Number(filterRateMin)||0) - 1)))}
+      style={{ width:16, height:11, display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:4, cursor:'pointer', color:'var(--muted)', padding:0, transition:'all .15s' }}
+      onMouseEnter={e => { e.currentTarget.style.background='var(--indigo-bg)'; e.currentTarget.style.color='var(--indigo2)'; e.currentTarget.style.borderColor='var(--indigo-border)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background='var(--bg2)'; e.currentTarget.style.color='var(--muted)'; e.currentTarget.style.borderColor='var(--border)'; }}
+    >
+      <svg width="8" height="8" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+  </div>
+  {filterRateMin && (
+    <button onClick={() => setFilterRateMin('')} style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', padding:0, display:'flex', flexShrink:0 }}>
+      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  )}
+  <style>{`
+    .min-rate-input::-webkit-outer-spin-button,
+    .min-rate-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .min-rate-input[type=number] {
+      -moz-appearance: textfield;
+    }
+  `}</style>
+</div>
+
           <div className="hp2-count-badge">{filtered.length} result{filtered.length!==1?'s':''}</div>
         </div>
       )}
@@ -9767,6 +10822,7 @@ const [recentActivity, setRecentActivity] = useState([]);
 const [showLoginHistory, setShowLoginHistory] = useState(false);
 const [showSessions,     setShowSessions]     = useState(false);
 const [showDanger,       setShowDanger]        = useState(false);
+const [showDeactivateModal, setShowDeactivateModal] = useState(false);
 const [sessionCount,     setSessionCount]      = useState(1);
 const [phone,    setPhone]    = useState(user?.phone    || '');
 const [company,  setCompany]  = useState(user?.company  || '');
@@ -9896,16 +10952,75 @@ const revokeAllSessions = async () => {
 };
 
 const deactivateAccount = async () => {
-  if (!window.confirm('Are you sure? This cannot be undone.')) return;
   setLoading(true);
   try {
-    await api.delete('/profile/delete');
+    await api.put('/profile/deactivate');
     setUser(null);
   } catch(err) { setError('Failed to deactivate account'); }
   setLoading(false);
+  setShowDeactivateModal(false);
 };
+const DeactivateModal = () => !showDeactivateModal ? null : (
+  <div
+    onClick={() => !loading && setShowDeactivateModal(false)}
+    style={{
+      position:'fixed', inset:0, background:'rgba(0,0,0,.6)', backdropFilter:'blur(4px)',
+      display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:20
+    }}
+  >
+    <div
+      onClick={e => e.stopPropagation()}
+      style={{
+        width:'100%', maxWidth:400, background:'var(--card, #0d1f35)', border:'1px solid var(--border, rgba(99,102,241,0.12))',
+        borderRadius:16, padding:'26px 28px', boxShadow:'0 24px 60px rgba(0,0,0,0.5)'
+      }}
+    >
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
+        <div style={{
+          width:40, height:40, borderRadius:10, background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.25)',
+          display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0
+        }}>
+          <svg width="18" height="18" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <div style={{ fontSize:16, fontWeight:700, color:'var(--text, #e8eaf0)' }}>Deactivate Account</div>
+      </div>
 
+      <p style={{ fontSize:13, color:'var(--muted, #8892a4)', lineHeight:1.6, marginBottom:22 }}>
+        Your account will be deactivated and hidden from access. You can reactivate it anytime by simply logging back in. Continue?
+      </p>
+
+      <div style={{ display:'flex', gap:10 }}>
+        <button
+          onClick={() => setShowDeactivateModal(false)}
+          disabled={loading}
+          style={{
+            flex:1, padding:'11px', borderRadius:10, background:'var(--bg2, #0b1829)', border:'1.5px solid var(--border, rgba(99,102,241,0.12))',
+            color:'var(--muted, #8892a4)', fontWeight:700, fontSize:13, cursor:'pointer'
+          }}
+        >
+          Cancel
+        </button>
+        <button
+  onClick={deactivateAccount}
+  disabled={loading}
+  style={{
+    flex:1, padding:'11px', borderRadius:10, background:'linear-gradient(135deg,#dc2626,#ef4444)', border:'none',
+    color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer',
+    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+    boxShadow:'0 4px 14px rgba(239,68,68,.35)'
+  }}
+>
+  {loading ? <><span className="spinner"/> Deactivating…</> : 'Yes, Deactivate'}
+</button>
+      </div>
+    </div>
+  </div>
+);
   return (
+        <>
     <div className="panel">
       <div className="p-header"><div><h1 className="p-title">{t('my')} <span className="g">{t('account')}</span></h1><p className="p-sub">{t('accountDesc')}</p></div></div>
       {msg   && (<div className="ac2-feedback ac2-feedback--ok"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>{msg}</div>)}
@@ -10253,9 +11368,10 @@ const deactivateAccount = async () => {
     {showDanger && (
       <div style={{ padding:'16px 20px', background:'rgba(239,68,68,.03)' }}>
         <div style={{ fontSize:12, color:'var(--muted)', marginBottom:12, lineHeight:1.6 }}>
-          Deactivating your account will <strong style={{ color:'#ef4444' }}>permanently delete</strong> all your data, projects and generations. This action cannot be undone.
-        </div>
-        <button onClick={deactivateAccount} disabled={loading}
+          Deactivating your account will <strong style={{ color:'#ef4444' }}>disable access</strong> and hide your data from other users. Your projects and generations will be preserved. You can reactivate your account anytime by logging in again.
+</div>
+        <button onClick={() => setShowDeactivateModal(true)} disabled={loading}
+
           style={{ width:'100%', padding:'11px', borderRadius:10, background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', color:'#ef4444', fontWeight:700, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
           <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
           Deactivate Account
@@ -10335,19 +11451,20 @@ const deactivateAccount = async () => {
         <svg width="14" height="14" fill="none" stroke="var(--muted)" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     ))}
+     </div>
   </div>
 </div>
-</div>
 
-
+<DeactivateModal />
+  </>
   );
 
 }
 
 
 // Settings Page 
-// Settings Page — redesigned to match the Nextest UI photo
-function SettingsPanel({ theme, setTheme }) {
+function SettingsPanel({ theme, setTheme, reduceMotion, setReduceMotion, sidebarPos, setSidebarPos }) {
+
   const { t, setLanguage: applyLanguage } = useLang();
   const { logout } = useAuth();
 
@@ -10356,8 +11473,6 @@ function SettingsPanel({ theme, setTheme }) {
   const [testAlerts,   setTestAlerts]   = useState(true);
   const [weekly,       setWeekly]       = useState(true);
   const [productUpd,   setProductUpd]   = useState(false);
-  const [compact,      setCompact]      = useState(false);
-  const [sidebarPos,   setSidebarPos]   = useState('Left');
   const [framework,    setFramework]    = useState('Playwright');
   const [testType,     setTestType]     = useState('E2E');
   const [aiModel,      setAiModel]      = useState('GPT-4o');
@@ -10382,7 +11497,7 @@ function SettingsPanel({ theme, setTheme }) {
       setTestAlerts(res.data.test_alerts ?? true);
       setWeekly(res.data.weekly_report ?? true);
       setProductUpd(res.data.product_updates ?? false);
-      setCompact(res.data.compact_mode ?? false);
+      setReduceMotion(res.data.reduce_motion ?? false);
       setSidebarPos(res.data.sidebar_position ?? 'Left');
       setFramework(res.data.default_framework ?? 'Playwright');
       setTestType(res.data.default_test_type ?? 'E2E');
@@ -10408,7 +11523,7 @@ function SettingsPanel({ theme, setTheme }) {
         test_alerts: testAlerts,
         weekly_report: weekly,
         product_updates: productUpd,
-        compact_mode: compact,
+        reduce_motion: reduceMotion,
         sidebar_position: sidebarPos,
         default_framework: framework,
         default_test_type: testType,
@@ -10453,72 +11568,147 @@ function SettingsPanel({ theme, setTheme }) {
       }} />
     </div>
   );
+const [isDarkMode, setIsDarkMode] = useState(true); // dark par défaut
 
-  const SetSelect = ({ value, onChange, options }) => (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      style={{
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 8, color: '#94a3b8',
-        fontSize: 12, fontWeight: 600,
-        padding: '7px 28px 7px 10px',
-        fontFamily: 'inherit', cursor: 'pointer',
-        outline: 'none', appearance: 'none',
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-        backgroundRepeat: 'no-repeat',
-        backgroundPosition: 'right 8px center',
-      }}
-    >
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
+useEffect(() => {
+  const computeIsDark = () => {
+    if (theme === 'dark') return true;
+    if (theme === 'light') return false;
+    // theme === 'system'
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true; // fallback: NexTest est dark par défaut
+  };
+
+  setIsDarkMode(computeIsDark());
+
+  // Si "system", on écoute les changements de préférence OS en live
+  if (theme === 'system' && typeof window !== 'undefined' && window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => setIsDarkMode(mq.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }
+}, [theme]);
+
+// Remplace tout le bloc SetSelect par ceci :
+const SetSelect = ({ value, onChange, options }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f8fafc',
+          border: isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+          borderRadius: 8,
+          color: isDarkMode ? '#94a3b8' : '#334155',
+          fontSize: 12, fontWeight: 600,
+          padding: '7px 10px',
+          fontFamily: 'inherit', cursor: 'pointer',
+          outline: 'none', minWidth: 110,
+        }}
+      >
+        <span style={{ flex: 1, textAlign: 'left' }}>{value}</span>
+        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"
+          viewBox="0 0 24 24"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }}>
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', right: 0, minWidth: 130, zIndex: 999,
+          background: isDarkMode ? '#0d1526' : '#ffffff',
+          border: isDarkMode ? '1px solid rgba(99,102,241,.25)' : '1px solid #e2e8f0',
+          borderRadius: 10,
+          boxShadow: isDarkMode ? '0 12px 32px rgba(0,0,0,.5)' : '0 12px 32px rgba(0,0,0,.12)',
+          overflow: 'hidden', padding: 4,
+        }}>
+          {options.map(o => {
+            const active = o === value;
+            return (
+              <div
+                key={o}
+                onClick={() => { onChange(o); setOpen(false); }}
+                style={{
+                  padding: '8px 12px', borderRadius: 6, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600,
+                  color: active ? '#6366f1' : (isDarkMode ? '#cbd5e1' : '#334155'),
+                  background: active ? (isDarkMode ? 'rgba(99,102,241,.12)' : 'rgba(99,102,241,.08)') : 'transparent',
+                  transition: 'background .15s',
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = isDarkMode ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.03)'; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+              >
+                {o}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
+};
+ 
 
   // Section card with colored icon header
-  const SectionCard = ({ icon, iconBg, iconColor, title, subtitle, children }) => (
+const SectionCard = ({ icon, iconBg, iconColor, title, subtitle, children }) => (
+  <div style={{
+    background: 'var(--card)',
+    border: '1px solid var(--border)',
+    borderRadius: 16, overflow: 'hidden',
+    boxShadow: 'var(--shadow)',
+  }}>
+    {/* Header */}
     <div style={{
-      background: 'rgba(255,255,255,0.02)',
-      border: '1px solid rgba(255,255,255,0.06)',
-      borderRadius: 16, overflow: 'hidden',
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '16px 20px',
+      borderBottom: '1px solid var(--border3)',
     }}>
-      {/* Header */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '16px 20px',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        width: 34, height: 34, borderRadius: 9,
+        background: iconBg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
       }}>
-        <div style={{
-          width: 34, height: 34, borderRadius: 9,
-          background: iconBg,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-          <span style={{ color: iconColor, fontSize: 16 }}>{icon}</span>
-        </div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>{title}</div>
-          <div style={{ fontSize: 11, color: '#475569', marginTop: 1 }}>{subtitle}</div>
-        </div>
+        <span style={{ color: iconColor, fontSize: 16 }}>{icon}</span>
       </div>
-      {children}
-    </div>
-  );
-
-  // Row inside a section
-  const SetRow = ({ label, desc, children, noBorder }) => (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '13px 20px', gap: 12,
-      borderTop: noBorder ? 'none' : '1px solid rgba(255,255,255,0.04)',
-    }}>
       <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#cbd5e1' }}>{label}</div>
-        {desc && <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>{desc}</div>}
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{title}</div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{subtitle}</div>
       </div>
-      {children}
     </div>
-  );
+    {children}
+  </div>
+);
+
+// Row inside a section
+const SetRow = ({ label, desc, children, noBorder }) => (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '13px 20px', gap: 12,
+    borderTop: noBorder ? 'none' : '1px solid var(--border3)',
+  }}>
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sub)' }}>{label}</div>
+      {desc && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{desc}</div>}
+    </div>
+    {children}
+  </div>
+);
 
   // ── render ───────────────────────────────────────────────────────────────────
   return (
@@ -10587,22 +11777,29 @@ function SettingsPanel({ theme, setTheme }) {
           subtitle="Customize how Nextest looks for you."
         >
           <SetRow noBorder label="Theme" desc="Choose your preferred theme">
-            <SetSelect
-              value={theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'System'}
-              onChange={v => {
-                const k = v === 'Dark' ? 'dark' : v === 'Light' ? 'light' : 'system';
-                setTheme(k);
-                api.put('/settings/update', { theme: k });
-              }}
-              options={['Light', 'Dark', 'System']}
-            />
-          </SetRow>
-          <SetRow label="Compact Mode" desc="Display more content in less space">
-            <Toggle on={compact} onToggle={() => setCompact(p => !p)} />
-          </SetRow>
+  <SetSelect
+    value={theme === 'dark' ? 'Dark' : 'Light'}
+    onChange={v => {
+      const k = v === 'Dark' ? 'dark' : 'light';
+      setTheme(k);
+      api.put('/settings/update', { theme: k });
+    }}
+    options={['Light', 'Dark']}
+  />
+</SetRow>
+          <SetRow label="Reduce Animations" desc="Turn off decorative motion effects">
+  <Toggle on={reduceMotion} onToggle={() => setReduceMotion(p => !p)} />
+</SetRow>
           <SetRow label="Sidebar Position" desc="Choose sidebar position">
-            <SetSelect value={sidebarPos} onChange={setSidebarPos} options={['Left', 'Right']} />
-          </SetRow>
+  <SetSelect
+    value={sidebarPos}
+    onChange={v => {
+      setSidebarPos(v);
+      api.put('/settings/update', { sidebar_position: v });
+    }}
+    options={['Left', 'Right']}
+  />
+</SetRow>
         </SectionCard>
 
         {/* Notifications */}
@@ -10713,95 +11910,13 @@ function SettingsPanel({ theme, setTheme }) {
       {/* ── ROW 3 — Integrations + General ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
-        {/* Integrations */}
-        <SectionCard
-          icon={
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-            </svg>
-          }
-          iconBg="rgba(16,185,129,0.12)"
-          iconColor="#34d399"
-          title="Integrations"
-          subtitle="Manage your connected tools."
-        >
-          {[
-            { key: 'slack',  state: slackConn,  set: setSlackConn,  label: 'Slack Notifications', desc: 'Send alerts to Slack channels' },
-            { key: 'jira',   state: jiraConn,   set: setJiraConn,   label: 'Jira Integration',    desc: 'Sync test results to Jira' },
-            { key: 'github', state: githubConn, set: setGithubConn, label: 'GitHub Integration',  desc: 'Sync with your repositories' },
-          ].map(({ key, state, set, label, desc }, i) => (
-            <SetRow key={key} noBorder={i === 0} label={label} desc={desc}>
-              <button
-                onClick={() => set(p => !p)}
-                style={{
-                  padding: '6px 14px', borderRadius: 8,
-                  background: state ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${state ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                  color: state ? '#818cf8' : '#64748b',
-                  fontSize: 12, fontWeight: 700,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center', gap: 6, transition: 'all .2s',
-                }}
-              >
-                {state ? (
-                  <>
-                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path d="M20 6L9 17l-5-5"/>
-                    </svg>
-                    Connected
-                  </>
-                ) : (
-                  <>
-                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                    </svg>
-                    Connect
-                  </>
-                )}
-              </button>
-            </SetRow>
-          ))}
-        </SectionCard>
-
-        {/* General */}
-        <SectionCard
-          icon={
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
-            </svg>
-          }
-          iconBg="rgba(148,163,184,0.1)"
-          iconColor="#94a3b8"
-          title="General"
-          subtitle="Other general preferences."
-        >
-          <SetRow noBorder label="Auto Save" desc="Automatically save your changes">
-            <Toggle on={autoSave} onToggle={() => setAutoSave(p => !p)} />
-          </SetRow>
-          <SetRow label="Confirm Before Run" desc="Ask for confirmation before running tests">
-            <Toggle on={confirmRun} onToggle={() => setConfirmRun(p => !p)} />
-          </SetRow>
-          <SetRow label="Delete Confirmation" desc="Show confirmation dialog for important actions">
-            <Toggle on={deleteConf} onToggle={() => setDeleteConf(p => !p)} />
-          </SetRow>
-          <SetRow label="Beta Features" desc="Enable access to beta features">
-            <Toggle on={beta} onToggle={() => setBeta(p => !p)} />
-          </SetRow>
-        </SectionCard>
+       
       </div>
 
     </div>
   );
 }
 
- 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Root Dashboard
-// ─────────────────────────────────────────────────────────────────────────────
 function CommandPalette({ open, onClose, histories, projects, goTo, setGeneration }) {
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -11017,6 +12132,28 @@ function CommandPalette({ open, onClose, histories, projects, goTo, setGeneratio
     document.body
   );
 }
+function Sparkline({ rates, color = '#818cf8' }) {
+  if (!rates || rates.length === 0) return null;
+  const w = 64, h = 22, pad = 2;
+  const max = 100, min = 0;
+  const step = rates.length > 1 ? (w - pad * 2) / (rates.length - 1) : 0;
+  const points = rates.map((v, i) => {
+    const x = pad + i * step;
+    const y = pad + (1 - (v - min) / (max - min || 1)) * (h - pad * 2);
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width={w} height={h} style={{ flexShrink: 0 }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      {rates.length > 0 && (() => {
+        const lastX = pad + (rates.length - 1) * step;
+        const lastY = pad + (1 - (rates[rates.length - 1] - min) / (max - min || 1)) * (h - pad * 2);
+        return <circle cx={lastX} cy={lastY} r={2.2} fill={color} />;
+      })()}
+    </svg>
+  );
+}
+
 function ReportsPanel({ goTo, setGeneration }) {
   const [reports, setReports] = useState([]);
   const [search, setSearch] = useState('');
@@ -11024,8 +12161,10 @@ function ReportsPanel({ goTo, setGeneration }) {
   const [expandedId, setExpandedId] = useState(null);
   const [pdfLoadingId, setPdfLoadingId] = useState(null);
   const [dateFilter, setDateFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);  // ← ICI
-  const ITEMS_PER_PAGE = 5;    
+  const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState('timeline'); // 'timeline' | 'byTest'
+  const [expandedGroupKey, setExpandedGroupKey] = useState(null);
+  const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
     try {
@@ -11036,7 +12175,7 @@ function ReportsPanel({ goTo, setGeneration }) {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, filterType, dateFilter]);
+  }, [search, filterType, dateFilter, viewMode]);
 
   const TYPE_CONFIG = {
     smoke:       { label: 'Smoke',       color: '#64748b', icon: '🔍' },
@@ -11132,11 +12271,39 @@ function ReportsPanel({ goTo, setGeneration }) {
     })
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-const paginated = filtered.slice(
-  (currentPage - 1) * ITEMS_PER_PAGE,
-  currentPage * ITEMS_PER_PAGE
-);
+  // ── Group by test (url + testType + framework) ──────────────────────────
+  const groupedByTest = (() => {
+    const map = {};
+    filtered.forEach(r => {
+      const key = `${r.url}||${r.testType}||${r.framework}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(r);
+    });
+    return Object.entries(map)
+      .map(([key, runs]) => {
+        const sorted = [...runs].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const latest = sorted[0];
+        const totalPass = runs.reduce((s, r) => s + (r.passCount || 0), 0);
+        const totalFail = runs.reduce((s, r) => s + (r.failCount || 0), 0);
+        const totalT = totalPass + totalFail;
+        const avgRate = totalT > 0 ? Math.round(totalPass / totalT * 100) : 0;
+        // oldest -> newest, last 10 runs, for the sparkline
+        const rates = [...sorted].slice(0, 10).reverse().map(r => {
+          const t = (r.passCount || 0) + (r.failCount || 0);
+          return t > 0 ? Math.round((r.passCount / t) * 100) : 0;
+        });
+        return { key, runs: sorted, latest, count: runs.length, avgRate, rates };
+      })
+      .sort((a, b) => new Date(b.latest.date) - new Date(a.latest.date));
+  })();
+
+  // ── Pagination (mode-aware) ──────────────────────────────────────────────
+  const pageSource = viewMode === 'byTest' ? groupedByTest : filtered;
+  const totalPages = Math.ceil(pageSource.length / ITEMS_PER_PAGE);
+  const paginated = pageSource.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
 // ── Dynamic KPI calculations ──────────────────────────────────────
   const kpiNow = Date.now();
@@ -11176,19 +12343,21 @@ const paginated = filtered.slice(
     (() => { const t = sumField(kpiLastWeek, r => r.passCount + r.failCount); return t > 0 ? Math.round(sumField(kpiLastWeek, r => r.passCount) / t * 100) : 0; })()
   );
   const trendDur = calcTrend(sumField(kpiThisWeek, estDurMin), sumField(kpiLastWeek, estDurMin));
-  
 
-  // ── Group by date ──
+
+  // ── Group by date (timeline mode only) ──
   const groups = { Today: [], Yesterday: [], 'This Week': [], Earlier: [] };
   const now = new Date();
-  paginated.forEach(r => {
-    const d = new Date(r.date);
-    const diffDays = Math.floor((now - d) / 86400000);
-    if (diffDays === 0) groups['Today'].push(r);
-    else if (diffDays === 1) groups['Yesterday'].push(r);
-    else if (diffDays < 7) groups['This Week'].push(r);
-    else groups['Earlier'].push(r);
-  });
+  if (viewMode === 'timeline') {
+    paginated.forEach(r => {
+      const d = new Date(r.date);
+      const diffDays = Math.floor((now - d) / 86400000);
+      if (diffDays === 0) groups['Today'].push(r);
+      else if (diffDays === 1) groups['Yesterday'].push(r);
+      else if (diffDays < 7) groups['This Week'].push(r);
+      else groups['Earlier'].push(r);
+    });
+  }
   const groupEntries = Object.entries(groups).filter(([, arr]) => arr.length > 0);
 
   const totalPass = reports.reduce((s, r) => s + (r.passCount || 0), 0);
@@ -11212,8 +12381,331 @@ const paginated = filtered.slice(
       };
     });
 
+  // ── Shared row renderer: main row + expanded detail panel for one report ──
+  const renderReportRow = (report) => {
+    const type = TYPE_CONFIG[report.testType] || TYPE_CONFIG.smoke;
+    const fw   = FW_CONFIG[report.framework] || { color: '#64748b', letters: report.framework?.slice(0, 2) || '?' };
+    const total = (report.passCount || 0) + (report.failCount || 0);
+    const skip  = report.skipCount || 0;
+    const rate  = total > 0 ? Math.round((report.passCount / total) * 100) : 0;
+    const rc    = rateColorOf(rate);
+    const isOpen = expandedId === report.id;
+    const hasGenId = !!report.generationData?.generation?.id;
+    const dur = report.durationMs ? fmtDur(Math.round(report.durationMs / 1000)) : estDurMin(report) > 0 ? fmtDur(estDurMin(report)) : null;
 
-  
+    const perf = report.generationData?.result?.performance || report.generationData?.performance;
+    const avgResp = perf?.metrics?.http_req_duration_avg || perf?.metrics?.load_time_ms;
+
+    const TYPE_ICONS = {
+      smoke:       <IconFlame       size={18} stroke={1.8} />,
+      functional:  <IconSettings2   size={18} stroke={1.8} />,
+      performance: <IconBolt        size={18} stroke={1.8} />,
+      api:         <IconApi         size={18} stroke={1.8} />,
+      regression:  <IconRefresh     size={18} stroke={1.8} />,
+      security:    <IconShieldCheck size={18} stroke={1.8} />,
+      seo:         <IconWorldSearch size={18} stroke={1.8} />,
+    };
+
+    return (
+      <div key={report.id} style={{
+        background: 'var(--card)',
+        border: `1px solid ${isOpen ? type.color : 'var(--border)'}`,
+        borderRadius: 14,
+        overflow: 'hidden',
+        transition: 'all .2s',
+        boxShadow: isOpen ? `0 4px 24px ${type.color}18` : 'none',
+      }}>
+
+        {/* ── MAIN ROW ── */}
+        <div
+          onClick={() => setExpandedId(isOpen ? null : report.id)}
+          style={{ display:'flex', alignItems:'center', gap:16, padding:'16px 24px 16px 20px', cursor:'pointer' }}
+          onMouseEnter={e => { if (!isOpen) e.currentTarget.parentElement.style.borderColor = `${type.color}55`; }}
+          onMouseLeave={e => { if (!isOpen) e.currentTarget.parentElement.style.borderColor = 'var(--border)'; }}
+        >
+          <div style={{ width:38, height:38, borderRadius:10, flexShrink:0, background:`${type.color}15`, border:`1px solid ${type.color}30`, display:'flex', alignItems:'center', justifyContent:'center', color:type.color }}>
+            {TYPE_ICONS[report.testType] || <IconFileText size={18} stroke={1.8} />}
+          </div>
+
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
+              {report.url || '—'}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+              <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:20, color:fw.color, background:`${fw.color}15`, border:`1px solid ${fw.color}33` }}>
+                {fw.letters}
+              </span>
+              <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, color:type.color, background:`${type.color}15`, border:`1px solid ${type.color}30`, textTransform:'uppercase', letterSpacing:.5 }}>
+                {type.label}
+              </span>
+              <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, color:'var(--muted)' }}>
+                <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {timeStr(report.date)}
+              </span>
+              {dur && (
+                <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, color:'var(--muted)' }}>
+                  <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  {dur}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:5, minWidth:160 }}>
+              <div style={{ height:5, borderRadius:4, background:'var(--border)', overflow:'hidden', display:'flex' }}>
+                <div style={{ width:`${total > 0 ? (report.passCount||0)/total*100 : 0}%`, background:'#10b981', transition:'width .6s ease' }} />
+                <div style={{ width:`${total > 0 ? skip/total*100 : 0}%`, background:'#f59e0b', transition:'width .6s ease' }} />
+                <div style={{ width:`${total > 0 ? (report.failCount||0)/total*100 : 0}%`, background:'#ef4444', transition:'width .6s ease' }} />
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#10b981' }}>
+                  <IconCircleCheck size={11} stroke={2.5} />{report.passCount||0}
+                </span>
+                {skip > 0 && (
+                  <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#f59e0b' }}>
+                    <IconCircleDashed size={11} stroke={2.5} />{skip}
+                  </span>
+                )}
+                <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#ef4444' }}>
+                  <IconCircleX size={11} stroke={2.5} />{report.failCount||0}
+                </span>
+                <span style={{ fontSize:10, color:'var(--muted)', marginLeft:'auto' }}>
+                  {total + skip} tests
+                </span>
+              </div>
+            </div>
+
+            <div style={{ position:'relative', width:48, height:48, flexShrink:0 }}>
+              <svg width="48" height="48" style={{ transform:'rotate(-90deg)' }}>
+                <circle cx="24" cy="24" r="19" fill="none" stroke="var(--border)" strokeWidth="3.5" />
+                <circle cx="24" cy="24" r="19" fill="none" stroke={rc} strokeWidth="3.5"
+                  strokeDasharray={`${2 * Math.PI * 19}`}
+                  strokeDashoffset={`${2 * Math.PI * 19 * (1 - rate / 100)}`}
+                  strokeLinecap="round"
+                  style={{ transition:'stroke-dashoffset .8s ease' }}
+                />
+              </svg>
+              <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
+                <span style={{ fontSize:11, fontWeight:800, color:rc, fontFamily:'var(--C)', lineHeight:1 }}>{rate}%</span>
+              </div>
+            </div>
+          </div>
+
+          <IconChevronDown size={16} stroke={2.5} style={{ color:'var(--muted)', flexShrink:0, transition:'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+        </div>
+
+        {/* ── EXPANDED ── */}
+        {isOpen && (
+          <div onClick={e => e.stopPropagation()} style={{ borderTop:`1px solid var(--border)` }}>
+            <div style={{ height:3, background:'var(--bg2)', overflow:'hidden' }}>
+              <div style={{ display:'flex', height:'100%' }}>
+                <div style={{ width:`${total > 0 ? (report.passCount||0)/total*100 : 0}%`, background:'#10b981' }} />
+                <div style={{ width:`${total > 0 ? skip/total*100 : 0}%`, background:'#f59e0b' }} />
+                <div style={{ width:`${total > 0 ? (report.failCount||0)/total*100 : 0}%`, background:'#ef4444' }} />
+              </div>
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'280px 1fr auto', gap:16, padding:'16px 20px', alignItems:'start' }}>
+
+              {report.htmlContent ? (
+                <div style={{ position:'relative', width:'100%', height:160, overflow:'hidden', borderRadius:10, border:'1px solid var(--border)', background:'#070e1c', flexShrink:0 }}>
+                  <iframe srcDoc={report.htmlContent} title="report preview"
+                    style={{ width:1400, height:900, border:'none', transform:'scale(0.2)', transformOrigin:'top left', pointerEvents:'none' }} />
+                  <div style={{ position:'absolute', bottom:6, right:6 }}>
+                    <button onClick={() => { const b=new Blob([report.htmlContent],{type:'text/html'}); window.open(URL.createObjectURL(b),'_blank'); }}
+                      style={{ padding:'4px 10px', borderRadius:6, background:'rgba(0,0,0,.7)', border:'1px solid rgba(255,255,255,.15)', color:'#fff', fontSize:9, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                      Full Preview ↗
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ width:'100%', height:160, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted)', fontSize:11 }}>
+                  No preview
+                </div>
+              )}
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div>
+                  <div style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.5, marginBottom:10 }}>Test Summary</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {[
+                      { val: report.passCount||0, lbl:'Passed',  color:'#10b981', bg:'rgba(16,185,129,.12)', border:'rgba(16,185,129,.2)' },
+                      { val: report.failCount||0, lbl:'Failed',  color:'#ef4444', bg:'rgba(239,68,68,.12)',   border:'rgba(239,68,68,.2)'  },
+                      { val: skip,                lbl:'Skipped', color:'#f59e0b', bg:'rgba(245,158,11,.12)',  border:'rgba(245,158,11,.2)' },
+                      { val: total + skip,        lbl:'Total',   color:'var(--text)', bg:'var(--bg2)', border:'var(--border)' },
+                    ].map(s => (
+                      <div key={s.lbl} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', borderRadius:8, background:s.bg, border:`1px solid ${s.border}` }}>
+                        <span style={{ fontSize:12, color:s.color, fontWeight:700 }}>{s.lbl}</span>
+                        <span style={{ fontSize:15, fontWeight:800, color:s.color, fontFamily:'var(--C)' }}>{s.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.5, marginBottom:10 }}>Test Environment</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', background:`${fw.color}12`, border:`1px solid ${fw.color}25`, borderRadius:8 }}>
+                      <span style={{ fontSize:11, fontWeight:800, color:fw.color }}>{fw.letters}</span>
+                      <span style={{ fontSize:12, color:'var(--text)', fontWeight:600 }}>{report.framework}</span>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', background:`${type.color}12`, border:`1px solid ${type.color}25`, borderRadius:8 }}>
+                      <span style={{ fontSize:13 }}>{type.icon}</span>
+                      <span style={{ fontSize:12, color:type.color, fontWeight:700 }}>{type.label}</span>
+                    </div>
+                    {dur && (
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:8 }}>
+                        <span style={{ fontSize:12, color:'var(--muted)' }}>Duration</span>
+                        <span style={{ fontSize:12, fontWeight:700, color:'var(--text)' }}>{dur}</span>
+                      </div>
+                    )}
+                    {perf && avgResp && (
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:8 }}>
+                        <span style={{ fontSize:12, color:'var(--muted)' }}>Avg Response</span>
+                        <span style={{ fontSize:12, fontWeight:700, color:'#8b5cf6' }}>{avgResp}ms</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display:'flex', flexDirection:'column', gap:8, minWidth:140 }}>
+                {report.generationData && (
+                  <button onClick={() => { setGeneration({ ...report.generationData, fresh: false }); goTo('execution'); }}
+                    style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 16px', borderRadius:9, background:'linear-gradient(135deg,var(--indigo),#4f46e5)', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 4px 14px rgba(99,102,241,.3)', whiteSpace:'nowrap' }}>
+                    <IconEye size={13} stroke={2}/> View Full Results
+                  </button>
+                )}
+                <div style={{ display:'flex', gap:6 }}>
+                  {report.htmlContent && (
+                    <button onClick={() => { const b=new Blob([report.htmlContent],{type:'text/html'}); const l=document.createElement('a'); l.href=URL.createObjectURL(b); l.download=`report_${report.id}.html`; l.click(); }}
+                      style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'8px 10px', borderRadius:8, background:'var(--indigo-bg)', border:'1px solid var(--indigo-border)', color:'var(--indigo2)', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                      <IconCode size={12} stroke={2}/> HTML
+                    </button>
+                  )}
+                  <button onClick={() => downloadCsv(report)}
+                    style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'8px 10px', borderRadius:8, background:'rgba(16,185,129,.08)', border:'1px solid rgba(16,185,129,.2)', color:'#10b981', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                    <IconFileTypeCsv size={12} stroke={2}/> CSV
+                  </button>
+                  {hasGenId && (
+                    <button onClick={() => downloadPdf(report)} disabled={pdfLoadingId === report.id}
+                      style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)', color:'#ef4444', fontSize:11, fontWeight:700, cursor: pdfLoadingId===report.id ? 'not-allowed':'pointer', fontFamily:'inherit', opacity: pdfLoadingId===report.id ? .6:1 }}>
+                      {pdfLoadingId===report.id ? <span className="spinner"/> : <IconFileTypePdf size={12} stroke={2}/>} PDF
+                    </button>
+                  )}
+                </div>
+                <button onClick={() => deleteReport(report.id)}
+                  style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'7px', borderRadius:8, background:'var(--bg2)', border:'1px solid var(--border)', color:'var(--muted)', cursor:'pointer', fontFamily:'inherit', fontSize:11 }}
+                  onMouseEnter={e => { e.currentTarget.style.background='var(--red-bg)'; e.currentTarget.style.color='var(--red)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background='var(--bg2)'; e.currentTarget.style.color='var(--muted)'; }}>
+                  <IconTrash size={12} stroke={2}/> Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── "By Test" group card: latest run header + expandable run history ──
+  const renderGroupCard = (group) => {
+    const { key, runs, latest, count, avgRate, rates } = group;
+    const type = TYPE_CONFIG[latest.testType] || TYPE_CONFIG.smoke;
+    const fw   = FW_CONFIG[latest.framework] || { color: '#64748b', letters: latest.framework?.slice(0, 2) || '?' };
+    const rc = rateColorOf(avgRate);
+    const isGroupOpen = expandedGroupKey === key;
+
+    const TYPE_ICONS = {
+      smoke:       <IconFlame       size={18} stroke={1.8} />,
+      functional:  <IconSettings2   size={18} stroke={1.8} />,
+      performance: <IconBolt        size={18} stroke={1.8} />,
+      api:         <IconApi         size={18} stroke={1.8} />,
+      regression:  <IconRefresh     size={18} stroke={1.8} />,
+      security:    <IconShieldCheck size={18} stroke={1.8} />,
+      seo:         <IconWorldSearch size={18} stroke={1.8} />,
+    };
+
+    return (
+      <div key={key} style={{
+        background: 'var(--card)',
+        border: `1px solid ${isGroupOpen ? type.color : 'var(--border)'}`,
+        borderRadius: 14,
+        overflow: 'hidden',
+        transition: 'all .2s',
+        boxShadow: isGroupOpen ? `0 4px 24px ${type.color}18` : 'none',
+      }}>
+        <div
+          onClick={() => setExpandedGroupKey(isGroupOpen ? null : key)}
+          style={{ display:'flex', alignItems:'center', gap:16, padding:'16px 24px 16px 20px', cursor:'pointer' }}
+          onMouseEnter={e => { if (!isGroupOpen) e.currentTarget.parentElement.style.borderColor = `${type.color}55`; }}
+          onMouseLeave={e => { if (!isGroupOpen) e.currentTarget.parentElement.style.borderColor = 'var(--border)'; }}
+        >
+          <div style={{ width:38, height:38, borderRadius:10, flexShrink:0, background:`${type.color}15`, border:`1px solid ${type.color}30`, display:'flex', alignItems:'center', justifyContent:'center', color:type.color }}>
+            {TYPE_ICONS[latest.testType] || <IconFileText size={18} stroke={1.8} />}
+          </div>
+
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
+              {latest.url || '—'}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+              <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:20, color:fw.color, background:`${fw.color}15`, border:`1px solid ${fw.color}33` }}>
+                {fw.letters}
+              </span>
+              <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, color:type.color, background:`${type.color}15`, border:`1px solid ${type.color}30`, textTransform:'uppercase', letterSpacing:.5 }}>
+                {type.label}
+              </span>
+              <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, color:'var(--indigo2)', background:'var(--indigo-bg)', border:'1px solid var(--indigo-border)' }}>
+                {count} run{count !== 1 ? 's' : ''}
+              </span>
+              <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, color:'var(--muted)' }}>
+                <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Last run {timeStr(latest.date)}
+              </span>
+            </div>
+          </div>
+
+          {/* Sparkline of recent pass rates */}
+          {rates.length > 1 && (
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, flexShrink:0 }}>
+              <Sparkline rates={rates} color={rc} />
+              <span style={{ fontSize:9, color:'var(--muted)', fontWeight:700 }}>last {rates.length}</span>
+            </div>
+          )}
+
+          {/* Avg rate ring */}
+          <div style={{ position:'relative', width:48, height:48, flexShrink:0 }}>
+            <svg width="48" height="48" style={{ transform:'rotate(-90deg)' }}>
+              <circle cx="24" cy="24" r="19" fill="none" stroke="var(--border)" strokeWidth="3.5" />
+              <circle cx="24" cy="24" r="19" fill="none" stroke={rc} strokeWidth="3.5"
+                strokeDasharray={`${2 * Math.PI * 19}`}
+                strokeDashoffset={`${2 * Math.PI * 19 * (1 - avgRate / 100)}`}
+                strokeLinecap="round"
+                style={{ transition:'stroke-dashoffset .8s ease' }}
+              />
+            </svg>
+            <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
+              <span style={{ fontSize:11, fontWeight:800, color:rc, fontFamily:'var(--C)', lineHeight:1 }}>{avgRate}%</span>
+            </div>
+          </div>
+
+          <IconChevronDown size={16} stroke={2.5} style={{ color:'var(--muted)', flexShrink:0, transition:'transform .2s', transform: isGroupOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+        </div>
+
+        {/* Run history */}
+        {isGroupOpen && (
+          <div onClick={e => e.stopPropagation()} style={{ borderTop:'1px solid var(--border)', padding:'14px 20px', background:'var(--bg2)', display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.5 }}>
+              Run history ({count})
+            </div>
+            {runs.map(r => renderReportRow(r))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="panel">
@@ -11247,7 +12739,7 @@ const paginated = filtered.slice(
             New Generation
           </button>
 
-         
+
         </div>
       </div>
 
@@ -11268,7 +12760,6 @@ const paginated = filtered.slice(
       ) : (
         <>
           {/* ── COMPACT STATS STRIP (pro icons) ── */}
-          {/* NOUVEAU bloc avec trends */}
 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:12, marginBottom:20 }}>
   {[
     { Icon: IconFileText,    val: reports.length,          lbl: 'Total reports',  color: '#818cf8', trend: trendReports, barW: `${Math.min(100, reports.length * 5)}%`              },
@@ -11322,7 +12813,6 @@ const paginated = filtered.slice(
           onChange={e => {
             const val = e.target.value;
             document.getElementById('trend-period').dataset.val = val;
-            // trigger re-render via a small hack
             e.target.dispatchEvent(new Event('change-period', { bubbles: true }));
           }}
           style={{
@@ -11400,7 +12890,6 @@ const paginated = filtered.slice(
 
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            {/* Donut */}
             <div style={{ position: 'relative', width: 120, height: 120, flexShrink: 0 }}>
               <PieChart width={120} height={120}>
                 <Pie
@@ -11423,7 +12912,6 @@ const paginated = filtered.slice(
               </div>
             </div>
 
-            {/* Legend */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
               {[
                 { label: 'Passed',  val: pass, color: '#10b981' },
@@ -11476,7 +12964,6 @@ const paginated = filtered.slice(
 
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            {/* Donut */}
             <div style={{ position: 'relative', width: 120, height: 120, flexShrink: 0 }}>
               <PieChart width={120} height={120}>
                 <Pie
@@ -11499,7 +12986,6 @@ const paginated = filtered.slice(
               </div>
             </div>
 
-            {/* Legend */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto', maxHeight: 120 }}>
               {typeData.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', paddingTop: 20 }}>No data yet</div>
@@ -11523,7 +13009,7 @@ const paginated = filtered.slice(
 
   </div>
 )}
-          
+
 
           {/* ── TOOLBAR ── */}
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:24, flexWrap:'wrap' }}>
@@ -11537,6 +13023,26 @@ const paginated = filtered.slice(
                 </button>
               )}
             </div>
+
+            {/* View mode toggle: Timeline vs By Test */}
+            <div style={{ display:'flex', gap:6 }}>
+              {[
+                { id: 'timeline', label: '🕐 Timeline' },
+                { id: 'byTest',   label: '📊 By Test'   },
+              ].map(m => {
+                const active = viewMode === m.id;
+                return (
+                  <button key={m.id} onClick={() => { setViewMode(m.id); setExpandedId(null); setExpandedGroupKey(null); }}
+                    style={{ padding:'7px 13px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
+                      border: active ? '1.5px solid var(--indigo2)' : '1.5px solid var(--border)',
+                      background: active ? 'var(--indigo-bg)' : 'var(--card)',
+                      color: active ? 'var(--indigo2)' : 'var(--muted)', transition:'all .18s' }}>
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {['all', 'smoke', 'functional', 'performance', 'api', 'regression', 'security', 'seo'].map(t => {
                 const cfg = TYPE_CONFIG[t];
@@ -11551,16 +13057,20 @@ const paginated = filtered.slice(
             </div>
           </div>
 
-{/* ── TIMELINE ── */}
-{filtered.length === 0 ? (
+{/* ── TIMELINE / BY TEST ── */}
+{(viewMode === 'timeline' ? filtered.length === 0 : groupedByTest.length === 0) ? (
   <div style={{ padding:'48px 32px', textAlign:'center', background:'var(--card)', border:'1px solid var(--border)', borderRadius:16, color:'var(--muted)', fontSize:13 }}>
     No results for your current filters.
+  </div>
+) : viewMode === 'byTest' ? (
+  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    {paginated.map(group => renderGroupCard(group))}
   </div>
 ) : (
   <div>
     {groupEntries.map(([label, items]) => (
       <div key={label} style={{ marginBottom: 32 }}>
-        
+
         {/* Group header */}
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
           <span style={{ fontSize:11, fontWeight:800, letterSpacing:2, textTransform:'uppercase', color:'var(--indigo2)' }}>
@@ -11575,266 +13085,7 @@ const paginated = filtered.slice(
 
         {/* Report rows */}
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {items.map(report => {
-            const type = TYPE_CONFIG[report.testType] || TYPE_CONFIG.smoke;
-            const fw   = FW_CONFIG[report.framework] || { color:'#64748b', letters: report.framework?.slice(0,2) || '?' };
-            const total = (report.passCount || 0) + (report.failCount || 0);
-            const skip  = report.skipCount || 0;
-            const rate  = total > 0 ? Math.round((report.passCount / total) * 100) : 0;
-            const rc    = rateColorOf(rate);
-            const isOpen = expandedId === report.id;
-            const hasGenId = !!report.generationData?.generation?.id;
-            const dur = report.durationMs ? fmtDur(Math.round(report.durationMs / 1000)) : estDurMin(report) > 0 ? fmtDur(estDurMin(report)) : null;
-
-            // Performance metrics from generationData
-            const perf = report.generationData?.result?.performance || report.generationData?.performance;
-            const avgResp = perf?.metrics?.http_req_duration_avg || perf?.metrics?.load_time_ms;
-            const reqSec  = perf?.metrics?.http_reqs_per_second;
-            const errRate = perf?.metrics?.http_req_failed_rate;
-            const throughput = perf?.metrics?.data_received;
-
-            return (
-              <div key={report.id} style={{
-                background: 'var(--card)',
-                border: `1px solid ${isOpen ? type.color : 'var(--border)'}`,
-                borderRadius: 14,
-                overflow: 'hidden',
-                transition: 'all .2s',
-                boxShadow: isOpen ? `0 4px 24px ${type.color}18` : 'none',
-              }}>
-                
-                {/* ── MAIN ROW ── */}
-                <div
-                  onClick={() => setExpandedId(isOpen ? null : report.id)}
-                  style={{ display:'flex', alignItems:'center', gap:16, padding:'16px 24px 16px 20px', cursor:'pointer' }}
-                  onMouseEnter={e => { if (!isOpen) e.currentTarget.parentElement.style.borderColor = `${type.color}55`; }}
-                  onMouseLeave={e => { if (!isOpen) e.currentTarget.parentElement.style.borderColor = 'var(--border)'; }}
-                >
-                 
-
-                  {/* Type icon */}
-                  {(() => {
-                    const TYPE_ICONS = {
-                      smoke:       <IconFlame       size={18} stroke={1.8} />,
-                      functional:  <IconSettings2   size={18} stroke={1.8} />,
-                      performance: <IconBolt        size={18} stroke={1.8} />,
-                      api:         <IconApi         size={18} stroke={1.8} />,
-                      regression:  <IconRefresh     size={18} stroke={1.8} />,
-                      security:    <IconShieldCheck size={18} stroke={1.8} />,
-                      seo:         <IconWorldSearch size={18} stroke={1.8} />,
-                    };
-                    return (
-                      <div style={{ width:38, height:38, borderRadius:10, flexShrink:0, background:`${type.color}15`, border:`1px solid ${type.color}30`, display:'flex', alignItems:'center', justifyContent:'center', color:type.color }}>
-                        {TYPE_ICONS[report.testType] || <IconFileText size={18} stroke={1.8} />}
-                      </div>
-                    );
-                  })()}
-
-                  {/* URL + badges */}
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
-                      {report.url || '—'}
-                    </div>
-                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                      {/* Framework badge */}
-                      <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:20, color:fw.color, background:`${fw.color}15`, border:`1px solid ${fw.color}33` }}>
-                        {fw.letters}
-                      </span>
-                      {/* Type badge */}
-                      <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, color:type.color, background:`${type.color}15`, border:`1px solid ${type.color}30`, textTransform:'uppercase', letterSpacing:.5 }}>
-                        {type.label}
-                      </span>
-                      {/* Time */}
-                      <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, color:'var(--muted)' }}>
-                        <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        {timeStr(report.date)}
-                      </span>
-                      {/* Duration */}
-                      {dur && (
-                        <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, color:'var(--muted)' }}>
-                          <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                          {dur}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                 {/* Stats — premium inline */}
-                  <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
-
-                    {/* Mini progress bar + counts */}
-                    <div style={{ display:'flex', flexDirection:'column', gap:5, minWidth:160 }}>
-                      {/* Bar */}
-                      <div style={{ height:5, borderRadius:4, background:'var(--border)', overflow:'hidden', display:'flex' }}>
-                        <div style={{ width:`${total > 0 ? (report.passCount||0)/total*100 : 0}%`, background:'#10b981', transition:'width .6s ease' }} />
-                        <div style={{ width:`${total > 0 ? skip/total*100 : 0}%`, background:'#f59e0b', transition:'width .6s ease' }} />
-                        <div style={{ width:`${total > 0 ? (report.failCount||0)/total*100 : 0}%`, background:'#ef4444', transition:'width .6s ease' }} />
-                      </div>
-                      {/* Counts inline */}
-                      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                        <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#10b981' }}>
-                          <IconCircleCheck size={11} stroke={2.5} />{report.passCount||0}
-                        </span>
-                        {skip > 0 && (
-                          <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#f59e0b' }}>
-                            <IconCircleDashed size={11} stroke={2.5} />{skip}
-                          </span>
-                        )}
-                        <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#ef4444' }}>
-                          <IconCircleX size={11} stroke={2.5} />{report.failCount||0}
-                        </span>
-                        <span style={{ fontSize:10, color:'var(--muted)', marginLeft:'auto' }}>
-                          {total + skip} tests
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Rate ring */}
-                    <div style={{ position:'relative', width:48, height:48, flexShrink:0 }}>
-                      <svg width="48" height="48" style={{ transform:'rotate(-90deg)' }}>
-                        <circle cx="24" cy="24" r="19" fill="none" stroke="var(--border)" strokeWidth="3.5" />
-                        <circle cx="24" cy="24" r="19" fill="none" stroke={rc} strokeWidth="3.5"
-                          strokeDasharray={`${2 * Math.PI * 19}`}
-                          strokeDashoffset={`${2 * Math.PI * 19 * (1 - rate / 100)}`}
-                          strokeLinecap="round"
-                          style={{ transition:'stroke-dashoffset .8s ease' }}
-                        />
-                      </svg>
-                      <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
-                        <span style={{ fontSize:11, fontWeight:800, color:rc, fontFamily:'var(--C)', lineHeight:1 }}>{rate}%</span>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Chevron */}
-                  <IconChevronDown size={16} stroke={2.5} style={{ color:'var(--muted)', flexShrink:0, transition:'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
-                </div>
-
-                {/* ── EXPANDED ── */}
-                
-{isOpen && (
-  <div onClick={e => e.stopPropagation()} style={{ borderTop:`1px solid var(--border)` }}>
-    
-    {/* Progress bar */}
-    <div style={{ height:3, background:'var(--bg2)', overflow:'hidden' }}>
-      <div style={{ display:'flex', height:'100%' }}>
-        <div style={{ width:`${total > 0 ? (report.passCount||0)/total*100 : 0}%`, background:'#10b981' }} />
-        <div style={{ width:`${total > 0 ? skip/total*100 : 0}%`, background:'#f59e0b' }} />
-        <div style={{ width:`${total > 0 ? (report.failCount||0)/total*100 : 0}%`, background:'#ef4444' }} />
-      </div>
-    </div>
-
-    <div style={{ display:'grid', gridTemplateColumns:'280px 1fr auto', gap:16, padding:'16px 20px', alignItems:'start' }}>
-
-      {/* HTML Preview */}
-      {report.htmlContent ? (
-        <div style={{ position:'relative', width:'100%', height:160, overflow:'hidden', borderRadius:10, border:'1px solid var(--border)', background:'#070e1c', flexShrink:0 }}>
-          <iframe srcDoc={report.htmlContent} title="report preview"
-            style={{ width:1400, height:900, border:'none', transform:'scale(0.2)', transformOrigin:'top left', pointerEvents:'none' }} />
-          <div style={{ position:'absolute', bottom:6, right:6 }}>
-            <button onClick={() => { const b=new Blob([report.htmlContent],{type:'text/html'}); window.open(URL.createObjectURL(b),'_blank'); }}
-              style={{ padding:'4px 10px', borderRadius:6, background:'rgba(0,0,0,.7)', border:'1px solid rgba(255,255,255,.15)', color:'#fff', fontSize:9, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-              Full Preview ↗
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div style={{ width:'100%', height:160, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted)', fontSize:11 }}>
-          No preview
-        </div>
-      )}
-
-      {/* Middle — Test Summary + Test Environment */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-
-        {/* Test Summary */}
-        <div>
-          <div style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.5, marginBottom:10 }}>Test Summary</div>
-          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            {[
-              { val: report.passCount||0, lbl:'Passed',  color:'#10b981', bg:'rgba(16,185,129,.12)', border:'rgba(16,185,129,.2)' },
-              { val: report.failCount||0, lbl:'Failed',  color:'#ef4444', bg:'rgba(239,68,68,.12)',   border:'rgba(239,68,68,.2)'  },
-              { val: skip,                lbl:'Skipped', color:'#f59e0b', bg:'rgba(245,158,11,.12)',  border:'rgba(245,158,11,.2)' },
-              { val: total + skip,        lbl:'Total',   color:'var(--text)', bg:'var(--bg2)', border:'var(--border)' },
-            ].map(s => (
-              <div key={s.lbl} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', borderRadius:8, background:s.bg, border:`1px solid ${s.border}` }}>
-                <span style={{ fontSize:12, color:s.color, fontWeight:700 }}>{s.lbl}</span>
-                <span style={{ fontSize:15, fontWeight:800, color:s.color, fontFamily:'var(--C)' }}>{s.val}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Test Environment */}
-        <div>
-          <div style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.5, marginBottom:10 }}>Test Environment</div>
-          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', background:`${fw.color}12`, border:`1px solid ${fw.color}25`, borderRadius:8 }}>
-              <span style={{ fontSize:11, fontWeight:800, color:fw.color }}>{fw.letters}</span>
-              <span style={{ fontSize:12, color:'var(--text)', fontWeight:600 }}>{report.framework}</span>
-            </div>
-            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', background:`${type.color}12`, border:`1px solid ${type.color}25`, borderRadius:8 }}>
-              <span style={{ fontSize:13 }}>{type.icon}</span>
-              <span style={{ fontSize:12, color:type.color, fontWeight:700 }}>{type.label}</span>
-            </div>
-            {dur && (
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:8 }}>
-                <span style={{ fontSize:12, color:'var(--muted)' }}>Duration</span>
-                <span style={{ fontSize:12, fontWeight:700, color:'var(--text)' }}>{dur}</span>
-              </div>
-            )}
-            {/* Performance metrics inline */}
-            {perf && avgResp && (
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:8 }}>
-                <span style={{ fontSize:12, color:'var(--muted)' }}>Avg Response</span>
-                <span style={{ fontSize:12, fontWeight:700, color:'#8b5cf6' }}>{avgResp}ms</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Right — Action buttons vertical */}
-      <div style={{ display:'flex', flexDirection:'column', gap:8, minWidth:140 }}>
-        {report.generationData && (
-          <button onClick={() => { setGeneration({ ...report.generationData, fresh: false }); goTo('execution'); }}
-
-            style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 16px', borderRadius:9, background:'linear-gradient(135deg,var(--indigo),#4f46e5)', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 4px 14px rgba(99,102,241,.3)', whiteSpace:'nowrap' }}>
-            <IconEye size={13} stroke={2}/> View Full Results
-          </button>
-        )}
-        <div style={{ display:'flex', gap:6 }}>
-          {report.htmlContent && (
-            <button onClick={() => { const b=new Blob([report.htmlContent],{type:'text/html'}); const l=document.createElement('a'); l.href=URL.createObjectURL(b); l.download=`report_${report.id}.html`; l.click(); }}
-              style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'8px 10px', borderRadius:8, background:'var(--indigo-bg)', border:'1px solid var(--indigo-border)', color:'var(--indigo2)', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-              <IconCode size={12} stroke={2}/> HTML
-            </button>
-          )}
-          <button onClick={() => downloadCsv(report)}
-            style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'8px 10px', borderRadius:8, background:'rgba(16,185,129,.08)', border:'1px solid rgba(16,185,129,.2)', color:'#10b981', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-            <IconFileTypeCsv size={12} stroke={2}/> CSV
-          </button>
-          {hasGenId && (
-            <button onClick={() => downloadPdf(report)} disabled={pdfLoadingId === report.id}
-              style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)', color:'#ef4444', fontSize:11, fontWeight:700, cursor: pdfLoadingId===report.id ? 'not-allowed':'pointer', fontFamily:'inherit', opacity: pdfLoadingId===report.id ? .6:1 }}>
-              {pdfLoadingId===report.id ? <span className="spinner"/> : <IconFileTypePdf size={12} stroke={2}/>} PDF
-            </button>
-          )}
-        </div>
-        <button onClick={() => deleteReport(report.id)}
-          style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'7px', borderRadius:8, background:'var(--bg2)', border:'1px solid var(--border)', color:'var(--muted)', cursor:'pointer', fontFamily:'inherit', fontSize:11 }}
-          onMouseEnter={e => { e.currentTarget.style.background='var(--red-bg)'; e.currentTarget.style.color='var(--red)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background='var(--bg2)'; e.currentTarget.style.color='var(--muted)'; }}>
-          <IconTrash size={12} stroke={2}/> Delete
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-              </div>
-            );
-          })}
+          {items.map(report => renderReportRow(report))}
         </div>
       </div>
     ))}
@@ -11846,7 +13097,6 @@ const paginated = filtered.slice(
     padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)',
     borderRadius: 10, marginTop: 8
   }}>
-    {/* Info texte */}
     <span style={{ fontSize: 12, color: 'var(--muted)' }}>
       Showing{' '}
       <span style={{ color: 'var(--text)', fontWeight: 700 }}>
@@ -11863,9 +13113,7 @@ const paginated = filtered.slice(
       reports
     </span>
 
-    {/* Boutons pagination */}
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      {/* Prev */}
       <button
         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
         disabled={currentPage === 1}
@@ -11880,7 +13128,6 @@ const paginated = filtered.slice(
         ← Prev
       </button>
 
-      {/* Numéros de pages */}
       {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
   <button
     key={p}
@@ -11898,7 +13145,6 @@ const paginated = filtered.slice(
   </button>
 ))}
 
-      {/* Next */}
       <button
         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
         disabled={currentPage === totalPages}
@@ -11916,128 +13162,345 @@ const paginated = filtered.slice(
   </div>
 )}
   </div>
-)}  
+)}
+
+{/* Pagination for By Test mode */}
+{viewMode === 'byTest' && groupedByTest.length > 0 && (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: 10, marginTop: 8
+  }}>
+    <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+      Showing{' '}
+      <span style={{ color: 'var(--text)', fontWeight: 700 }}>
+        {(currentPage - 1) * ITEMS_PER_PAGE + 1}
+      </span>{' '}
+      to{' '}
+      <span style={{ color: 'var(--text)', fontWeight: 700 }}>
+        {Math.min(currentPage * ITEMS_PER_PAGE, groupedByTest.length)}
+      </span>{' '}
+      of{' '}
+      <span style={{ color: 'var(--indigo2)', fontWeight: 700 }}>
+        {groupedByTest.length}
+      </span>{' '}
+      test groups
+    </span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <button
+        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+        disabled={currentPage === 1}
+        style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', background: 'var(--card)', border: '1px solid var(--border)', color: currentPage === 1 ? 'var(--muted)' : 'var(--text)', opacity: currentPage === 1 ? 0.5 : 1 }}
+      >
+        ← Prev
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+        <button key={p} onClick={() => setCurrentPage(p)}
+          style={{ width: 32, height: 32, borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', background: currentPage === p ? 'linear-gradient(135deg,var(--indigo),#4f46e5)' : 'var(--card)', border: currentPage === p ? 'none' : '1px solid var(--border)', color: currentPage === p ? '#fff' : 'var(--text)', boxShadow: currentPage === p ? '0 4px 12px rgba(99,102,241,.3)' : 'none' }}
+        >
+          {p}
+        </button>
+      ))}
+      <button
+        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+        disabled={currentPage === totalPages}
+        style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'inherit', background: 'var(--card)', border: '1px solid var(--border)', color: currentPage === totalPages ? 'var(--muted)' : 'var(--text)', opacity: currentPage === totalPages ? 0.5 : 1 }}
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+)}
       </>
       )}
     </div>
   );
-} 
-
+}
 function saveReportToStorage({ url, framework, testType, passCount, failCount, skipCount, htmlContent, csvContent, generationData, durationMs }) {
+  const key = 'nextest-reports';
+
+  // Écrit dans localStorage ; en cas de QuotaExceededError, réduit progressivement
+  // le tableau (le plus vieux en premier) puis réessaie jusqu'à ce que ça passe.
+  const writeWithRetry = (arr) => {
+    let list = arr;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      try {
+        localStorage.setItem(key, JSON.stringify(list));
+        return list;
+      } catch (err) {
+        const isQuota = err && (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014);
+        if (!isQuota || list.length <= 1) {
+          console.error('[saveReport] failed permanently', err);
+          return null;
+        }
+        // Supprime le rapport le plus ancien (fin du tableau, trié du plus récent au plus vieux)
+        list = list.slice(0, -1);
+        console.warn(`[saveReport] quota exceeded, retrying with ${list.length} reports`);
+      }
+    }
+    return null;
+  };
+
   try {
-    const key = 'nextest-reports';
     const existing = JSON.parse(localStorage.getItem(key) || '[]');
     const genId = generationData?.generation?.id;
 
+    let updated;
     if (genId) {
       const idx = existing.findIndex(r => r.generationData?.generation?.id === genId);
       if (idx !== -1) {
-        // Mettre à jour le rapport existant
         if (htmlContent) existing[idx].htmlContent = htmlContent;
         if (csvContent) existing[idx].csvContent = csvContent;
-        // Mettre à jour aussi les compteurs si fournis
         if (passCount !== undefined) existing[idx].passCount = passCount;
         if (failCount !== undefined) existing[idx].failCount = failCount;
         if (skipCount !== undefined) existing[idx].skipCount = skipCount;
-        localStorage.setItem(key, JSON.stringify(existing));
-        return;
+        updated = existing;
       }
     }
 
-    
+    if (!updated) {
+      const newReport = {
+        id: Date.now(),
+        date: new Date().toISOString(),
+        url, framework, testType,
+        passCount: passCount || 0,
+        failCount: failCount || 0,
+        skipCount: skipCount || 0,
+        durationMs: durationMs || 0,
+        htmlContent: htmlContent || null,
+        csvContent: csvContent || null,
+        generationData: generationData || null,
+      };
+      updated = [newReport, ...existing].slice(0, 50);
+    }
 
-    // Nouveau rapport
-    const newReport = {
-      id: Date.now(),
-      date: new Date().toISOString(),
-      url, framework, testType,
-      passCount: passCount || 0,
-      failCount: failCount || 0,
-      skipCount: skipCount || 0,
-      durationMs: durationMs || 0,
-      htmlContent: htmlContent || null,
-      csvContent: csvContent || null,
-      generationData: generationData || null,
-    };
-    const updated = [newReport, ...existing].slice(0, 50);
-    localStorage.setItem(key, JSON.stringify(updated));
+    const result = writeWithRetry(updated);
+    if (result === null) {
+      // Dernier recours : on garde les métadonnées mais on vide le HTML/CSV lourd
+      const stripped = updated.map(r => ({ ...r, htmlContent: null, csvContent: null }));
+      writeWithRetry(stripped);
+    }
   } catch (err) {
     console.error('[saveReport]', err);
   }
 }
 
-
-function DocsPanel() {
+function DocsPanel({ goTo, setProjectStep }) {
   const [active, setActive] = useState('overview');
 
+  const onNavigate = (page, step = null) => {
+    if (step && setProjectStep) {
+      setProjectStep(step);
+    }
+    goTo(page);
+  };
+
   const sections = [
-    { id: 'overview',    label: 'Overview',         Icon: IconLayoutDashboard },
-    { id: 'smoke',       label: 'Smoke Test',       Icon: IconEye },
-    { id: 'functional',  label: 'Functional Test',  Icon: IconClick },
-    { id: 'performance', label: 'Performance Test', Icon: IconBolt },
-    { id: 'security',    label: 'Security Test',    Icon: IconShieldLock },
-    { id: 'regression',  label: 'Regression Test',  Icon: IconRefresh },
-    { id: 'api',         label: 'API Test',         Icon: IconLink },
-    { id: 'seo',         label: 'SEO Test',         Icon: IconSeeding },
+    { group: 'Getting Started', items: [
+      { id: 'overview',        label: 'Overview',          Icon: IconLayoutDashboard },
+      { id: 'getting-started', label: 'Getting Started',   Icon: IconRocket },
+      { id: 'architecture',    label: 'Architecture',      Icon: IconCode },
+      { id: 'frameworks',      label: 'Frameworks',        Icon: IconTestPipe },
+      { id: 'ai-engine',       label: 'AI Engine',         Icon: IconRobot },
+    ]},
+    { group: 'Test Types', items: [
+      { id: 'smoke',       label: 'Smoke Test',       Icon: IconEye },
+      { id: 'functional',  label: 'Functional Test',  Icon: IconClick },
+      { id: 'performance', label: 'Performance Test', Icon: IconBolt },
+      { id: 'security',    label: 'Security Test',    Icon: IconShieldLock },
+      { id: 'regression',  label: 'Regression Test',  Icon: IconRefresh },
+      { id: 'api',         label: 'API Test',         Icon: IconApi },
+      { id: 'seo',         label: 'SEO Test',         Icon: IconSeeding },
+    ]},
+    { group: 'More', items: [
+      { id: 'reports', label: 'Reports & Exports', Icon: IconFileText },
+      { id: 'flaky-tests', label: 'Flaky Tests',        Icon: IconActivity  }, 
+      { id: 'faq',     label: 'FAQ',               Icon: IconBulb },
+    ]},
+  ];
+
+  const FRAMEWORKS = [
+    { name:'Selenium',   color:'#43B02A', role:'Legacy web automation via WebDriver', usedFor:['Smoke','Functional (fallback)'], lang:'Python' },
+    { name:'Cypress',    color:'#00BFA5', role:'Modern JS-based E2E testing in-browser', usedFor:['Smoke (public projects)'], lang:'JavaScript' },
+    { name:'Playwright', color:'#E2574C', role:'Primary framework — fast, reliable, headless Chromium', usedFor:['Smoke','Functional','Performance','Regression'], lang:'Python' },
+    { name:'Pytest',     color:'#3776AB', role:'Python test runner for API & Security suites', usedFor:['API Test','Security Test'], lang:'Python' },
+    { name:'Postman / Newman', color:'#FF6C37', role:'Collection-based REST API testing', usedFor:['API Test'], lang:'JSON / CLI' },
+    { name:'k6',         color:'#7D64FF', role:'Load, stress, spike & soak testing engine', usedFor:['Performance Test'], lang:'JavaScript' },
+    { name:'Requests + BeautifulSoup', color:'#06b6d4', role:'Lightweight HTML fetch & parse for SEO audits', usedFor:['SEO Test'], lang:'Python' },
   ];
 
   const content = {
     overview: {
       title: 'NexTest — Documentation',
-      desc: 'NexTest is an AI-powered test automation platform. Generate, execute, and analyze tests for any web application in seconds.',
+      desc: 'NexTest is an AI-powered test automation platform. Generate, execute, and analyze tests for any web application, internal system, or API in seconds, no manual scripting required.',
       items: [
-        { Icon: IconRobot,        color:'#6366f1', bg:'rgba(99,102,241,.12)', title:'AI-Powered Generation',     desc:'LLaMA 3 generates test cases automatically from your URL — no manual scripting required.' },
-        { Icon: IconWorld,        color:'#10b981', bg:'rgba(16,185,129,.12)', title:'Public & Internal Projects', desc:'Test public websites or internal apps with credential injection and JWT token support.' },
-        { Icon: IconChartBar,     color:'#8b5cf6', bg:'rgba(139,92,246,.12)', title:'Reports & Analytics',       desc:'PDF, HTML, CSV exports. Real-time pass rate charts, heatmaps, and AI insights.' },
-        { Icon: IconBellRinging,  color:'#f59e0b', bg:'rgba(245,158,11,.12)', title:'Alerts & Notifications',    desc:'Get notified when tests fail. Alert pipeline with 15s polling and badge count.' },
+        { Icon: IconRobot,        color:'#6366f1', bg:'rgba(99,102,241,.12)', title:'AI-Powered Generation',      desc:'Groq LLaMA 3.3-70b generates test cases automatically from your URL — from DOM scraping to full scenario coverage.' },
+        { Icon: IconWorld, color:'#10b981', bg:'rgba(16,185,129,.12)', title:'Public & Internal Projects', desc:'Test public websites or internal apps with credential injection.' },
+        { Icon: IconChartBar,     color:'#8b5cf6', bg:'rgba(139,92,246,.12)', title:'Reports & Analytics',        desc:'PDF, HTML, CSV exports. Real-time pass rate charts, activity heatmaps, and AI-generated insights.' },
+        { Icon: IconBellRinging,  color:'#f59e0b', bg:'rgba(245,158,11,.12)', title:'Alerts & Scheduling',        desc:'Scheduled recurring test runs, flaky test detection, and email alerts via Gmail SMTP / n8n webhooks.' },
+        { Icon: IconTestPipe, color:'#E2574C', bg:'rgba(226,87,76,.12)', title:'7 Frameworks Supported', desc:'Selenium, Cypress, Playwright, Pytest, Postman/Newman, k6, and BeautifulSoup — NexTest picks the best framework per test type automatically.' },
+        { Icon: IconShieldLock, color:'#ef4444', bg:'rgba(239,68,68,.12)', title:'7 Test Types', desc:'Smoke, Functional, Performance, Security, Regression, API, and SEO — covering both public websites and internal systems.' },
       ]
     },
-    smoke:       { color:'#64748b', badge:'Quick · ~30s',      Icon: IconEye,         title:'Smoke Test',       desc:'Validates that key UI elements are visible and present in the DOM. The fastest way to confirm a page is up and functional.',                                              frameworks:[{n:'Selenium',c:'#43B02A'},{n:'Cypress',c:'#00BFA5'},{n:'Playwright',c:'#E2574C'}], steps:['NexTest scrapes the target URL and detects DOM elements','AI generates visibility checks for nav, buttons, forms, images','Tests run in headless browser and report pass/fail per element'], when:'Use after every deployment to catch critical UI regressions instantly.' },
-    functional:  { color:'#6366f1', badge:'Medium · ~1min',    Icon: IconClick,       title:'Functional Test',  desc:'Tests real user interactions — fill forms, click buttons, navigate pages, assert text content. Powered by Playwright with AI-generated steps.',                           frameworks:[{n:'Playwright',c:'#E2574C'}],                                                      steps:['LLaMA 3 generates click/fill/navigate/assert steps based on page structure','Playwright executes each step in a real browser with screenshots on fail','AI analysis provides root cause and fix for every failure'],    when:'Use to validate login flows, form submissions, and user journeys.' },
-    performance: { color:'#8b5cf6', badge:'Advanced · ~3min',  Icon: IconBolt,        title:'Performance Test', desc:'Measures Core Web Vitals (LCP, FCP, TTI, Load Time) and resource sizes. Also supports k6 load/stress/spike/soak testing.',                                              frameworks:[{n:'Playwright',c:'#E2574C'},{n:'k6',c:'#7D64FF'}],                                 steps:['Playwright captures Web Vitals via browser performance APIs','k6 generates load scripts and runs concurrent virtual users','Results scored out of 100 with actionable recommendations'],                           when:'Use before releases to ensure your app meets performance budgets.' },
-    security:    { color:'#ef4444', badge:'Critical · ~5min',  Icon: IconShieldLock,  title:'Security Test',    desc:'Checks for common vulnerabilities — XSS, auth bypass, missing headers, session issues, and information exposure.',                                                     frameworks:[{n:'Pytest',c:'#3776AB'}],                                                          steps:['Scans authentication routes, input fields, and HTTP headers','Tests for XSS injection, unauthorized access, and insecure cookies','Reports severity (critical/high/medium/low) per finding'],                        when:'Use before production releases and after security patches.' },
-    regression:  { color:'#f97316', badge:'Thorough · ~3min',  Icon: IconRefresh,     title:'Regression Test',  desc:'Ensures existing features still work after code changes. Covers navigation, content, authentication, and functionality.',                                              frameworks:[{n:'Playwright',c:'#E2574C'}],                                                      steps:['AI generates a test suite covering all major page routes','Playwright validates each page loads correctly with expected content','Pass/fail per category: navigation, form, auth, UI'],                               when:'Run after every sprint or major code change to prevent regressions.' },
-    api:         { color:'#10b981', badge:'Technical · ~2min', Icon: IconApi,         title:'API Test',         desc:'Tests REST API endpoints — status codes, response payloads, authentication, CRUD operations, and edge cases.',                                                        frameworks:[{n:'Pytest',c:'#3776AB'},{n:'Postman',c:'#FF6C37'}],                                steps:['LLaMA 3 discovers endpoints and generates CRUD test cases','Tests run with real HTTP requests and JWT token injection','Validates status codes, response schema, and error handling'],                               when:'Use to validate your API contract before frontend integration.' },
-    seo:         { color:'#06b6d4', badge:'Public · ~1min',    Icon: IconSeeding,     title:'SEO Test',         desc:'Audits meta tags, headings, page speed, robots.txt, sitemap, Open Graph, and structured data for SEO compliance.',                                                    frameworks:[{n:'BeautifulSoup',c:'#06b6d4'}],                                                   steps:['Fetches page HTML and analyzes SEO elements','Checks title, meta description, H1, canonical, OG tags, sitemap','Scores the page out of 100 with priority-ranked recommendations'],                                 when:'Use before launching new pages or after content changes.' },
   };
 
-  const current = content[active];
+  const testTypeContent = {
+    smoke:       { color:'#64748b', badge:'Quick · ~30s',      Icon: IconEye,         title:'Smoke Test',       scope:'Public & Internal', desc:'Validates that key UI elements are visible and present in the DOM. The fastest way to confirm a page is up and functional.',                                              frameworks:[{n:'Selenium',c:'#43B02A'},{n:'Cypress',c:'#00BFA5'},{n:'Playwright',c:'#E2574C'}], steps:['NexTest scrapes the target URL and detects DOM elements','AI generates visibility checks for nav, buttons, forms, images','Tests run in headless browser and report pass/fail per element'], when:'Use after every deployment to catch critical UI regressions instantly.', config:['Target URL (required)','Framework: Selenium / Cypress / Playwright','No credentials needed for public apps'], tips:['Fastest test type — ideal for CI/CD post-deploy checks.','Combine with Scheduled Tasks for hourly uptime-style monitoring.'] },
+    functional:  { color:'#6366f1', badge:'Medium · ~1min',    Icon: IconClick,       title:'Functional Test',  scope:'Public & Internal', desc:'Tests real user interactions — fill forms, click buttons, navigate pages, assert text content. Powered by Playwright with AI-generated steps.',                           frameworks:[{n:'Playwright',c:'#E2574C'}],                                                      steps:['LLaMA 3 generates click/fill/navigate/assert steps based on page structure','Playwright executes each step in a real browser with screenshots on fail','AI analysis provides root cause and fix for every failure'],    when:'Use to validate login flows, form submissions, and user journeys.', config:['Target URL','Login credentials (internal projects)','Optional: Project Context docs (Swagger, README) for smarter generation'], tips:['Screenshots are automatically captured on failed steps.','AI Recommendations tab suggests concrete fixes per failure.'] },
+    performance: { color:'#8b5cf6', badge:'Advanced · ~3min',  Icon: IconBolt,        title:'Performance Test', scope:'Public & Internal', desc:'Measures Core Web Vitals (LCP, FCP, TTI, Load Time) and resource sizes. Also supports k6 load/stress/spike/soak testing.',                                              frameworks:[{n:'Playwright',c:'#E2574C'},{n:'k6',c:'#7D64FF'}],                                 steps:['Playwright captures Web Vitals via browser performance APIs','k6 generates load scripts and runs concurrent virtual users','Results scored out of 100 with actionable recommendations'],                           when:'Use before releases to ensure your app meets performance budgets.', config:['Target URL','Framework: Playwright (Web Vitals) or k6 (load testing)','k6 test types: Load, Stress, Spike, Soak (run together)'], tips:['k6 mode groups results by test type — check the Stress card first for breaking points.','Score below 50 usually means image/JS bundle optimization is needed.'] },
+    security:    { color:'#ef4444', badge:'Critical · ~5min',  Icon: IconShieldLock,  title:'Security Test',    scope:'Internal only',     desc:'Checks for common vulnerabilities — XSS, auth bypass, missing headers, session issues, and information exposure.',                                                     frameworks:[{n:'Pytest',c:'#3776AB'}],                                                          steps:['Scans authentication routes, input fields, and HTTP headers','Tests for XSS injection, unauthorized access, and insecure cookies','Reports severity (critical/high/medium/low) per finding'],                        when:'Use before production releases and after security patches.', config:['Target URL','Internal login credentials','JWT/ANPE token auto-injected from session'], tips:['Findings are grouped by category: auth, XSS, session, headers, info_exposure.','Critical severity findings should block deployment.'] },
+    regression:  { color:'#f97316', badge:'Thorough · ~3min',  Icon: IconRefresh,     title:'Regression Test',  scope:'Internal only',     desc:'Ensures existing features still work after code changes. Covers navigation, content, authentication, and functionality.',                                              frameworks:[{n:'Playwright',c:'#E2574C'}],                                                      steps:['AI generates a test suite covering all major page routes','Playwright validates each page loads correctly with expected content','Pass/fail per category: navigation, form, auth, UI'],                               when:'Run after every sprint or major code change to prevent regressions.', config:['Target URL','Login credentials','Optional: Project Context docs improve route detection'], tips:['Results by Category table shows which area broke — e.g. Authentication vs Navigation.'] },
+    api:         { color:'#10b981', badge:'Technical · ~2min', Icon: IconApi,         title:'API Test',         scope:'Internal only',     desc:'Tests REST API endpoints — status codes, response payloads, authentication, CRUD operations, and edge cases.',                                                        frameworks:[{n:'Pytest',c:'#3776AB'},{n:'Postman',c:'#FF6C37'}],                                steps:['LLaMA 3 discovers endpoints and generates CRUD test cases','Tests run with real HTTP requests and JWT token injection','Validates status codes, response schema, and error handling'],                               when:'Use to validate your API contract before frontend integration.', config:['API base URL','Framework: Pytest (requests) or Postman/Newman (collection)','Auth token — auto-cached from session'], tips:['Postman export gives you a ready-to-import .json collection for your team.','Dynamic email generation & ID chaining are used to test create→read→update→delete flows.'] },
+    seo:         { color:'#06b6d4', badge:'Public · ~1min',    Icon: IconSeeding,     title:'SEO Test',         scope:'Public only',       desc:'Audits meta tags, headings, page speed, robots.txt, sitemap, Open Graph, and structured data for SEO compliance.',                                                    frameworks:[{n:'Requests + BeautifulSoup',c:'#06b6d4'}],                                        steps:['Fetches page HTML and analyzes SEO elements','Checks title, meta description, H1, canonical, OG tags, sitemap','Scores the page out of 100 with priority-ranked recommendations'],                                 when:'Use before launching new pages or after content changes.', config:['Target URL only — no login required','15+ factors analyzed automatically'], tips:['No Project Context upload needed — SEO tests are always fully public.','Score combines technical SEO + content + social sharing signals.'] },
+  };
+
+const GenericSection = ({ title, subtitle, color = '#6366f1', onGo, goLabel, children }) => (
+  <div style={{ marginBottom:32 }}>
+    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom: subtitle ? 4 : 14 }}>
+      <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)' }}>{title}</div>
+      {onGo && (
+        <button
+          onClick={onGo}
+          style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase',
+            color: '#fff', background: color, border: 'none', borderRadius: 6,
+            padding: '3px 9px', cursor: 'pointer', transition: 'opacity 0.15s ease',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+        >
+          {goLabel || 'Click here'}
+        </button>
+      )}
+    </div>
+    {subtitle && <div style={{ fontSize:12, color:'var(--sub)', marginBottom:14, lineHeight:1.6 }}>{subtitle}</div>}
+    {children}
+  </div>
+);
+
+const StepList = ({ steps, color = '#6366f1', onNavigate }) => (
+  <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+    {steps.map((step, i) => {
+      const isObj = typeof step === 'object';
+      const text = isObj ? step.text : step;
+      const link = isObj ? step.link : null;
+      const stepTarget = isObj ? step.step : null;
+      return (
+        <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
+          <div style={{ width:26, height:26, borderRadius:'50%', flexShrink:0, background:`${color}15`, border:`1px solid ${color}30`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color, marginTop:1 }}>{i+1}</div>
+          <div style={{ fontSize:13, color:'var(--sub)', lineHeight:1.7 }}>
+            {text}
+            {link && (
+  <button
+    onClick={() => onNavigate(link, stepTarget)}
+    style={{
+      marginLeft: 10,
+      fontSize: 10.5,
+      fontWeight: 700,
+      letterSpacing: 0.3,
+      textTransform: 'uppercase',
+      color: '#fff',
+      background: color,
+      border: 'none',
+      borderRadius: 6,
+      padding: '3px 9px',
+      cursor: 'pointer',
+      display: 'inline-flex',
+      alignItems: 'center',
+      verticalAlign: 'middle',
+      transition: 'opacity 0.15s ease, transform 0.15s ease',
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.opacity = '0.85';
+      e.currentTarget.style.transform = 'scale(1.05)';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.opacity = '1';
+      e.currentTarget.style.transform = 'scale(1)';
+    }}
+  >
+    Click here
+  </button>
+)}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
 
   return (
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
 
+      <style>{`
+        .docs-nav-scroll::-webkit-scrollbar,
+        .docs-content-scroll::-webkit-scrollbar {
+          width: 6px;
+        }
+        .docs-nav-scroll::-webkit-scrollbar-track,
+        .docs-content-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .docs-nav-scroll::-webkit-scrollbar-thumb,
+        .docs-content-scroll::-webkit-scrollbar-thumb {
+          background: transparent;
+          border-radius: 10px;
+        }
+        .docs-nav-scroll:hover::-webkit-scrollbar-thumb,
+        .docs-content-scroll:hover::-webkit-scrollbar-thumb {
+          background: rgba(148,163,184,.25);
+        }
+      `}</style>
+
       {/* LEFT NAV */}
-      <div style={{ width:220, flexShrink:0, borderRight:'1px solid var(--border)', padding:'24px 0', background:'var(--bg)', overflowY:'auto' }}>
-        <div style={{ padding:'0 16px 12px', fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase', color:'var(--muted)' }}>
-          Contents
-        </div>
-        {sections.map(({ id, label, Icon }) => (
-          <button key={id} onClick={() => setActive(id)}
-            style={{
-              display:'flex', alignItems:'center', gap:10,
-              width:'100%', padding:'9px 16px',
-              border:'none', borderRadius:0,
-              borderLeft: active===id ? '3px solid #6366f1' : '3px solid transparent',
-              background: active===id ? 'rgba(99,102,241,.1)' : 'transparent',
-              color: active===id ? '#818cf8' : 'var(--muted)',
-              fontSize:13, fontWeight: active===id ? 700 : 500,
-              cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'all .15s',
-            }}>
-            <Icon size={15} />
-            {label}
-          </button>
+      <div
+        className="docs-nav-scroll"
+        style={{
+          width:230, flexShrink:0, borderRight:'1px solid var(--border)',
+          padding:'24px 0', background:'var(--bg)', overflowY:'auto',
+          scrollbarWidth:'thin', scrollbarColor:'transparent transparent',
+        }}
+      >
+        {sections.map(group => (
+          <div key={group.group} style={{ marginBottom:18 }}>
+            <div style={{ padding:'0 16px 8px', fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase', color:'var(--muted)' }}>
+              {group.group}
+            </div>
+            {group.items.map(({ id, label, Icon }) => (
+              <button key={id} onClick={() => setActive(id)}
+                style={{
+                  display:'flex', alignItems:'center', gap:10,
+                  width:'100%', padding:'9px 16px',
+                  border:'none', borderRadius:0,
+                  borderLeft: active===id ? '3px solid #6366f1' : '3px solid transparent',
+                  background: active===id ? 'rgba(99,102,241,.1)' : 'transparent',
+                  color: active===id ? '#818cf8' : 'var(--muted)',
+                  fontSize:13, fontWeight: active===id ? 700 : 500,
+                  cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'all .15s',
+                }}>
+                <Icon size={15} />
+                {label}
+              </button>
+            ))}
+          </div>
         ))}
       </div>
 
       {/* CONTENT */}
-      <div style={{ flex:1, padding:'36px 48px', overflowY:'auto' }}>
+      <div
+        className="docs-content-scroll"
+        style={{
+          flex:1, padding:'36px 48px', overflowY:'auto',
+          scrollbarWidth:'thin', scrollbarColor:'transparent transparent',
+        }}
+      >
 
-        {active === 'overview' ? (
+        {active === 'overview' && (
           <>
-            <h1 style={{ fontSize:28, fontWeight:700, color:'var(--text)', marginBottom:10 }}>{current.title}</h1>
-            <p style={{ fontSize:14, color:'var(--muted)', lineHeight:1.8, marginBottom:32, maxWidth:580 }}>{current.desc}</p>
+            <h1 style={{ fontSize:28, fontWeight:700, color:'var(--text)', marginBottom:10 }}>{content.overview.title}</h1>
+            <p style={{ fontSize:14, color:'var(--muted)', lineHeight:1.8, marginBottom:32, maxWidth:620 }}>{content.overview.desc}</p>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-              {current.items.map(({ Icon, color, bg, title, desc }) => (
+              {content.overview.items.map(({ Icon, color, bg, title, desc }) => (
                 <div key={title}
                   style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:14, padding:'22px 24px', transition:'border-color .2s' }}
                   onMouseEnter={e => e.currentTarget.style.borderColor='rgba(99,102,241,.4)'}
@@ -12051,62 +13514,390 @@ function DocsPanel() {
               ))}
             </div>
           </>
-        ) : (
+        )}
+
+        {active === 'getting-started' && (
           <>
-            {/* Header */}
-            <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:28 }}>
-              <div style={{ width:52, height:52, borderRadius:14, background:`${current.color}18`, border:`1px solid ${current.color}35`, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <current.Icon size={24} color={current.color} />
-              </div>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <h1 style={{ fontSize:24, fontWeight:700, color:'var(--text)', margin:0 }}>{current.title}</h1>
-                <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, color:current.color, background:`${current.color}18`, border:`1px solid ${current.color}35` }}>
-                  {current.badge}
-                </span>
-              </div>
+            <h1 style={{ fontSize:26, fontWeight:700, color:'var(--text)', marginBottom:10 }}>Getting Started</h1>
+            <p style={{ fontSize:13, color:'var(--muted)', lineHeight:1.8, marginBottom:28, maxWidth:600 }}>
+              From zero to your first test report in under 3 minutes.
+            </p>
+         
+
+
+<GenericSection title="1. Create a Project" color="#6366f1" onGo={() => onNavigate('generate', 'create')}>
+  <StepList color="#6366f1" steps={[
+    'Go to Projects → New Project.',
+    'Choose Public — for websites and landing pages, no login required.',
+    'Or choose Internal — for APIs and authenticated apps, requires credentials or JWT tokens.',
+    'Name your project and add an optional description.',
+  ]} />
+</GenericSection>
+
+<GenericSection title="2. Generate Tests" color="#8b5cf6">
+  <StepList color="#8b5cf6" steps={[
+    'Open your project and click New Generation.',
+    'Enter the target URL — for Internal projects, also provide credentials or a JWT token.',
+    'Pick a Test Type — Public: Smoke, Functional, Performance, SEO. Internal: Smoke, Functional, Performance, Security, Regression, API.',
+    'Select a Framework — NexTest recommends the best fit automatically.',
+    'Click Generate — AI scrapes the page, plans tests, and executes them live.',
+    'A live terminal opens showing real-time execution logs as each test step runs.',
+  ]} />
+</GenericSection>
+<GenericSection title="3. Review & Export" color="#10b981">
+  <StepList color="#10b981" steps={[
+    'Check pass/fail results, AI root-cause analysis, and screenshots on failure.',
+    'Check the scenario details and AI recommendations for each test case.',
+    'Download PDF, HTML, or CSV reports — and the generated test script — from the Execution page.',
+    'Your results are also sent to your email via the n8n workflow, with the PDF report attached.',
+    'Check your notifications in the interface for a summary of every completed generation.',
+  ]} />
+</GenericSection>
+          </>
+        )}
+
+        {active === 'architecture' && (
+          <>
+            <h1 style={{ fontSize:26, fontWeight:700, color:'var(--text)', marginBottom:10 }}>Architecture</h1>
+            <p style={{ fontSize:13, color:'var(--muted)', lineHeight:1.8, marginBottom:28, maxWidth:640 }}>
+              NexTest is a multi-service platform: a React frontend, a Laravel API layer, and a FastAPI AI service that talks to Groq's LLaMA 3.3-70b model.
+            </p>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:32 }}>
+              {[
+                { label:'React (Vite)',  desc:'Frontend dashboard, forms, real-time charts',        color:'#61dafb' },
+                { label:'Laravel API',   desc:'Auth, project CRUD, generation storage, PDF reports', color:'#ef4444' },
+                { label:'FastAPI + Groq', desc:'AI test generation, scraping, execution engine',      color:'#10b981' },
+                { label:'PostgreSQL',    desc:'Users, projects, generations, alerts, schedules',      color:'#336791' },
+              ].map(s => (
+                <div key={s.label} style={{ background:'var(--card)', border:'1px solid var(--border)', borderTop:`3px solid ${s.color}`, borderRadius:12, padding:'16px' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>{s.label}</div>
+                  <div style={{ fontSize:11, color:'var(--muted)', lineHeight:1.6 }}>{s.desc}</div>
+                </div>
+              ))}
             </div>
-
-            <p style={{ fontSize:14, color:'var(--muted)', lineHeight:1.8, marginBottom:32, maxWidth:600 }}>{current.desc}</p>
-
-            {/* Frameworks */}
-            <div style={{ marginBottom:32 }}>
-              <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:12 }}>Supported Frameworks</div>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                {current.frameworks.map(fw => (
-                  <span key={fw.n} style={{ fontSize:12, fontWeight:700, padding:'5px 14px', borderRadius:20, color:fw.c, background:`${fw.c}15`, border:`1px solid ${fw.c}30` }}>{fw.n}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* Steps */}
-            <div style={{ marginBottom:32 }}>
-              <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:16 }}>How it works</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                {current.steps.map((step, i) => (
-                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
-                    <div style={{ width:28, height:28, borderRadius:'50%', flexShrink:0, background:`${current.color}15`, border:`1px solid ${current.color}30`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:current.color }}>
-                      {i+1}
-                    </div>
-                    <div style={{ fontSize:13, color:'var(--sub)', lineHeight:1.7, paddingTop:4 }}>{step}</div>
+            <GenericSection title="Request Flow" subtitle="How a single test generation moves through the stack.">
+              <StepList color="#6366f1" steps={[
+                'React sends the generation request to Laravel (with URL, framework, test type, credentials).',
+                'Laravel validates the project/user and forwards the payload to the FastAPI AI service.',
+                'FastAPI scrapes the DOM (Playwright/Selenium/Cypress) and sends context to Groq LLaMA 3.3-70b.',
+                'LLaMA generates test cases and scripts, which FastAPI executes against the live page.',
+                'Results flow back to Laravel for storage, then to React for display + PDF/HTML/CSV export.',
+              ]} />
+            </GenericSection>
+            <GenericSection title="Supporting Services">
+  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+    {[
+      ['n8n / Gmail SMTP', 'Sends scheduled test result emails with PDF/HTML/CSV attachments'],
+      ['pm2', 'Process manager keeping the Laravel scheduler & queue workers alive'],
+    ].map(([l, d]) => (
+                  <div key={l} style={{ display:'flex', gap:12, padding:'10px 14px', background:'var(--card)', border:'1px solid var(--border)', borderRadius:10 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:'var(--indigo2)', minWidth:150 }}>{l}</span>
+                    <span style={{ fontSize:12, color:'var(--muted)' }}>{d}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            </GenericSection>
+          </>
+        )}
 
-            {/* When to use */}
-            <div style={{ background:`${current.color}08`, border:`1px solid ${current.color}20`, borderRadius:12, padding:'16px 20px', display:'flex', gap:12, alignItems:'flex-start' }}>
-              <IconBulb size={20} color={current.color} style={{ flexShrink:0, marginTop:2 }} />
-              <div>
-                <div style={{ fontSize:10, fontWeight:700, color:current.color, marginBottom:6, letterSpacing:1.5, textTransform:'uppercase' }}>When to use</div>
-                <div style={{ fontSize:13, color:'var(--sub)', lineHeight:1.7 }}>{current.when}</div>
+        {active === 'frameworks' && (
+          <>
+            <h1 style={{ fontSize:26, fontWeight:700, color:'var(--text)', marginBottom:10 }}>Supported Frameworks</h1>
+            <p style={{ fontSize:13, color:'var(--muted)', lineHeight:1.8, marginBottom:28, maxWidth:640 }}>
+              NexTest picks the right framework per test type automatically, but you can always choose manually when multiple options are available.
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              {FRAMEWORKS.map(fw => (
+                <div key={fw.name} style={{ display:'flex', alignItems:'center', gap:16, background:'var(--card)', border:'1px solid var(--border)', borderRadius:14, padding:'16px 20px' }}>
+                  <div style={{ width:44, height:44, borderRadius:12, flexShrink:0, background:`${fw.color}18`, border:`1px solid ${fw.color}35`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:fw.color }}>
+                    {fw.name.slice(0,2).toUpperCase()}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                      <span style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{fw.name}</span>
+                      <span style={{ fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:20, color:fw.color, background:`${fw.color}15`, border:`1px solid ${fw.color}30` }}>{fw.lang}</span>
+                    </div>
+                    <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.6, marginBottom:8 }}>{fw.role}</div>
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                      {fw.usedFor.map(u => (
+                        <span key={u} style={{ fontSize:10, fontWeight:600, padding:'2px 9px', borderRadius:20, color:'var(--muted)', background:'var(--bg2)', border:'1px solid var(--border)' }}>{u}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {active === 'ai-engine' && (
+          <>
+            <h1 style={{ fontSize:26, fontWeight:700, color:'var(--text)', marginBottom:10 }}>AI Engine</h1>
+            <p style={{ fontSize:13, color:'var(--muted)', lineHeight:1.8, marginBottom:28, maxWidth:640 }}>
+              NexTest's intelligence is powered by <strong style={{ color:'var(--text)' }}>Groq</strong>, running <strong style={{ color:'var(--text)' }}>LLaMA 3.3-70b-versatile</strong> for both test generation and post-execution analysis.
+            </p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:32 }}>
+              {[
+                { title:'Test Generation', color:'#6366f1', desc:'Given scraped DOM data (inputs, buttons, nav, forms), LLaMA plans realistic test scenarios — including edge cases and negative tests.' },
+                { title:'AI Recommendations', color:'#10b981', desc:'After execution, failures are analyzed for root cause and a concrete fix is suggested per test case.' },
+                { title:'SEO & Performance Scoring', color:'#06b6d4', desc:'Raw metrics (load time, meta tags, Web Vitals) are converted into human-readable scores and priority-ranked action items.' },
+                { title:'Dashboard Insights', color:'#f59e0b', desc:'The Dashboard AI Insights panel summarizes trends across all your projects in plain language.' },
+              ].map(s => (
+                <div key={s.title} style={{ background:'var(--card)', border:'1px solid var(--border)', borderTop:`3px solid ${s.color}`, borderRadius:12, padding:'18px' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:8 }}>{s.title}</div>
+                  <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.7 }}>{s.desc}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ background:'rgba(245,158,11,.06)', border:'1px solid rgba(245,158,11,.2)', borderRadius:12, padding:'16px 20px', display:'flex', gap:12 }}>
+              <IconBulb size={20} color="#f59e0b" style={{ flexShrink:0, marginTop:2 }} />
+              <div style={{ fontSize:12, color:'var(--sub)', lineHeight:1.7 }}>
+                <strong style={{ color:'#f59e0b' }}>Rate limits:</strong> the free Groq tier caps at 100K tokens/day. Large Project Context uploads or many parallel generations can hit this limit — space out heavy runs if you see AI errors.
               </div>
             </div>
           </>
         )}
+
+        {active === 'reports' && (
+  <>
+    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+      <h1 style={{ fontSize:26, fontWeight:700, color:'var(--text)', margin:0 }}>Reports & Exports</h1>
+      <button
+       onClick={() => onNavigate('reports')}
+        style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase',
+          color: '#fff', background: '#818cf8', border: 'none', borderRadius: 6,
+          padding: '3px 9px', cursor: 'pointer', transition: 'opacity 0.15s ease',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+        onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+      >
+        Click here
+      </button>
+    </div>
+    <p style={{ fontSize:13, color:'var(--muted)', lineHeight:1.8, marginBottom:28, maxWidth:640 }}>
+      Every generation can be exported in three formats, each suited to a different audience.
+    </p>
+    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+      {[
+        { fmt:'PDF',  color:'#ef4444', desc:'Full formatted report with charts, AI recommendations, and verdict — ideal for stakeholders and audits.' },
+        { fmt:'HTML', color:'#818cf8', desc:'Interactive, printable, self-contained report — open in any browser, no login required to view.' },
+        { fmt:'CSV',  color:'#10b981', desc:'Raw tabular data for spreadsheets, custom dashboards, or further analysis.' },
+      ].map(r => (
+        <div key={r.fmt} style={{ display:'flex', gap:16, alignItems:'center', background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'14px 18px' }}>
+          <span style={{ width:52, height:36, borderRadius:8, background:`${r.color}15`, border:`1px solid ${r.color}33`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:r.color, flexShrink:0 }}>{r.fmt}</span>
+          <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.6 }}>{r.desc}</div>
+        </div>
+      ))}
+    </div>
+    <div style={{ marginTop:24 }}>
+      <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:12 }}>Scheduled Reports</div>
+      <p style={{ fontSize:12, color:'var(--sub)', lineHeight:1.7, maxWidth:600 }}>
+        Configure a Scheduled Task to re-run any test on a recurring basis. Results are emailed automatically as PDF/HTML/CSV attachments via Gmail SMTP (or n8n webhook in local dev).
+      </p>
+    </div>
+  </>
+)}
+          
+{active === 'flaky-tests' && (
+  <>
+    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+      <h1 style={{ fontSize:26, fontWeight:700, color:'var(--text)', margin:0 }}>Flaky Tests</h1>
+      <button
+        onClick={() => onNavigate('flaky')}
+        style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase',
+          color: '#fff', background: '#f97316', border: 'none', borderRadius: 6,
+          padding: '3px 9px', cursor: 'pointer', transition: 'opacity 0.15s ease',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+        onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+      >
+        Click here
+      </button>
+    </div>
+    <p style={{ fontSize:13, color:'var(--muted)', lineHeight:1.8, marginBottom:28, maxWidth:640 }}>
+      NexTest automatically detects unstable tests by analyzing your execution history — no manual tagging required.
+    </p>
+
+    <div style={{ marginBottom:32 }}>
+      <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:12 }}>Status Levels</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {[
+          ['Stable',   '#10b981', 'Consistently passing across recent runs.'],
+          ['Warning',  '#f59e0b', 'Showing early signs of inconsistency.'],
+          ['Flaky',    '#f97316', 'Intermittently failing — passes and fails without code changes.'],
+          ['Critical',  '#ef4444', 'Failing most or all recent runs.'],
+          ['Ignored',  '#64748b', 'Manually silenced — excluded from alerts until re-enabled.'],
+ 
+
+        ].map(([label, color, desc]) => (
+          <div key={label} style={{ display:'flex', gap:12, alignItems:'center', padding:'10px 14px', background:'var(--card)', border:'1px solid var(--border)', borderRadius:10 }}>
+            <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, color, background:`${color}15`, border:`1px solid ${color}33`, minWidth:70, textAlign:'center' }}>{label}</span>
+            <span style={{ fontSize:12, color:'var(--muted)' }}>{desc}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div style={{ marginBottom:32 }}>
+      <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:16 }}>How it works</div>
+      <StepList color="#f97316" steps={[
+        'Every test execution across all your projects is logged with its pass/fail outcome.',
+        'Tests are grouped by URL, then broken down by individual test case.',
+        'A flakiness score is calculated from the ratio of failed vs total runs for each test.',
+        'Tests are automatically classified — Stable, Warning, Flaky, or Critical — based on that score.',
+        'Filter by status or search by test name/URL to quickly spot problem areas.',
+      ]} />
+    </div>
+
+    <div style={{ marginBottom:32 }}>
+  <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:12 }}>Actions per test</div>
+  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+    {[
+      ['Ignore / Unignore', 'Silence a known/expected flaky test without deleting its history.'],
+      ['Mark Stable', 'Manually override the status once the underlying issue is fixed.'],
+      ['Delete', 'Remove a single test case, or an entire URL and all its tests.'],
+    ].map(([l, d]) => (
+      <div key={l} style={{ display:'flex', gap:12, padding:'10px 14px', background:'var(--card)', border:'1px solid var(--border)', borderRadius:10 }}>
+        <span style={{ fontSize:12, fontWeight:700, color:'#f97316', minWidth:110 }}>{l}</span>
+        <span style={{ fontSize:12, color:'var(--muted)' }}>{d}</span>
+      </div>
+    ))}
+  </div>
+</div>
+
+    <div style={{ background:'rgba(249,115,22,.06)', border:'1px solid rgba(249,115,22,.2)', borderRadius:12, padding:'16px 20px', display:'flex', gap:12 }}>
+      <IconBulb size={20} color="#f97316" style={{ flexShrink:0, marginTop:2 }} />
+      <div style={{ fontSize:12, color:'var(--sub)', lineHeight:1.7 }}>
+        <strong style={{ color:'#f97316' }}>Note:</strong> Flaky Tests and Alerts work together — Critical and Flaky statuses feed directly into your notification system, so you get warned as soon as instability appears, without checking this page manually.
+      </div>
+    </div>
+  </>
+)}
+        {active === 'faq' && (
+          <>
+            <h1 style={{ fontSize:26, fontWeight:700, color:'var(--text)', marginBottom:10 }}>FAQ</h1>
+            <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:20 }}>
+              {[
+                ['Do public tests require login credentials?', 'No. Smoke, Functional, Performance, and SEO tests on Public projects work with just a URL.'],
+                ['Which test types need Project Context docs?', 'None are required, but uploading Swagger/README/PDF docs improves AI accuracy for Internal projects (Functional, Regression, Security, API).'],
+                ['Can I change the framework after generating?', 'Yes — use Regenerate from the project detail view and pick a different framework for the same URL.'],
+                ['Why did my test get skipped?', 'A test is skipped when the AI could not confidently locate the expected element/selector — check the Assertion badge for details.'],
+                ['How do Scheduled Tasks send emails?', 'Via Gmail SMTP in production, or an n8n webhook in local development — configured per schedule.'],
+              ].map(([q, a], i) => (
+                <div key={i} style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'14px 18px' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>{q}</div>
+                  <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.7 }}>{a}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {testTypeContent[active] && (() => {
+          const current = testTypeContent[active];
+          return (
+            <>
+              <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:20 }}>
+                <div style={{ width:52, height:52, borderRadius:14, background:`${current.color}18`, border:`1px solid ${current.color}35`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <current.Icon size={24} color={current.color} />
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                  <h1 style={{ fontSize:24, fontWeight:700, color:'var(--text)', margin:0 }}>{current.title}</h1>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, color:current.color, background:`${current.color}18`, border:`1px solid ${current.color}35` }}>
+                    {current.badge}
+                  </span>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, color:'var(--muted)', background:'var(--bg2)', border:'1px solid var(--border)' }}>
+                    {current.scope}
+                  </span>
+                </div>
+              </div>
+
+              <p style={{ fontSize:14, color:'var(--muted)', lineHeight:1.8, marginBottom:32, maxWidth:600 }}>{current.desc}</p>
+
+              <div style={{ marginBottom:32 }}>
+                <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:12 }}>Supported Frameworks</div>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  {current.frameworks.map(fw => (
+                    <span key={fw.n} style={{ fontSize:12, fontWeight:700, padding:'5px 14px', borderRadius:20, color:fw.c, background:`${fw.c}15`, border:`1px solid ${fw.c}30` }}>{fw.n}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom:32 }}>
+                <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:16 }}>How it works</div>
+                <StepList steps={current.steps} color={current.color} />
+              </div>
+
+              {current.config && (
+                <div style={{ marginBottom:32 }}>
+                  <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:12 }}>Configuration</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {current.config.map((c, i) => (
+                      <div key={i} style={{ display:'flex', alignItems:'center', gap:10, fontSize:12, color:'var(--sub)' }}>
+                        <span style={{ width:5, height:5, borderRadius:'50%', background:current.color, flexShrink:0 }} />
+                        {c}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ background:`${current.color}08`, border:`1px solid ${current.color}20`, borderRadius:12, padding:'16px 20px', display:'flex', gap:12, alignItems:'flex-start', marginBottom: current.tips ? 20 : 0 }}>
+                <IconBulb size={20} color={current.color} style={{ flexShrink:0, marginTop:2 }} />
+                <div>
+                  <div style={{ fontSize:10, fontWeight:700, color:current.color, marginBottom:6, letterSpacing:1.5, textTransform:'uppercase' }}>When to use</div>
+                  <div style={{ fontSize:13, color:'var(--sub)', lineHeight:1.7 }}>{current.when}</div>
+                </div>
+              </div>
+
+              {current.tips && (
+                <div style={{ marginTop:20 }}>
+                  <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:12 }}>Tips</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {current.tips.map((tip, i) => (
+                      <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, fontSize:12, color:'var(--sub)', lineHeight:1.6 }}>
+                        <span style={{ fontSize:13, flexShrink:0 }}>💡</span>
+                        {tip}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
+
       </div>
     </div>
   );
 }
+
+function saveNotifsSafe(userId, updated) {
+  if (!userId) return;
+  const trimmed = updated.slice(0, 30).map(n => ({
+    id: n.id,
+    date: n.date,
+    url: n.url,
+    framework: n.framework,
+    testType: n.testType,
+    passCount: n.passCount,
+    failCount: n.failCount,
+  }));
+  try {
+    localStorage.setItem(`nextest-notifs-${userId}`, JSON.stringify(trimmed));
+  } catch (e) {
+    console.warn('[Notifs] quota exceeded, trimming further', e);
+    try {
+      localStorage.setItem(`nextest-notifs-${userId}`, JSON.stringify(trimmed.slice(0, 10)));
+    } catch (e2) {
+      localStorage.removeItem(`nextest-notifs-${userId}`);
+    }
+  }
+}
+
+
 export default function Dashboard() {
 
   const [page, setPage]= useState('dashboard');
@@ -12129,6 +13920,7 @@ export default function Dashboard() {
   const [alertUnread, setAlertUnread] = useState(0);
 
 useEffect(() => {
+  if (page === 'alerts') return;
   const fetchUnread = () => {
     api.get('/alerts/unread-count')
       .then(res => setAlertUnread(res.data.count || 0))
@@ -12137,10 +13929,10 @@ useEffect(() => {
   fetchUnread();
   const interval = setInterval(fetchUnread, 15000);
   return () => clearInterval(interval);
-}, []);
+}, [page]);  
 
 const [notifs, setNotifs] = useState([]);
-  
+
   const [searchHistories, setSearchHistories] = useState([]);   // ← AJOUTE
   const [searchProjects,  setSearchProjects]  = useState([]); 
   const [headerSearch, setHeaderSearch] = useState('');
@@ -12149,12 +13941,15 @@ const [headerOpen, setHeaderOpen] = useState(false);
 const headerRef = useRef(null);
 
   const [theme,          setTheme]         = useState(() => {
+
     const saved = localStorage.getItem('nextest-theme');
     if (saved === 'light' || saved === 'dark') return saved;
     localStorage.setItem('nextest-theme', 'dark');
     document.documentElement.setAttribute('data-theme', 'dark');
     return 'dark';
   });
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [sidebarPos, setSidebarPos] = useState('Left');
   const [generation,      setGeneration]    = useState(null);
   const [currentProject,  setCurrentProject] = useState(null);
   const [selectedPageUrl, setSelectedPageUrl] = useState('');
@@ -12233,10 +14028,20 @@ const LABELS = {
   flaky:     'Flaky Tests',
   alerts:    'Alerts',
   reports:   'Reports', 
-  docs: 'Documentation',  
+  docs: 'Documentation', 
+  scheduled: 'Scheduled Tasks', 
 };
   return (
-    <div className="dash-root" style={{ position:'fixed', top:0, left:0, right:0, bottom:0, width:'100vw', height:'100vh', display:'flex', flexDirection:'row', overflow:'hidden' }}>
+    <div
+  className={`dash-root${reduceMotion ? ' reduce-motion' : ''}`}
+  style={{
+    position:'fixed', top:0, left:0, right:0, bottom:0,
+    width:'100vw', height:'100vh',
+    display:'flex',
+    flexDirection: sidebarPos === 'Right' ? 'row-reverse' : 'row',
+    overflow:'hidden'
+  }}
+>
       <aside className={`sidebar${collapsed?' collapsed':''}`}>
         <NexLogo collapsed={collapsed} />
         <button className="s-toggle" onClick={() => setCollapse(p=>!p)}>
@@ -12248,13 +14053,14 @@ const LABELS = {
     {NAV_MAIN.map(it => (
       <SItem key={it.id} {...it} active={page===it.id} collapsed={collapsed}
         onClick={
-          it.id === 'generate'  ? handleGenerateNav :
-          it.id === 'execution' ? () => {
-            if (generation) setGeneration(g => ({ ...g, fresh: false }));
-            setPage('execution');
-          } :
-          setPage
-        }
+  it.id === 'generate'  ? handleGenerateNav :
+  it.id === 'execution' ? () => {
+    if (generation) setGeneration(g => ({ ...g, fresh: false }));
+    setPage('execution');
+  } :
+  it.id === 'alerts' ? () => { setAlertUnread(0); setPage('alerts'); } :
+  setPage
+}
       />
     ))}
   </div>
@@ -12384,14 +14190,15 @@ const LABELS = {
    isDark={theme === 'dark'}
     notifs={notifs}
     onClose={() => setNotifOpen(false)}
-   onDelete={(id) => {
+ 
+onDelete={(id) => {
   const updated = notifs.filter(n => n.id !== id);
   setNotifs(updated);
-  localStorage.setItem(`nextest-notifs-${user?.id}`, JSON.stringify(updated));
+  saveNotifsSafe(user?.id, updated);
 }}
 onClearAll={() => {
   setNotifs([]);
-  localStorage.setItem(`nextest-notifs-${user?.id}`, JSON.stringify([]));
+  localStorage.removeItem(`nextest-notifs-${user?.id}`);
 }}
    
     goTo={setPage}
@@ -12466,7 +14273,8 @@ onClearAll={() => {
   setProjectStep('list'); 
   setPage(p); 
 }}  setGeneration={setGeneration} project={currentProject} initialUrl={selectedPageUrl} initialTestType={selectedTestType} initialFramework={selectedFramework} initialUsername={selectedUsername}
-    initialPassword={selectedPassword}   onGenerationSaved={(notif) => {
+    initialPassword={selectedPassword}   
+    onGenerationSaved={(notif) => {
   if (!notif?.url) return;
   const newNotif = { ...notif, id: Date.now(), date: new Date().toISOString() };
   setNotifs(prev => {
@@ -12477,7 +14285,7 @@ onClearAll={() => {
     );
     if (isDup) return prev;
     const updated = [newNotif, ...prev];
-    localStorage.setItem(`nextest-notifs-${user?.id}`, JSON.stringify(updated));
+    saveNotifsSafe(user?.id, updated);
     return updated;
   });
   setNotifCount(c => c + 1);
@@ -12502,10 +14310,10 @@ onClearAll={() => {
   <ExecutionPanel
     generation={generation}
     onGenerationSaved={(notif) => {
-      const newNotif = { ...notif, id: Date.now(), date: new Date().toISOString() };
-      setNotifs(prev => {
+            const newNotif = { ...notif, id: Date.now(), date: new Date().toISOString() };
+setNotifs(prev => {
         const updated = [newNotif, ...prev];
-        localStorage.setItem(`nextest-notifs-${user?.id}`, JSON.stringify(updated));
+        saveNotifsSafe(user?.id, updated);
         return updated;
       });
       setNotifCount(c => c + 1);
@@ -12524,13 +14332,15 @@ onClearAll={() => {
   />
 )}
           {page === 'reports' && <ReportsPanel goTo={setPage} setGeneration={setGeneration} />}
-          {page === 'docs' && <DocsPanel />}
+          {page === 'docs' && <DocsPanel goTo={setPage} setProjectStep={setProjectStep} />}
           {page === 'scheduled' && <ScheduledTasksPanel projects={searchProjects} />}
           {page === 'flaky' && <FlakyTestsPanel />}
-          {page === 'alerts' && <AlertsPanel />}
+          {page === 'alerts' && (
+  <AlertsPanel onAlertRead={() => setAlertUnread(c => Math.max(0, c - 1))} />
+)}
           {page === 'history'   && <HistoryPanel   goTo={setPage} setGeneration={setGeneration} />}
           {page === 'account' && <AccountPanel user={user} setPage={setPage} setProjectStep={setProjectStep} />}
-          {page === 'settings'  && <SettingsPanel  theme={theme} setTheme={setTheme} />}
+          {page === 'settings'  && <SettingsPanel  theme={theme} setTheme={setTheme} reduceMotion={reduceMotion} setReduceMotion={setReduceMotion} sidebarPos={sidebarPos} setSidebarPos={setSidebarPos} />}
         </div>
       </div>
       <NextestChatbot theme={theme} />
@@ -12875,8 +14685,8 @@ function NotifPanel({ notifs, onClose, onDelete, onClearAll, goTo, setGeneration
             </div>
           )}
 
-        </div>{/* ── fin INNER box ── */}
-      </div>{/* ── fin OUTER ── */}
+        </div>
+      </div>
     </>
   );
 }

@@ -499,7 +499,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
     )
 
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
             temperature=0.2,
@@ -533,6 +533,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
         "suite":       reason,
         "reason":      reason,
         "duration":    f"{duration_ms}ms",
+        "expected":    expected, 
         "description": tc.get("description", ""),
         "priority":    tc.get("priority", "medium"),
         "ai_analysis": ai_analysis,

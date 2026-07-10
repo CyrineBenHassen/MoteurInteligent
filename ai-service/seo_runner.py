@@ -76,7 +76,7 @@ Focus on the most impactful improvements. Provide at most 6 recommendations orde
         return {"summary": f"AI recommendations unavailable: {str(e)}", "recommendations": [], "action_plan": []}
 
 
-# ── LLaMA per-test analyses ───────────────────────────────────────────────────
+#LLaMA per-test analyses
 def _generate_per_test_analyses(checks: list) -> dict:
     """
     Call Groq once with all SEO checks to get per-test root_cause + fix.
@@ -99,9 +99,10 @@ SEO Checks:
 {checks_text}
 
 Rules:
+- CRITICAL: You MUST copy numeric values (character counts, ms, word counts, image counts) EXACTLY as given in the check detail above. NEVER recalculate, estimate, or invent a different number.
 - Use the actual values shown (title text, character counts, URLs, ms values etc.)
 - PASS: root_cause = mention the actual value found (e.g. title text, URL, count). fix = a specific SEO tip to improve it further.
-- FAIL: root_cause = specific problem with actual value. fix = concrete actionable step.
+- FAIL: root_cause = specific problem with actual value, copied exactly from the detail text above. fix = concrete actionable step.
 - Max 20 words per sentence. No generic phrases like "no action required" or "continue to include"."""
 
     try:
@@ -119,7 +120,7 @@ Rules:
         return {}
 
 
-# ── Build test cases ──────────────────────────────────────────────────────────
+#Build test cases
 def _build_test_cases(analysis: dict, ai_result: dict = None) -> list:
     load_time = analysis.get("load_time_ms")
     title_len = analysis.get("title_length", 0)
@@ -167,8 +168,7 @@ def _build_test_cases(analysis: dict, ai_result: dict = None) -> list:
         (
             "Meta Description Present", "meta",
             bool(analysis["meta_description"]),
-            f'Meta description: "{analysis["meta_description"][:80]}..."' if analysis["meta_description"] else "No meta description — Google may auto-generate a poor snippet.",
-            "A meta description is present, improving click-through rates in search results.",
+            f'Meta description: "{analysis["meta_description"]}"' if analysis["meta_description"] else "No meta description — Google may auto-generate a poor snippet.",            "A meta description is present, improving click-through rates in search results.",
             "No meta description found. Google will auto-generate one, often with poor quality.",
             "Add a <meta name='description'> tag with a compelling summary (70-160 chars).",
         ),
@@ -183,7 +183,7 @@ def _build_test_cases(analysis: dict, ai_result: dict = None) -> list:
         (
             "Single H1 Tag", "structure",
             h1_count == 1,
-            f'H1 found: "{analysis["h1_tags"][0][:60]}"' if h1_count == 1 else f"{h1_count} H1 tags found — there should be exactly one.",
+            f'H1 found: "{analysis["h1_tags"][0]}"' if h1_count == 1 else f"{h1_count} H1 tags found — there should be exactly one.",
             "Exactly one H1 tag found, correctly signaling the main topic to search engines.",
             f"{'No H1 tag found' if h1_count == 0 else f'{h1_count} H1 tags found'} — search engines expect exactly one.",
             "Ensure exactly one H1 tag exists per page, containing the primary keyword.",
@@ -292,7 +292,7 @@ def _build_test_cases(analysis: dict, ai_result: dict = None) -> list:
 
     return test_cases
 
-# ── Generate standalone Python script (Requests + BeautifulSoup) ────────────
+#Generate standalone Python script (Requests + BeautifulSoup)
 def _generate_seo_script(url: str) -> str:
     return f'''"""
 NexTest - SEO Audit Script
@@ -423,7 +423,7 @@ if __name__ == "__main__":
     results = run_seo_audit(TARGET_URL)
     print_report(results)
 '''
-# ── Main runner ───────────────────────────────────────────────────────────────
+# ── Main runner
 def run_seo_test(url: str) -> dict:
     started_at = datetime.now().isoformat()
 
@@ -447,7 +447,7 @@ def run_seo_test(url: str) -> dict:
                 "total":     total,
                 "passed":    passed,
                 "failed":    failed,
-                "pass_rate": round((passed / total) * 100, 1) if total > 0 else 0,
+                "pass_rate": round((passed / total) * 100) if total > 0 else 0,
             },
             "analysis":   analysis,
             "test_cases": test_cases,

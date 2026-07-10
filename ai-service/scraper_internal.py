@@ -135,6 +135,40 @@ def scrape_internal(
     if scrape_login:
         return _scrape_login_page(login_url or LOGIN_URL, wait_time)
 
+    # ── Si token fourni explicitement, l'utiliser directement ──────────────
+    if token:
+        return _scrape_with_jwt(target_url, token, wait_time)
+
+    # ── Si credentials fournis → tenter un VRAI login d'abord ──────────────
+    if username and password:
+        result = _scrape_with_credentials(
+            target_url = target_url,
+            username   = username,
+            password   = password,
+            login_url  = login_url or LOGIN_URL,
+            wait_time  = wait_time,
+        )
+
+        # Si le login a réussi (pas de captcha, pas d'erreur) → on garde ce résultat
+        login_result = result.get("login_result", {})
+        if login_result.get("success"):
+            print(f"[AUTH] ✅ Login réussi avec credentials fournis")
+            return result
+
+        # Si bloqué par CAPTCHA → fallback sur le token caché (cas ANPE connu)
+        if login_result.get("captcha_blocked") and _CACHED_TOKEN:
+            print(f"[AUTH] ⚠️ CAPTCHA détecté — fallback sur token caché (ANPE)")
+            return _scrape_with_jwt(target_url, _CACHED_TOKEN, wait_time)
+
+        # Sinon (login échoué pour une autre raison) → retourner l'erreur telle quelle
+        print(f"[AUTH] ❌ Login échoué: {login_result.get('error_message')}")
+        return result
+
+    if cookies:
+        return _scrape_with_cookies(target_url, cookies, wait_time)
+
+    return _scrape_login_page(login_url or LOGIN_URL, wait_time)
+
     # Auto-login via cached token
     if username and password and not token:
         token = _CACHED_TOKEN
@@ -670,6 +704,17 @@ def _scrape_with_credentials(
     Since CAPTCHA is present, full login will likely fail.
     Returns login page data + partial test results about the login form.
     """
+    login_result = {
+        "attempted": True,
+        "success":   False,
+        "has_captcha": False,
+        "captcha_blocked": False,
+        "error_message": None,
+        "redirected_to": None,
+    }
+    dashboard_result = None  # rempli seulement si le login réussit vraiment
+    load_error       = None  # rempli si la page login ne charge pas du tout
+
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -691,87 +736,85 @@ def _scrape_with_credentials(
             try:
                 page.goto(login_url, timeout=30000, wait_until="domcontentloaded")
             except Exception:
-                browser.close()
-                return {"error": "Cannot load login page", "url": login_url}
+                load_error = "Cannot load login page"
 
-        page.wait_for_timeout(1500)
+        if not load_error:
+            page.wait_for_timeout(1500)
 
-        login_result = {
-            "attempted": True,
-            "success":   False,
-            "has_captcha": False,
-            "captcha_blocked": False,
-            "error_message": None,
-            "redirected_to": None,
-        }
-
-        try:
-        
-            email_sel = (
-                "input[type='email'], input[type='text'], "
-                "input[name*='email' i], input[name*='username' i], "
-                "input[placeholder*='email' i], input[placeholder*='mail' i], "
-                "input[placeholder*='utilisateur' i]"
-            )
-            page.wait_for_selector(email_sel, timeout=8000)
-            page.fill(email_sel, username)
-
-            # Fill password
-            pwd_sel = "input[type='password']"
-            page.wait_for_selector(pwd_sel, timeout=5000)
-            page.fill(pwd_sel, password)
-
-            # Check for CAPTCHA input
-            captcha_input = page.query_selector(
-                "input[placeholder*='code' i], input[placeholder*='saisir' i], "
-                "input[placeholder*='sécurité' i]"
-            )
-            if captcha_input:
-                login_result["has_captcha"]      = True
-                login_result["captcha_blocked"]  = True
-                login_result["error_message"]    = (
-                    "CAPTCHA detected — automated login blocked. "
-                    "Use cookie-based session injection instead."
+            try:
+                email_sel = (
+                    "input[type='email'], input[type='text'], "
+                    "input[name*='email' i], input[name*='username' i], "
+                    "input[placeholder*='email' i], input[placeholder*='mail' i], "
+                    "input[placeholder*='utilisateur' i]"
                 )
+                page.wait_for_selector(email_sel, timeout=8000)
+                page.fill(email_sel, username)
 
-            # Click submit anyway (to test form behavior)
-            submit = page.query_selector("button[type='submit'], input[type='submit']")
-            if submit:
-                submit.click()
-                page.wait_for_timeout(2000)
+                # Fill password
+                pwd_sel = "input[type='password']"
+                page.wait_for_selector(pwd_sel, timeout=5000)
+                page.fill(pwd_sel, password)
 
-            current_url = page.url
-            login_result["redirected_to"] = current_url
+                # Check for CAPTCHA input
+                captcha_input = page.query_selector(
+                    "input[placeholder*='code' i], input[placeholder*='saisir' i], "
+                    "input[placeholder*='sécurité' i]"
+                )
+                if captcha_input:
+                    login_result["has_captcha"]     = True
+                    login_result["captcha_blocked"] = True
+                    login_result["error_message"]   = (
+                        "CAPTCHA detected — automated login blocked. "
+                        "Use cookie-based session injection instead."
+                    )
 
-            if "login" not in current_url.lower():
-                login_result["success"] = True
-                # Scrape dashboard if login succeeded
-                result = _scrape_dashboard_content(page, current_url)
-                result["login_result"] = login_result
-                browser.close()
-                return result
+                # Click submit anyway (to test form behavior)
+                submit = page.query_selector("button[type='submit'], input[type='submit']")
+                if submit:
+                    submit.click()
+                    page.wait_for_timeout(2000)
 
-        except Exception as e:
-            login_result["error_message"] = str(e)[:200]
+                current_url = page.url
+                login_result["redirected_to"] = current_url
 
-        # Login failed — return login page scrape + login_result
-        login_page_data = _scrape_login_page(login_url, wait_time)
-        login_page_data["login_result"]    = login_result
-        login_page_data["credentials_test"] = {
-            "username_filled": True,
-            "password_filled": True,
-            "captcha_present": login_result["has_captcha"],
-            "form_submitted":  True,
-        }
+                if "login" not in current_url.lower():
+                    login_result["success"] = True
+                    # Scrape dashboard if login succeeded — toujours dans le même browser
+                    dashboard_result = _scrape_dashboard_content(page, current_url)
 
+            except Exception as e:
+                login_result["error_message"] = str(e)[:200]
+
+        # ── Fermeture propre AVANT toute réouverture de sync_playwright ────────
         browser.close()
-        return login_page_data
+
+    # ── ICI on est sorti du with : browser fermé, aucun conflit possible ───────
+
+    if load_error:
+        return {"error": load_error, "url": login_url}
+
+    if dashboard_result is not None:
+        dashboard_result["login_result"] = login_result
+        return dashboard_result
+
+    # Login échoué (captcha ou credentials invalides) — on rescrape la login page
+    # via un tout nouveau sync_playwright(), maintenant que le premier est fermé.
+    login_page_data = _scrape_login_page(login_url, wait_time)
+    login_page_data["login_result"]     = login_result
+    login_page_data["credentials_test"] = {
+        "username_filled": True,
+        "password_filled": True,
+        "captcha_present": login_result["has_captcha"],
+        "form_submitted":  True,
+    }
+
+    return login_page_data
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DASHBOARD CONTENT SCRAPER
 # ─────────────────────────────────────────────────────────────────────────────
-
 def _scrape_dashboard_content(page, url: str) -> dict:
     """
     Scrapes the full dashboard content after authentication.
