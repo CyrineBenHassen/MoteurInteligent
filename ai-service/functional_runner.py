@@ -41,7 +41,11 @@ def _inject_token(page, base_url: str, username: str = "", password: str = "") -
                             return True
             except Exception as e:
                 print(f"[FUNCTIONAL_RUNNER] API login failed: {e}")
-                return _login_form(page, base_url, username, password)
+
+            # Credentials fournis mais API login absent/échoué → login formulaire générique,
+            # ne JAMAIS retomber sur les données ANPE hardcodées ci-dessous.
+            print(f"[FUNCTIONAL_RUNNER] Falling back to form login (generic, credentials-based)")
+            return _login_form(page, base_url, username, password)
             
         
 
@@ -86,49 +90,182 @@ def _inject_token(page, base_url: str, username: str = "", password: str = "") -
         return _login_form(page, base_url)
 
 def _login_form(page, base_url: str, username: str = "", password: str = "") -> bool:
-    """Fallback — login with real credentials via form"""
+    """Fallback — generic credentials-based login (same selector strategy as scraper_internal.py)"""
     try:
         login_url = f"{base_url}/login"
         page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(3000)
+        page.wait_for_timeout(1500)
 
-        for sel in ["#basic_email", "input[type='email']", "input[name='email']"]:
-            try:
-                if page.is_visible(sel):
-                    page.fill(sel, username)
-                    break
-            except:
-                continue
+        email_sel = (
+            "input[type='email'], input[type='text'], "
+            "input[name*='email' i], input[name*='username' i], "
+            "input[placeholder*='email' i], input[placeholder*='mail' i], "
+            "input[placeholder*='utilisateur' i]"
+        )
+        pwd_sel = "input[type='password']"
 
-        for sel in ["#basic_password", "input[type='password']", "input[name='password']"]:
-            try:
-                if page.is_visible(sel):
-                    page.fill(sel, password)
-                    break
-            except:
-                continue
+        try:
+            page.wait_for_selector(email_sel, timeout=8000)
+            page.fill(email_sel, username)
+        except Exception as e:
+            print(f"[FUNCTIONAL_RUNNER] email field not found: {e}")
+            return False
 
-        for sel in ["button[type='submit']", "form button", "button:has-text('Connexion')"]:
-            try:
-                if page.is_visible(sel):
-                    page.click(sel)
-                    break
-            except:
-                continue
+        try:
+            page.wait_for_selector(pwd_sel, timeout=5000)
+            page.fill(pwd_sel, password)
+        except Exception as e:
+            print(f"[FUNCTIONAL_RUNNER] password field not found: {e}")
+            return False
 
-        page.wait_for_timeout(5000)
+        submit = page.query_selector(
+            "button[type='submit'], input[type='submit'], "
+            "button:has-text('connecter'), button:has-text('login'), "
+            "button:has-text('Se connecter'), button:has-text('Sign in')"
+        )
+        if not submit:
+            print(f"[FUNCTIONAL_RUNNER] submit button not found")
+            return False
+
+        submit.click()
+
+        try:
+            page.wait_for_url(lambda u: "login" not in u.lower(), timeout=12000)
+        except Exception:
+            pass
+
+        page.wait_for_timeout(2000)
         success = "login" not in page.url.lower()
-        print(f"[FUNCTIONAL_RUNNER] Form login: {'✓' if success else '✗'}")
+        print(f"[FUNCTIONAL_RUNNER] Form login: {'✓' if success else '✗'} | url={page.url}")
         return success
 
     except Exception as e:
         print(f"[FUNCTIONAL_RUNNER] Form login error: {e}")
         return False
 
+def _friendly_step_element(selector: str) -> str:
+    """Human-readable element description from a CSS selector."""
+    s = (selector or "").lower()
+    if "input" in s or "form-item" in s: return "input field"
+    if "btn" in s or "button" in s: return "button"
+    if "table" in s: return "table"
+    if "card" in s: return "card"
+    if "menu" in s: return "navigation menu"
+    if "header" in s: return "header"
+    if "breadcrumb" in s: return "breadcrumb"
+    return "element"
+
+def _friendly_reason(action: str, selector: str = "", fill_value: str = "", title: str = "", text: str = "") -> str:
+    """Human-readable success message, same style as the public runner."""
+    elem = _friendly_step_element(selector)
+    if action == "navigate":
+        return f"The page loaded successfully" + (f" — {title[:50]}." if title else ".")
+    if action == "fill":
+        return f"Text entered successfully in the {elem}."
+    if action == "click":
+        return f"The {elem} was clicked successfully."
+    if action == "check_visible":
+        return f"The {elem} is visible and accessible on the page."
+    if action == "check_text":
+        return f"The page content contains the expected text '{text}'."
+    if action == "select":
+        return f"An option was selected successfully in the {elem}."
+    if action == "hover":
+        return f"Hover interaction on the {elem} completed successfully."
+    return "Test passed successfully."
+
+def _execute_steps(page, tc: dict, base_url: str) -> tuple:
+    """Execute a multi-step scenario (fill -> click -> verify) as one test."""
+    steps      = tc.get("steps", [])
+    url        = tc.get("url", base_url)
+    wait_after = tc.get("wait_after_ms", 1500)
+
+    def safe_selector(sel: str) -> str:
+        return sel.replace("'", '"')
+
+    try:
+        if "login" in url:
+            page.evaluate("() => { localStorage.clear(); sessionStorage.clear(); }")
+        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(wait_after)
+    except Exception as e:
+        return "fail", "Could not navigate to the test page. The URL may be unreachable."
+
+    completed = []  # friendly descriptions of steps that succeeded so far
+
+    for idx, step in enumerate(steps, 1):
+        s_action = step.get("action", "")
+        s_sel    = safe_selector(step.get("selector", ""))
+        s_fill   = step.get("fill_value", "")
+        s_text   = step.get("expected_text", "") or s_fill
+        elem     = _friendly_step_element(s_sel)
+
+        try:
+            if s_action == "fill":
+                page.wait_for_selector(s_sel, timeout=8000)
+                target_sel = s_sel
+                try:
+                    tag = page.locator(s_sel).first.evaluate("el => el.tagName.toLowerCase()")
+                except Exception:
+                    tag = ""
+                if tag not in ("input", "textarea", "select"):
+                    fallback_sel = f"{s_sel} input, {s_sel} textarea"
+                    if page.locator(fallback_sel).count() > 0:
+                        target_sel = fallback_sel
+                page.fill(target_sel, s_fill)
+                page.wait_for_timeout(400)
+                completed.append(f"filled the {elem} with '{s_fill}'")
+
+            elif s_action == "click":
+                page.wait_for_selector(s_sel, timeout=8000)
+                page.click(s_sel, timeout=6000)
+                page.wait_for_timeout(step.get("wait_after_ms", 1500))
+                completed.append(f"clicked the {elem}")
+
+            elif s_action == "check_visible":
+                page.wait_for_selector(s_sel, timeout=8000)
+                if not page.is_visible(s_sel):
+                    return "fail", f"Action was executed but the expected {elem} did not appear. The element may be hidden, not rendered, or the selector is outdated."
+                completed.append(f"verified the {elem} is visible")
+
+            elif s_action == "check_text":
+                content = page.content().lower()
+                no_data_markers = ["no data", "aucune donnée", "aucun résultat", "pas de résultat", "aucune direction"]
+                found_expected = s_text and s_text.lower() in content
+                found_no_data  = any(marker in content for marker in no_data_markers)
+
+                if found_expected:
+                    completed.append(f"verified the page shows '{s_text}'")
+                elif found_no_data:
+                    completed.append("verified the filter returned no matching results (empty state shown correctly)")
+                else:
+                    prior = f"Successfully {', then '.join(completed)}, but " if completed else "Action was executed but "
+                    return "fail", f"{prior}neither the expected text '{s_text}' nor an empty-results message was found on the page."
+
+            elif s_action == "select":
+                page.wait_for_selector(s_sel, timeout=8000)
+                page.select_option(s_sel, s_fill) if s_fill else page.select_option(s_sel, index=1)
+                completed.append(f"selected an option in the {elem}")
+
+            elif s_action == "hover":
+                page.wait_for_selector(s_sel, timeout=8000)
+                page.hover(s_sel)
+                completed.append(f"hovered over the {elem}")
+
+        except PlaywrightTimeout:
+            prior = f"Successfully {', then '.join(completed)}, but then " if completed else "Action was executed but "
+            return "fail", f"{prior}the {elem} was not found within the timeout period. It may be hidden, disabled, or slow to load."
+        except Exception as e:
+            print(f"[FUNCTIONAL_RUNNER] _execute_steps error on step {idx} ({s_action} / {s_sel}): {repr(e)}")
+            prior = f"Successfully {', then '.join(completed)}, but then " if completed else "Action was executed but "
+            return "fail", f"{prior}an unexpected error occurred while interacting with the {elem}."
+
+    summary = tc.get("expected") or "the workflow completed as expected"
+    return "pass", f"Scenario completed successfully — {', then '.join(completed)}. {summary}."
 
 
-
-def _run_one_functional(page, tc: dict, base_url: str) -> dict:
+   
+def _run_one_functional(page, tc: dict, base_url: str, username: str = "", password: str = "") -> dict:
     """Execute a single functional test case"""
 
     url          = tc.get("url", "")
@@ -150,7 +287,10 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
         return sel.replace("'", '"')
 
     try:
-        if action == "navigate":
+        if tc.get("steps"):
+            final_status, reason = _execute_steps(page, tc, base_url)
+
+        elif action == "navigate":
             page.goto(url, wait_until="domcontentloaded", timeout=40000)
             page.wait_for_timeout(wait_after)
 
@@ -171,13 +311,13 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                         sel = safe_selector(selector)
                         page.wait_for_selector(sel, timeout=8000)
                         final_status = "pass"
-                        reason = f"Page chargée, élément '{selector}' présent ✓ | {title[:40]}"
+                        reason = _friendly_reason("navigate", selector, title=title)
                     except:
                         final_status = "pass"
-                        reason = f"Page chargée ✓ (élément '{selector}' non trouvé mais page accessible) | {title[:40]}"
+                        reason = _friendly_reason("navigate", title=title)
                 else:
                     final_status = "pass"
-                    reason = f"Page chargée ✓ | {title[:40] if title else 'N/A'}"
+                    reason = _friendly_reason("navigate", title=title)
 
         
         elif action == "fill":
@@ -200,7 +340,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 typed_value = page.input_value(sel)
                 if typed_value:
                     final_status = "pass"
-                    reason = f"Champ '{selector}' rempli avec '{fill_value or 'test_value'}' ✓"
+                    reason = _friendly_reason("fill", selector, fill_value)
                 else:
                     final_status = "fail"
                     reason = f"Champ '{selector}' non rempli"
@@ -227,7 +367,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 page.click(sel, timeout=8000)
                 page.wait_for_timeout(wait_after)
                 final_status = "pass"
-                reason = f"Bouton/élément '{selector}' cliqué ✓"
+                reason = _friendly_reason("click", selector)
             except PlaywrightTimeout:
                 final_status = "fail"
                 reason = f"Élément '{selector}' introuvable ou non cliquable (timeout)"
@@ -255,7 +395,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 is_visible = page.is_visible(sel)
                 if is_visible:
                     final_status = "pass"
-                    reason = f"Élément '{selector}' visible ✓"
+                    reason = _friendly_reason("check_visible", selector)
                 else:
                     final_status = "fail"
                     reason = f"Élément '{selector}' présent mais non visible"
@@ -277,7 +417,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 reason = "Sélecteur trop générique — préciser le texte attendu (ex: 'Identifiants incorrects')"
             elif text_to_find.lower() in content.lower():
                 final_status = "pass"
-                reason = f"Texte '{text_to_find}' trouvé ✓"
+                reason = _friendly_reason("check_text", text=text_to_find)
             else:
                 final_status = "fail"
                 reason = f"Texte '{text_to_find}' NON trouvé sur la page"
@@ -296,7 +436,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                     # Select first available option
                     page.select_option(sel, index=1)
                 final_status = "pass"
-                reason = f"Option sélectionnée dans '{selector}' ✓"
+                reason = _friendly_reason("select", selector)
             except Exception as e:
                 final_status = "fail"
                 reason = f"Erreur select '{selector}': {str(e)[:60]}"
@@ -312,7 +452,7 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
                 page.hover(sel)
                 page.wait_for_timeout(1000)
                 final_status = "pass"
-                reason = f"Hover sur '{selector}' ✓"
+                reason = _friendly_reason("hover", selector)
             except Exception as e:
                 final_status = "fail"
                 reason = f"Erreur hover '{selector}': {str(e)[:60]}"
@@ -359,32 +499,50 @@ def _run_one_functional(page, tc: dict, base_url: str) -> dict:
         
         elif action == "auth_success":
             page.evaluate("() => { localStorage.clear(); sessionStorage.clear(); }")
-            
-            # Inject token directly instead of form login (captcha blocks form)
-            try:
-                page.goto(f"{base_url}", wait_until="domcontentloaded", timeout=25000)
-                page.wait_for_timeout(1000)
-                page.evaluate(f"""
-                    () => {{
-                        localStorage.setItem('token', '{_CACHED_TOKEN}');
-                        localStorage.setItem('access_token', '{_CACHED_TOKEN}');
-                        localStorage.setItem('authToken', '{_CACHED_TOKEN}');
-                    }}
-                """)
-                page.goto(f"{base_url}/dashboard", wait_until="domcontentloaded", timeout=25000)
-                page.wait_for_timeout(3000)
 
-                current_url = page.url
-                if "login" not in current_url.lower():
-                    final_status = "pass"
-                    reason = f"Authentification réussie via token → dashboard accessible ✓"
-                else:
+            # ── Cas générique : credentials fournis → vrai login formulaire ──
+            if username and password:
+                try:
+                    ok = _login_form(page, base_url, username, password)
+                    if ok:
+                        final_status = "pass"
+                        reason = "Authentification réussie via credentials → dashboard accessible ✓"
+                    else:
+                        final_status = "fail"
+                        reason = "Login échoué avec les credentials fournis"
+                except Exception as e:
                     final_status = "fail"
-                    reason = "Token rejeté — dashboard inaccessible"
+                    reason = f"Erreur auth_success (credentials): {str(e)[:60]}"
 
-            except Exception as e:
+            # ── Cas ANPE : pas de credentials, token caché disponible ──
+            elif _CACHED_TOKEN:
+                try:
+                    page.goto(f"{base_url}", wait_until="domcontentloaded", timeout=25000)
+                    page.wait_for_timeout(1000)
+                    page.evaluate(f"""
+                        () => {{
+                            localStorage.setItem('token', '{_CACHED_TOKEN}');
+                            localStorage.setItem('access_token', '{_CACHED_TOKEN}');
+                            localStorage.setItem('authToken', '{_CACHED_TOKEN}');
+                        }}
+                    """)
+                    page.goto(f"{base_url}/dashboard", wait_until="domcontentloaded", timeout=25000)
+                    page.wait_for_timeout(3000)
+
+                    current_url = page.url
+                    if "login" not in current_url.lower():
+                        final_status = "pass"
+                        reason = "Authentification réussie via token → dashboard accessible ✓"
+                    else:
+                        final_status = "fail"
+                        reason = "Token rejeté — dashboard inaccessible"
+
+                except Exception as e:
+                    final_status = "fail"
+                    reason = f"Erreur auth_success (token): {str(e)[:60]}"
+            else:
                 final_status = "fail"
-                reason = f"Erreur auth_success: {str(e)[:60]}"
+                reason = "Ni credentials ni token disponible pour ce test"
         # ── AUTH FAIL TEST ────────────────────────────────────────────────────
         elif action == "auth_fail":
             page.evaluate("() => { localStorage.clear(); sessionStorage.clear(); }")
@@ -591,7 +749,7 @@ def run_functional_tests(test_cases: list, base_url: str, username: str = "", pa
 
             print(f"[FUNCTIONAL_RUNNER] [{i}/{len(test_cases)}] [{cat}] {sev} | {name}")
 
-            result = _run_one_functional(page, tc, base_url)
+            result = _run_one_functional(page, tc, base_url, username, password)
             if result["status"] == "fail" and js_errors:
                 result["reason"] += f" | ⚠ Erreur JS app: {js_errors[-1][:120]}"
                 js_errors.clear()

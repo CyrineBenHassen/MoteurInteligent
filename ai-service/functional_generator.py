@@ -54,8 +54,29 @@ def _get_page_features(path: str, doc_text: str = "") -> list:
     except Exception as e:
         print(f"[FUNCTIONAL_GENERATOR] Feature extraction error: {e} — using defaults")
         return DEFAULT_FEATURES
+_EXPECTED_FALLBACK = {
+    "navigate":      "The page loads successfully without errors",
+    "click":         "The element responds to the click action as expected",
+    "fill":          "The field accepts and retains the entered value",
+    "check_visible": "The element is visible and accessible on the page",
+    "check_text":    "The expected text appears on the page",
+    "select":        "An option is selected successfully in the dropdown",
+    "hover":         "The hover state is applied to the element",
+    "auth_success":  "Login succeeds and the dashboard becomes accessible",
+    "auth_fail":     "Login is rejected and an error message is displayed",
+}
 
-def generate_functional_tests(base_url: str, target_url: str = None, username: str = "", password: str = "", doc_text: str = "") -> dict:
+def _clean_expected(tc: dict) -> str:
+    """Guards against the LLM returning non-string values (true/false/null)
+    for 'expected' — falls back to a readable sentence based on action type."""
+    raw = tc.get("expected", "")
+    if isinstance(raw, str) and raw.strip() and raw.strip().lower() not in ("true", "false", "none", "null"):
+        return raw.strip()
+    if tc.get("steps"):
+        return "The workflow completes successfully with the expected result"
+    action = tc.get("action", "navigate")
+    return _EXPECTED_FALLBACK.get(action, "The step completes successfully")
+def generate_functional_tests(base_url: str, target_url: str = None, username: str = "", password: str = "", doc_text: str = "", has_captcha: bool = False) -> dict:
     print(f"[FUNCTIONAL_GENERATOR] username='{username}' | password='{password[:15] if password else 'EMPTY'}'") 
     username = username.strip()
     password = password.strip()
@@ -75,18 +96,35 @@ def generate_functional_tests(base_url: str, target_url: str = None, username: s
 
     # Build page-specific rules as plain string (no nested f-string)
     if is_login:
+        if has_captcha:
+            steps_list = (
+                "- Generate exactly these 8 tests in this order:\n"
+                "  1. action=navigate, selector='body'\n"
+                "  2. action=check_visible, selector='#basic_email'\n"
+                "  3. action=fill, selector='#basic_email', fill_value='" + username + "'\n"
+                "  4. action=fill, selector='#basic_password', fill_value='" + password + "'\n"
+                "  5. action=click, selector='button[type=submit]'\n"
+                "  6. action=check_visible, selector='#basic_captcha'\n"
+                "  7. action=auth_success — name='Authentification reussie', category='authentication', selector='body', fill_value='', expected='Dashboard visible'\n"
+                "  8. action=auth_fail — name='Authentification echouee', category='authentication', selector='body', fill_value='', expected='Message erreur visible'\n"
+                "- For tests 7 and 8, action must be exactly 'auth_success' and 'auth_fail'\n"
+            )
+        else:
+            steps_list = (
+                "- Generate exactly these 7 tests in this order (NO captcha test — this app has no captcha):\n"
+                "  1. action=navigate, selector='body'\n"
+                "  2. action=check_visible, selector='#basic_email'\n"
+                "  3. action=fill, selector='#basic_email', fill_value='" + username + "'\n"
+                "  4. action=fill, selector='#basic_password', fill_value='" + password + "'\n"
+                "  5. action=click, selector='button[type=submit]'\n"
+                "  6. action=auth_success — name='Authentification reussie', category='authentication', selector='body', fill_value='', expected='Dashboard visible'\n"
+                "  7. action=auth_fail — name='Authentification echouee', category='authentication', selector='body', fill_value='', expected='Message erreur visible'\n"
+                "- For tests 6 and 7, action must be exactly 'auth_success' and 'auth_fail'\n"
+            )
+
         page_rules = (
             "- This IS the login page. requires_login=false for all tests.\n"
-            "- Generate exactly these 8 tests in this order:\n"
-            "  1. action=navigate, selector='body'\n"
-            "  2. action=check_visible, selector='#basic_email'\n"
-            "  3. action=fill, selector='#basic_email', fill_value='" + username + "'\n"
-            "  4. action=fill, selector='#basic_password', fill_value='" + password + "'\n"
-            "  5. action=click, selector='button[type=submit]'\n"
-            "  6. action=check_visible, selector='#basic_captcha'\n"
-            "  7. action=auth_success — name='Authentification reussie', category='authentication', selector='body', fill_value='', expected='Dashboard visible'\n"
-            "  8. action=auth_fail — name='Authentification echouee', category='authentication', selector='body', fill_value='', expected='Message erreur visible'\n"
-            "- For tests 7 and 8, action must be exactly 'auth_success' and 'auth_fail'\n"
+            + steps_list +
             "- DO NOT use check_text for authentication tests\n"
         )
         login_context = ""
@@ -96,9 +134,15 @@ def generate_functional_tests(base_url: str, target_url: str = None, username: s
         page_rules = (
             "- requires_login=true for all tests\n"
             "- Start with 1-2 navigation tests (page loads, main element visible)\n"
-            "- Generate form tests for features: " + ", ".join(form_features) + "\n"
-            "- Generate action tests for: " + ", ".join(action_features) + "\n"
-            "- Use ONLY these real Ant Design selectors:\n"
+            "- CRITICAL: ONLY generate tests for elements EXPLICITLY confirmed present in the "
+            "- STRICT RULE: only use CSS selectors that appear literally in the 'CONFIRMED selectors' "
+            "line of the documentation above. NEVER create sub-selectors like '.ant-card-title' or "
+            "'.ant-page-header-title' unless that exact string is listed as confirmed.\n"
+            "'Real scraped elements' documentation above. DO NOT generate a test for menu, table, "
+            "form, create button, search, or 404-page UNLESS that exact element is listed as present.\n"
+            "- If the documentation says 'NO form present' or 'no_create_button' or similar negative "
+            "feature, DO NOT generate any test targeting that element type.\n"
+            "- Reference selectors (use ONLY if the matching element was confirmed present):\n"
             "  navigation: .ant-menu, .ant-menu-item, .ant-layout-sider, .ant-breadcrumb\n"
             "  stats/cards: .ant-card, .ant-statistic, .ant-card-body\n"
             "  tables: .ant-table, .ant-table-row, .ant-pagination\n"
@@ -106,10 +150,22 @@ def generate_functional_tests(base_url: str, target_url: str = None, username: s
             "  forms: .ant-input, .ant-select, .ant-form-item, input, textarea\n"
             "  header: .ant-layout-header, .ant-page-header, header\n"
             "- NEVER invent class names like '.stat_cards', '.sidebar_navigation', '.header_menu'\n"
-            "- fill_value: use realistic sample data\n"
-            + (f"- Focus on the features specific to {page_path} based on the documentation provided.\n" if doc_text else "")
+            "- fill_value: use realistic sample data. For filter/search fields specifically, "
+            "extract a real, distinctive word or substring from the 'documentation'/scraped content "
+            "above (e.g. an actual name, code, or label visible on the page) — NEVER invent a generic "
+            "word like 'reference', 'test', or 'designation' that likely won't match any real row.\n"
+            "- For check_text steps verifying filter/search results: set expected_text to that same "
+            "real substring you used as fill_value, NOT a generic sentence like 'Les resultats sont "
+            "affiches' — such invented sentences never appear literally in the DOM and will always fail.\n"
+            "- CRITICAL for fill actions: NEVER use '.ant-form-item' or '.ant-form-item-control' as the "
+            "fill selector — these are wrapper divs, not inputs. Always target the actual input, e.g. "
+            "'.ant-form-item input', 'input[placeholder*=\"reference\" i]', or the exact input selector "
+            "from the confirmed elements list.\n"
+            "- DO NOT generate a separate check_text test just to verify 'no 404' or 'page loads without error' "
+            "— the navigate action test already validates this automatically in the runner. Only use check_text "
+            "to verify specific, meaningful content (e.g. a filtered result, an error message, a success banner).\n"
+            + (f"- Focus ONLY on the features specific to {page_path} based on the documentation provided above.\n" if doc_text else "")
         )
-        
         
         login_context = (
             "Login URL: " + base + "/login\n"
@@ -152,6 +208,34 @@ def generate_functional_tests(base_url: str, target_url: str = None, username: s
         '  "fill_value": "valeur si action=fill sinon vide",\n'
         '  "wait_after_ms": 2000\n'
         '}\n\n'
+        "ALTERNATE structure for multi-step SCENARIOS (use for real workflows: filter, "
+        "add/edit/delete item, submit a form and verify the result — NOT for simple visibility checks):\n"
+        "Omit top-level 'action' and 'selector', use a 'steps' array instead:\n"
+        '{\n'
+        '  "id": 2,\n'
+        '  "name": "Filtrer par designation retourne les bons resultats",\n'
+        '  "category": "action",\n'
+        '  "severity": "high",\n'
+        '  "page": "' + page_path + '",\n'
+        '  "url": "' + url_to_test + '",\n'
+        '  "steps": [\n'
+        '    {"action": "fill", "selector": "CSS precis", "fill_value": "valeur reelle"},\n'
+        '    {"action": "click", "selector": "CSS precis"},\n'
+        '    {"action": "check_text", "selector": "", "expected_text": "texte attendu dans le resultat"}\n'
+        '  ],\n'
+        '  "expected": "La table se met a jour avec les bons resultats",\n'
+        '  "description": "...",\n'
+        '  "requires_login": ' + requires_login_default + ',\n'
+        '  "priority": "high",\n'
+        '  "fill_value": "",\n'
+        '  "wait_after_ms": 2000\n'
+        '}\n'
+        "steps[].action can be: fill|click|check_visible|check_text|select|hover — "
+        "same selector rules apply (only CONFIRMED selectors from the documentation).\n"
+        "REQUIREMENT: at least 2 of your 'action' or 'form' category tests MUST use the "
+        "'steps' scenario format if a filter/search, add/create, or edit/delete workflow "
+        "is present on this page. Simple presence checks (navigation, check_visible) stay "
+        "single-action.\n\n"
         "RULES for this page (" + page_path + "):\n"
         + page_rules + "\n\n"
         "Generate between 6 and 10 tests total. Focus on what makes sense for THIS specific page.\n"
@@ -185,10 +269,19 @@ def generate_functional_tests(base_url: str, target_url: str = None, username: s
 
         test_cases = json.loads(raw)
 
+        _VAGUE_TEXTS = {"", "404", "not found", "error", "identifiants incorrects"}
+
         cleaned = []
+        skipped_vague = 0
         for i, tc in enumerate(test_cases, 1):
+            if (tc.get("action") == "check_text" and not tc.get("steps")
+                    and (tc.get("selector", "") or "").strip().lower() in _VAGUE_TEXTS):
+                skipped_vague += 1
+                continue
             cleaned.append({
-                "id":             i,
+        
+                "id":             len(cleaned) + 1,
+                "steps":          tc.get("steps", None),
                 "name":           tc.get("name", "Functional Test " + str(i)),
                 "category":       tc.get("category", "navigation"),
                 "severity":       tc.get("severity", "medium"),
@@ -196,13 +289,16 @@ def generate_functional_tests(base_url: str, target_url: str = None, username: s
                 "url":            tc.get("url", url_to_test),
                 "action":         tc.get("action", "navigate"),
                 "selector":       tc.get("selector", ""),
-                "expected":       tc.get("expected", "Action reussie"),
-                "description":    tc.get("description", ""),
+                "expected":       _clean_expected(tc),
+                "description":    tc.get("description", "") if isinstance(tc.get("description", ""), str) and tc.get("description", "").strip() else _clean_expected(tc),
                 "requires_login": tc.get("requires_login", not is_login),
                 "priority":       tc.get("priority", "medium"),
                 "fill_value":     tc.get("fill_value", ""),
                 "wait_after_ms":  tc.get("wait_after_ms", 2000),
             })
+            
+        if skipped_vague:
+            print(f"[FUNCTIONAL_GENERATOR] Skipped {skipped_vague} vague check_text test(s)")
 
         print("[FUNCTIONAL_GENERATOR] Generated " + str(len(cleaned)) + " tests for " + page_path)
 

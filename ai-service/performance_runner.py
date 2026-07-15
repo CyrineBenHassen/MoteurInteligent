@@ -341,7 +341,8 @@ def run_performance_tests(scripts: dict, base_url: str, username: str = "", pass
         print(f"\n[PERF_RUNNER] ══ Starting: {profile_name} ══")
 
         # ← refresh token avant chaque test type
-        _refresh_token(username, password)
+        if "anpe" in base_url.lower():
+            _refresh_token(username, password)
 
         run_result = _run_k6_script(script_code, test_type)
         all_run_results[test_type] = run_result

@@ -2,15 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area  
 } from 'recharts';
 
 import {
   IconShieldExclamation, IconClockExclamation, IconFlame, IconCircleDashedCheck,
-  IconZoomScan, IconBellOff, IconTrashX, IconCircleCheck, IconChevronDown, IconX,
+  IconZoomScan, IconEyeOff, IconTrashX, IconCircleCheck, IconChevronDown, IconX,
   IconShieldBolt, IconTrendingUp, IconChartBar, IconRefresh, IconSearch,
-  IconWorldSearch, IconSettings2, IconBolt, IconApi, IconShieldCheck,
+  IconWorldSearch, IconSettings2, IconBolt, IconApi, IconShieldCheck, IconChartAreaLine, IconStack3, IconArrowUpRight,
 } from '@tabler/icons-react';
+
+import { LogoSpinner } from '../Dashboard/Dashboard';
 
 
 const SEV = {
@@ -22,7 +24,8 @@ const SEV = {
 const STAT = {
   Active:   { color: '#ef4444', bg: 'rgba(239,68,68,.12)', border: 'rgba(239,68,68,.3)'  },
   Resolved: { color: '#10b981', bg: 'rgba(16,185,129,.12)', border: 'rgba(16,185,129,.3)' },
-  Muted:    { color: '#64748b', bg: 'rgba(100,116,139,.12)', border: 'rgba(100,116,139,.3)' },
+  Ignored:  { color: '#64748b', bg: 'rgba(100,116,139,.12)', border: 'rgba(100,116,139,.3)' },
+
 };
 const TEST_TYPE_ICONS = {
   smoke: <IconFlame size={13} stroke={2} />, seo: <IconWorldSearch size={13} stroke={2} />,
@@ -30,11 +33,12 @@ const TEST_TYPE_ICONS = {
   functional: <IconSettings2 size={13} stroke={2} />, security: <IconShieldCheck size={13} stroke={2} />,
 };
 
+const SEV_RANK = { Critical: 3, High: 2, Medium: 1, Low: 0 };
 
 function mapAlert(a) {
   const severityMap  = { critical: 'Critical', flaky: 'High', warning: 'Medium', stable: 'Low' };
   const categoryMap  = { critical: 'Failures', flaky: 'Failures', warning: 'Performance', stable: 'Availability' };
-  const statusMap    = { resolved: 'Resolved', muted: 'Muted', active: 'Active' };
+  const statusMap    = { resolved: 'Resolved', muted: 'Ignored', active: 'Active' };
   const triggeredAt  = new Date(a.created_at);
   const todayCutoff  = new Date(); todayCutoff.setHours(0, 0, 0, 0);
   const severitySource = a.status; 
@@ -42,6 +46,7 @@ function mapAlert(a) {
   return {
     id: a.id,
     project_name: a.project?.name ?? '—',
+     project_id: a.project?.id ?? null,
     test_name: a.test_name,
     test_type: a.test_type,
     severity: severityMap[severitySource] ?? 'Low',
@@ -54,7 +59,33 @@ function mapAlert(a) {
     flakiness_score: a.flakiness_score,
   };
 }
+function getTrendRecommendation(trendData) {
+  const totalAlerts = trendData.reduce((s, d) => s + d.Critical + d.High + d.Medium + d.Low, 0);
+  if (totalAlerts === 0) {
+    return { text: "No alerts triggered in the last 7 days — system is stable.", color: '#10b981', icon: '✓' };
+  }
 
+  const mid = Math.floor(trendData.length / 2);
+  const firstHalf  = trendData.slice(0, mid).reduce((s, d) => s + d.Critical + d.High + d.Medium + d.Low, 0);
+  const secondHalf = trendData.slice(mid).reduce((s, d) => s + d.Critical + d.High + d.Medium + d.Low, 0);
+
+  const criticalTotal = trendData.reduce((s, d) => s + d.Critical, 0);
+  const highTotal = trendData.reduce((s, d) => s + d.High, 0);
+
+  if (criticalTotal > 0 && criticalTotal / totalAlerts > 0.3) {
+    return { text: `${criticalTotal} critical alert${criticalTotal > 1 ? 's' : ''} this week — investigate the affected tests first.`, color: '#ef4444', icon: '⚠' };
+  }
+  if (secondHalf > firstHalf * 1.3 && secondHalf - firstHalf >= 2) {
+    return { text: "Alert volume is rising — check recent deployments or environment changes.", color: '#f59e0b', icon: '↑' };
+  }
+  if (secondHalf < firstHalf * 0.7 && firstHalf - secondHalf >= 2) {
+    return { text: "Alert volume is decreasing — recent fixes seem to be working.", color: '#10b981', icon: '↓' };
+  }
+  if (highTotal / totalAlerts > 0.4) {
+    return { text: "High-severity alerts dominate — consider reviewing test thresholds.", color: '#f59e0b', icon: '!' };
+  }
+  return { text: "Alert activity is stable, no unusual pattern detected.", color: '#6366f1', icon: '•' };
+}
 function buildTrendData(alerts) {
   const days = 7, now = Date.now();
   return Array.from({ length: days }, (_, i) => {
@@ -72,18 +103,43 @@ function buildTrendData(alerts) {
 }
 
 function buildTopProjectsData(alerts) {
-  const counts = {};
+  const groups = {};
   alerts.forEach(a => {
     const p = a.project_name || 'Unknown';
-    counts[p] = (counts[p] || 0) + 1;
+    if (!groups[p]) groups[p] = { name: p, project_id: a.project_id, count: 0, worstSeverity: 'Low' };
+    groups[p].count += 1;
+    if (SEV_RANK[a.severity] > SEV_RANK[groups[p].worstSeverity]) groups[p].worstSeverity = a.severity;
   });
   const colors = ['#ef4444', '#f97316', '#eab308', '#6366f1', '#3b82f6'];
-  return Object.entries(counts)
-    .map(([name, count], i) => ({ name, count, color: colors[i % colors.length] }))
+  return Object.values(groups)
+    .map((g, i) => ({ ...g, color: colors[i % colors.length] }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 }
 
+
+function groupAlertsByUrl(alerts) {
+  const groups = {};
+  alerts.forEach(a => {
+    if (!groups[a.url]) groups[a.url] = { url: a.url, alerts: [] };
+    groups[a.url].alerts.push(a);
+  });
+  return Object.values(groups).map(g => {
+    const worst = g.alerts.reduce((w, a) => SEV_RANK[a.severity] > SEV_RANK[w.severity] ? a : w, g.alerts[0]);
+    const activeCount   = g.alerts.filter(a => a.status === 'Active').length;
+    const resolvedCount = g.alerts.filter(a => a.status === 'Resolved').length;
+    const mutedCount    = g.alerts.filter(a => a.status === 'Ignored').length;
+    const latest = g.alerts.reduce((l, a) => a.triggeredAt > l ? a.triggeredAt : l, g.alerts[0].triggeredAt);
+    return {
+      url: g.url,
+      project_name: worst.project_name,
+      worstSeverity: worst.severity,
+      alerts: g.alerts.sort((a, b) => b.triggeredAt - a.triggeredAt),
+      activeCount, resolvedCount, mutedCount,
+      latestTriggeredAt: latest,
+    };
+  }).sort((a, b) => SEV_RANK[b.worstSeverity] - SEV_RANK[a.worstSeverity] || b.latestTriggeredAt - a.latestTriggeredAt);
+}
 
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -134,7 +190,7 @@ function getPageNumbers(current, total) {
 
   return rangeWithDots;
 }
-export default function AlertsPanel({ onAlertRead }) {
+export default function AlertsPanel({ onAlertRead, onSelectProject }) {
   const [allAlerts, setAllAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
@@ -192,7 +248,7 @@ export default function AlertsPanel({ onAlertRead }) {
     const newStatus = action === 'resolve' ? 'resolved' : 'muted';
     try {
       await api.patch(`/alerts/${id}/status`, { alert_state: newStatus });
-      setAllAlerts(prev => prev.map(a => a.id === id ? { ...a, status: action === 'resolve' ? 'Resolved' : 'Muted' } : a));
+      setAllAlerts(prev => prev.map(a => a.id === id ? { ...a, status: action === 'resolve' ? 'Resolved' : 'Ignored' } : a));
     } catch (err) { console.error(err); }
   };
 
@@ -226,7 +282,7 @@ export default function AlertsPanel({ onAlertRead }) {
   const trendCritical = calcTrend(thisWeek.filter(a => a.severity === 'Critical').length, lastWeek.filter(a => a.severity === 'Critical').length, true);
   const trendResolved = calcTrend(thisWeek.filter(a => a.status === 'Resolved').length, lastWeek.filter(a => a.status === 'Resolved').length, false);
 
-  const FILTERS = ['All', 'Active', 'Critical', 'Resolved', 'Muted'];
+  const FILTERS = ['All', 'Active', 'Critical', 'Resolved', 'Ignored'];
   const filtered = allAlerts.filter(a => {
     const q = search.toLowerCase();
     const matchSearch = !q || a.url.toLowerCase().includes(q) || a.project_name.toLowerCase().includes(q);
@@ -234,10 +290,27 @@ export default function AlertsPanel({ onAlertRead }) {
     return matchSearch && matchFilter;
   });
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
-  const pageAlerts = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const groupedAlerts = groupAlertsByUrl(filtered);
+  const totalPages = Math.ceil(groupedAlerts.length / PAGE_SIZE) || 1;
+  const pageGroups = groupedAlerts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const trendData = buildTrendData(allAlerts);
+  const trendRecommendation = getTrendRecommendation(trendData);
+
   const topProjectsData = buildTopProjectsData(allAlerts);
+
+  const handleGroupClick = (group) => {
+    const key = group.url;
+    setExpandedId(prev => prev === key ? null : key);
+    const unread = group.alerts.filter(a => !a.read);
+    unread.forEach(a => {
+      api.patch(`/alerts/${a.id}/read`).catch(console.error);
+    });
+    if (unread.length) {
+      const unreadIds = new Set(unread.map(a => a.id));
+      setAllAlerts(prev => prev.map(a => unreadIds.has(a.id) ? { ...a, read: true } : a));
+      onAlertRead?.();
+    }
+  };
 
   return (
     <div className="panel">
@@ -306,37 +379,66 @@ export default function AlertsPanel({ onAlertRead }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
         {/* Trend */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 20px' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <IconTrendingUp size={15} stroke={1.5} style={{ color: '#818cf8' }} />
-            Alerts Trigger Trend
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <IconChartAreaLine size={15} stroke={1.5} style={{ color: '#818cf8' }} />              Alerts Trigger Trend
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {Object.entries(SEV).map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>
+                  <div style={{ width: 8, height: 3, borderRadius: 2, background: v.color }} /> {k}
+                </div>
+              ))}
+            </div>
           </div>
           <div style={{ height: 160 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={trendData} margin={{ top: 8, right: 4, bottom: 0, left: -20 }} barSize={7}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.4} />
-                <XAxis dataKey="date" tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={false} tickLine={false} width={24} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="Critical" fill="#ef4444" radius={[3,3,0,0]} />
-                <Bar dataKey="High"     fill="#f59e0b" radius={[3,3,0,0]} />
-                <Bar dataKey="Medium"   fill="#eab308" radius={[3,3,0,0]} />
-                <Bar dataKey="Low"      fill="#3b82f6" radius={[3,3,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
+<AreaChart data={trendData} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>    <defs>
+      <linearGradient id="gradCritical" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.35} />
+        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+      </linearGradient>
+      <linearGradient id="gradHigh" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.35} />
+        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+      </linearGradient>
+      <linearGradient id="gradMedium" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="#eab308" stopOpacity={0.35} />
+        <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
+      </linearGradient>
+      <linearGradient id="gradLow" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+      </linearGradient>
+    </defs>
+    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.4} />
+    <XAxis dataKey="date" tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
+    <YAxis tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+    <Tooltip content={<ChartTooltip />} />
+    <Area type="monotone" dataKey="Critical" stroke="#ef4444" strokeWidth={2} fill="url(#gradCritical)" />
+    <Area type="monotone" dataKey="High"     stroke="#f59e0b" strokeWidth={2} fill="url(#gradHigh)" />
+    <Area type="monotone" dataKey="Medium"   stroke="#eab308" strokeWidth={2} fill="url(#gradMedium)" />
+    <Area type="monotone" dataKey="Low"      stroke="#3b82f6" strokeWidth={2} fill="url(#gradLow)" />
+  </AreaChart>
+</ResponsiveContainer>
           </div>
-          <div style={{ display: 'flex', gap: 14, marginTop: 10, flexWrap: 'wrap' }}>
-            {Object.entries(SEV).map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
-                <div style={{ width: 10, height: 3, borderRadius: 2, background: v.color }} /> {k}
-              </div>
-            ))}
+          
+          
+
+          {/* ── Recommendation ── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, padding: '9px 12px',
+            borderRadius: 9, background: `${trendRecommendation.color}12`, border: `1px solid ${trendRecommendation.color}30`,
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: trendRecommendation.color, flexShrink: 0 }}>{trendRecommendation.icon}</span>
+            <span style={{ fontSize: 11.5, color: 'var(--text)', fontWeight: 600, lineHeight: 1.4 }}>{trendRecommendation.text}</span>
           </div>
         </div>
 
         {/* Top Projects */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 20px' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <IconChartBar size={15} stroke={1.5} style={{ color: '#f97316' }} />
+            <IconStack3 size={15} stroke={1.5} style={{ color: '#f97316' }} />
             Top Projects by Alerts
           </div>
           {topProjectsData.length === 0 ? (
@@ -347,14 +449,36 @@ export default function AlertsPanel({ onAlertRead }) {
                 const total = topProjectsData.reduce((s, c) => s + c.count, 0);
                 return topProjectsData.map(c => {
                   const pct = total > 0 ? Math.round(c.count / total * 100) : 0;
+                  const cSev = SEV[c.worstSeverity];
                   return (
-                    <div key={c.name}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <div
+                      key={c.name}
+                      onClick={() => { setSearch(c.name); setPage(1); }}
+                      style={{ cursor: 'pointer' }}
+                      title={`Filter alerts for ${c.name}`}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, gap: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
                           <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, flexShrink: 0 }} />
                           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                          <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 20, color: cSev.color, background: cSev.bg, border: `1px solid ${cSev.border}`, textTransform: 'uppercase', flexShrink: 0 }}>
+                            {c.worstSeverity}
+                          </span>
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: c.color, flexShrink: 0 }}>{c.count} <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>({pct}%)</span></span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: c.color }}>{c.count} <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>({pct}%)</span></span>
+                          {c.project_id != null && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onSelectProject?.({ id: c.project_id, name: c.name }); }}
+                              title={`Open ${c.name}`}
+                              style={{ width: 22, height: 22, borderRadius: 6, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}
+                              onMouseEnter={e => { e.currentTarget.style.color = c.color; e.currentTarget.style.borderColor = c.color; }}
+                              onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+                            >
+                              <IconArrowUpRight size={12} stroke={2.2} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div style={{ height: 5, borderRadius: 5, background: 'var(--border)' }}>
                         <div style={{ height: '100%', borderRadius: 5, width: `${pct}%`, background: `linear-gradient(90deg, ${c.color}88, ${c.color})`, transition: 'width .6s ease' }} />
@@ -388,110 +512,113 @@ export default function AlertsPanel({ onAlertRead }) {
         </div>
       </div>
 
-      {/* ── ALERTS LIST (card style) ── */}
+      {/* ── ALERTS LIST (grouped by URL) ── */}
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-          {[1, 2, 3].map(i => (
-            <div key={i} style={{ height: 76, borderRadius: 14, background: 'var(--card)', border: '1px solid var(--border)', opacity: 1 - i * 0.15 }}>
-              <div style={{ height: '100%', borderRadius: 14, background: 'var(--border)', animation: `shimmer 1.5s ease-in-out ${i * 0.15}s infinite`, opacity: .3 }} />
-            </div>
-          ))}
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 14, padding: '40px 0', marginBottom: 24,
+          background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16,
+        }}>
+          <LogoSpinner size={64} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', letterSpacing: 1, textTransform: 'uppercase' }}>
+            Loading alerts…
+          </span>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : groupedAlerts.length === 0 ? (
         <div style={{ padding: '48px 32px', textAlign: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, color: 'var(--muted)', fontSize: 13, marginBottom: 24 }}>
           🔔 No alerts found. Try adjusting your search or filters.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-          {pageAlerts.map(a => {
-            const sev = SEV[a.severity], st = STAT[a.status];
-            const isOpen = expandedId === a.id;
-            const diff = Date.now() - a.triggeredAt;
+          {pageGroups.map(g => {
+            const sev = SEV[g.worstSeverity];
+            const isOpen = expandedId === g.url;
+            const diff = Date.now() - g.latestTriggeredAt;
             const ago = diff < 3600000 ? `${Math.floor(diff / 60000)}m ago` : diff < 86400000 ? `${Math.floor(diff / 3600000)}h ago` : `${Math.floor(diff / 86400000)}d ago`;
 
             return (
-              <div key={a.id} style={{
+              <div key={g.url} style={{
                 background: 'var(--card)', border: `1px solid ${isOpen ? sev.color : 'var(--border)'}`,
                 borderRadius: 14, overflow: 'hidden', transition: 'all .2s',
                 boxShadow: isOpen ? `0 4px 24px ${sev.color}18` : 'none',
               }}>
-                {/* MAIN ROW */}
-                 <div onClick={(e) => handleAction(a.id, 'view', e)}
+                {/* GROUP HEADER ROW */}
+                <div onClick={() => handleGroupClick(g)}
                   style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', cursor: 'pointer' }}
                   onMouseEnter={e => { if (!isOpen) e.currentTarget.parentElement.style.borderColor = `${sev.color}55`; }}
                   onMouseLeave={e => { if (!isOpen) e.currentTarget.parentElement.style.borderColor = 'var(--border)'; }}
                 >
-                  {/* severity icon */}
                   <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: sev.bg, border: `1px solid ${sev.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: sev.color }}>
                     {sev.icon}
                   </div>
 
-                  {/* url + badges */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <code style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.url}</code>
+                      <code style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.url}</code>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 20, color: sev.color, background: sev.bg, border: `1px solid ${sev.border}`, textTransform: 'uppercase', letterSpacing: .5 }}>
-                        {a.severity}
+                        {g.worstSeverity}
                       </span>
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: 'var(--indigo2)', background: 'var(--indigo-bg)', border: '1px solid var(--indigo-border)' }}>
-                        {a.project_name}
+                        {g.project_name}
                       </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: '#a78bfa', background: 'rgba(167,139,250,.12)', border: '1px solid rgba(167,139,250,.3)', textTransform: 'capitalize' }}>
-                        {TEST_TYPE_ICONS[a.test_type]} {a.test_type}
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)' }}>
+                        {g.alerts.length} alert{g.alerts.length !== 1 ? 's' : ''}
                       </span>
+                      {g.activeCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: '#ef4444', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)' }}>{g.activeCount} active</span>}
+                      {g.resolvedCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: '#10b981', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.2)' }}>{g.resolvedCount} resolved</span>}
+                      {g.mutedCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: '#64748b', background: 'rgba(100,116,139,.1)', border: '1px solid rgba(100,116,139,.2)' }}>{g.mutedCount} ignored</span>}
                       <span style={{ fontSize: 10, color: 'var(--muted)' }}>{ago}</span>
                     </div>
-                  </div>
-
-                  {/* status pill */}
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 20,
-                    fontSize: 11, fontWeight: 700, color: st.color, background: st.bg, border: `1px solid ${st.border}`, flexShrink: 0,
-                  }}>
-                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: st.color, animation: a.status === 'Active' ? 'pulse 1.5s infinite' : 'none' }} />
-                    {a.status}
-                  </div>
-
-                  {/* action buttons */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                    {a.status !== 'Resolved' && (
-                      <IconBtn icon={<IconCircleCheck size={14} />} onClick={e => handleAction(a.id, 'resolve', e)}
-                        color="#10b981" bg="rgba(16,185,129,.1)" border="rgba(16,185,129,.3)" title="Resolve" />
-                    )}
-                    {a.status !== 'Muted' && (
-                      <IconBtn icon={<IconBellOff size={14} />} onClick={e => handleAction(a.id, 'mute', e)}
-                        color="var(--sub)" bg="var(--bg2)" border="var(--border)" title="Mute" />
-                    )}
-                    <IconBtn icon={<IconTrashX size={14} />} onClick={e => handleAction(a.id, 'delete', e)}
-                      color="var(--red)" bg="rgba(239,68,68,.1)" border="rgba(239,68,68,.3)" title="Delete" />
                   </div>
 
                   <IconChevronDown size={16} stroke={2.5} style={{ color: 'var(--muted)', flexShrink: 0, transition: 'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
                 </div>
 
-                {/* EXPANDED */}
+                {/* EXPANDED — liste des alertes individuelles */}
                 {isOpen && (
-                  <div style={{ borderTop: '1px solid var(--border)', padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
-                    <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Test Name</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{a.test_name || '—'}</div>
-                    </div>
-                    <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Category</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{a.category}</div>
-                    </div>
-                    <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Flakiness</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: a.flakiness_score > 50 ? '#ef4444' : a.flakiness_score > 20 ? '#f97316' : '#10b981' }}>
-                        {a.flakiness_score ?? '—'}%
-                      </div>
-                    </div>
-                    <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Last Triggered</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{a.triggeredAt.toLocaleString()}</div>
-                    </div>
+                  <div style={{ borderTop: '1px solid var(--border)' }}>
+                    {g.alerts.map(a => {
+                      const aSev = SEV[a.severity], aSt = STAT[a.status];
+                      const aDiff = Date.now() - a.triggeredAt;
+                      const aAgo = aDiff < 3600000 ? `${Math.floor(aDiff / 60000)}m ago` : aDiff < 86400000 ? `${Math.floor(aDiff / 3600000)}h ago` : `${Math.floor(aDiff / 86400000)}d ago`;
+                      return (
+                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 20px 12px 74px', borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{a.test_name || '—'}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 20, color: aSev.color, background: aSev.bg, border: `1px solid ${aSev.border}`, textTransform: 'uppercase' }}>{a.severity}</span>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, color: '#a78bfa', background: 'rgba(167,139,250,.12)', border: '1px solid rgba(167,139,250,.3)', textTransform: 'capitalize' }}>
+                                {TEST_TYPE_ICONS[a.test_type]} {a.test_type}
+                              </span>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: a.flakiness_score > 50 ? '#ef4444' : a.flakiness_score > 20 ? '#f97316' : '#10b981' }}>{a.flakiness_score ?? '—'}%</span>
+                              <span style={{ fontSize: 10, color: 'var(--muted)' }}>{aAgo}</span>
+                            </div>
+                          </div>
+
+                          <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 20,
+                            fontSize: 10, fontWeight: 700, color: aSt.color, background: aSt.bg, border: `1px solid ${aSt.border}`, flexShrink: 0,
+                          }}>
+                            <div style={{ width: 5, height: 5, borderRadius: '50%', background: aSt.color, animation: a.status === 'Active' ? 'pulse 1.5s infinite' : 'none' }} />
+{a.status === 'Muted' ? 'Ignored' : a.status}                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                            {a.status !== 'Resolved' && (
+                              <IconBtn icon={<IconCircleCheck size={13} />} onClick={e => handleAction(a.id, 'resolve', e)}
+                                color="#10b981" bg="rgba(16,185,129,.1)" border="rgba(16,185,129,.3)" title="Resolve" />
+                            )}
+                            {a.status !== 'Ignored' && (
+                              <IconBtn icon={<IconEyeOff size={13} />} onClick={e => handleAction(a.id, 'mute', e)}
+                                color="var(--sub)" bg="var(--bg2)" border="var(--border)" title="Ignore" />
+                            )}
+                            <IconBtn icon={<IconTrashX size={13} />} onClick={e => handleAction(a.id, 'delete', e)}
+                              color="var(--red)" bg="rgba(239,68,68,.1)" border="rgba(239,68,68,.3)" title="Delete" />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -501,12 +628,12 @@ export default function AlertsPanel({ onAlertRead }) {
       )}
 
       {/* pagination */}
-      {filtered.length > 0 && (
+      {groupedAlerts.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 24 }}>
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>
             Showing <span style={{ color: 'var(--text)', fontWeight: 700 }}>{(page - 1) * PAGE_SIZE + 1}</span> to{' '}
-            <span style={{ color: 'var(--text)', fontWeight: 700 }}>{Math.min(page * PAGE_SIZE, filtered.length)}</span> of{' '}
-            <span style={{ color: 'var(--indigo2)', fontWeight: 700 }}>{filtered.length}</span> alerts
+            <span style={{ color: 'var(--text)', fontWeight: 700 }}>{Math.min(page * PAGE_SIZE, groupedAlerts.length)}</span> of{' '}
+            <span style={{ color: 'var(--indigo2)', fontWeight: 700 }}>{groupedAlerts.length}</span> URLs
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}

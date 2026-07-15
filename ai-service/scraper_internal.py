@@ -2,11 +2,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-# scraper_internal.py — Back Office Internal Scraper
-# Supports:
-#   1. Login page testing (smoke + negative tests — CAPTCHA-aware)
-#   2. Cookie-based session injection → direct dashboard scraping
-#   3. Full dashboard DOM analysis after auth
+
 
 import html
 
@@ -19,6 +15,8 @@ import base64
 import io
 
 import requests
+from urllib.parse import urlparse
+
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
@@ -133,7 +131,7 @@ def scrape_internal(
 ) -> dict:
 
     if scrape_login:
-        return _scrape_login_page(login_url or LOGIN_URL, wait_time)
+        return _scrape_login_page(login_url or target_url, wait_time)
 
     # ── Si token fourni explicitement, l'utiliser directement ──────────────
     if token:
@@ -141,11 +139,12 @@ def scrape_internal(
 
     # ── Si credentials fournis → tenter un VRAI login d'abord ──────────────
     if username and password:
+        default_login_url = f"{urlparse(target_url).scheme}://{urlparse(target_url).netloc}/login"
         result = _scrape_with_credentials(
             target_url = target_url,
             username   = username,
             password   = password,
-            login_url  = login_url or LOGIN_URL,
+            login_url  = login_url or default_login_url,
             wait_time  = wait_time,
         )
 
@@ -757,6 +756,7 @@ def _scrape_with_credentials(
                 page.fill(pwd_sel, password)
 
                 # Check for CAPTCHA input
+                # Check for CAPTCHA input
                 captcha_input = page.query_selector(
                     "input[placeholder*='code' i], input[placeholder*='saisir' i], "
                     "input[placeholder*='sécurité' i]"
@@ -770,18 +770,41 @@ def _scrape_with_credentials(
                     )
 
                 # Click submit anyway (to test form behavior)
-                submit = page.query_selector("button[type='submit'], input[type='submit']")
+                submit = page.query_selector(
+                    "button[type='submit'], input[type='submit'], "
+                    "button:has-text('connecter'), button:has-text('login'), "
+                    "button:has-text('Se connecter'), button:has-text('Sign in')"
+                )
+                print(f"[LOGIN DEBUG] submit button found: {submit is not None}")
                 if submit:
                     submit.click()
-                    page.wait_for_timeout(2000)
+                    print(f"[LOGIN DEBUG] clicked, waiting for navigation...")
+                    try:
+                        page.wait_for_url(lambda u: "login" not in u.lower(), timeout=8000)
+                    except Exception as e:
+                        print(f"[LOGIN DEBUG] wait_for_url timeout: {e}")
+                    page.wait_for_timeout(1500)
+                else:
+                    login_result["error_message"] = "Submit button not found — no matching selector"
 
                 current_url = page.url
+                print(f"[LOGIN DEBUG] final url after submit: {current_url}")
                 login_result["redirected_to"] = current_url
 
                 if "login" not in current_url.lower():
                     login_result["success"] = True
-                    # Scrape dashboard if login succeeded — toujours dans le même browser
-                    dashboard_result = _scrape_dashboard_content(page, current_url)
+                    # Navigue explicitement vers l'URL cible demandée (l'app peut avoir
+                    # redirigé vers sa home par défaut plutôt que target_url)
+                    if current_url.rstrip("/") != target_url.rstrip("/"):
+                        try:
+                            page.goto(target_url, timeout=15000, wait_until="networkidle")
+                        except Exception:
+                            try:
+                                page.goto(target_url, timeout=15000, wait_until="domcontentloaded")
+                            except Exception as e:
+                                print(f"[LOGIN DEBUG] navigation to target_url failed: {e}")
+                        page.wait_for_timeout(1000)
+                    dashboard_result = _scrape_dashboard_content(page, page.url)
 
             except Exception as e:
                 login_result["error_message"] = str(e)[:200]
@@ -898,20 +921,28 @@ def _scrape_dashboard_content(page, url: str) -> dict:
     ".ant-card",
     """els => {
         return els.slice(0, 20).map(el => {
-            const title = (el.querySelector('.ant-card-head-title') || {}).innerText || '';
-            const body  = (el.querySelector('.ant-card-body') || {}).innerText || '';
-            const rect  = el.getBoundingClientRect();
+            const headTitle = (el.querySelector('.ant-card-head-title') || {}).innerText || '';
+            const body      = (el.querySelector('.ant-card-body') || {}).innerText || '';
+            const rect      = el.getBoundingClientRect();
+            // fallback: si pas de head-title, prend la 1ere ligne de texte du body (souvent le label, ex: "Total inspections")
+            const bodyLines = body.trim().split('\\n').map(l => l.trim()).filter(l => l);
+            const effectiveTitle = headTitle.trim() || bodyLines[0] || '';
+            const displayNumber  = headTitle.trim() ? body.trim() : (bodyLines[1] || bodyLines[0] || '');
+            const safeTitle = effectiveTitle.slice(0, 40).replace(/'/g, "\\\\'");
             return {
-                css_selector: '.ant-card',
-                title: title.trim().slice(0, 80),
-                number: body.trim().slice(0, 50),
+                css_selector: safeTitle
+                    ? ".ant-card:has-text('" + safeTitle + "')"
+                    : '.ant-card',
+                title: effectiveTitle.slice(0, 80),
+                number: displayNumber.slice(0, 50),
                 visible: true,
                 has_size: rect.width > 50 && rect.height > 50,
             };
-        }).filter(e => e.has_size);
+        }).filter(e => e.has_size && e.title.length > 0);
     }
     """
 )
+
 
     # ── Header elements ───────────────────────────────────────────────────────
     header_elements = safe_eval(
@@ -1010,7 +1041,28 @@ def _scrape_dashboard_content(page, url: str) -> dict:
         """
     )
     print(f"[DEBUG] ant_tables = {len(ant_tables)}")
-
+    # ── Row action buttons (view/edit/delete icons inside table rows) ──────────
+    row_action_buttons = safe_eval(
+        ".ant-table-tbody .anticon, .ant-table-tbody button, "
+        ".ant-table-tbody a[class*='action' i]",
+        """els => {
+            const seen = new Set();
+            return els.slice(0, 30).map(el => {
+                const cls = (el.getAttribute('class') || '');
+                const iconMatch = cls.match(/anticon-([a-z-]+)/i);
+                const label = iconMatch ? iconMatch[1] : (el.innerText || '').trim();
+                if (!label || seen.has(label)) return null;
+                seen.add(label);
+                return {
+                    css_selector: '.ant-table-tbody .anticon, .ant-table-tbody button',
+                    text: label.slice(0, 30),
+                    visible: true,
+                };
+            }).filter(e => e);
+        }
+        """
+    )
+    print(f"[DEBUG] row_action_buttons = {len(row_action_buttons)}")
     # ── Forms (filters, search) ───────────────────────────────────────────────
     forms = safe_eval(
         "form, .filter-form, [class*='search-form' i]",
@@ -1037,21 +1089,31 @@ def _scrape_dashboard_content(page, url: str) -> dict:
     )
     
     
-    # ── Filter inputs (back office filters) ──────────────────────────────────
+    # ── Filter inputs (generic: any field inside .ant-form-item, any placeholder) ──
     filter_inputs = safe_eval(
-        "input[placeholder*='valeur' i], input[placeholder*='Entrer' i], "
-        "input[placeholder*='numéro' i], input[placeholder*='référence' i]",
-        """els => els.map(el => ({
-            css_selector: '.ant-input',
-            text: el.closest('.ant-form-item') 
-                ? (el.closest('.ant-form-item').querySelector('label') || {}).innerText || el.placeholder || 'Filtre'
-                : el.placeholder || 'Filtre',
-            title: el.closest('.ant-form-item')
-                ? (el.closest('.ant-form-item').querySelector('label') || {}).innerText || el.placeholder || 'Filtre'
-                : el.placeholder || 'Filtre',
-            placeholder: el.placeholder || '',
-            visible: true,
-        })).filter(e => e.text.length > 0)
+        ".ant-form-item input, .ant-form-item .ant-select-selector, "
+        ".ant-form-item .ant-picker",
+        """els => {
+            const seen = new Set();
+            return els.map(el => {
+                const formItem = el.closest('.ant-form-item');
+                if (!formItem) return null;
+                const labelEl = formItem.querySelector('.ant-form-item-label label, label');
+                const label = labelEl ? labelEl.innerText.trim() : (el.placeholder || 'Filtre');
+                if (!label || seen.has(label)) return null;
+                seen.add(label);
+                const rect = formItem.getBoundingClientRect();
+                const safeLabel = label.replace(/'/g, "\\\\'");
+                return {
+                    css_selector: ".ant-form-item:has-text('" + safeLabel + "')",
+                    text: label.slice(0, 40),
+                    
+                    title: label.slice(0, 40),
+                    placeholder: el.placeholder || '',
+                    visible: rect.width > 0 && rect.height > 0,
+                };
+            }).filter(e => e && e.visible);
+        }
         """
     )
     print(f"[DEBUG] filter_inputs = {len(filter_inputs)}")
@@ -1129,6 +1191,21 @@ def _scrape_dashboard_content(page, url: str) -> dict:
         })).filter(e => e.text.length > 0)
         """
     )
+    if not breadcrumbs:
+        breadcrumbs = safe_eval(
+            "a:has-text('Home'), a:has-text('Accueil'), "
+            "button:has-text('Home'), button:has-text('Accueil'), "
+            "[class*='home' i]:has-text('Home'), "
+            "nav[aria-label*='breadcrumb' i], [class*='breadcrumb' i]",
+            _STABLE_CSS_JS + """
+            els => els.slice(0, 3).map(el => ({
+                css_selector: stableCSS(el, 'a'),
+                text: (el.innerText || '').trim().slice(0, 100),
+                visible: el.offsetParent !== null,
+            })).filter(e => e.text.length > 0 && e.visible)
+            """
+        )
+    print(f"[DEBUG] breadcrumbs found = {breadcrumbs}")
 
     # ── Pagination ────────────────────────────────────────────────────────────
     pagination = safe_eval(
@@ -1165,7 +1242,15 @@ def _scrape_dashboard_content(page, url: str) -> dict:
         }""")
     except Exception:
         pass
-
+    # ── Tag each source with its real kind (avoid mislabeling as "stat_card") ──
+    for c in stat_cards:     c["kind"] = "stat_card"
+    for c in charts:         c["kind"] = "chart"
+    for c in data_tables:    c["kind"] = "table"
+    for c in ant_tables:     c["kind"] = "table"
+    for c in filter_inputs:  c["kind"] = "filter_input"
+    for c in filter_buttons: c["kind"] = "filter_button"
+    for c in row_action_buttons: c["kind"] = "row_action"
+    
     return {
         # Meta
         "url":            url,
@@ -1188,6 +1273,7 @@ def _scrape_dashboard_content(page, url: str) -> dict:
         "breadcrumbs":      breadcrumbs,
         "lang_switcher":    lang_switcher,
         "search_inputs":    search_inputs,
+        "row_action_buttons": row_action_buttons,
 
         # Standard compat keys
         "inputs":           [],

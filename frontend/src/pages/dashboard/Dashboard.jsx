@@ -1,12 +1,13 @@
 
 //Imports
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo  } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useLang } from '../../context/LanguageContext';
 import api from '../../api/axios';
 import './Dashboard.css';
 import { createPortal } from 'react-dom';
 import NextestChatbot from '../../pages/Chatboot/Nextestchatbot';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -34,6 +35,10 @@ import {
   IconChevronDown,
   IconTag,
   IconAlignLeft,
+  IconSparkles,
+  IconStarFilled,
+  IconInfoCircle,
+  IconKey, 
 
 } from '@tabler/icons-react';
 
@@ -69,9 +74,27 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 
 import ScheduledTasksPanel from './ScheduledTasksPanel';
 
-import { Calendar, ChevronLeft, ChevronRight, X, LayoutGrid, Code2, ListFilter  } from 'lucide-react';
 
 import { useNavigate } from 'react-router-dom';
+
+
+import {
+  IconWind,
+  IconSettings,
+} from '@tabler/icons-react';
+
+import { IconHelpCircle } from '@tabler/icons-react';
+
+
+import { TrendingUp, Flame, Zap, Waves, CheckCircle2, XCircle, AlertTriangle, MinusCircle, Clock, BarChart3, Users  } from 'lucide-react';
+
+import {
+  Globe, Lock, Settings2, Smartphone, Check, ChevronDown, Link as LinkIcon,
+  ShieldCheck, Sparkles, Tag, User, FileText, ArrowRight, Save, Rocket,
+  Wand2, TrendingUp as TrendUpIcon, Loader2, Info, Type,
+} from 'lucide-react';
+
+
 
 
 
@@ -161,7 +184,67 @@ function NexLogo({ collapsed }) {
     </div>
   );
 }
+//Spinner réutilisable — juste le logo hexagone avec les 2 anneaux animés
+export function LogoSpinner({ size = 100 }) {
+  return (
+    <div style={{ position: 'relative', width: size, height: size }}>
+      {/* Ring tournant */}
+      <svg width={size} height={size} viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0, animation: 'spin 2.5s linear infinite' }}>
+        <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(201,162,39,.15)" strokeWidth="2.5" />
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#C9A227" strokeWidth="2.5"
+          strokeDasharray="60 230" strokeLinecap="round" />
+      </svg>
 
+      {/* Ring inverse */}
+      <svg width={size} height={size} viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0, animation: 'spinReverse 2s linear infinite' }}>
+        <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(99,102,241,.12)" strokeWidth="2" />
+        <circle cx="50" cy="50" r="38" fill="none" stroke="#6366f1" strokeWidth="2"
+          strokeDasharray="35 200" strokeLinecap="round" />
+      </svg>
+
+      {/* Hexagone logo — centre */}
+      <div style={{
+        position: 'absolute', top: '50%', left: '50%',
+        transform: 'translate(-50%, -50%)',
+        animation: 'logoGlow 2s ease-in-out infinite',
+      }}>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90" width={size * 0.52} height={size * 0.52}>
+          <defs>
+            <linearGradient id={`hexGradSpinner-${size}`} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#8a6a00"/>
+              <stop offset="40%" stopColor="#C9A227"/>
+              <stop offset="100%" stopColor="#E8C84A"/>
+            </linearGradient>
+            <filter id={`glowSpinner-${size}`}>
+              <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+              <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <polygon points="45,8 77,27 77,63 45,82 13,63 13,27"
+            fill="rgba(201,162,39,0.08)" stroke={`url(#hexGradSpinner-${size})`} strokeWidth="2"/>
+          <circle cx="45" cy="8"  r="2.5" fill="#C9A227" opacity="0.8"/>
+          <circle cx="77" cy="27" r="2.5" fill="#C9A227" opacity="0.8"/>
+          <circle cx="77" cy="63" r="2.5" fill="#C9A227" opacity="0.8"/>
+          <circle cx="45" cy="82" r="2.5" fill="#C9A227" opacity="0.8"/>
+          <circle cx="13" cy="63" r="2.5" fill="#C9A227" opacity="0.8"/>
+          <circle cx="13" cy="27" r="2.5" fill="#C9A227" opacity="0.8"/>
+          <text x="45" y="56" textAnchor="middle"
+            fontFamily="Georgia, serif" fontSize="36" fontWeight="700"
+            fill="#C9A227" filter={`url(#glowSpinner-${size})`}>N</text>
+        </svg>
+      </div>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes spinReverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+        @keyframes logoGlow {
+          0%, 100% { filter: drop-shadow(0 0 6px rgba(201,162,39,0.5)); transform: translate(-50%,-50%) scale(1); }
+          50% { filter: drop-shadow(0 0 14px rgba(201,162,39,0.9)); transform: translate(-50%,-50%) scale(1.06); }
+        }
+      `}</style>
+    </div>
+  );
+}
 //Function of switch light and balck mood 
 function ThemeToggle({ theme, setTheme }) {
   const isDark = theme !== 'light';
@@ -391,10 +474,10 @@ function KPICard({ icon, iconBg, iconBorder, accentColor, title, value, trend, s
 
           {circular ? (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <CircularProgress value={circular.value} size={52} stroke={5} color={circular.color} />
+      <CircularProgress value={circular.value} size={68} stroke={6} color={circular.color} />
       <div style={{
         position: 'absolute',
-        fontSize: 10, fontWeight: 800,
+        fontSize: 13, fontWeight: 800,
         color: circular.color,
         fontFamily: 'var(--C)',
       }}>
@@ -563,7 +646,7 @@ function ActivityHeatmap({ gens, projects = [] }) {
   const formatDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   return (
-    <div className="section-box" style={{ flex: 1 }}>
+  <div className="section-box" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
       <div className="sb-head" style={{ alignItems: 'flex-start' }}>
   {/* Title + "Last 4 weeks" subtitle */}
   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -897,7 +980,10 @@ function DashboardPanel({ user, goTo }) {
   const [loading, setLoading] = useState(true);
   const [typeData, setTypeData] = useState([]);
   const [allGens,  setAllGens]  = useState([]);
-   const [allProjects, setAllProjects] = useState([]);
+  const [allProjects, setAllProjects] = useState([]); 
+  const [projectTrend, setProjectTrend] = useState([0,0,0,0,0,0,0]);
+   const [aiVerdict, setAiVerdict] = useState(null);
+const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -1001,6 +1087,16 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
   tests: testsPerDay[i],
 })));
 
+// ── Active Projects trend (cumulative count per day, last 7 days) ──
+const projCounts = [0,0,0,0,0,0,0];
+for (let i = 0; i < 7; i++) {
+  const dayEnd = new Date(now);
+  dayEnd.setDate(now.getDate() - (6 - i));
+  dayEnd.setHours(23, 59, 59, 999);
+  projCounts[i] = projs.filter(p => new Date(p.created_at) <= dayEnd).length;
+}
+setProjectTrend(projCounts);
+
   // Donut Charts
   const grandTotal = (totalPass + totalFail + totalSkip) || 1;
   setDonutData([
@@ -1009,10 +1105,12 @@ setBarData(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => ({
     { name: 'Skipped', value: Math.round(totalSkip / grandTotal * 100), color: '#f59e0b' },
   ]);
 
+ 
+
   //Top URLs
 const urlMap = {};
 gens.forEach(g => {
-  if (!urlMap[g.url]) urlMap[g.url] = { url: g.url, framework: g.framework, tests: 0, pass: 0, date: g.created_at };
+  if (!urlMap[g.url]) urlMap[g.url] = { url: g.url, framework: g.framework, tests: 0, pass: 0, date: g.created_at, project_id: g.project_id };
   urlMap[g.url].tests += (g.pass_count||0) + (g.fail_count||0) + (g.skip_count||0);
   urlMap[g.url].pass  += g.pass_count || 0;
   urlMap[g.url].date   = g.created_at;
@@ -1141,6 +1239,31 @@ if (loading) return (
   Math.round(((donutData[1]?.value||0) / 100) * (stats.totalPass / ((donutData[0]?.value||1) / 100))) +
   Math.round(((donutData[2]?.value||0) / 100) * (stats.totalPass / ((donutData[0]?.value||1) / 100)));
 
+  const fetchAiVerdict = async () => {
+    if (!topUrls.length) return;
+    setAiLoading(true);
+    setAiVerdict(null);
+    const top = topUrls[0];
+    const rate = Math.round((top.pass / top.tests) * 100) || 0;
+    const projectName = allProjects.find(p => p.id === top.project_id)?.name || top.url;
+    try {
+      const res = await api.post('/generations/project-verdict', {
+        project_name: projectName,
+        tests: top.tests,
+        pass_count: top.pass,
+        fail_count: top.tests - top.pass,
+        pass_rate: rate,
+      });
+      setAiVerdict(res.data);
+    } catch (e) {
+      setAiVerdict({ rating: null, text: "Erreur lors de la génération de l'avis IA." });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  
+
   return (
     <div className="panel">
       <div className="p-header">
@@ -1208,14 +1331,14 @@ if (loading) return (
 </div>
 
 
-<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 20, marginBottom: 24 }}>
 
   {/* ── LINE CHART ── */}
   <div className="section-box" style={{ display: 'flex', flexDirection: 'column', minHeight: 380 }}>
     <div className="sb-head" style={{ padding: '16px 20px', flexShrink: 0 }}>
-<span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+<span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
   <IconTrendingUp size={15} stroke={1.5} style={{ color: '#8b5cf6' }} />
-  {t('testsTrend')}
+  Tests Trend
 </span>
       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--indigo2)', background: 'var(--indigo-bg)', border: '1px solid var(--indigo-border)', padding: '3px 10px', borderRadius: 20 }}>{t('thisWeek')}</span>
     </div>
@@ -1227,35 +1350,58 @@ if (loading) return (
         </div>
       ))}
     </div>
-    <div style={{ flex: 1, padding: '8px 8px 12px', minHeight: 280 }}>
-      <ResponsiveContainer width="100%" height="100%">
-  <LineChart data={barData} margin={{ top: 28, right: 16, bottom: 4, left: -10 }}>
-    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.5} />
-    <XAxis dataKey="day" tick={{ fill: 'var(--muted)', fontSize: 11, fontWeight: 600 }} axisLine={false} tickLine={false} />
-    <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
-    <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12, boxShadow: '0 4px 20px rgba(0,0,0,.3)' }} cursor={{ stroke: 'var(--border)', strokeWidth: 1 }} />
-    <Line type="monotone" dataKey="count" name="Scripts Generated" stroke="#8b5cf6" strokeWidth={2.5}
-      dot={{ r: 5, fill: '#8b5cf6', stroke: 'var(--card)', strokeWidth: 2 }}
-      activeDot={{ r: 7, fill: '#8b5cf6' }}
-      label={({ x, y, value }) => value > 0 ? <text x={x} y={y - 12} fill="#8b5cf6" fontSize={11} fontWeight={700} textAnchor="middle">{value}</text> : null}
-    />
-    <Line type="monotone" dataKey="tests" name="Tests Executed" stroke="#10b981" strokeWidth={2.5}
-      dot={{ r: 5, fill: '#10b981', stroke: 'var(--card)', strokeWidth: 2 }}
-      activeDot={{ r: 7, fill: '#10b981' }}
-      label={({ x, y, value }) => value > 0 ? <text x={x} y={y - 12} fill="#10b981" fontSize={11} fontWeight={700} textAnchor="middle">{value}</text> : null}
-    />
-  </LineChart>
-</ResponsiveContainer>
-    </div>
+ <div style={{ flex: 1, padding: '8px 8px 12px', minHeight: 280 }}>
+  <ResponsiveContainer width="100%" height="100%">
+    <LineChart data={barData} margin={{ top: 40, right: 24, bottom: 4, left: 8 }}>
+      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.5} />
+      <XAxis dataKey="day" tick={{ fill: 'var(--muted)', fontSize: 11, fontWeight: 600 }} axisLine={false} tickLine={false} />
+      <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
+      <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12, boxShadow: '0 4px 20px rgba(0,0,0,.3)' }} cursor={{ stroke: 'var(--border)', strokeWidth: 1 }} />
+      <Line type="monotone" dataKey="count" name="Scripts Generated" stroke="#8b5cf6" strokeWidth={2.5}
+        dot={{ r: 5, fill: '#8b5cf6', stroke: 'var(--card)', strokeWidth: 2 }}
+        activeDot={{ r: 7, fill: '#8b5cf6' }}
+        isAnimationActive={false}
+        label={({ x, y, value }) => {
+          if (!(value > 0)) return null;
+          const ty = Math.max(y - 12, 14);
+          const tx = Math.min(Math.max(x, 14), 500);
+          return (
+            <text x={tx} y={ty} fill="#8b5cf6" fontSize={11} fontWeight={700}
+              textAnchor="middle" paintOrder="stroke" stroke="var(--card)" strokeWidth={4}>
+              {value}
+            </text>
+          );
+        }}
+      />
+      <Line type="monotone" dataKey="tests" name="Tests Executed" stroke="#10b981" strokeWidth={2.5}
+        dot={{ r: 5, fill: '#10b981', stroke: 'var(--card)', strokeWidth: 2 }}
+        activeDot={{ r: 7, fill: '#10b981' }}
+        isAnimationActive={false}
+        label={({ x, y, value }) => {
+          if (!(value > 0)) return null;
+          const ty = Math.max(y - 12, 14);
+          const tx = Math.min(Math.max(x, 14), 500);
+          return (
+            <text x={tx} y={ty} fill="#10b981" fontSize={11} fontWeight={700}
+              textAnchor="middle" paintOrder="stroke" stroke="var(--card)" strokeWidth={4}>
+              {value}
+            </text>
+          );
+        }}
+      />
+    </LineChart>
+  </ResponsiveContainer>
+</div>
   </div>
 
   {/* ── DONUT ── */}
-  <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: 380 }}>
-    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', padding: '16px 20px', borderBottom: '1px solid var(--border3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-  <IconChartDonut size={15} stroke={1.5} style={{ color: '#10b981' }} />
-  {t('testsResults')}
-
-</div>
+<div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: 380 }}>
+  <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border3)' }}>
+    <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <IconChartDonut size={15} stroke={1.5} style={{ color: '#10b981' }} />
+      Test Results
+    </span>
+  </div>
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '24px 20px' }}>
       {/* Donut */}
       <div style={{ position: 'relative', width: 180, height: 180, flexShrink: 0 }}>
@@ -1303,120 +1449,146 @@ if (loading) return (
 
   <ActivityHeatmap gens={allGens} projects={allProjects} />
 </div>
-<ActivityHeatmap gens={allGens} projects={allProjects} />
-</div>
 
 {/* ── MOST TESTED APP ── */}
 {topUrls.length > 0 && (() => {
   const top = topUrls[0];
+    const projectName = allProjects.find(p => p.id === top.project_id)?.name || top.url;
+
   const rate = Math.round((top.pass / top.tests) * 100) || 0;
   const isGood = rate >= 80;
   const statusColor = isGood ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
-  const statusLabel = isGood ? 'Stable' : rate >= 50 ? 'À surveiller' : 'Critique';
-
-  return (
-    <div className="section-box" style={{ marginBottom: 24, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{
-          width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-          background: `${statusColor}18`, border: `1px solid ${statusColor}33`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <svg width="20" height="20" fill="none" stroke={statusColor} strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M12 2l3 6.5 7 1-5 5 1.5 7L12 18l-6.5 3.5L7 14.5l-5-5 7-1L12 2z"/>
-          </svg>
+  const statusLabel = isGood ? 'Stable' : rate >= 50 ? 'Needs attention' : 'Critical';
+ return (
+    <div className="section-box" style={{ marginBottom: 24, padding: '18px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+            background: 'rgba(201,162,39,0.12)', border: '1px solid rgba(201,162,39,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="20" height="20" fill="none" stroke="#c9a227" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M12 2l3 6.5 7 1-5 5 1.5 7L12 18l-6.5 3.5L7 14.5l-5-5 7-1L12 2z"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--muted)', marginBottom: 3 }}>
+  Most Tested App
+</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo2)', cursor: 'pointer' }}
+              onClick={() => window.open(top.url, '_blank', 'noopener,noreferrer')}
+              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
+              {projectName}
+            </div>
+          </div>
         </div>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--muted)', marginBottom: 3 }}>
-            App la plus testée
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--C)' }}>{top.tests}</div>
+            <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>tests</div>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo2)', cursor: 'pointer' }}
-            onClick={() => window.open(top.url, '_blank', 'noopener,noreferrer')}
-            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
-            {top.url}
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: statusColor, fontFamily: 'var(--C)' }}>{rate}%</div>
+            <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>pass rate</div>
           </div>
+          <button
+            onClick={fetchAiVerdict}
+            disabled={aiLoading}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 11, fontWeight: 700, padding: '6px 14px', borderRadius: 20,
+              color: '#c9a227', background: 'rgba(201,162,39,0.12)', border: '1px solid rgba(201,162,39,0.3)',
+              cursor: aiLoading ? 'default' : 'pointer', opacity: aiLoading ? 0.6 : 1,
+            }}
+          >
+            <IconSparkles size={14} stroke={1.8} />
+            {aiLoading ? 'Analyse...' : 'Avis IA'}
+          </button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--C)' }}>{top.tests}</div>
-          <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>tests</div>
+      {aiVerdict && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border3)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          {aiVerdict.rating && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <IconStarFilled
+                  key={i}
+                  size={15}
+                  style={{ color: i < aiVerdict.rating ? '#c9a227' : 'var(--border)' }}
+                />
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{aiVerdict.text}</div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: statusColor, fontFamily: 'var(--C)' }}>{rate}%</div>
-          <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>pass rate</div>
-        </div>
-        <span style={{
-          fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 20,
-          color: statusColor, background: `${statusColor}18`, border: `1px solid ${statusColor}33`,
-        }}>
-          {statusLabel}
-        </span>
-      </div>
+      )}
     </div>
   );
 })()}
 
-<div className="section-box" style={{ marginBottom: 24 }}>
-  <div className="sb-head">
-    <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-  <IconTestPipe size={15} stroke={1.5} style={{ color: '#6366f1' }} />
-  {t('testTypeDistribution')}
-</span>
-  </div>
-<div className="section-box" style={{ marginBottom: 24 }}>
-  <div className="sb-head">
-    <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-  <IconTestPipe size={15} stroke={1.5} style={{ color: '#6366f1' }} />
-  {t('testTypeDistribution')}
-</span>
-  </div>
-  <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-    {[
-      { key: 'smoke',       label: 'Smoke',       color: '#64748b', icon: '🔍' },
-      { key: 'functional',  label: 'Functional',  color: '#6366f1', icon: '⚙️' },
-      { key: 'regression',  label: 'Regression',  color: '#f97316', icon: '🔄' },
-      { key: 'security',    label: 'Security',    color: '#ef4444', icon: '🔒' },
-      { key: 'performance', label: 'Performance', color: '#8b5cf6', icon: '⚡' },
-      { key: 'seo', label: 'SEO', color: '#06b6d4', icon: '🔍' },
-    ].map(type => {
-      const count = typeData.find(d => d.name === type.key)?.value || 0;
-      const total = typeData.reduce((s, d) => s + d.value, 0) || 1;
-      const pct = Math.round((count / total) * 100);
-      return (
-        <div key={type.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>{type.icon}</span>
-          <div style={{ width: 90, fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>{type.label}</div>
-          <div style={{ flex: 1, height: 8, borderRadius: 8, background: 'var(--border)', overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', borderRadius: 8,
-              width: `${pct}%`,
-              background: type.color,
-              transition: 'width 1s ease',
-            }} />
+
+
+
+ <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 20, marginBottom: 24, alignItems: 'start' }}>
+  {/* ── TEST TYPE DISTRIBUTION ── */}
+  <div className="section-box">
+    <div className="sb-head">
+      <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <IconTestPipe size={15} stroke={1.5} style={{ color: '#6366f1' }} />
+        Test Type Distribution
+      </span>
+    </div>
+    <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {[
+        { key: 'smoke',       label: 'Smoke',       color: '#64748b', icon: IconWind },
+        { key: 'functional',  label: 'Functional',  color: '#6366f1', icon: IconSettings },
+        { key: 'api',         label: 'API',         color: '#10b981', icon: IconApi },
+        { key: 'regression',  label: 'Regression',  color: '#f97316', icon: IconRefresh },
+        { key: 'security',    label: 'Security',    color: '#ef4444', icon: IconLock },
+        { key: 'performance', label: 'Performance', color: '#8b5cf6', icon: IconBolt },
+        { key: 'seo',         label: 'SEO',          color: '#06b6d4', icon: IconSearch },
+      ].map(type => {
+        const count = typeData.find(d => d.name === type.key)?.value || 0;
+        const total = typeData.reduce((s, d) => s + d.value, 0) || 1;
+        const pct = Math.round((count / total) * 100);
+        const Icon = type.icon;
+        return (
+          <div key={type.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 24, display: 'flex', justifyContent: 'center' }}>
+              <Icon size={16} stroke={1.6} style={{ color: type.color }} />
+            </div>
+            <div style={{ width: 90, fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>{type.label}</div>
+            <div style={{ flex: 1, height: 8, borderRadius: 8, background: 'var(--border)', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 8,
+                width: `${pct}%`,
+                background: type.color,
+                transition: 'width 1s ease',
+              }} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: type.color, width: 32, textAlign: 'right' }}>{count}</span>
+            <span style={{ fontSize: 10, color: 'var(--muted)', width: 36, textAlign: 'right' }}>{pct}%</span>
           </div>
-          <span style={{ fontSize: 12, fontWeight: 700, color: type.color, width: 32, textAlign: 'right' }}>{count}</span>
-          <span style={{ fontSize: 10, color: 'var(--muted)', width: 36, textAlign: 'right' }}>{pct}%</span>
-        </div>
-      );
-    })}
+        );
+      })}
+    </div>
   </div>
-</div>
-<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
+
   {/* ── TOP URLs ── */}
   <div className="section-box">
     <div className="sb-head">
-      <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-  <IconLink size={15} stroke={1.5} style={{ color: '#0ea5e9' }} />
-  {t('topUrls')}
-</span>
+      <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <IconLink size={15} stroke={1.5} style={{ color: '#0ea5e9' }} />
+        Top URLs
+      </span>
       <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')}</span>
-
     </div>
     {/* Column headers */}
-    <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 100px 50px 110px', gap: 8, padding: '8px 20px 6px', borderBottom: '1px solid var(--border3)' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '24px 1fr 92px 40px 110px', gap: 6, padding: '8px 14px 6px', borderBottom: '1px solid var(--border3)' }}>
       {['#', 'URL', 'Tool', 'Tests', 'Pass Rate'].map(h => (
         <div key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
       ))}
@@ -1432,12 +1604,12 @@ if (loading) return (
       const fwColor = FW_COLORS[item.framework] || '#4f86e8';
       return (
         <div key={i}
-          style={{ display: 'grid', gridTemplateColumns: '28px 1fr 100px 50px 110px', gap: 8, padding: '11px 20px', borderBottom: i < topUrls.length - 1 ? '1px solid var(--border3)' : 'none', alignItems: 'center', transition: 'background .15s' }}
+          style={{ display: 'grid', gridTemplateColumns: '24px 1fr 92px 40px 110px', gap: 6, padding: '11px 14px', borderBottom: i < topUrls.length - 1 ? '1px solid var(--border3)' : 'none', alignItems: 'center', transition: 'background .15s' }}
           onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{i + 1}</div>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--indigo2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}
               onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
               onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
@@ -1461,9 +1633,9 @@ if (loading) return (
             </span>
           </div>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{item.tests}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: rc, minWidth: 34 }}>{rate}%</span>
-            <div style={{ flex: 1, height: 5, borderRadius: 4, background: 'var(--border)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: rc, flexShrink: 0, whiteSpace: 'nowrap', width: 30, textAlign: 'right' }}>{rate}%</span>
+            <div style={{ flex: 1, minWidth: 8, height: 5, borderRadius: 4, background: 'var(--border)', overflow: 'hidden' }}>
               <div style={{ height: '100%', borderRadius: 4, width: `${rate}%`, background: rc, transition: 'width 1s ease' }} />
             </div>
           </div>
@@ -1472,92 +1644,92 @@ if (loading) return (
     })}
   </div>
 
-{/* ── RECENT ACTIVITY ── */}
-<div className="section-box">
-  <div className="sb-head">
-    <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-  <IconActivity size={15} stroke={1.5} style={{ color: '#4f86e8' }} />
-  {t('recentActivity')}
-</span>
-    <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')}</span>
-  </div>
-  <div>
-    {topUrls.length === 0 ? (
-      <div className="empty-row">{t('noActivity')}</div>
-    ) : topUrls.slice(0, 3).map((item, i) => {
-      const rate = Math.round((item.pass / item.tests) * 100) || 0;
-      const rc = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
-      const isOk = rate >= 80;
-      const FW_COLORS = { Selenium: '#43B02A', Cypress: '#00BFA5', Playwright: '#E2574C', Both: '#C9A227', k6: '#7D64FF', Pytest: '#3776AB', Postman: '#FF6C37' };
-      const fwColor = FW_COLORS[item.framework] || '#4f86e8';
-      const timeStr = (() => {
-        if (!item.date) return '—';
-        const diff = (Date.now() - new Date(item.date)) / 1000;
-        if (isNaN(diff)) return '—';
-        if (diff < 60) return `${Math.floor(diff)}s ago`;
-        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-        return `${Math.floor(diff / 86400)}d ago`;
-      })();
-      return (
-        <div key={i}
-          style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 20px', borderBottom: i < Math.min(topUrls.length, 3) - 1 ? '1px solid var(--border3)' : 'none', transition: 'background .15s' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-          {/* Circle icon */}
-          <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, marginTop: 1, background: isOk ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)', border: `2px solid ${isOk ? '#10b981' : '#ef4444'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {isOk
-              ? <svg width="10" height="10" fill="none" stroke="#10b981" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
-              : <svg width="10" height="10" fill="none" stroke="#ef4444" strokeWidth="3" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            }
-          </div>
+</div>
 
-          {/* Content */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 4, lineHeight: 1.5 }}>
-              {isOk ? (
-                <>
-                  <span style={{ color: 'var(--muted)' }}>{item.framework} tests completed on </span>
-                  <span style={{ color: 'var(--indigo2)', cursor: 'pointer' }}
-                    onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
-                    onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-                    onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
-                    {item.url}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span style={{ color: 'var(--muted)' }}>{item.framework} scan failed on </span>
-                  <span style={{ color: 'var(--indigo2)', cursor: 'pointer' }}
-                    onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
-                    onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-                    onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
-                    {item.url}
-                  </span>
-                </>
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 20, marginBottom: 24 }}>
+
+  {/* ── RECENT ACTIVITY ── */}
+  <div className="section-box">
+    <div className="sb-head">
+      <span className="sb-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <IconActivity size={15} stroke={1.5} style={{ color: '#4f86e8' }} />
+        {t('recentActivity')}
+      </span>
+      <span className="sb-action" onClick={() => goTo('history')}>{t('viewAll')}</span>
+    </div>
+    <div>
+      {topUrls.length === 0 ? (
+        <div className="empty-row">{t('noActivity')}</div>
+      ) : topUrls.slice(0, 3).map((item, i) => {
+        const rate = Math.round((item.pass / item.tests) * 100) || 0;
+        const rc = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+        const isOk = rate >= 80;
+        const FW_COLORS = { Selenium: '#43B02A', Cypress: '#00BFA5', Playwright: '#E2574C', Both: '#C9A227', k6: '#7D64FF', Pytest: '#3776AB', Postman: '#FF6C37' };
+        const fwColor = FW_COLORS[item.framework] || '#4f86e8';
+        const timeStr = (() => {
+          if (!item.date) return '—';
+          const diff = (Date.now() - new Date(item.date)) / 1000;
+          if (isNaN(diff)) return '—';
+          if (diff < 60) return `${Math.floor(diff)}s ago`;
+          if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+          if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+          return `${Math.floor(diff / 86400)}d ago`;
+        })();
+        return (
+          <div key={i}
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 20px', borderBottom: i < Math.min(topUrls.length, 3) - 1 ? '1px solid var(--border3)' : 'none', transition: 'background .15s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, marginTop: 1, background: isOk ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)', border: `2px solid ${isOk ? '#10b981' : '#ef4444'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isOk
+                ? <svg width="10" height="10" fill="none" stroke="#10b981" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                : <svg width="10" height="10" fill="none" stroke="#ef4444" strokeWidth="3" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              }
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 4, lineHeight: 1.5 }}>
+                {isOk ? (
+                  <>
+                    <span style={{ color: 'var(--muted)' }}>{item.framework} tests completed on </span>
+                    <span style={{ color: 'var(--indigo2)', cursor: 'pointer' }}
+                      onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+                      onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                      onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
+                      {item.url}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ color: 'var(--muted)' }}>{item.framework} scan failed on </span>
+                    <span style={{ color: 'var(--indigo2)', cursor: 'pointer' }}
+                      onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+                      onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                      onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
+                      {item.url}
+                    </span>
+                  </>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: isOk ? 0 : 4 }}>
+                {item.tests} tests · Pass rate: <span style={{ color: rc, fontWeight: 700 }}>{rate}%</span>
+              </div>
+              {!isOk && (
+                <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>
+                  {item.tests - item.pass} critical issue{(item.tests - item.pass) > 1 ? 's' : ''} found
+                </div>
               )}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: isOk ? 0 : 4 }}>
-              {item.tests} tests · Pass rate: <span style={{ color: rc, fontWeight: 700 }}>{rate}%</span>
+            <div style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              {timeStr}
             </div>
-            {!isOk && (
-              <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>
-                {item.tests - item.pass} critical issue{(item.tests - item.pass) > 1 ? 's' : ''} found
-              </div>
-            )}
           </div>
-
-          {/* Time */}
-          <div style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>
-            {timeStr}
-          </div>
-        </div>
-      );
-    })}
+        );
+      })}
+    </div>
   </div>
-</div>
-{/* ── AI INSIGHTS ── */}
+
+  {/* ── AI INSIGHTS ── */}
   <AIInsights stats={stats} topUrls={topUrls} typeData={typeData} />
 
 </div>
@@ -1751,13 +1923,11 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
       </div>
 
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '24px', opacity: .5 }}>
-              <div style={{ height: 14, borderRadius: 4, background: 'var(--border)', width: '40%', marginBottom: 10 }} />
-              <div style={{ height: 11, borderRadius: 4, background: 'var(--border)', width: '60%' }} />
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 32px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, gap: 20 }}>
+          <LogoSpinner size={80} />
+          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
+            Loading Projects...
+          </div>
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 32px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, textAlign: 'center' }}>
@@ -2244,13 +2414,11 @@ const paginatedCards = urlCards.slice(
       )}
 
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, opacity: .5 }}>
-              <div style={{ height: 14, borderRadius: 4, background: 'var(--border)', width: '40%', marginBottom: 10 }} />
-              <div style={{ height: 10, borderRadius: 4, background: 'var(--border)', width: '60%' }} />
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 32px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, gap: 20 }}>
+          <LogoSpinner size={80} />
+          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
+            Loading Project...
+          </div>
         </div>
       ) : urlCards.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 32px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, textAlign: 'center' }}>
@@ -2456,239 +2624,357 @@ const paginatedCards = urlCards.slice(
   );
 }
 
-// CreateProjectPanel Page 
+const PROJECT_TYPES = [
+  { id: 'public',  label: 'Public website',    desc: 'Landing pages, marketing sites, storefronts', Icon: Globe,     accent: '#4F86E8' },
+  { id: 'private', label: 'Private application', desc: 'Internal tools, back-office, intranets',     Icon: Lock,      accent: '#6D5DFC' },
+];
+ 
+const FRAMEWORKS = [
+  { id: 'selenium',    name: 'Selenium',    desc: 'Cross-browser E2E automation',      lang: 'Java / Python', difficulty: 'Medium', ai: true,  badge: 'Se' },
+  { id: 'playwright',  name: 'Playwright',  desc: 'Fast, reliable browser automation', lang: 'JS / TS',        difficulty: 'Easy',   ai: true,  badge: 'Pw' },
+  { id: 'cypress',     name: 'Cypress',     desc: 'Developer-friendly E2E testing',    lang: 'JS / TS',        difficulty: 'Easy',   ai: true,  badge: 'Cy' },
+  { id: 'requests',    name: 'Requests',    desc: 'Lightweight HTTP calls',            lang: 'Python',         difficulty: 'Easy',   ai: true,  badge: 'Rq' },
+  { id: 'beautifulsoup', name: 'BeautifulSoup', desc: 'HTML parsing and scraping',     lang: 'Python',         difficulty: 'Easy',   ai: false, badge: 'Bs' },
+  { id: 'jmeter',      name: 'JMeter',      desc: 'Load and performance testing',      lang: 'Java / XML',     difficulty: 'Medium', ai: false, badge: 'Jm' },
+  { id: 'k6',          name: 'K6',          desc: 'Modern scriptable load testing',    lang: 'JS',             difficulty: 'Medium', ai: true,  badge: 'K6' },
+  { id: 'postman',     name: 'Postman',     desc: 'API testing and collections',       lang: 'JSON',           difficulty: 'Easy',   ai: false, badge: 'Pm' },
+  { id: 'newman',      name: 'Newman',      desc: 'CLI runner for Postman suites',     lang: 'JS / CLI',       difficulty: 'Medium', ai: false, badge: 'Nw' },
+];
+ 
+const TEST_TYPES = ['Smoke', 'Regression', 'Functional', 'Performance', 'Accessibility', 'SEO', 'Security', 'Responsive', 'Cross browser'];
+ 
+const ENVIRONMENTS = ['Development', 'Staging', 'Production'];
+ 
+const RECENT_PROJECTS = [
+  { name: 'Auth Service QA', type: 'private', tests: 42 },
+  { name: 'Checkout Suite',  type: 'public',  tests: 28 },
+  { name: 'Internal Gateway', type: 'api',    tests: 15 },
+];
+ 
 export function CreateProjectPanel({ onProjectCreated }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [nameError, setNameError] = useState('');
+
   const [projectType, setProjectType] = useState(null);
-  const [name,        setName]        = useState('');
+  const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [submitting,  setSubmitting]  = useState(false);
-  const [nameError,   setNameError]   = useState('');
-  const inputRef = useRef(null);
 
-  const isReady = projectType !== null && name.trim().length > 0;
-  const TAG_ICONS = {
-  Smoke: IconFlame,
-  Functional: IconCircleCheck,
-  Performance: IconGauge,
-  Seo: IconSearch,
-  Regression: IconHistory,
-  Security: IconShieldCheck,
-  API: IconApi,
-};
+  const nameRef = useRef(null);
 
-const FW_ICONS = {
-  Selenium: IconFlask2,
-  Cypress: IconComponents,
-  Playwright: IconPlayerPlay,
-  'Requests + BeautifulSoup': IconCode,
-  K6: IconActivity,
-  Postman: IconSend,
-};
-  const SUGGESTIONS = {
-    public:   ['Login Flow QA', 'Homepage E2E', 'Checkout Suite', 'Auth Regression'],
-    internal: ['API Auth Tests', 'Internal Gateway', 'Microservice Suite', 'CI Security Scan'],
-  };
+  const stepDone = [!!projectType, name.trim().length > 0, description.trim().length > 0];
+  const weights = [40, 40, 20];
+  const progress = Math.round(
+    stepDone.reduce((sum, done, i) => sum + (done ? weights[i] : 0), 0)
+  );
+  const isReady = stepDone[0] && stepDone[1];
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!name.trim()) { setNameError('Project name is required'); inputRef.current?.focus(); return; }
+  const handleSubmit = async () => {
+    if (!name.trim()) { setNameError('Project name is required'); nameRef.current?.focus(); return; }
     if (!projectType) return;
     setSubmitting(true);
     try {
-      const res = await api.post('/projects', { name: name.trim(), type: projectType, description: description.trim() });
+      const res = await api.post('/projects', {
+        name: name.trim(), type: projectType, description: description.trim(),
+      });
       onProjectCreated(res.data);
-    } catch (err) { console.error(err); setNameError('Error creating project, try again.'); }
+    } catch (err) {
+      console.error(err);
+      setNameError('Error creating project, try again.');
+    }
     setSubmitting(false);
   };
 
-  const fwConf = projectType === 'public' ? { bc: '#4f86e8', bshadow: 'rgba(79,134,232,.35)' } : projectType === 'internal' ? { bc: '#8b5cf6', bshadow: 'rgba(139,92,246,.35)' } : {};
-  const CheckIcon = (<svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>);
+  const selectedType = PROJECT_TYPES.find(t => t.id === projectType);
 
-  const steps = [
-    { n: 1, label: 'Project Type', val: projectType ? (projectType === 'public' ? '🌐 Public Test' : '🔒 Internal Test') : 'Not selected yet', done: !!projectType, active: !projectType },
-    { n: 2, label: 'Project Name', val: name.trim() || 'Enter a name…', done: name.trim().length > 0, active: !!projectType && !name.trim() },
-    { n: 3, label: 'Description', val: description.trim() ? description.trim().slice(0, 30) + (description.length > 30 ? '…' : '') : 'Optional — skip if not needed', done: description.trim().length > 0, active: !!projectType && name.trim().length > 0 },
-    { n: 4, label: 'Launch Project', val: isReady ? 'Ready to launch ' : 'Complete fields above', done: false, active: isReady },
-  ];
+  const TYPE_COLORS = {
+    public:  { tc: '#4F86E8', tg: 'rgba(79,134,232,.1)',  tb: 'rgba(79,134,232,.3)'  },
+    private: { tc: '#6D5DFC', tg: 'rgba(109,93,252,.1)',  tb: 'rgba(109,93,252,.3)'  },
+    api:     { tc: '#10B981', tg: 'rgba(16,185,129,.1)',  tb: 'rgba(16,185,129,.3)'  },
+    mobile:  { tc: '#F59E0B', tg: 'rgba(245,158,11,.1)',  tb: 'rgba(245,158,11,.3)'  },
+  };
 
   return (
-    <div className="cpv5-root">
-      <div className="p-header" style={{ marginBottom: 32 }}>
+    <div className="panel">
+      <div className="p-header">
         <div>
-          <h1 className="p-title">New <span className="g">Project</span></h1>
-          <p className="p-sub">Configure your project — your test options will adapt to the type you choose.</p>
+          <h1 className="p-title">Create new <span className="g">project</span></h1>
+          <p className="p-sub">Build your testing workspace in a few steps.</p>
         </div>
-        {isReady && (<div className="gp-ready-badge"><span className="gp-ready-dot" />Ready to launch</div>)}
       </div>
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20, alignItems: 'start' }}>
-          <div className="cpv5-left">
-            <div className="cpv5-section">
-              <div className="cpv5-section-header">
-                <span className="cpv5-sec-num">01</span>
-                <div><div className="cpv5-sec-title">Project Type</div><div className="cpv5-sec-sub">Choose the kind of application you want to test</div></div>
-              </div>
-              <div className="cpv5-type-grid">
-                <div className={`cpv5-type-card${projectType === 'public' ? ' selected' : ''}`} style={{ '--tc': '#4f86e8', '--tg': 'rgba(79,134,232,.1)', '--tb': 'rgba(79,134,232,.25)' }} onClick={() => setProjectType('public')}>
-  <div className="cpv5-type-top"><div className="cpv5-type-icon" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:44, height:44, borderRadius:12, background:'rgba(79,134,232,.12)', border:'1px solid rgba(79,134,232,.25)' }}><IconWorld size={24} stroke={1.6} style={{ color:'#4f86e8' }} /></div>{projectType === 'public' && <div className="cpv5-type-check">{CheckIcon}</div>}</div>
-                  <div className="cpv5-type-name">Public Test</div>
-                  <div className="cpv5-type-desc">Web apps, landing pages & user-facing interfaces</div>
-                  <div className="cpv5-type-tags">
-  {['Smoke', 'Functional', 'Performance', 'Seo'].map(tag => {
-    const Icon = TAG_ICONS[tag];
-    return <span key={tag}><Icon size={11} stroke={2} style={{ marginRight: 3, verticalAlign: -1 }} />{tag}</span>;
-  })}
-</div>
-<div className="cpv5-type-fws">
-  {[
-    { name: 'Selenium', color: '#44d128' },
-    { name: 'Cypress', color: '#00BFA5' },
-    { name: 'Playwright', color: '#E2574C' },
-    { name: 'Requests + BeautifulSoup', color: '#FFD43B' },
-  ].map(fw => {
-    const Icon = FW_ICONS[fw.name];
-    return (
-      <span key={fw.name} style={{ color: fw.color }}>
-        <Icon size={12} stroke={2} style={{ marginRight: 4, verticalAlign: -2 }} />{fw.name}
-      </span>
-    );
-  })}
-</div>
-                  <div className="cpv5-type-edge" />
-                </div>
-               <div className={`cpv5-type-card${projectType === 'internal' ? ' selected' : ''}`} style={{ '--tc': '#8b5cf6', '--tg': 'rgba(139,92,246,.1)', '--tb': 'rgba(139,92,246,.25)' }} onClick={() => setProjectType('internal')}>
-  <div className="cpv5-type-top">
-    <div className="cpv5-type-icon" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:44, height:44, borderRadius:12, background:'rgba(139,92,246,.12)', border:'1px solid rgba(139,92,246,.25)' }}>
-      <IconLock size={24} stroke={1.6} style={{ color:'#8b5cf6' }} />
-    </div>
-    {projectType === 'internal' && <div className="cpv5-type-check">{CheckIcon}</div>}
-  </div>
-  <div className="cpv5-type-name">Private / API Test</div>
-  <div className="cpv5-type-desc">APIs, microservices & private infrastructure</div>
-  <div className="cpv5-type-tags">
-  {['Performance', 'Functional', 'Smoke', 'Regression', 'Security', 'API'].map(tag => {
-    const Icon = TAG_ICONS[tag];
-    return <span key={tag}><Icon size={11} stroke={2} style={{ marginRight: 3, verticalAlign: -1 }} />{tag}</span>;
-  })}
-</div>
-<div className="cpv5-type-fws">
-  {[
-    { name: 'Playwright', color: '#E2574C' },
-    { name: 'Selenium', color: '#43B02A' },
-    { name: 'Cypress', color: '#00BFA5' },
-    { name: 'K6', color: '#7D64FF' },
-    { name: 'Postman', color: '#FF6C37' },
-    { name: 'Requests + BeautifulSoup', color: '#FFD43B' },
-  ].map(fw => {
-    const Icon = FW_ICONS[fw.name];
-    return (
-      <span key={fw.name} style={{ color: fw.color }}>
-        <Icon size={12} stroke={2} style={{ marginRight: 4, verticalAlign: -2 }} />{fw.name}
-      </span>
-    );
-  })}
-</div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
 
-  <div className="cpv5-type-edge" />
-</div>
+        {/* ── LEFT COLUMN ── */}
+        <div className="cpv5-left">
+
+          {/* Step 1 — Project type */}
+          <div className="cpv5-section">
+            <div className="cpv5-section-header">
+              <span className="cpv5-sec-num">01</span>
+              <div>
+                <div className="cpv5-sec-title">Project type</div>
+                <div className="cpv5-sec-sub">What are we testing?</div>
               </div>
             </div>
-            <div className="cpv5-section">
-              <div className="cpv5-section-header">
-                <span className="cpv5-sec-num">02</span>
-                <div><div className="cpv5-sec-title">Project Name</div><div className="cpv5-sec-sub">Give your project a clear, descriptive name</div></div>
-              </div>
-              <div className={`cpv5-input-wrap${nameError ? ' error' : ''}${name ? ' filled' : ''}`}>
-            <IconTag size={15} stroke={2} className="cpv5-input-ico" />
-<input
-  ref={inputRef}
-  className="cpv5-input"
-  type="text"
-  placeholder="Auth Service QA"
-  value={name}
-  maxLength={60}
-  onChange={e => { setName(e.target.value); setNameError(''); }}
-  onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
-  autoComplete="off"
-/>
-                {name.length > 0 && <span className="cpv5-input-count">{name.length}/60</span>}
-              </div>
-              {nameError && (<div className="cpv5-error"><svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>{nameError}</div>)}
-              {projectType && (
-                <div className="cpv5-suggestions">
-                  {SUGGESTIONS[projectType].map(s => (
-                    <button key={s} type="button" className="cpv5-sug"
-                      style={projectType === 'public' ? { '--sc': '#4f86e8', '--sb': 'rgba(79,134,232,.08)', '--sbo': 'rgba(79,134,232,.2)' } : { '--sc': '#8b5cf6', '--sb': 'rgba(139,92,246,.08)', '--sbo': 'rgba(139,92,246,.2)' }}
-                      onClick={() => { setName(s); setNameError(''); }}>{s}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="cpv5-section">
-              <div className="cpv5-section-header">
-                <span className="cpv5-sec-num">03</span>
-                <div>
-                  <div className="cpv5-sec-title">Description <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, padding: '2px 8px', marginLeft: 8 }}>optional</span></div>
-                  <div className="cpv5-sec-sub">Briefly describe what this project tests</div>
-                </div>
-              </div>
-              <div className="cpv5-textarea-wrap" style={{ position: 'relative' }}>
-  <IconAlignLeft size={15} stroke={2} style={{ position: 'absolute', top: 14, left: 14, color: 'var(--muted)' }} />
-  <textarea className="cpv5-textarea" style={{ paddingLeft: 38 }} placeholder="Describe the test scope, target environment, and key scenarios this suite should cover." value={description} maxLength={280} rows={4} onChange={e => setDescription(e.target.value)} />
-  {description.length > 0 && <span className="cpv5-textarea-count">{description.length}/280</span>}
-</div>
-              <div className="cpv5-optional-hint"><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>You can always add or edit the description later from project settings.</div>
-            </div>
-            <button type="submit" className={`cpv5-submit${isReady ? ' colored' : ''}`} disabled={submitting || !isReady} style={projectType ? { '--bc': fwConf.bc, '--bshadow': fwConf.bshadow } : {}}>
-              {submitting ? (<><span className="spinner" /> Creating project…</>) : (<><svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>{isReady ? 'Launch Project →' : 'Fill in the fields above'}</>)}
-            </button>
-          </div>
-          <div className="cpv5-right">
-            <div className="cpv5-progress-card">
-              <div className="cpv5-progress-head"><span className="cpv5-progress-head-dot" />Project Setup</div>
-              <div className="cpv5-steps">
-                {steps.map((s, i) => (
-                  <div key={s.n} className="cpv5-step-row">
-                    <div className="cpv5-step-left">
-                      <div className={`cpv5-step-circle${s.done ? ' done' : s.active ? ' active' : ''}`}>
-                        {s.done ? (<svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>) : s.n}
+            <div className="cpv5-type-grid">
+              {PROJECT_TYPES.map(t => {
+                const active = projectType === t.id;
+                const c = TYPE_COLORS[t.id] || TYPE_COLORS.public;
+                return (
+                  <div
+                    key={t.id}
+                    className={`cpv5-type-card${active ? ' selected' : ''}`}
+                    style={{ '--tc': c.tc, '--tg': c.tg, '--tb': c.tb }}
+                    onClick={() => setProjectType(t.id)}
+                  >
+                    <div className="cpv5-type-top">
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 10,
+                        background: c.tg, border: `1px solid ${c.tb}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <t.Icon size={19} style={{ color: c.tc }} />
                       </div>
-                      {i < steps.length - 1 && (<div className={`cpv5-step-line${s.done ? ' done' : ''}`} />)}
+                      {active && (
+                        <div className="cpv5-type-check">
+                          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                        </div>
+                      )}
                     </div>
-                    <div className="cpv5-step-body">
-                      <div className={`cpv5-step-title${s.done ? ' done' : s.active ? ' active' : ''}`}>{s.label}</div>
-                      <div className={`cpv5-step-val${s.done || (s.active && s.val !== 'Not selected yet' && s.val !== 'Enter a name…') ? ' filled' : ''}`}>{s.val}</div>
-                    </div>
+                    <div className="cpv5-type-name">{t.label}</div>
+                    <div className="cpv5-type-desc">{t.desc}</div>
+                    <div className="cpv5-type-edge" />
                   </div>
-                ))}
+                );
+              })}
+            </div>
+          </div>
+
+  {/* Step 2 — Basic info */}
+<div className="cpv5-section">
+  <div className="cpv5-section-header">
+    <span className="cpv5-sec-num">02</span>
+    <div>
+      <div className="cpv5-sec-title">Project name</div>
+      <div className="cpv5-sec-sub">Give your project a name</div>
+    </div>
+  </div>
+
+            <div className={`cpv5-input-wrap${name ? ' filled' : ''}${nameError ? ' error' : ''}`}>
+  <span className="cpv5-input-ico"><FileText size={16} /></span>
+              <input
+                ref={nameRef}
+                className="cpv5-input"
+                placeholder="Project name — e.g. Auth Service QA"
+                value={name}
+                onChange={e => { setName(e.target.value); setNameError(''); }}
+                maxLength={60}
+              />
+              <span className="cpv5-input-count">{name.length}/60</span>
+            </div>
+            {nameError && (
+              <div className="cpv5-error">
+                <Info size={12} />{nameError}
               </div>
-              <div className={`cpv5-summary-status${isReady ? ' ready' : ' waiting'}`}>
-                <span className={`cpv5-status-dot${isReady ? ' ready' : ''}`} />
-                {isReady ? 'Ready to launch your project' : 'Complete the required fields'}
+            )}
+          </div>
+
+          {/* Step 3 — Description */}
+          <div className="cpv5-section">
+            <div className="cpv5-section-header">
+              <span className="cpv5-sec-num">03</span>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="cpv5-sec-title">Description</div>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                    color: 'var(--indigo3)', background: 'var(--indigo-bg)',
+                    border: '1px solid var(--indigo-border)', borderRadius: 8,
+                    padding: '1px 7px', textTransform: 'uppercase',
+                  }}>
+                    Optional
+                  </span>
+                </div>
+                <div className="cpv5-sec-sub">Add context about your project</div>
               </div>
             </div>
-            <div className="cpv5-tips-card">
-              <div className="cpv5-tips-head"><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>What happens next</div>
-              <div className="cpv5-tips-body">
-                {[
-  { Icon: IconLink,     color: '#4f86e8', text: 'Enter the URL or API endpoint you want to test' },
-  { Icon: IconTarget,   color: '#8b5cf6', text: 'Choose your test type: Smoke, Functional, or Performance' },
-  { Icon: IconBolt,     color: '#f59e0b', text: 'Select a framework' },
-  { Icon: IconFileText, color: '#10b981', text: 'Download your generated test scripts instantly' },
-].map((tip, i) => (
-  <div key={i} className="cpv5-tip-row">
-    <div className="cpv5-tip-icon" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:28, height:28, borderRadius:8, background:`${tip.color}15`, border:`1px solid ${tip.color}30`, flexShrink:0 }}>
-      <tip.Icon size={14} stroke={1.8} style={{ color: tip.color }} />
-    </div>
-    <div className="cpv5-tip-text">{tip.text}</div>
-  </div>
-))}
+            <div className="cpv5-textarea-wrap">
+  <span className="cpv5-textarea-ico"><IconAlignLeft size={16} /></span>
+  <textarea
+    className="cpv5-textarea"
+    rows={4}
+    maxLength={280}
+    placeholder="Briefly describe what this project tests…"
+    value={description}
+    onChange={e => setDescription(e.target.value)}
+  />
+  <span className="cpv5-textarea-count">{description.length}/280</span>
+</div>
+          </div>
+
+          {/* Submit */}
+          <button
+            className={`cpv5-submit${isReady ? ' colored' : ''}`}
+            style={isReady ? { '--bc': '#6D5DFC', '--bshadow': 'rgba(109,93,252,.35)' } : {}}
+            disabled={!isReady || submitting}
+            onClick={handleSubmit}
+          >
+            {submitting ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />}
+            Launch project
+          </button>
+        </div>
+
+        {/* ── RIGHT COLUMN ── */}
+        <div className="cpv5-right">
+
+          {/* ── Progress card (v6 — carte unique, plus de doublon) ── */}
+          <div className="cpv6-progress-outer">
+
+            <div className="cpv6-progress-badge">
+              <span className="cpv6-progress-badge-dot" />
+              Progress
+            </div>
+
+            <div className="cpv6-progress-top">
+              <div className="cpv6-ring-wrap">
+                <svg width="88" height="88" viewBox="0 0 88 88">
+                  <circle
+                    cx="44" cy="44" r="38"
+                    fill="none" stroke="rgba(109,93,252,.15)"
+                    strokeWidth="6"
+                  />
+                  <circle
+                    cx="44" cy="44" r="38"
+                    fill="none"
+                    stroke="url(#cpv6-grad)"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 38}
+                    strokeDashoffset={2 * Math.PI * 38 * (1 - progress / 100)}
+                    style={{
+                      transform: 'rotate(-90deg)',
+                      transformOrigin: '44px 44px',
+                      transition: 'stroke-dashoffset 500ms cubic-bezier(.4,0,.2,1)',
+                    }}
+                  />
+                  <defs>
+                    <linearGradient id="cpv6-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#6D5DFC" />
+                      <stop offset="100%" stopColor="#4F86E8" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="cpv6-ring-label">
+                  <span className="cpv6-ring-pct">{progress}%</span>
+                </div>
               </div>
+
+              <div className="cpv6-progress-headtext">
+                <div className="cpv6-progress-title">Setup progress</div>
+                <div className="cpv6-progress-subtitle">
+                  {progress === 100
+                    ? 'All set — ready to launch'
+                    : isReady
+                      ? 'Required fields complete'
+                      : `${stepDone.filter(Boolean).length} of ${stepDone.length} required steps done`}
+                </div>
+              </div>
+            </div>
+
+            <div className="cpv6-steps">
+              {[
+                { key: 'type', label: 'Project type', val: selectedType?.label, optional: false, weight: 40, Icon: selectedType?.Icon || Settings2, color: selectedType ? (TYPE_COLORS[projectType]?.tc) : '#6D5DFC' },
+                { key: 'name', label: 'Project name', val: name.trim(), optional: false, weight: 40, Icon: FileText, color: '#4F86E8' },
+                { key: 'desc', label: 'Description', val: description.trim(), optional: true, weight: 20, Icon: IconAlignLeft, color: '#10B981' },
+              ].map((s, i, arr) => {
+                const done = !!s.val;
+                return (
+                  <div key={s.key} className={`cpv6-step-row${done ? ' done' : ''}`} style={{ animationDelay: `${i * 60}ms` }}>
+                    <div
+                      className={`cpv6-step-icon${done ? ' done' : ''}`}
+                      style={done ? { '--sc': s.color, background: `${s.color}18`, borderColor: `${s.color}40`, color: s.color } : {}}
+                    >
+                      {done
+                        ? <Check size={13} className="cpv6-step-check-pop" />
+                        : <s.Icon size={13} />}
+                    </div>
+                    <div className="cpv6-step-body">
+                      <div className="cpv6-step-title-row">
+                        <span className="cpv6-step-title">{s.label}</span>
+                        <span className="cpv6-step-weight">{s.weight}%</span>
+                        {s.optional && !done && <span className="cpv6-step-optional">optional</span>}
+                      </div>
+                      <div className={`cpv6-step-val${done ? ' filled' : ''}`}>
+                        {s.val || (s.optional ? 'Skipped' : 'Waiting for input')}
+                      </div>
+                    </div>
+                    {i < arr.length - 1 && <div className="cpv6-step-connector" />}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className={`cpv6-status ${isReady ? 'ready' : 'waiting'}`}>
+  <span className={`cpv6-status-dot ${isReady ? 'ready-pulse' : ''}`} />
+  {isReady ? 'Ready to launch 🚀' : `${100 - progress}% left`}
+</div>
+          </div>
+
+          {/* What happens next card */}
+          <div className="gp4-how-card">
+            <div className="gp4-how-head">
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+              What happens next
+            </div>
+            <div className="gp4-how-steps">
+              {[
+                { n: '01', title: 'Project created',        desc: 'Your workspace is set up instantly with the type and name you chose.',            Icon: IconFolder, color: '#6D5DFC' },
+                { n: '02', title: 'Add your first target',   desc: 'Enter a URL or endpoint you want to test, public or internal.',                    Icon: IconLink,   color: '#0EA5E9' },
+                { n: '03', title: 'Generate tests with AI',  desc: 'Pick a test type and framework — NexTest scans the target and writes the tests.',   Icon: IconRobot,  color: '#F59E0B' },
+                { n: '04', title: 'Review & export results', desc: 'Get pass/fail results, AI insights, and download PDF/HTML/CSV reports.',            Icon: IconFileText, color: '#10B981' },
+              ].map((s, i, arr) => (
+                <div key={s.n} className="gp4-how-step">
+                  <div className="gp4-how-step-left">
+                    <div
+                      className="gp4-how-circle"
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: s.color,
+                        background: `${s.color}18`,
+                        border: `1px solid ${s.color}40`,
+                      }}
+                    >
+                      <s.Icon size={15} stroke={1.8} />
+                    </div>
+                    {i < arr.length - 1 && <div className="gp4-how-line" />}
+                  </div>
+                  <div className="gp4-how-body">
+                    <div className="gp4-how-title">{s.title}</div>
+                    <div className="gp4-how-desc">{s.desc}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </form>
+      </div>
+    </div>
+  );
+}
+function SummaryTile({ label, value, span }) {
+  return (
+    <div className={`rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 ${span ? 'col-span-2' : ''}`}>
+      <div className="mb-1 text-[9.5px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="truncate text-[13px] font-semibold text-slate-100">{value}</div>
+    </div>
+  );
+}
+ 
+function SidebarRow({ label, value, valueClass = 'text-slate-200' }) {
+  return (
+    <div className="flex items-center justify-between text-[12px]">
+      <span className="text-slate-500">{label}</span>
+      <span className={`font-semibold ${valueClass}`}>{value}</span>
     </div>
   );
 }
@@ -2717,7 +3003,7 @@ const [dragOver, setDragOver] = useState(false);
   try { new URL(initialUrl); return true; } catch { return false; }
 });
 
-  const isInternal = project?.type === 'internal';
+  const isInternal = project?.type === 'private';
 
  
 
@@ -2754,13 +3040,14 @@ const REGRESSION_FRAMEWORKS = [
   { key: 'Pytest',   color: '#3776AB', letters: 'Py', letterClass: 'gp4-letter-pytest',  note: 'requests' },
   { key: 'Postman',  color: '#FF6C37', letters: 'Po', letterClass: 'gp4-letter-postman', note: 'Newman CLI' },
   ];
-  const PERFORMANCE_FRAMEWORKS = [{ key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl', note: 'Web Vitals' }];
+  const PERFORMANCE_FRAMEWORKS_PUBLIC   = [{ key: 'Playwright', color: '#E2574C', letters: 'Pl', letterClass: 'gp4-letter-pl', note: 'Web Vitals' }];
+const PERFORMANCE_FRAMEWORKS_INTERNAL = [{ key: 'k6', color: '#7D64FF', letters: 'k6', letterClass: 'gp4-letter-k6', note: 'Load Test' }];
   const SEO_FRAMEWORKS = [{ key: 'Requests', color: '#10b981', letters: 'RQ', letterClass: 'gp4-letter-api', note: 'BeautifulSoup' },
 ];
 
   const TEST_TYPES = isInternal ? INTERNAL_TEST_TYPES : PUBLIC_TEST_TYPES;
   const FRAMEWORKS = testType === 'performance'
-  ? PERFORMANCE_FRAMEWORKS
+  ? (isInternal ? PERFORMANCE_FRAMEWORKS_INTERNAL : PERFORMANCE_FRAMEWORKS_PUBLIC)
   : testType === 'api'
   ? API_FRAMEWORKS
   : testType === 'security'  ? SECURITY_FRAMEWORKS 
@@ -2836,7 +3123,7 @@ const payload = testType === 'api'
     password,   
   }
 
-  : testType === 'security'
+ : testType === 'security'
 ? {
     url,
     project_id:   project?.id,
@@ -2844,6 +3131,8 @@ const payload = testType === 'api'
     project_type: project?.type,
     anpe_token:   localStorage.getItem('token') || '',
     categories:   null,
+    username,
+    password,
   }
   
 
@@ -4561,9 +4850,11 @@ const sectionDetailedMetrics = `
           <h1 className="p-title">Performance <span className="g">Test</span></h1>
           <div className="ep-info-bar">
             <div className="ep-info-chip">
-              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10"/></svg>
-              <span>{url}</span>
-            </div>
+  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+  <span title={url}>{url}</span>
+</div>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, padding: '3px 10px', borderRadius: 20, textTransform: 'uppercase', background: 'rgba(99,102,241,.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,.2)' }}>{siteType}</span>
           </div>
         </div>
@@ -4582,7 +4873,8 @@ const sectionDetailedMetrics = `
               link.href = URL.createObjectURL(blob);
               link.download = 'performance_playwright.py';
               link.click();
-            }} className="ep-dl-btn">
+            }} className="ep-dl-btn"
+              style={{ background: 'transparent', border: '1px solid rgba(125,100,255,.35)', color: '#7D64FF' }}>
               <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               <span className="ep-dl-letters" style={{ color: '#E2574C' }}>Pl</span> .py
             </button>
@@ -4681,12 +4973,13 @@ const sectionDetailedMetrics = `
       {/* ── STAT CARDS ── */}
       <div className="ep-stats" style={{ marginBottom: 24, opacity: running ? 0.4 : 1, transition: 'opacity .3s' }}>
         {[
-          { label: 'Passed',    val: running ? 0 : pass,         color: '#10B981', bg: 'rgba(16,185,129,.08)', border: 'rgba(16,185,129,.2)'},
-          { label: 'Failed',    val: running ? 0 : fail,         color: '#EF4444', bg: 'rgba(239,68,68,.08)',  border: 'rgba(239,68,68,.2)'},
-          { label: 'Warn/Skip', val: running ? 0 : skip,         color: '#F59E0B', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.2)'},
-          { label: 'Score',     val: running ? '—' : `${score}`, color: scoreColor, bg: `${scoreColor}12`,     border: `${scoreColor}33` },
+          { label: 'Passed',    val: running ? 0 : pass,         color: '#10B981', bg: 'rgba(16,185,129,.08)', border: 'rgba(16,185,129,.2)', icon: <svg width="18" height="18" fill="none" stroke="#10B981" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> },
+          { label: 'Failed',    val: running ? 0 : fail,         color: '#EF4444', bg: 'rgba(239,68,68,.08)',  border: 'rgba(239,68,68,.2)', icon: <svg width="18" height="18" fill="none" stroke="#EF4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg> },
+          { label: 'Warn/Skip', val: running ? 0 : skip,         color: '#F59E0B', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.2)', icon: <svg width="18" height="18" fill="none" stroke="#F59E0B" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg> },
+          { label: 'Score',     val: running ? '—' : `${score}`, color: scoreColor, bg: `${scoreColor}12`,     border: `${scoreColor}33`, icon: <svg width="18" height="18" fill="none" stroke={running ? 'var(--muted)' : scoreColor} strokeWidth="2.5" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
         ].map((s, i) => (
           <div key={s.label} className="ep-stat" style={{ '--sc': s.color, '--sb': s.bg, '--sbo': s.border, '--i': i }}>
+            <div className="ep-stat-icon">{s.icon}</div>
             <div className="ep-stat-body"><div className="ep-stat-val" style={{ color: s.color }}>{s.val}</div><div className="ep-stat-lbl">{s.label}</div></div>
           </div>
         ))}
@@ -4695,10 +4988,10 @@ const sectionDetailedMetrics = `
       {/* ── KEY METRICS ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
-  { key: 'load_time_ms', label: 'Load Time', icon: <IconActivity size={22} stroke={1.5} style={{ color: '#6366f1' }} />, unit: 'ms' },
-  { key: 'fcp_ms',       label: 'FCP',       icon: <IconFlame    size={22} stroke={1.5} style={{ color: '#f97316' }} />, unit: 'ms' },
-  { key: 'lcp_ms',       label: 'LCP',       icon: <IconTarget   size={22} stroke={1.5} style={{ color: '#10b981' }} />, unit: 'ms' },
-  { key: 'tti_ms',       label: 'TTI',       icon: <IconBolt     size={22} stroke={1.5} style={{ color: '#f59e0b' }} />, unit: 'ms' },
+  { key: 'load_time_ms', label: 'Load Time', fullName: 'Load Time', icon: <IconActivity size={22} stroke={1.5} style={{ color: '#6366f1' }} />, unit: 'ms', accent: '#6366f1' },
+  { key: 'fcp_ms',       label: 'FCP',       fullName: 'First Contentful Paint', icon: <IconFlame    size={22} stroke={1.5} style={{ color: '#f97316' }} />, unit: 'ms', accent: '#f97316' },
+  { key: 'lcp_ms',       label: 'LCP',       fullName: 'Largest Contentful Paint', icon: <IconTarget   size={22} stroke={1.5} style={{ color: '#10b981' }} />, unit: 'ms', accent: '#10b981' },
+  { key: 'tti_ms',       label: 'TTI',       fullName: 'Time to Interactive', icon: <IconBolt     size={22} stroke={1.5} style={{ color: '#f59e0b' }} />, unit: 'ms', accent: '#f59e0b' },
         ].map(m => {
           const val   = running ? null : (metrics[m.key] ?? perf?.[m.key] ?? null);
           const test  = tests.find(t => t.metric_key === m.key);
@@ -4714,13 +5007,17 @@ const sectionDetailedMetrics = `
       </div>
 {/* ── TABS ── */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0, opacity: running ? 0.3 : 1, pointerEvents: running ? 'none' : 'auto', transition: 'opacity .3s' }}>
-        {[{ key: 'metrics', label: '📊 Metrics', count: running ? 0 : tests.length }, { key: 'recommendations', label: '💡 Recommendations', count: running ? 0 : recs.length }].map(tab => (
-          <button key={tab.key} onClick={() => setActiveSection(tab.key)}
-            style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 700, color: activeSection === tab.key ? 'var(--indigo2)' : 'var(--muted)', borderBottom: activeSection === tab.key ? '2px solid var(--indigo2)' : '2px solid transparent', marginBottom: -1, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {tab.label}
-            <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: activeSection === tab.key ? 'var(--indigo-bg)' : 'var(--bg2)', color: activeSection === tab.key ? 'var(--indigo2)' : 'var(--muted)' }}>{tab.count}</span>
-          </button>
-        ))}
+        {[
+  { key: 'metrics', label: 'Metrics', Icon: IconChartBar, count: running ? 0 : tests.length },
+  { key: 'recommendations', label: 'Recommendations', Icon: IconBulb, count: running ? 0 : recs.length },
+].map(tab => (
+  <button key={tab.key} onClick={() => setActiveSection(tab.key)}
+    style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 700, color: activeSection === tab.key ? 'var(--indigo2)' : 'var(--muted)', borderBottom: activeSection === tab.key ? '2px solid var(--indigo2)' : '2px solid transparent', marginBottom: -1, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: 8 }}>
+    <tab.Icon size={15} stroke={1.8} />
+    {tab.label}
+    <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: activeSection === tab.key ? 'var(--indigo-bg)' : 'var(--bg2)', color: activeSection === tab.key ? 'var(--indigo2)' : 'var(--muted)' }}>{tab.count}</span>
+  </button>
+))}
       </div>
 {running ? (
         <div style={{
@@ -4785,19 +5082,28 @@ const sectionDetailedMetrics = `
           {SECTIONS.map(sec => {
             const secTests = bySection[sec] || [];
             if (!secTests.length) return null;
+            const SECTION_ICONS = {
+              timing:  IconActivity,
+              network: IconWorldSearch,
+              assets:  IconChartArea,
+              dom:     IconChartDonut,
+            };
+            const SecIcon = SECTION_ICONS[sec];
             return (
               <div key={sec}>
                 <div style={{ padding: '8px 20px', background: `${SECTION_COLORS[sec]}08`, borderBottom: '1px solid var(--border)', fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: SECTION_COLORS[sec], display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {(() => {
-  const SECTION_ICONS = {
-    timing:  <IconActivity   size={13} stroke={1.5} />,
-    network: <IconWorldSearch size={13} stroke={1.5} />,
-    assets:  <IconChartArea  size={13} stroke={1.5} />,
-    dom:     <IconChartDonut size={13} stroke={1.5} />,
-  };
-  return <span style={{ color: SECTION_COLORS[sec] }}>{SECTION_ICONS[sec]}</span>;
-})()}
-{SECTION_LABELS[sec] || sec}
+                  {SecIcon && <span style={{ color: SECTION_COLORS[sec] }}><SecIcon size={13} stroke={1.5} /></span>}
+                  {SECTION_LABELS[sec] || sec}
+                  <InfoTooltip
+                    title={SECTION_LABELS[sec] || sec}
+                    text={getPerformanceSectionExplanation(sec)}
+                    icon={SecIcon ? <SecIcon size={14} color={SECTION_COLORS[sec]} /> : 'ℹ️'}
+                    accent={SECTION_COLORS[sec]}
+                    details={secTests.map(t => ({
+                      title: t.name.replace(/^[^\s]+\s/, ''),
+                      text: getPerformanceMetricExplanation(t.name),
+                    }))}
+                  />
                 </div>
                 {secTests.map((test, i) => (<PerformanceMetricRow key={test.id} test={test} index={i} />))}
               </div>
@@ -4855,20 +5161,24 @@ function K6MetricCard({ label, value, unit, good, threshold, color, icon }) {
   );
 }
  
+
+
 function K6TestTypeCard({ typeKey, data, active, onClick }) {
   const TYPE_CONFIG = {
-    load:   { label: 'Load Test',   icon: '📈', color: '#6366f1', desc: 'Normal expected traffic' },
-    stress: { label: 'Stress Test', icon: '🔥', color: '#ef4444', desc: 'Beyond capacity — breaking point' },
-    spike:  { label: 'Spike Test',  icon: '⚡', color: '#f59e0b', desc: 'Sudden traffic burst' },
-    soak:   { label: 'Soak Test',   icon: '🌊', color: '#0ea5e9', desc: 'Extended load — memory leaks' },
+    load:   { label: 'Load Test',   icon: TrendingUp, color: '#6366f1', desc: 'Normal expected traffic' },
+    stress: { label: 'Stress Test', icon: Flame,       color: '#ef4444', desc: 'Beyond capacity — breaking point' },
+    spike:  { label: 'Spike Test',  icon: Zap,         color: '#f59e0b', desc: 'Sudden traffic burst' },
+    soak:   { label: 'Soak Test',   icon: Waves,       color: '#0ea5e9', desc: 'Extended load — memory leaks' },
   };
-  const cfg    = TYPE_CONFIG[typeKey] || { label: typeKey, icon: '📊', color: '#6366f1', desc: '' };
-  const status = data?.status || 'unknown';
-  const sc     = status === 'pass' ? '#10b981' : status === 'fail' ? '#ef4444' : status === 'error' ? '#f59e0b' : '#64748b';
-  const metrics = data?.metrics || {};
-  const p95    = metrics.http_req_duration_p95;
-  const errRate = metrics.http_req_failed_rate;
- 
+  const cfg      = TYPE_CONFIG[typeKey] || { label: typeKey, icon: BarChart3, color: '#6366f1', desc: '' };
+  const Icon     = cfg.icon;
+  const status   = data?.status || 'unknown';
+  const sc       = status === 'pass' ? '#10b981' : status === 'fail' ? '#ef4444' : status === 'error' ? '#f59e0b' : '#64748b';
+  const StatusIcon = status === 'pass' ? CheckCircle2 : status === 'fail' ? XCircle : status === 'error' ? AlertTriangle : MinusCircle;
+  const metrics  = data?.metrics || {};
+  const p95      = metrics.http_req_duration_p95;
+  const errRate  = metrics.http_req_failed_rate;
+
   return (
     <div onClick={onClick} style={{
       background: active ? `${cfg.color}12` : 'var(--card)',
@@ -4882,7 +5192,13 @@ function K6TestTypeCard({ typeKey, data, active, onClick }) {
       {active && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,transparent,${cfg.color},transparent)` }} />}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 22 }}>{cfg.icon}</span>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: `${cfg.color}15`, border: `1px solid ${cfg.color}33`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Icon size={18} color={cfg.color} strokeWidth={2.25} />
+          </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: active ? cfg.color : 'var(--text)' }}>{cfg.label}</div>
             <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{cfg.desc}</div>
@@ -4891,14 +5207,17 @@ function K6TestTypeCard({ typeKey, data, active, onClick }) {
         <span style={{
           fontSize: 9, fontWeight: 800, padding: '3px 10px', borderRadius: 20, textTransform: 'uppercase',
           color: sc, background: `${sc}15`, border: `1px solid ${sc}33`,
+          display: 'inline-flex', alignItems: 'center', gap: 4,
         }}>
-          {status === 'pass' ? '✓ PASS' : status === 'fail' ? '✗ FAIL' : status === 'error' ? '⚠ ERROR' : '— N/A'}
+          <StatusIcon size={11} strokeWidth={2.5} />
+          {status === 'pass' ? 'PASS' : status === 'fail' ? 'FAIL' : status === 'error' ? 'ERROR' : 'N/A'}
         </span>
       </div>
-      
+
       {data?.duration_seconds && (
-        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 10 }}>
-          ⏱ Duration: {data.duration_seconds}s
+        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Clock size={11} />
+          Duration: {data.duration_seconds}s
         </div>
       )}
     </div>
@@ -5105,13 +5424,222 @@ function formatK6TestCase(rawName, suite, category) {
     description: info || 'k6 performance metric',
   };
 }
+// Plain-language explanation per metric, for non-technical viewers (jury, stakeholders)
+function getMetricExplanation(title) {
+  const map = {
+    '95th Percentile Response Time': "95% of requests were faster than this value — the standard way to measure real-world speed.",
+    'Average Response Time': "Mean server response time across all requests in this test.",
+    'Maximum Response Time': "Slowest single request recorded — the worst case.",
+    'HTTP Error Rate': "Share of requests that failed (server errors, timeouts) instead of succeeding.",
+    'Request Throughput': "Requests handled per second — higher means better capacity.",
+    'Peak Virtual Users': "Maximum number of simulated concurrent users reached.",
+    'k6 Assertions Pass Rate': "Share of automatic checks that passed during execution.",
+  };
+  if (map[title]) return map[title];
+  if (title.startsWith('Threshold:')) {
+    const thresholdMap = {
+      'Threshold: p95 Response Time': "Limit set before the test: 95% of requests must respond faster than a target time (ex: under 500ms). ✓ Passed means this held true throughout the test.",
+      'Threshold: Error Rate': "Limit set before the test: the share of failed requests must stay below a target (ex: under 1%). ✓ Passed means errors stayed under that limit.",
+      'Threshold: HTTP Status Codes': "Limit set before the test: requests must return valid HTTP status codes (ex: no 500 server errors). ✓ Passed means no invalid codes were returned.",
+      'Threshold: Test Duration & VUs': "Limit set before the test: the test had to run for its full planned duration with the target number of virtual users. ✓ Passed means it completed as configured.",
+    };
+    return thresholdMap[title] || "A limit you set before the test. ✓ Passed means the test respected this limit the whole time.";
+  }
+}
+function getPerformanceMetricExplanation(metricName) {
+  const name = (metricName || '').toLowerCase();
+
+  if (name.includes('load time'))
+    return "Total time for the page to fully load, from navigation start to the load event. The single most direct measure of perceived speed.";
+  if (name.includes('first contentful paint') || name.includes('fcp'))
+    return "Time until the browser renders the first piece of DOM content (text, image). Marks when the user sees something is happening.";
+  if (name.includes('largest contentful paint') || name.includes('lcp'))
+    return "Time until the largest visible element (usually a hero image or heading) finishes rendering. Core Web Vital — should be under 2.5s for good UX.";
+  if (name.includes('interactive') || name.includes('tti'))
+    return "Time until the page is fully interactive — main thread is free and event handlers are attached. Affects how soon users can click/type.";
+  if (name.includes('request'))
+    return "Number of HTTP requests fired to load the page. More requests generally mean more round trips and slower loads.";
+  if (name.includes('total page size') || name.includes('page size'))
+    return "Combined size of all downloaded resources (HTML, JS, CSS, images, fonts). Directly impacts load time, especially on slow connections.";
+  if (name.includes('dom'))
+    return "Number of nodes in the DOM tree. A very large DOM slows down rendering, layout, and JavaScript queries.";
+  if (name.includes('javascript') || name.includes('js size'))
+    return "Total size of JS bundles downloaded. Large JS payloads delay parsing, execution, and Time to Interactive.";
+  if (name.includes('css'))
+    return "Total size of stylesheets downloaded. Oversized CSS can block rendering until it's parsed.";
+  if (name.includes('image'))
+    return "Total size of images on the page. Unoptimized images are one of the most common causes of slow page loads.";
+
+  return "Performance metric measuring page speed and resource efficiency.";
+}
+
+function getPerformanceSectionExplanation(section) {
+  switch (section) {
+    case 'timing':  return "Measures how fast the page becomes visible and usable to the end user, from first paint to full interactivity.";
+    case 'network':  return "Measures the volume and efficiency of network activity required to load the page — requests, size, and transfer time.";
+    case 'assets':   return "Measures the size of individual resource types (JS, CSS, images) that make up the page's total payload.";
+    case 'dom':      return "Measures the complexity of the page's DOM structure, which affects rendering and script execution speed.";
+    default:          return "Performance measurement for this page.";
+  }
+}
+function getTestTypeExplanation(typeKey) {
+  switch (typeKey) {
+    case 'load':
+      return "Simulates normal, expected traffic matching the application's typical production usage. Verifies the system responds correctly under everyday, realistic conditions.";
+    case 'stress':
+      return "Pushes the system beyond its normal capacity to find its breaking point. Helps identify the load level at which performance degrades or the system fails.";
+    case 'spike':
+      return "Simulates a sudden, sharp increase in traffic (e.g. a burst of visitors). Verifies the system can absorb unexpected load without crashing.";
+    case 'soak':
+      return "Applies a moderate but sustained load over an extended period. Helps detect issues that only appear over time, such as memory leaks.";
+    default:
+      return "Measures the system's behavior under simulated load.";
+  }
+}
+function InfoTooltip({ title, text, details = [], icon = 'ℹ️', accent = '#7D64FF' }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return null;
+
+  return (
+    <>
+     <span
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 20, height: 20, borderRadius: 4, marginLeft: 8,
+          cursor: 'pointer', flexShrink: 0,
+          background: `${accent}20`, border: `1px solid ${accent}55`,
+          color: accent, transition: 'all .15s',
+          fontSize: 12, fontWeight: 700, lineHeight: 1, userSelect: 'none',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = `${accent}35`; e.currentTarget.style.borderColor = accent; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = `${accent}20`; e.currentTarget.style.borderColor = `${accent}55`; }}
+      >
+        ?
+      </span>
+      {open && createPortal(
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(3px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#0d1526', border: '1px solid var(--border)',
+              borderRadius: 18, width: 440, maxWidth: '90%',
+              boxShadow: '0 24px 70px rgba(0,0,0,.55)',
+              overflow: 'hidden',
+              animation: 'dFadeUp .2s var(--ease) both',
+            }}
+          >
+            {/* Top accent line */}
+            <div style={{ height: 3, background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }} />
+
+            {/* Header */}
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+              gap: 12, padding: '20px 24px 16px', borderBottom: '1px solid var(--border)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: `${accent}18`, border: `1px solid ${accent}40`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 16,
+                }}>
+                  {icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', lineHeight: 1.3 }}>
+                    {title}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>
+                    What each test checks
+                  </div>
+                </div>
+              </div>
+              <span
+                onClick={() => setOpen(false)}
+                style={{
+                  cursor: 'pointer', color: 'var(--muted)', fontSize: 16, lineHeight: 1,
+                  padding: 4, flexShrink: 0,
+                }}
+              >✕</span>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '16px 24px 22px', maxHeight: '60vh', overflowY: 'auto' }}>
+              {details && details.length > 0 ? (
+                <>
+                  <div style={{
+                    background: 'rgba(125,100,255,.08)',
+                    border: `1px solid ${accent}40`,
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    marginBottom: 14,
+                    fontSize: 12.5, color: 'var(--text)', opacity: 0.85,
+                    lineHeight: 1.7, letterSpacing: 0.1,
+                  }}>
+                    {text}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {details.map((d, i) => (
+                      <div key={i} style={{
+                        background: 'rgba(255,255,255,.03)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 12,
+                        padding: '14px 16px',
+                        borderLeft: `3px solid ${accent}`,
+                      }}>
+                        <div style={{
+                          fontSize: 13, fontWeight: 700, color: accent, marginBottom: 6,
+                          display: 'flex', alignItems: 'center', gap: 7,
+                        }}>
+                          <span style={{
+                            width: 5, height: 5, borderRadius: '50%', background: accent, flexShrink: 0,
+                          }} />
+                          {d.title}
+                        </div>
+                        <div style={{
+                          fontSize: 12.5, color: 'var(--text)', opacity: 0.75,
+                          lineHeight: 1.75, letterSpacing: 0.1,
+                        }}>
+                          {d.text}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.65, opacity: 0.85 }}>
+                  {text}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
 function K6ExecutionPanel({ generation }) {
-  const [activeType,   setActiveType]   = useState(null);
+   const [activeType,   setActiveType]   = useState(null);
   const [activeTab,    setActiveTab]    = useState('results');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [pdfLoading,   setPdfLoading]   = useState(false);
   const dropdownRef = useRef(null);
-
+  const [typePageIndex, setTypePageIndex] = useState(0);
+  const [scenarioPageIndex, setScenarioPageIndex] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [terminalLines, setTerminalLines] = useState([]);
+  const k6AnimFiredRef = useRef(false);
  useEffect(() => {
     if (!generation) return;
     const url = generation?.generation?.url || generation?.url || '';
@@ -5149,6 +5677,7 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
   const total    = tests.length || 1;
   const passRate = Math.round((pass / total) * 100);
   const rateColor = passRate >= 80 ? '#10b981' : passRate >= 50 ? '#f59e0b' : '#ef4444';
+  const aiRecsCount = (generation?.result?.ai?.recommendations || []).length;
  
   useEffect(() => {
     if (availableTypes.length > 0 && !activeType) setActiveType(availableTypes[0]);
@@ -5159,7 +5688,71 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
- 
+useEffect(() => {
+    if (!generation) return;
+    if (!generation.fresh) { setRunning(false); return; }
+    if (k6AnimFiredRef.current) return;
+    k6AnimFiredRef.current = true;
+
+    setRunning(true); setTerminalLines([]);
+
+    const targetUrl = generation?.generation?.url || generation?.url || '';
+    const totalTests = tests.length || 0;
+
+    const addLine = (text, type = 'info', delay = 0) =>
+      new Promise(res => setTimeout(() => {
+        setTerminalLines(prev => [...prev, { text, type, time: new Date().toLocaleTimeString('en-US', { hour12: false }) }]);
+        res();
+      }, delay));
+
+    const playAnimation = async () => {
+      await addLine('NexTest AI Engine v2.0 initializing...', 'system', 0);
+      await addLine(`Connecting to ${targetUrl}`, 'info', 400);
+      await addLine('Launching k6 Load Testing Engine...', 'info', 800);
+      await addLine(`Preparing ${availableTypes.length} test type(s): ${availableTypes.join(', ')}`, 'info', 1200);
+      await addLine(`AI analyzing ${totalTests} threshold check(s)...`, 'ai', 1700);
+      await addLine('Spinning up virtual users...', 'info', 2100);
+      await addLine('Load generation started — collecting metrics...', 'success', 2500);
+      await addLine('─'.repeat(52), 'divider', 2800);
+
+      for (let i = 0; i < Math.min(tests.length, 8); i++) {
+        await addLine(`Running [${i + 1}/${totalTests}] ${tests[i]?.name || `Check ${i + 1}`}...`, 'running', 3000 + i * 300);
+      }
+      if (totalTests > 8) {
+        await addLine(`... and ${totalTests - 8} more checks processed`, 'muted', 3000 + 8 * 300);
+      }
+
+      await addLine('─'.repeat(52), 'divider', 3000 + Math.min(totalTests, 8) * 300 + 200);
+
+      const passN = tests.filter(t => t.status === 'pass').length;
+      const failN = tests.filter(t => t.status === 'fail').length;
+      const skipN = tests.filter(t => t.status === 'skip' || t.status === 'warn').length;
+
+      tests.slice(0, 6).forEach((t, i) => {
+        const icon = t.status === 'pass' ? '✓' : t.status === 'fail' ? '✗' : '—';
+        const type = t.status === 'pass' ? 'pass' : t.status === 'fail' ? 'fail' : 'skip';
+        setTerminalLines(prev => [...prev, {
+          text: `${icon} ${t.name || `Check ${i + 1}`}`,
+          type,
+          time: new Date().toLocaleTimeString('en-US', { hour12: false })
+        }]);
+      });
+
+      await addLine('─'.repeat(52), 'divider', 200);
+      await addLine(`Load test complete — ${passN} passed · ${failN} failed · ${skipN} skipped`, 'summary', 400);
+      await addLine(`Pass rate: ${totalTests > 0 ? Math.round(passN / totalTests * 100) : 0}%`, passN / (totalTests || 1) >= 0.8 ? 'success' : 'fail', 600);
+      await addLine('Generating AI analysis report...', 'ai', 800);
+      await addLine('Done ✓', 'success', 1000);
+
+      setTimeout(() => {
+        setRunning(false);
+        generation.fresh = false;
+      }, 1200);
+    };
+
+    playAnimation();
+    
+  }, [generation?.generation?.id, generation?.fresh]);
   //Download CSV 
   const downloadCsv = () => {
     const headers = ['Type', 'Status', 'p95 (ms)', 'Error Rate (%)', 'Req/s', 'Max VUs', 'Duration (s)'];
@@ -5180,7 +5773,7 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
     testType: 'performance',
     passCount: pass,
     failCount: fail,
-    htmlContent: html,
+    csvContent: csv,
     generationData: generation,
   });
   setDropdownOpen(false);
@@ -5195,11 +5788,11 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
     const genId   = generation?.generation?.id || 'nextest';
  
     const TYPE_CONFIG = {
-      load:   { label: 'Load Test',   icon: '📈', color: '#6366f1' },
-      stress: { label: 'Stress Test', icon: '🔥', color: '#ef4444' },
-      spike:  { label: 'Spike Test',  icon: '⚡', color: '#f59e0b' },
-      soak:   { label: 'Soak Test',   icon: '🌊', color: '#0ea5e9' },
-    };
+  load:   { label: 'Load Test',   icon: TrendingUp, color: '#6366f1' },
+  stress: { label: 'Stress Test', icon: Flame,       color: '#ef4444' },
+  spike:  { label: 'Spike Test',  icon: Zap,         color: '#f59e0b' },
+  soak:   { label: 'Soak Test',   icon: Waves,       color: '#0ea5e9' },
+};
  
     const typeRows = availableTypes.map(t => {
       const d   = summary[t] || {};
@@ -5412,12 +6005,12 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
           </div>
           <h1 className="p-title">Performance <span className="g">k6</span></h1>
           <div className="ep-info-bar">
-  <div className="ep-info-chip">
-    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-    </svg>
-    <span>{url}</span>
-  </div>
+ <div className="ep-info-chip">
+  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+  <span title={url}>{url}</span>
+</div>
   <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(125,100,255,.15)', color: '#7D64FF', border: '1px solid rgba(125,100,255,.35)' }}>
     <span style={{ fontWeight: 800 }}>k6</span> · Performance
   </span>
@@ -5445,13 +6038,18 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
 
     {/* Download Report dropdown */}
     <div ref={dropdownRef} style={{ position: 'relative' }}>
-      <button className="ep-pdf-btn" onClick={() => setDropdownOpen(o => !o)} disabled={pdfLoading}>
-        {pdfLoading ? (<><span className="spinner" /> Generating...</>) : (<>
-          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          Download Report
-          <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" style={{ marginLeft: 2, transition: 'transform .2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}><path d="M6 9l6 6 6-6"/></svg>
-        </>)}
-      </button>
+      <button
+  className="ep-pdf-btn"
+  onClick={() => setDropdownOpen(o => !o)}
+  disabled={pdfLoading}
+  style={{ background: 'transparent', border: '1px solid rgba(125,100,255,.4)', color: '#7D64FF' }}
+>
+  {pdfLoading ? (<><span className="spinner" /> Generating...</>) : (<>
+    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    Download Report
+    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" style={{ marginLeft: 2, transition: 'transform .2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}><path d="M6 9l6 6 6-6"/></svg>
+  </>)}
+</button>
       {dropdownOpen && (
         <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 6, boxShadow: '0 8px 32px rgba(0,0,0,.5)', zIndex: 200, minWidth: 190, animation: 'dFadeUp .18s var(--ease) both' }}>
           {/* CSV */}
@@ -5495,30 +6093,127 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
       )}
     </div>
   </div>
-            <PerformanceScoreRing score={passRate} label={`${passRate}%`} color={rateColor} />
-
+<PerformanceScoreRing score={running ? 0 : passRate} label={running ? '0%' : `${passRate}%`} color={rateColor} />
         </div>
       </div>
- 
-      {/* ── GLOBAL STATS ── */}
-      <div className="ep-stats" style={{ marginBottom: 24 }}>
-        {[
-          { label: 'Passed',    val: pass,         color: '#10B981', bg: 'rgba(16,185,129,.08)',  border: 'rgba(16,185,129,.2)'  },
-          { label: 'Failed',    val: fail,         color: '#EF4444', bg: 'rgba(239,68,68,.08)',   border: 'rgba(239,68,68,.2)'   },
-          { label: 'Warn/Skip', val: skip,         color: '#F59E0B', bg: 'rgba(245,158,11,.08)',  border: 'rgba(245,158,11,.2)'  },
-          { label: 'Pass Rate', val: `${passRate}%`, color: rateColor, bg: `${rateColor}12`, border: `${rateColor}33` },
-        ].map((s, i) => (
-          <div key={s.label} className="ep-stat" style={{ '--sc': s.color, '--sb': s.bg, '--sbo': s.border, '--i': i }}>
-            <div className="ep-stat-body"><div className="ep-stat-val" style={{ color: s.color }}>{s.val}</div><div className="ep-stat-lbl">{s.label}</div></div>
-          </div>
-        ))}
+ {(() => {
+  const aiSummary = generation?.result?.ai?.summary || null;
+  if (!aiSummary || running) return null;
+
+  return (
+    <div style={{
+      display: 'flex', gap: 14, alignItems: 'flex-start',
+      background: 'var(--card)', border: '1px solid var(--border)',
+      borderRadius: 14, padding: '16px 20px', marginBottom: 20,
+    }}>
+      <span style={{
+        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+        background: 'rgba(125,100,255,.1)', border: '1px solid rgba(125,100,255,.25)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+      }}>🤖</span>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: '#7D64FF', marginBottom: 4, textTransform: 'uppercase' }}>
+          LLaMA Analysis
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginBottom: 2 }}>
+          Performance analysis for {url}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic', lineHeight: 1.5 }}>
+          {aiSummary}
+        </div>
       </div>
- 
-      {/* ── TEST TYPE SELECTOR ── */}
-      {availableTypes.length > 0 && (
+    </div>
+  );
+})()}
+
+
+      {/* ── GLOBAL STATS ── */}
+<div className="ep-stats" style={{ marginBottom: 24 }}>
+  {[
+    { label: 'Passed',    val: running ? 0 : pass,         color: '#10B981', bg: 'rgba(16,185,129,.08)', border: 'rgba(16,185,129,.2)', icon: <svg width="18" height="18" fill="none" stroke="#10B981" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> },
+    { label: 'Failed',    val: running ? 0 : fail,         color: '#EF4444', bg: 'rgba(239,68,68,.08)',  border: 'rgba(239,68,68,.2)', icon: <svg width="18" height="18" fill="none" stroke="#EF4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg> },
+    { label: 'Warn/Skip', val: running ? 0 : skip,         color: '#F59E0B', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.2)', icon: <svg width="18" height="18" fill="none" stroke="#F59E0B" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg> },
+    { label: 'Pass Rate', val: running ? '0%' : `${passRate}%`, color: rateColor, bg: `${rateColor}12`, border: `${rateColor}33`, icon: <svg width="18" height="18" fill="none" stroke={rateColor} strokeWidth="2.5" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
+  ].map((s, i) => (
+    <div key={s.label} className="ep-stat" style={{ '--sc': s.color, '--sb': s.bg, '--sbo': s.border, '--i': i }}>
+      <div className="ep-stat-icon">{s.icon}</div>
+      <div className="ep-stat-body"><div className="ep-stat-val" style={{ color: s.color }}>{s.val}</div><div className="ep-stat-lbl">{s.label}</div></div>
+    </div>
+  ))}
+</div>
+ {running && (
+  <div className="ep-progress-card">
+    <div className="ep-progress-top">
+      <div className="ep-progress-info">
+        <span className="spinner" style={{ marginRight: 8 }} />
+        <span style={{ color: 'var(--indigo2)' }}>Running tests...</span>
+      </div>
+      <div className="ep-progress-rate" style={{ color: '#ef4444' }}>0% pass rate</div>
+    </div>
+    <div className="ep-progress-track">
+      <div className="ep-progress-fill" style={{ width: '100%', background: 'linear-gradient(90deg,var(--indigo),var(--indigo2))' }} />
+    </div>
+  </div>
+)}
+     {/* ── TERMINAL WHILE RUNNING ── */}
+      {running ? (
+        <div style={{
+          background: '#050a14', border: '1px solid rgba(125,100,255,.25)', borderRadius: 16,
+          overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,.5)',
+          fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+          marginBottom: 24,
+        }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 16px', background:'linear-gradient(135deg,#0a0f1e,#0d1526)', borderBottom:'1px solid rgba(255,255,255,.06)' }}>
+            <div style={{ display:'flex', gap:6 }}>
+              {['#ef4444','#f59e0b','#10b981'].map((c,i) => (
+                <div key={i} style={{ width:12, height:12, borderRadius:'50%', background:c, opacity:.8 }} />
+              ))}
+            </div>
+            <div style={{ flex:1, textAlign:'center', fontSize:11, fontWeight:700, color:'#64748b', letterSpacing:1 }}>
+              NexTest Terminal — k6 Load Engine
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <div style={{ width:7, height:7, borderRadius:'50%', background:'#7D64FF', animation:'termPulse 1s ease-in-out infinite' }} />
+              <span style={{ fontSize:10, color:'#7D64FF', fontWeight:700, letterSpacing:1 }}>RUNNING</span>
+            </div>
+          </div>
+          <div style={{ padding:'16px 20px', minHeight:280, maxHeight:380, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}
+            ref={el => { if (el) el.scrollTop = el.scrollHeight; }}>
+            {terminalLines.map((line, i) => {
+              const colors = { system:'#818cf8', info:'#94a3b8', ai:'#c9a227', success:'#10b981', fail:'#ef4444', pass:'#10b981', skip:'#f59e0b', running:'#60a5fa', muted:'#475569', divider:'#1e293b', summary:'#e2e8f0' };
+              const icons  = { system:'⬡', info:'›', ai:'◆', success:'✓', fail:'✗', pass:'✓', skip:'◌', running:'◉', muted:'·', divider:'', summary:'▸' };
+              if (line.type === 'divider') return (
+                <div key={i} style={{ color:'#1e2d47', fontSize:11, userSelect:'none', margin:'4px 0' }}>{line.text}</div>
+              );
+              return (
+                <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, animation:'termFadeIn .3s ease both', fontSize:12, lineHeight:1.6 }}>
+                  <span style={{ color:'#1e3a5f', fontSize:10, flexShrink:0, marginTop:1 }}>{line.time}</span>
+                  <span style={{ color:colors[line.type]||'#94a3b8', flexShrink:0, fontSize:11 }}>{icons[line.type]||'›'}</span>
+                  <span style={{ color:colors[line.type]||'#94a3b8', flex:1 }}>{line.text}</span>
+                </div>
+              );
+            })}
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:4 }}>
+              <span style={{ color:'#1e3a5f', fontSize:10 }}>{new Date().toLocaleTimeString('en-US',{hour12:false})}</span>
+              <span style={{ color:'#7D64FF' }}>›</span>
+              <span style={{ display:'inline-block', width:8, height:15, background:'#7D64FF', borderRadius:1, animation:'termBlink .8s step-end infinite' }} />
+            </div>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 16px', background:'rgba(125,100,255,.06)', borderTop:'1px solid rgba(125,100,255,.1)' }}>
+            <span style={{ fontSize:10, color:'#7D64FF', fontWeight:700 }}>◉ {terminalLines.length} events</span>
+            <span style={{ fontSize:10, color:'#475569', fontWeight:600 }}>k6 · AI-Powered</span>
+          </div>
+          <style>{`
+            @keyframes termFadeIn { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+            @keyframes termBlink  { 0%,100%{opacity:1} 50%{opacity:0} }
+            @keyframes termPulse  { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+          `}</style>
+        </div>
+      ) : availableTypes.length > 0 && (
         <>
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>
-            🚀 Test Type Results
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <IconRocket size={14} stroke={1.8} style={{ color: '#7D64FF' }} />
+            Test Type Results
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
             {availableTypes.map(typeKey => (
@@ -5534,17 +6229,20 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
         </>
       )}
  
-      {/* ── ACTIVE TYPE DETAIL ── */}
+    {/* ── ACTIVE TYPE DETAIL ── */}
+{(() => { const aiRecsCount = (generation?.result?.ai?.recommendations || []).length; return null; })()}
       
+{!running && (
+<>
 {/* ── TABS ── */}
-<div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+<div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', opacity: running ? 0.3 : 1, pointerEvents: running ? 'none' : 'auto', transition: 'opacity .3s' }}>
   {[
-    { key: 'results',         label: '📋 Test Cases',     count: tests.length },
-    { key: 'scenarios',       label: '🎯 Scenarios',       count: tests.length },
-    { key: 'recommendations', label: '💡 Recommendations', count: availableTypes.length },
-  ].map(tab => (
+    { key: 'results',         label: 'Test Cases',     count: tests.length, Icon: IconFileText },
+    { key: 'scenarios',       label: 'Scenarios',       count: tests.length, Icon: IconTarget },
+    { key: 'recommendations', label: 'Recommendations', count: aiRecsCount, Icon: IconBulb },  ].map(tab => (
     <button key={tab.key} onClick={() => setActiveTab(tab.key)}
       style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 700, color: activeTab === tab.key ? 'var(--indigo2)' : 'var(--muted)', borderBottom: activeTab === tab.key ? '2px solid var(--indigo2)' : '2px solid transparent', marginBottom: -1, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <tab.Icon size={15} stroke={1.8} />
       {tab.label}
       <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: activeTab === tab.key ? 'var(--indigo-bg)' : 'var(--bg2)', color: activeTab === tab.key ? 'var(--indigo2)' : 'var(--muted)' }}>{tab.count}</span>
     </button>
@@ -5555,11 +6253,11 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
  {activeTab === 'results' && tests.length > 0 && (() => {
  
   const TYPE_CONFIG = {
-    load:   { label: 'Load Test',   icon: '📈', color: '#6366f1', bg: 'rgba(99,102,241,.08)',  border: 'rgba(99,102,241,.25)',  desc: 'Normal expected traffic'   },
-    stress: { label: 'Stress Test', icon: '🔥', color: '#ef4444', bg: 'rgba(239,68,68,.08)',   border: 'rgba(239,68,68,.25)',   desc: 'Beyond capacity — breaking point' },
-    spike:  { label: 'Spike Test',  icon: '⚡', color: '#f59e0b', bg: 'rgba(245,158,11,.08)',  border: 'rgba(245,158,11,.25)',  desc: 'Sudden traffic burst'      },
-    soak:   { label: 'Soak Test',   icon: '🌊', color: '#0ea5e9', bg: 'rgba(14,165,233,.08)',  border: 'rgba(14,165,233,.25)',  desc: 'Extended load — memory leaks' },
-  };
+  load:   { label: 'Load Test',   icon: TrendingUp, color: '#6366f1', bg: 'rgba(99,102,241,.08)',  border: 'rgba(99,102,241,.25)',  desc: 'Normal expected traffic'   },
+  stress: { label: 'Stress Test', icon: Flame,       color: '#ef4444', bg: 'rgba(239,68,68,.08)',   border: 'rgba(239,68,68,.25)',   desc: 'Beyond capacity — breaking point' },
+  spike:  { label: 'Spike Test',  icon: Zap,         color: '#f59e0b', bg: 'rgba(245,158,11,.08)',  border: 'rgba(245,158,11,.25)',  desc: 'Sudden traffic burst'      },
+  soak:   { label: 'Soak Test',   icon: Waves,       color: '#0ea5e9', bg: 'rgba(14,165,233,.08)',  border: 'rgba(14,165,233,.25)',  desc: 'Extended load — memory leaks' },
+};
  
   const getType = (test) => {
     const n = (test.name || '').toLowerCase();
@@ -5580,10 +6278,38 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
     : '#7D64FF';
  
   const timeVal = (test) => {
+    // Response time metrics already carry a real ms duration
     if (test.duration && test.duration !== 0 && test.duration !== '0')
       return `${test.duration}ms`;
-    const m = (test.name || test.suite || '').match(/(\d+m\d+s|\d+s|\d+ms)/);
-    return m ? m[0] : '—';
+
+    const suite = test.suite || '';
+
+    // Percentage-based metrics (error rate, checks pass rate, etc.)
+    let m = suite.match(/(\d+\.?\d*)\s*%/);
+    if (m) return `${m[1]}%`;
+
+    // Throughput
+    m = suite.match(/([\d.]+)\s*req(?:uests)?\/s/i) || suite.match(/([\d.]+)\s*requests\/second/i);
+    if (m) return `${m[1]} req/s`;
+
+    // Virtual users
+    m = suite.match(/max_vus=(\d+)/i) || suite.match(/(\d+)\s*VUs?/i);
+    if (m) return `${m[1]} VUs`;
+
+    // Threshold checks — match "Passed"/"Failed" loosely (avoid relying on
+    // the checkmark unicode char, which can get mangled in storage/transit)
+    if (/passed/i.test(suite)) return '✓';
+    if (/failed/i.test(suite)) return '✗';
+
+    // Fallback: planned test duration text (e.g. "ran for 1m54s...")
+    m = `${test.name || ''} ${suite}`.match(/(\d+m\d+s|\d+s)/);
+    if (m) return m[1];
+
+    // Last resort: derive from status directly
+    if (test.status === 'pass') return '✓';
+    if (test.status === 'fail') return '✗';
+
+    return '—';
   };
  
   // Group tests by type
@@ -5595,27 +6321,27 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
   });
  
   const typeOrder = ['load', 'stress', 'spike', 'soak'];
+  const visibleTypeOrder = typeOrder.filter(t => groups[t]?.length);
+  const currentType = visibleTypeOrder[typePageIndex] || visibleTypeOrder[0];
  
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {typeOrder.filter(t => groups[t]?.length).map(typeKey => {
+      {[currentType].filter(Boolean).map(typeKey => {
         const cfg       = TYPE_CONFIG[typeKey];
         const groupTests = groups[typeKey];
+       
         const pass      = groupTests.filter(t => t.status === 'pass').length;
         const fail      = groupTests.filter(t => t.status === 'fail').length;
         const skip      = groupTests.filter(t => t.status === 'skip' || t.status === 'warn').length;
         const groupStatus = fail > 0 ? 'fail' : skip === groupTests.length ? 'skip' : 'pass';
         const statusColor = groupStatus === 'pass' ? '#10b981' : groupStatus === 'fail' ? '#ef4444' : '#f59e0b';
  
-        // Get duration from last threshold row
-        const durationTest = groupTests.find(t =>
-          (t.name || '').match(/\d+m\d+s|\d+VUs/i) ||
-          (t.suite || '').match(/\d+m\d+s|\d+VUs/i)
-        );
-        const durationMatch = durationTest
-          ? (durationTest.name + ' ' + (durationTest.suite || '')).match(/(\d+m\d+s|\d+s)/)
+         const rawSeconds = summary[typeKey]?.duration_seconds;
+        const duration = rawSeconds != null
+          ? (rawSeconds >= 60
+              ? `${Math.floor(rawSeconds / 60)}m${Math.round(rawSeconds % 60)}s`
+              : `${Math.round(rawSeconds)}s`)
           : null;
-        const duration = durationMatch ? durationMatch[1] : null;
  
         // VU count
         const vuTest = groupTests.find(t => /max_vus=\d+/i.test(t.suite || ''));
@@ -5645,31 +6371,37 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
                 width: 4, background: cfg.color, borderRadius: '0 4px 4px 0',
               }} />
  
-              <span style={{ fontSize: 24, marginLeft: 4 }}>{cfg.icon}</span>
+    <div style={{
+  width: 34, height: 34, borderRadius: 9, flexShrink: 0, marginLeft: 4,
+  background: `${cfg.color}18`, border: `1px solid ${cfg.color}35`,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+}}>
+  {(() => { const Icon = cfg.icon; return <Icon size={17} color={cfg.color} strokeWidth={2.25} />; })()}
+</div>
  
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 3 }}>
-                  <span style={{ fontSize: 15, fontWeight: 800, color: cfg.color }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: cfg.color, display: 'flex', alignItems: 'center' }}>
                     {cfg.label}
+          <InfoTooltip
+  title={cfg.label}
+  text={getTestTypeExplanation(typeKey)}
+  icon={<cfg.icon size={14} color={cfg.color} />}
+  accent={cfg.color}
+  details={[...new Set(groupTests.map(t => formatK6TestCase(t.name, t.suite, t.section).title))]
+    .map(title => ({ title, text: getMetricExplanation(title) }))}
+/>
                   </span>
-                  {duration && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                      color: cfg.color, background: `${cfg.color}15`,
-                      border: `1px solid ${cfg.color}30`,
-                    }}>
-                      ⏱ {duration}
-                    </span>
-                  )}
-                  {vus && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                      color: cfg.color, background: `${cfg.color}15`,
-                      border: `1px solid ${cfg.color}30`,
-                    }}>
-                      👥 {vus} VUs
-                    </span>
-                  )}
+                 {duration && (
+  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: cfg.color, background: `${cfg.color}15`, border: `1px solid ${cfg.color}30`, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+    <Clock size={11} /> {duration}
+  </span>
+)}
+{vus && (
+  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: cfg.color, background: `${cfg.color}15`, border: `1px solid ${cfg.color}30`, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+    <Users size={11} /> {vus} VUs
+  </span>
+)}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>{cfg.desc}</div>
               </div>
@@ -5699,8 +6431,7 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
               background: 'var(--bg)',
               borderBottom: '1px solid var(--border)',
             }}>
-              {['', 'Test Name', 'Category', 'Status', 'Time'].map(h => (
-                <div key={h} style={{
+              {['', 'Test Name', 'Category', 'Status', 'Value'].map(h => (                <div key={h} style={{
                   fontSize: 9, fontWeight: 700, letterSpacing: 1.5,
                   textTransform: 'uppercase', color: 'var(--muted)',
                 }}>{h}</div>
@@ -5738,10 +6469,11 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
                   <div style={{ minWidth: 0 }}>
                     <div style={{
                       fontSize: 13, fontWeight: 600, color: 'var(--text)',
-                      marginBottom: 2, overflow: 'hidden',
-                      textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      marginBottom: 2, display: 'flex', alignItems: 'center',
                     }}>
-                      {title}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {title}
+                      </span>
                     </div>
                     <div style={{
                       fontSize: 11, color: 'var(--muted)',
@@ -5752,7 +6484,7 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
                     </div>
                   </div>
  
-                  {/* Category */}
+                 {/* Category */}
                   <div>
                     <span style={{
                       fontSize: 9, fontWeight: 800, padding: '3px 10px',
@@ -5783,85 +6515,272 @@ console.log('[K6] summary full:', JSON.stringify(summary, null, 2));
                 </div>
               );
             })}
+            
           </div>
         );
       })}
+      {visibleTypeOrder.length > 1 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 16, padding: '18px 0 4px',
+        }}>
+          <button
+            disabled={typePageIndex === 0}
+            onClick={() => setTypePageIndex(i => i - 1)}
+            style={{
+              padding: '7px 16px', borderRadius: 10, border: '1px solid var(--border)',
+              background: 'var(--card)', color: typePageIndex === 0 ? 'var(--muted)' : 'var(--text)',
+              cursor: typePageIndex === 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600,
+            }}
+          >Previous</button>
+
+          <div style={{ display: 'flex', gap: 6 }}>
+            {visibleTypeOrder.map((t, i) => (
+              <span
+                key={t}
+                onClick={() => setTypePageIndex(i)}
+                style={{
+                  width: 8, height: 8, borderRadius: '50%', cursor: 'pointer',
+                  background: i === typePageIndex ? TYPE_CONFIG[t].color : 'var(--border)',
+                  transition: 'background .2s',
+                }}
+              />
+            ))}
+          </div>
+
+          <button
+            disabled={typePageIndex === visibleTypeOrder.length - 1}
+            onClick={() => setTypePageIndex(i => i + 1)}
+            style={{
+              padding: '7px 16px', borderRadius: 10, border: '1px solid var(--border)',
+              background: 'var(--card)',
+              color: typePageIndex === visibleTypeOrder.length - 1 ? 'var(--muted)' : 'var(--text)',
+              cursor: typePageIndex === visibleTypeOrder.length - 1 ? 'not-allowed' : 'pointer',
+              fontSize: 13, fontWeight: 600,
+            }}
+          >Next</button>
+        </div>
+      )}
     </div>
   );
 })()}
  
   
 
-      {activeTab === 'scenarios' && tests.length > 0 && (
-  <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
-    <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 100px 100px', gap: 12, padding: '12px 20px', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-      {['#', 'Scenario', 'Category', 'Type', 'Status'].map(h => (
-        <div key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
-      ))}
+{activeTab === 'scenarios' && (() => {
+
+  // ── Plan de test statique — ce que CHAQUE type de test k6 vérifie ──
+  const K6_CHECK_PLAN = [
+    { title: 'Response Time p95',        desc: 'p95 response time must stay under the type-specific threshold', category: 'PERFORMANCE',  priority: 'HIGH'   },
+    { title: 'Average Response Time',    desc: 'Mean response time across all requests during the run',          category: 'PERFORMANCE',  priority: 'MEDIUM' },
+    { title: 'Max Response Time',        desc: 'Slowest single response observed during the run',                category: 'PERFORMANCE',  priority: 'LOW'    },
+    { title: 'Error Rate',               desc: 'HTTP error rate must stay under the type-specific limit',        category: 'RELIABILITY',  priority: 'HIGH'   },
+    { title: 'Throughput (req/s)',       desc: 'Sustained requests-per-second the system can handle',            category: 'PERFORMANCE',  priority: 'MEDIUM' },
+    { title: 'Max Virtual Users',        desc: 'Peak concurrent virtual users reached during the run',           category: 'SCALABILITY',  priority: 'MEDIUM' },
+    { title: 'k6 Checks Pass Rate',      desc: 'Percentage of k6 assertions (checks) that passed — must exceed 95%', category: 'RELIABILITY', priority: 'HIGH' },
+  ];
+
+  const TYPE_CONFIG = {
+    load:   { label: 'Load Test',   icon: TrendingUp, color: '#6366f1', desc: 'Normal expected traffic',            threshold: '2000ms / 5% errors'  },
+    stress: { label: 'Stress Test', icon: Flame,       color: '#ef4444', desc: 'Beyond capacity — breaking point',   threshold: '5000ms / 15% errors' },
+    spike:  { label: 'Spike Test',  icon: Zap,         color: '#f59e0b', desc: 'Sudden traffic burst',               threshold: '8000ms / 20% errors' },
+    soak:   { label: 'Soak Test',   icon: Waves,       color: '#0ea5e9', desc: 'Extended load — memory leaks',       threshold: '3000ms / 5% errors'  },
+  };
+
+  const catColor = (cat) =>
+    cat === 'PERFORMANCE'  ? '#6366f1'
+    : cat === 'RELIABILITY' ? '#ef4444'
+    : cat === 'SCALABILITY' ? '#0ea5e9'
+    : '#7D64FF';
+
+  const priColor = (p) =>
+    p === 'HIGH' ? '#ef4444' : p === 'MEDIUM' ? '#f59e0b' : '#10b981';
+
+  const typeOrder = ['load', 'stress', 'spike', 'soak'];
+  const presentTypes = typeOrder.filter(t => availableTypes.includes(t));
+  const typesToShow = presentTypes.length ? presentTypes : typeOrder;
+
+  const currentType = typesToShow[scenarioPageIndex] || typesToShow[0];
+  const cfg = TYPE_CONFIG[currentType];
+  const groupTests = tests.filter(t => (t.name || '').toLowerCase().includes(`[${currentType}`));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{
+        background: 'rgba(125,100,255,.06)', border: '1px solid rgba(125,100,255,.2)',
+        borderRadius: 10, padding: '10px 16px', fontSize: 12, color: 'var(--muted)',
+      }}>
+        Test plan — what each k6 test type checks, independent of execution results. See the <b style={{ color: 'var(--indigo2)' }}>Test Cases</b> tab for pass/fail outcomes.
+      </div>
+
+      <div style={{ background: 'var(--card)', border: `1px solid ${cfg.color}33`, borderRadius: 16, overflow: 'hidden' }}>
+
+        {/* ── HEADER DU GROUPE ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', background: `${cfg.color}0d`, borderBottom: `1px solid ${cfg.color}33` }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: `${cfg.color}18`, border: `1px solid ${cfg.color}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <cfg.icon size={16} color={cfg.color} strokeWidth={2.25} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: cfg.color }}>{cfg.label}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{cfg.desc} · thresholds: {cfg.threshold}</div>
+          </div>
+        </div>
+
+        {/* ── COLONNES ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 130px 100px 90px', gap: 12, padding: '10px 20px', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+          {['#', 'Scenario', 'Category', 'Priority', 'Tested'].map(h => (
+            <div key={h} style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</div>
+          ))}
+        </div>
+
+        {/* ── LIGNES DU PLAN ── */}
+        {K6_CHECK_PLAN.map((chk, i) => {
+          const wasTested = groupTests.some(t => (t.name || '').includes(chk.title));
+          return (
+            <div key={chk.title} style={{
+              display: 'grid', gridTemplateColumns: '40px 1fr 130px 100px 90px', gap: 12,
+              padding: '13px 20px', alignItems: 'center',
+              borderBottom: i < K6_CHECK_PLAN.length - 1 ? '1px solid var(--border)' : 'none',
+              animation: `dFadeUp .2s var(--ease) ${i * 0.03}s both`,
+            }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{i + 1}</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{chk.title}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{chk.desc}</div>
+              </div>
+              <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 10px', borderRadius: 20, letterSpacing: .8, textTransform: 'uppercase', color: catColor(chk.category), background: `${catColor(chk.category)}18`, border: `1px solid ${catColor(chk.category)}44`, width: 'fit-content' }}>
+                {chk.category}
+              </span>
+              <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 10px', borderRadius: 20, textTransform: 'uppercase', color: priColor(chk.priority), background: `${priColor(chk.priority)}18`, border: `1px solid ${priColor(chk.priority)}44`, width: 'fit-content' }}>
+                {chk.priority}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: wasTested ? '#10b981' : 'var(--muted)' }}>
+                {wasTested ? '✓ Yes' : '— No'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── PAGINATION ── */}
+      {typesToShow.length > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '18px 0 4px' }}>
+          <button
+            disabled={scenarioPageIndex === 0}
+            onClick={() => setScenarioPageIndex(i => i - 1)}
+            style={{
+              padding: '7px 16px', borderRadius: 10, border: '1px solid var(--border)',
+              background: 'var(--card)', color: scenarioPageIndex === 0 ? 'var(--muted)' : 'var(--text)',
+              cursor: scenarioPageIndex === 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600,
+            }}
+          >Previous</button>
+
+          <div style={{ display: 'flex', gap: 6 }}>
+            {typesToShow.map((t, i) => (
+              <span
+                key={t}
+                onClick={() => setScenarioPageIndex(i)}
+                style={{
+                  width: 8, height: 8, borderRadius: '50%', cursor: 'pointer',
+                  background: i === scenarioPageIndex ? TYPE_CONFIG[t].color : 'var(--border)',
+                  transition: 'background .2s',
+                }}
+              />
+            ))}
+          </div>
+
+          <button
+            disabled={scenarioPageIndex === typesToShow.length - 1}
+            onClick={() => setScenarioPageIndex(i => i + 1)}
+            style={{
+              padding: '7px 16px', borderRadius: 10, border: '1px solid var(--border)',
+              background: 'var(--card)',
+              color: scenarioPageIndex === typesToShow.length - 1 ? 'var(--muted)' : 'var(--text)',
+              cursor: scenarioPageIndex === typesToShow.length - 1 ? 'not-allowed' : 'pointer',
+              fontSize: 13, fontWeight: 600,
+            }}
+          >Next</button>
+        </div>
+      )}
     </div>
-    {tests.map((test, i) => (
-      <div key={i} style={{
-  display: 'flex', alignItems: 'center', gap: 16,
-  padding: '14px 20px', borderBottom: i < tests.length - 1 ? '1px solid var(--border)' : 'none',
-  animation: `dFadeUp .25s var(--ease) ${i * 0.04}s both`,
-}}>
-  {/* Nom du test */}
-  <div style={{ flex: 1, minWidth: 0 }}>
-    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{test.name?.replace(/^\[.*?\]\s*/, '')}</div>
-    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{test.suite || '—'}</div>
-  </div>
+  );
+})()}
+{activeTab === 'recommendations' && (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    {(() => {
+      const aiResult = generation?.result?.ai || {};
+      const aiRecs = aiResult.recommendations || [];
+      const aiSummary = aiResult.summary || '';
+      const actionPlan = aiResult.action_plan || [];
 
-  {/* CATEGORY */}
-  <span style={{
-    fontSize: 10, fontWeight: 700, padding: '4px 12px', borderRadius: 20,
-    color: '#7D64FF', background: 'rgba(125,100,255,.1)', border: '1px solid rgba(125,100,255,.25)',
-    textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0,
-  }}>
-    {test.category || 'performance'}
-  </span>
+      if (aiSummary || aiRecs.length > 0) {
+        return (
+          <>
+            {aiSummary && (
+              <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 12, padding: '14px 18px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>🤖</span>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#818cf8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>AI Summary</div>
+                  <p style={{ fontSize: 13, color: 'var(--sub)', margin: 0, lineHeight: 1.7 }}>{aiSummary}</p>
+                </div>
+              </div>
+            )}
 
-  {/* TYPE (section) */}
-  <span style={{
-    fontSize: 10, fontWeight: 700, padding: '4px 12px', borderRadius: 20,
-    color: '#0ea5e9', background: 'rgba(14,165,233,.1)', border: '1px solid rgba(14,165,233,.25)',
-    textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0,
-  }}>
-    {test.section || 'k6'}
-  </span>
+            {aiRecs.length > 0 && (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {['high', 'medium', 'low'].map(p => {
+                  const count = aiRecs.filter(r => r.priority === p).length;
+                  if (!count) return null;
+                  const colors = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
+                  return (
+                    <span key={p} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700, color: colors[p], background: `${colors[p]}12`, border: `1px solid ${colors[p]}30`, textTransform: 'capitalize' }}>
+                      {count} {p}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
 
-  {/* STATUS */}
-  <span style={{
-    fontSize: 10, fontWeight: 800, padding: '4px 12px', borderRadius: 20, flexShrink: 0,
-    color: test.status === 'pass' ? '#10b981' : test.status === 'fail' ? '#ef4444' : '#f59e0b',
-    background: test.status === 'pass' ? 'rgba(16,185,129,.1)' : test.status === 'fail' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)',
-    border: `1px solid ${test.status === 'pass' ? 'rgba(16,185,129,.25)' : test.status === 'fail' ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)'}`,
-  }}>
-    {test.status === 'pass' ? '✓ PASS' : test.status === 'fail' ? '✗ FAIL' : '— SKIP'}
-  </span>
+            {aiRecs.map((rec, i) => (
+              <RecommendationCard key={i} rec={{
+                priority: rec.priority || 'medium',
+                category: rec.category || 'server',
+                title: rec.issue || rec.category || 'Performance Issue',
+                description: rec.fix || '',
+                impact: null,
+              }} index={i} />
+            ))}
 
-  {/* DURATION */}
-  <span style={{ fontSize: 11, color: 'var(--muted)', minWidth: 50, textAlign: 'right', fontFamily: 'monospace', flexShrink: 0 }}>
-    {test.duration != null && test.duration !== 0 ? `${test.duration}ms` : '—'}
-  </span>
-</div>
-    ))}
+            {actionPlan.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Action Plan</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {actionPlan.map((step, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 10, padding: '9px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--sub)' }}>
+                      <span style={{ color: 'var(--indigo2)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+                      {step}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      }
+
+      // ── Fallback générique si aucune donnée IA disponible ──
+      // ── Aucune donnée IA disponible : empty-state (comme SEO/smoke/functional) ──
+      return (
+        <div style={{ textAlign: 'center', padding: '60px 32px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🤖</div>
+          <h3 style={{ color: 'var(--text)', marginBottom: 8 }}>No AI recommendations available</h3>
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>The AI analysis may not have completed for this generation.</p>
+        </div>
+      );
+    })()}
   </div>
 )}
-
-{activeTab === 'recommendations' && tests.length > 0 && (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-    {(() => {
-      const recs = [];
-      if (fail > 0) recs.push({ priority: 'high', category: 'server', title: `${fail} Test(s) Failed`, description: 'Review failed test cases — thresholds exceeded or k6 script errors detected.', impact: 'Fix failures to ensure performance targets are met' });
-      if (skip > 0) recs.push({ priority: 'medium', category: 'network', title: `${skip} Test(s) Skipped`, description: 'Some metrics could not be parsed — check k6 output format.', impact: 'Better metric coverage' });
-      if (summary['stress']?.status === 'fail') recs.push({ priority: 'critical', category: 'server', title: 'Stress Test Failed', description: 'Server breaks under high load. Consider horizontal scaling or optimizing backend response time.', impact: 'Improved resilience under traffic spikes' });
-      if (pass === tests.length && tests.length > 0) recs.push({ priority: 'low', category: 'caching', title: 'All Threshold Tests Passed 🎉', description: 'All k6 threshold checks passed. Application handles expected load well.', impact: 'Continue monitoring with each release' });
-      if (recs.length === 0) recs.push({ priority: 'low', category: 'caching', title: 'Performance Looks Good', description: 'No critical issues detected. Keep monitoring load and stress scenarios.', impact: 'Sustained performance' });
-      return recs;
-    })().map((rec, i) => (
-      <RecommendationCard key={i} rec={rec} index={i} />
-    ))}
-  </div>
+</>
 )}
     </div>
   );
@@ -6079,16 +6998,12 @@ useEffect(() => {
   const framework = generation?.generation?.framework || generation?.framework || 'Selenium';
   const testType  = generation?.result?.test_type     || generation?.test_type  || 'smoke';
 
-  if (testType === 'performance' && framework === 'k6') {
-  return <K6ExecutionPanel generation={generation} />;
-}
-if (testType === 'performance') {
-  return <PerformanceExecutionPanel generation={generation} />;
-}
+ 
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
 useEffect(() => {
     if (!generation) return;
+    if (testType === 'performance') return;
     const savedResults = generation?.result?.execution_results || generation?.generation?.execution_results || [];
     console.log('[EP] fresh:', generation.fresh, 'savedResults:', savedResults.length);
 
@@ -6274,6 +7189,13 @@ useEffect(() => {
 };
     run();
   }, [generation]);
+  
+  if (testType === 'performance' && framework === 'k6') {
+    return <K6ExecutionPanel generation={generation} />;
+  }
+  if (testType === 'performance') {
+    return <PerformanceExecutionPanel generation={generation} />;
+  }
 
   const buildTests = (test_cases, execution_results) => {
     if (execution_results && execution_results.length > 0) {
@@ -8898,9 +9820,11 @@ const downloadPdf = async () => {
           <h1 className="p-title">Test <span className="g">Execution</span></h1>
           <div className="ep-info-bar">
             <div className="ep-info-chip">
-              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              <span>{url}</span>
-            </div>
+  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+  <span title={url}>{url}</span>
+</div>
             <div className="ep-info-chip" style={{ color: fwConf.color, borderColor: `${fwConf.color}33`, background: `${fwConf.color}11` }}>
               <span className="ep-fw-dot" style={{ background: fwConf.color }} />{fwConf.letters} · {framework}
             </div>
@@ -9057,42 +9981,15 @@ const downloadPdf = async () => {
 
 
 {/* ── TABS ── */}
-<div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0, opacity: running ? 0.3 : 1, pointerEvents: running ? 'none' : 'auto', transition: 'opacity .3s' }}>
-
+<div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
   {[
-    {
-      key: 'results',
-      label: 'Results',
-      icon: <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
-      count: running ? 0 : tests.length,
-    },
-    {
-      key: 'scenarios',
-      label: 'Scenarios',
-      icon: <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M9 4h9a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1"/><path d="M9 3v4H5V3"/><path d="M9 12h6M9 16h6M9 8h2"/></svg>,
-      count: running ? 0 : tests.length,
-    },
-    {
-      key: 'recommendations',
-      label: 'Recommendations',
-      icon: <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.44 1 1.2 1 2.05V17h6v-2.25c0-.85.4-1.6 1-2.05A7 7 0 0 0 12 2z"/></svg>,
-      count: running ? 0 : (
-        (isSeo || testType === 'smoke' || testType === 'functional' || isRegression || testType === 'api' || isSecurity)
-          ? ((generation?.result?.ai || runResults?.ai || {}).recommendations || []).length
-          : (() => {
-              const perfRecs = [];
-              if (loadTimeMs > 5000 || loadTimeMs > 3000) perfRecs.push(1); else perfRecs.push(1);
-              if (fail > 0) perfRecs.push(1);
-              if (skip > 0) perfRecs.push(1);
-              if (pass === tests.length && tests.length > 0) perfRecs.push(1);
-              return perfRecs.length;
-            })()
-      ),
-    },
+    { key: 'results',         label: 'Test Cases',     count: tests.length,          Icon: IconFileText },
+    { key: 'scenarios',       label: 'Scenarios',       count: tests.length,          Icon: IconTarget },
+    { key: 'recommendations', label: 'Recommendations', count: fail, Icon: IconBulb },
   ].map(tab => (
     <button key={tab.key} onClick={() => setActiveTab(tab.key)}
       style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 700, color: activeTab === tab.key ? 'var(--indigo2)' : 'var(--muted)', borderBottom: activeTab === tab.key ? '2px solid var(--indigo2)' : '2px solid transparent', marginBottom: -1, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: 8 }}>
-      {tab.icon}
+      <tab.Icon size={15} stroke={1.8} />
       {tab.label}
       <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: activeTab === tab.key ? 'var(--indigo-bg)' : 'var(--bg2)', color: activeTab === tab.key ? 'var(--indigo2)' : 'var(--muted)' }}>{tab.count}</span>
     </button>
@@ -9142,6 +10039,8 @@ const downloadPdf = async () => {
             </div>
 
             {/* Body */}
+            
+            {/* Body */}
             <div style={{ padding:'16px 20px', minHeight:280, maxHeight:380, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}
               ref={el => { if (el) el.scrollTop = el.scrollHeight; }}>
               {terminalLines.map((line, i) => {
@@ -9158,7 +10057,6 @@ const downloadPdf = async () => {
                   </div>
                 );
               })}
-              {/* Blinking cursor */}
               <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:4 }}>
                 <span style={{ color:'#1e3a5f', fontSize:10 }}>{new Date().toLocaleTimeString('en-US',{hour12:false})}</span>
                 <span style={{ color:'#6366f1' }}>›</span>
@@ -10706,7 +11604,12 @@ useEffect(() => {
           )}
           <div className="hp2-tbody">
             {loading ? (
-              Array.from({ length:5 }).map((_,i) => (<div key={i} className="hp2-row" style={{ cursor:'default', padding:'16px 26px' }}><div className="hp2-skel-line" style={{ width:'100%', height:13 }}/></div>))
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 32px', gap: 20 }}>
+                <LogoSpinner size={80} />
+                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
+                  Loading History...
+                </div>
+              </div>
             ) : filtered.length === 0 ? (
               <div className="hp2-empty">
                 <div className="hp2-empty-icon"><svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
@@ -11669,7 +12572,7 @@ const SectionCard = ({ icon, iconBg, iconColor, title, subtitle, children }) => 
   <div style={{
     background: 'var(--card)',
     border: '1px solid var(--border)',
-    borderRadius: 16, overflow: 'hidden',
+    borderRadius: 16,
     boxShadow: 'var(--shadow)',
   }}>
     {/* Header */}
@@ -11714,42 +12617,10 @@ const SetRow = ({ label, desc, children, noBorder }) => (
   return (
     <div className="panel" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-      {/* Page header */}
-      <div style={{
-        display: 'flex', alignItems: 'flex-start',
-        justifyContent: 'space-between', marginBottom: 28,
-      }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#e2e8f0', margin: 0 }}>
-            Settings
-          </h1>
-          <p style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>
-            Manage your preferences and customize your experience
-          </p>
-        </div>
-        <button
-          onClick={saveSettings}
-          disabled={loading}
-          style={{
-            padding: '10px 20px', borderRadius: 10,
-            background: '#6366f1', border: 'none',
-            color: '#fff', fontSize: 13, fontWeight: 700,
-            cursor: 'pointer', display: 'flex', alignItems: 'center',
-            gap: 8, fontFamily: 'inherit',
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading
-            ? <><span className="spinner" /> Saving…</>
-            : <>
-                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                  <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-                </svg>
-                Save Settings
-              </>}
-        </button>
-      </div>
+      <div style={{ marginBottom: 28 }}>
+    <h1 className="p-title">My <span className="g">Settings</span></h1>
+    <p style={{ fontSize: 13, color: '#cbd5e1', marginTop: 4, fontWeight: 500 }}>Manage your preferences and customize your experience</p>
+  </div>
 
       {msg && (
         <div style={{
@@ -11761,7 +12632,7 @@ const SetRow = ({ label, desc, children, noBorder }) => (
         </div>
       )}
 
-      {/* ── ROW 1 — Appearance + Notifications ── */}
+     {/* ── ROW 1 — Appearance + Language & Region ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
 
         {/* Appearance */}
@@ -11777,140 +12648,149 @@ const SetRow = ({ label, desc, children, noBorder }) => (
           subtitle="Customize how Nextest looks for you."
         >
           <SetRow noBorder label="Theme" desc="Choose your preferred theme">
-  <SetSelect
-    value={theme === 'dark' ? 'Dark' : 'Light'}
-    onChange={v => {
-      const k = v === 'Dark' ? 'dark' : 'light';
-      setTheme(k);
-      api.put('/settings/update', { theme: k });
-    }}
-    options={['Light', 'Dark']}
-  />
-</SetRow>
-          <SetRow label="Reduce Animations" desc="Turn off decorative motion effects">
-  <Toggle on={reduceMotion} onToggle={() => setReduceMotion(p => !p)} />
-</SetRow>
-          <SetRow label="Sidebar Position" desc="Choose sidebar position">
-  <SetSelect
-    value={sidebarPos}
-    onChange={v => {
-      setSidebarPos(v);
-      api.put('/settings/update', { sidebar_position: v });
-    }}
-    options={['Left', 'Right']}
-  />
-</SetRow>
-        </SectionCard>
-
-        {/* Notifications */}
-        <SectionCard
-          icon={
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
-          }
-          iconBg="rgba(234,179,8,0.12)"
-          iconColor="#eab308"
-          title="Notifications"
-          subtitle="Manage how you receive notifications."
-        >
-          <SetRow noBorder label="Email Notifications" desc="Receive updates via email">
-            <Toggle on={notifs} onToggle={() => setNotifs(p => !p)} />
-          </SetRow>
-          <SetRow label="Test Alerts" desc="Get notified about test failures and issues">
-            <Toggle on={testAlerts} onToggle={() => setTestAlerts(p => !p)} />
-          </SetRow>
-          <SetRow label="Weekly Report" desc="Receive a summary of your tests">
-            <Toggle on={weekly} onToggle={() => setWeekly(p => !p)} />
-          </SetRow>
-          <SetRow label="Product Updates" desc="Receive updates about new features">
-            <Toggle on={productUpd} onToggle={() => setProductUpd(p => !p)} />
-          </SetRow>
-        </SectionCard>
-      </div>
-
-      {/* ── ROW 2 — Language & Region + Test Defaults ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-
-        {/* Language & Region */}
-        <SectionCard
-          icon={
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="2" y1="12" x2="22" y2="12"/>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            </svg>
-          }
-          iconBg="rgba(59,130,246,0.12)"
-          iconColor="#60a5fa"
-          title="Language & Region"
-          subtitle="Set your language and regional preferences."
-        >
-          <SetRow noBorder label="Language" desc="Choose your preferred language">
             <SetSelect
-              value={language === 'fr' ? 'Français' : language === 'ar' ? 'العربية' : 'English'}
-              onChange={v => setLanguage(v === 'Français' ? 'fr' : v === 'العربية' ? 'ar' : 'en')}
-              options={['English', 'Français', 'العربية']}
-            />
-          </SetRow>
-          <SetRow label="Timezone" desc="Set your timezone">
-            <SetSelect
-              value={timezone}
-              onChange={setTimezone}
-              options={['(UTC+01:00) Europe/Paris', '(UTC+00:00) UTC', '(UTC-05:00) New York']}
-            />
-          </SetRow>
-          <SetRow label="Date Format" desc="Choose date format">
-            <SetSelect value={dateFormat} onChange={setDateFormat} options={['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']} />
-          </SetRow>
-          <SetRow label="Time Format" desc="Choose time format">
-            <SetSelect value={timeFormat} onChange={setTimeFormat} options={['24-hour', '12-hour']} />
-          </SetRow>
-        </SectionCard>
-
-        {/* Test Defaults */}
-        <SectionCard
-          icon={
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-          }
-          iconBg="rgba(34,197,94,0.12)"
-          iconColor="#4ade80"
-          title="Test Defaults"
-          subtitle="Configure default settings for tests."
-        >
-          <SetRow noBorder label="Default Framework" desc="Pre-selected for new test generations">
-            <SetSelect value={framework} onChange={setFramework} options={['Playwright', 'Selenium', 'Cypress', 'Both']} />
-          </SetRow>
-          <SetRow label="Default Test Type" desc="Type de test par défaut">
-            <SetSelect value={testType} onChange={setTestType} options={['E2E', 'Unit', 'Integration']} />
-          </SetRow>
-          <SetRow label="Default AI Model" desc="Modèle IA par défaut pour la génération">
-            <SetSelect value={aiModel} onChange={setAiModel} options={['GPT-4o', 'Claude 3.5', 'Gemini']} />
-          </SetRow>
-          <SetRow label="Default Test Directory" desc="Dossier par défaut pour les tests">
-            <input
-              value={testDir}
-              onChange={e => setTestDir(e.target.value)}
-              style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8, color: '#94a3b8',
-                fontSize: 12, fontWeight: 600,
-                padding: '7px 10px', fontFamily: 'monospace',
-                outline: 'none', width: 80,
+              value={theme === 'dark' ? 'Dark' : 'Light'}
+              onChange={v => {
+                const k = v === 'Dark' ? 'dark' : 'light';
+                setTheme(k);
+                api.put('/settings/update', { theme: k });
               }}
+              options={['Light', 'Dark']}
+            />
+          </SetRow>
+          <SetRow label="Reduce Animations" desc="Turn off decorative motion effects">
+            <Toggle on={reduceMotion} onToggle={() => setReduceMotion(p => !p)} />
+          </SetRow>
+          <SetRow label="Sidebar Position" desc="Choose sidebar position">
+            <SetSelect
+              value={sidebarPos}
+              onChange={v => {
+                setSidebarPos(v);
+                api.put('/settings/update', { sidebar_position: v });
+              }}
+              options={['Left', 'Right']}
             />
           </SetRow>
         </SectionCard>
+
+        <SectionCard
+  icon={
+    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="2" y1="12" x2="22" y2="12"/>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+  }
+  iconBg="rgba(59,130,246,0.12)"
+  iconColor="#60a5fa"
+  title="Language & Region"
+  subtitle="Set your language and regional preferences."
+>
+  <SetRow noBorder label="Language" desc="Choose your preferred language">
+    <SetSelect
+      value={language === 'fr' ? 'Français' : language === 'ar' ? 'العربية' : 'English'}
+      onChange={v => setLanguage(v === 'Français' ? 'fr' : v === 'العربية' ? 'ar' : 'en')}
+      options={['English', 'Français', 'العربية']}
+    />
+  </SetRow>
+  <SetRow label="Text Direction" desc="Automatically adjusted based on language">
+    <span style={{
+      fontSize: 11, fontWeight: 700,
+      color: language === 'ar' ? '#f97316' : '#60a5fa',
+      background: language === 'ar' ? 'rgba(249,115,22,0.1)' : 'rgba(96,165,250,0.1)',
+      border: `1px solid ${language === 'ar' ? 'rgba(249,115,22,0.25)' : 'rgba(96,165,250,0.25)'}`,
+      padding: '4px 10px', borderRadius: 6,
+    }}>
+      {language === 'ar' ? 'RTL' : 'LTR'}
+    </span>
+  </SetRow>
+  <SetRow label="Available Languages" desc="Supported interface languages">
+  <div style={{ display: 'flex', gap: 6 }}>
+    <span style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', padding: '4px 10px', borderRadius: 6 }}>EN</span>
+    <span style={{ fontSize: 11, fontWeight: 700, color: '#818cf8', background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.25)', padding: '4px 10px', borderRadius: 6 }}>FR</span>
+    <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316', background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.25)', padding: '4px 10px', borderRadius: 6 }}>AR</span>
+  </div>
+</SetRow>
+</SectionCard>
+
       </div>
 
-      {/* ── ROW 3 — Integrations + General ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      {/* ── ROW 2 — About NexTest (full width) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
 
-       
+ <SectionCard
+  icon={
+    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.6-6.3 4.6 2.3-7.2-6-4.6h7.6z"/>
+    </svg>
+  }
+  iconBg="rgba(16,185,129,0.12)"
+  iconColor="#34d399"
+  title="About NexTest"
+  subtitle="Platform information and version."
+>
+  <SetRow noBorder label="Version" desc="Current release">
+    <span style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      fontSize: 12, fontWeight: 700, color: '#34d399',
+      background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)',
+      padding: '5px 12px', borderRadius: 20,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 6px rgba(52,211,153,.6)' }} />
+      v1.0.0
+    </span>
+  </SetRow>
+
+  <SetRow label="Tech Stack" desc="Built with">
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      {[
+        { name: 'React',      color: '#61dafb' },
+        { name: 'Laravel',    color: '#ff6c37' },
+        { name: 'FastAPI',    color: '#10b981' },
+        { name: 'PostgreSQL', color: '#60a5fa' },
+        { name: 'Playwright', color: '#e2574c' },
+      ].map(tech => (
+        <span key={tech.name} style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          fontSize: 11, fontWeight: 600, color: 'var(--text)',
+          background: `${tech.color}14`, border: `1px solid ${tech.color}30`,
+          padding: '5px 11px', borderRadius: 8,
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: tech.color, flexShrink: 0 }} />
+          {tech.name}
+        </span>
+      ))}
+    </div>
+  </SetRow>
+
+  <SetRow label="AI Engine" desc="Test generation powered by">
+    <div style={{ display: 'flex', gap: 6 }}>
+      <span style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        fontSize: 11, fontWeight: 700, color: '#a78bfa',
+        background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)',
+        padding: '5px 12px', borderRadius: 8,
+      }}>
+        <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        LLaMA (Groq)
+      </span>
+      <span style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        fontSize: 11, fontWeight: 700, color: '#34d399',
+        background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)',
+        padding: '5px 12px', borderRadius: 8,
+      }}>
+        <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path d="M12 2a4 4 0 0 0-4 4c0 1 .3 1.9.8 2.7A4 4 0 0 0 6 12a4 4 0 0 0 2 3.5V18a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.5A4 4 0 0 0 18 12a4 4 0 0 0-2.8-3.3c.5-.8.8-1.7.8-2.7a4 4 0 0 0-4-4z"/>
+        </svg>
+        Claude API
+      </span>
+    </div>
+  </SetRow>
+</SectionCard>
+
       </div>
 
     </div>
@@ -13751,21 +14631,7 @@ const StepList = ({ steps, color = '#6366f1', onNavigate }) => (
       ]} />
     </div>
 
-    <div style={{ marginBottom:32 }}>
-  <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'var(--muted)', marginBottom:12 }}>Actions per test</div>
-  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-    {[
-      ['Ignore / Unignore', 'Silence a known/expected flaky test without deleting its history.'],
-      ['Mark Stable', 'Manually override the status once the underlying issue is fixed.'],
-      ['Delete', 'Remove a single test case, or an entire URL and all its tests.'],
-    ].map(([l, d]) => (
-      <div key={l} style={{ display:'flex', gap:12, padding:'10px 14px', background:'var(--card)', border:'1px solid var(--border)', borderRadius:10 }}>
-        <span style={{ fontSize:12, fontWeight:700, color:'#f97316', minWidth:110 }}>{l}</span>
-        <span style={{ fontSize:12, color:'var(--muted)' }}>{d}</span>
-      </div>
-    ))}
-  </div>
-</div>
+    
 
     <div style={{ background:'rgba(249,115,22,.06)', border:'1px solid rgba(249,115,22,.2)', borderRadius:12, padding:'16px 20px', display:'flex', gap:12 }}>
       <IconBulb size={20} color="#f97316" style={{ flexShrink:0, marginTop:2 }} />
@@ -14004,15 +14870,13 @@ useEffect(() => {
   //les elements qui exist dans le side bar 
   const NAV_MAIN = [
     { id: 'dashboard', label: t('dashboard'),     badge: null     },
-    { id: 'generate',  label: 'Projects',         },
+    { id: 'generate',  label: t('projects'),         },
     { id: 'execution', label: t('testExecution'), badge: null     },
-     { id: 'scheduled', label: 'Scheduled Tasks', badge: null },
-    { id: 'flaky', label: 'Flaky Tests', badge: null },
-    { id: 'alerts', label: 'Alerts', badge: alertUnread > 0 ? alertUnread : null },
-    { id: 'reports', label: 'Reports', badge: null },
+    { id: 'scheduled', label: t('scheduledTasks'), badge: null },
+    { id: 'flaky',     label: t('flakyTests'),    badge: null },
+    { id: 'alerts',    label: t('alerts'),        badge: alertUnread > 0 ? alertUnread : null },
+    { id: 'reports',   label: t('reports'),       badge: null },
     { id: 'history',   label: t('history'),       badge: null     },
-
-    
   ];
   
   const NAV_USER = [{ id: 'account', label: t('account') }, { id: 'settings', label: t('settings') }];
@@ -14020,16 +14884,16 @@ useEffect(() => {
 
 const LABELS = {
   dashboard: t('dashboard'),
-  generate:  'Projects',
+  generate:  t('projects'),
   execution: t('testExecution'),
   history:   t('history'),
   account:   t('account'),
   settings:  t('settings'),
-  flaky:     'Flaky Tests',
-  alerts:    'Alerts',
-  reports:   'Reports', 
-  docs: 'Documentation', 
-  scheduled: 'Scheduled Tasks', 
+  flaky:     t('flakyTests'),
+  alerts:    t('alerts'),
+  reports:   t('reports'), 
+  docs:      t('documentation'), 
+  scheduled: t('scheduledTasks'), 
 };
   return (
     <div
@@ -14076,8 +14940,8 @@ const LABELS = {
 
   {/* ← Help déplacé ici, juste après User (Settings) */}
   <div className="s-group">
-    {!collapsed && <div className="s-label">Help</div>}
-    <SItem id="docs" label="Documentation" active={page==='docs'} collapsed={collapsed} onClick={setPage} />
+    {!collapsed && <div className="s-label">{t('help')}</div>}
+    <SItem id="docs" label={t('documentation')} active={page==='docs'} collapsed={collapsed} onClick={setPage} />
   </div>
 </nav>
 
@@ -14335,8 +15199,15 @@ setNotifs(prev => {
           {page === 'docs' && <DocsPanel goTo={setPage} setProjectStep={setProjectStep} />}
           {page === 'scheduled' && <ScheduledTasksPanel projects={searchProjects} />}
           {page === 'flaky' && <FlakyTestsPanel />}
-          {page === 'alerts' && (
-  <AlertsPanel onAlertRead={() => setAlertUnread(c => Math.max(0, c - 1))} />
+   {page === 'alerts' && (
+  <AlertsPanel
+    onAlertRead={() => setAlertUnread(c => Math.max(0, c - 1))}
+    onSelectProject={(project) => {
+      setCurrentProject(project);
+      setProjectStep('detail');
+      setPage('generate');
+    }}
+  />
 )}
           {page === 'history'   && <HistoryPanel   goTo={setPage} setGeneration={setGeneration} />}
           {page === 'account' && <AccountPanel user={user} setPage={setPage} setProjectStep={setProjectStep} />}

@@ -52,6 +52,9 @@ from groq import Groq
 from chatbot import router as chatbot_router
 
 
+from pydantic import BaseModel
+
+
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 _groq_client_smoke = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
@@ -147,8 +150,50 @@ Rules:
     except Exception as e:
         print(f"[SMOKE AI SUMMARY] error: {e}")
         return {}
- 
- 
+def _generate_project_verdict(project_name: str, tests: int, pass_count: int, fail_count: int, pass_rate: int) -> dict:
+    """Verdict IA rapide sur l'app la plus testée — rating 1-5 + texte court."""
+    if not _groq_client_smoke:
+        return {"rating": None, "text": "AI service unavailable."}
+
+    if pass_rate >= 95:
+        forced_rating = 5
+    elif pass_rate >= 85:
+        forced_rating = 4
+    elif pass_rate >= 70:
+        forced_rating = 3
+    elif pass_rate >= 50:
+        forced_rating = 2
+    else:
+        forced_rating = 1
+
+    rating_word = {5: "excellent", 4: "bon", 3: "correct", 2: "fragile", 1: "critique"}[forced_rating]
+
+    prompt = f"""You are a QA lead reviewing a tested application's stats.
+
+App: {project_name}
+Total tests: {tests}
+Passed: {pass_count}
+Failed: {fail_count}
+Pass rate: {pass_rate}%
+Rating already decided: {forced_rating}/5 ({rating_word})
+
+Respond ONLY with a valid JSON object:
+{{"text": "<one short sentence, max 20 words, in French, describing the result as '{rating_word}' — use that exact word or a close synonym, do not overstate it. Mention the actual numbers and give one concrete tip only if rate is below 95%>"}}"""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=150,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(raw)
+        return {"rating": forced_rating, "text": parsed.get("text", "")}
+    except Exception as e:
+        print(f"[PROJECT VERDICT AI] error: {e}")
+        return {"rating": forced_rating, "text": "Analyse IA indisponible, verdict basé sur le taux de réussite."} 
 def _generate_functional_analyses(results: list) -> dict:
     """Root cause + fix — n'analyse que les FAIL (les pass ont un message générique, pas besoin de LLaMA)."""
     if not _groq_client_smoke or not results:
@@ -215,14 +260,51 @@ def _generate_functional_summary(results: list, url: str) -> dict:
             detail = r.get("reason") or r.get("error") or "—"
             fail_lines.append(f"- {r.get('name','')} ({action}): {detail}")
 
+    # ── Cas 100% pass : recommandations PROACTIVES ──
     if not fail_lines:
         pass_count = sum(1 for r in results if r.get("status") == "pass")
-        return {
-            "summary": f"All {pass_count} functional steps passed on {url}. Forms, navigation, and interactive elements behave as expected.",
-            "recommendations": [],
-            "action_plan": [],
-        }
+        pass_names = [r.get("name", "") for r in results if r.get("status") == "pass"]
+        checks_text = "\n".join(f"- {n}" for n in pass_names)
 
+        prompt = f"""You are a senior QA automation engineer. All {pass_count} functional steps passed on {url}. No failures to analyze.
+
+Passed steps:
+{checks_text}
+
+Since everything passed, suggest 2-3 PROACTIVE improvements a QA engineer should still consider (e.g. edge cases not covered, validation gaps, error-state handling not yet tested, accessibility or UX angles not yet tested).
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview confirming all functional steps passed and overall form/navigation health",
+  "recommendations": [
+    {{"priority": "low|medium", "category": "coverage|validation|accessibility|ux", "issue": "gap or opportunity not currently tested", "fix": "concrete suggestion"}}
+  ],
+  "action_plan": ["optional next step 1", "optional next step 2"]
+}}
+
+Rules:
+- Max 3 items in recommendations, priority should be low or medium (nothing is broken).
+- Be specific to the steps listed above, no generic filler, no markdown fences."""
+
+        try:
+            response = _groq_client_smoke.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=800,
+            )
+            raw = response.choices[0].message.content.strip()
+            raw = raw.replace("```json", "").replace("```", "").strip()
+            return json.loads(raw)
+        except Exception as e:
+            print(f"[FUNCTIONAL AI SUMMARY - proactive] error: {e}")
+            return {
+                "summary": f"All {pass_count} functional steps passed on {url}. Forms, navigation, and interactive elements behave as expected.",
+                "recommendations": [],
+                "action_plan": [],
+            }
+
+    # ── Cas avec échecs ──
     checks_text = "\n".join(fail_lines)
     prompt = f"""You are a senior QA automation engineer. Analyze these FAILED functional test steps for {url}.
 
@@ -358,8 +440,105 @@ Rules:
     except Exception as e:
         print(f"[REGRESSION AI SUMMARY] error: {e}")
         return {} 
-    
-    
+def _generate_k6_summary(summary: dict, execution_results: list, url: str) -> dict:
+    """Summary + recommendations + action_plan pour k6 performance — même format que regression/functional."""
+    if not _groq_client_smoke or not summary:
+        return {}
+
+    type_lines = []
+    for test_type, data in summary.items():
+        status  = data.get("status", "N/A")
+        metrics = data.get("metrics", {})
+        th_fail = data.get("threshold_failures", [])
+        line = (
+            f"- {test_type.upper()}: status={status}, "
+            f"p95={metrics.get('http_req_duration_p95', 'N/A')}, "
+            f"error_rate={metrics.get('http_req_failed_rate', 'N/A')}%, "
+            f"throughput={metrics.get('http_reqs_per_second', 'N/A')} req/s, "
+            f"max_vus={metrics.get('vus_max', 'N/A')}, "
+            f"duration={data.get('duration_seconds', 'N/A')}s"
+        )
+        if th_fail:
+            line += f", failed_thresholds=[{', '.join(th_fail)}]"
+        type_lines.append(line)
+
+    fail_count = sum(1 for r in execution_results if r.get("status") == "fail")
+    pass_count = sum(1 for r in execution_results if r.get("status") == "pass")
+
+    if fail_count == 0:
+        checks_text = "\n".join(type_lines)
+        prompt = f"""You are a senior performance engineer. All k6 threshold checks passed on {url}. No failures to analyze.
+
+Test type results:
+{checks_text}
+
+Since everything passed, suggest 2-3 PROACTIVE improvements a performance engineer should still consider (e.g. higher load ceilings not yet tested, caching/CDN opportunities, monitoring gaps, scalability angles not yet explored).
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview confirming all load/stress/spike/soak tests passed and overall performance health",
+  "recommendations": [
+    {{"priority": "low|medium", "category": "server|caching|network|scalability", "issue": "opportunity not currently tested", "fix": "concrete suggestion"}}
+  ],
+  "action_plan": ["optional next step 1", "optional next step 2"]
+}}
+
+Rules:
+- Max 3 items in recommendations, priority should be low or medium (nothing is broken).
+- Be specific to the metrics listed above, no generic filler, no markdown fences."""
+
+        try:
+            response = _groq_client_smoke.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=800,
+            )
+            raw = response.choices[0].message.content.strip()
+            raw = raw.replace("```json", "").replace("```", "").strip()
+            return json.loads(raw)
+        except Exception as e:
+            print(f"[K6 AI SUMMARY - proactive] error: {e}")
+            return {
+                "summary": f"All k6 threshold checks passed on {url}. Application handles load, stress, spike and soak scenarios well.",
+                "recommendations": [],
+                "action_plan": [],
+            }
+
+    checks_text = "\n".join(type_lines)
+    prompt = f"""You are a senior performance engineer. Analyze these k6 load testing results for {url}. {fail_count} threshold check(s) failed out of {fail_count + pass_count}.
+
+Test type results:
+{checks_text}
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview mentioning how many threshold checks failed and overall performance health under load",
+  "recommendations": [
+    {{"priority": "high|medium|low", "category": "server|caching|network|scalability", "issue": "what failed and at which test type", "fix": "concrete actionable fix"}}
+  ],
+  "action_plan": ["step 1", "step 2", "step 3"]
+}}
+
+Rules:
+- Max 6 items in recommendations, ordered by priority (high first).
+- Max 3 items in action_plan.
+- Reference the actual test type (load/stress/spike/soak) and metric values shown above.
+- Be specific, no generic filler, no markdown fences."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        return json.loads(raw)
+    except Exception as e:
+        print(f"[K6 AI SUMMARY] error: {e}")
+        return {} 
 def _generate_api_summary(results: list, url: str) -> dict:
     """Summary + recommendations + action_plan pour API — même format que regression/functional."""
     if not _groq_client_smoke or not results:
@@ -810,7 +989,18 @@ async def run_tests(data: dict):
         "raw_output": "",
         "ai":         ai_summary, 
     }
+class ProjectVerdictRequest(BaseModel):
+    project_name: str
+    tests: int
+    pass_count: int
+    fail_count: int
+    pass_rate: int
 
+@app.post("/project-verdict")
+def project_verdict(payload: ProjectVerdictRequest):
+    return _generate_project_verdict(
+        payload.project_name, payload.tests, payload.pass_count, payload.fail_count, payload.pass_rate
+    )
 #Analyzer
 @app.post("/analyze")
 def analyze(data: dict):
@@ -930,7 +1120,10 @@ def generate_internal(data: dict):
     result = generate_internal_tests(
         scraped   = scraped,
         framework = framework,
-         doc_text  = doc_text
+        doc_text  = doc_text,
+        username  = username,
+        password  = password,
+        login_url = login_url,
     )
 
     return {
@@ -1045,6 +1238,10 @@ def generate_security(data: dict):
     token      = data.get("token", "")
     categories = data.get("categories", None)
     framework  = data.get("framework", "Pytest")
+    username   = data.get("username", "")
+    password   = data.get("password", "")
+    print(f"[SECURITY DEBUG] username='{username}' | password={'set' if password else 'EMPTY'}")
+
 
     if not url:
         return {"error": "URL is required"}
@@ -1068,7 +1265,9 @@ def generate_security(data: dict):
     gen_result = generate_security_tests(
         base_url   = frontend_url,
         categories = categories,
-        doc_text   = doc_text,    # ← AJOUTE
+        doc_text   = doc_text,
+        username   = username,
+        password   = password,
     )
 
     test_cases = gen_result.get("test_cases", [])
@@ -1079,14 +1278,14 @@ def generate_security(data: dict):
 
     # ── 2. Exécuter les tests avec le token ──────────────────────────────────
     from security_runner import _CACHED_TOKEN
-    jwt_token = token if token else _CACHED_TOKEN
+    jwt_token = token if token else (_CACHED_TOKEN if not (username and password) else "")
 
     generation_id = data.get("generation_id")
     project_id    = data.get("project_id")
     for tc in test_cases:
         tc["generation_id"] = generation_id
         tc["project_id"]    = project_id
-    run_result = run_security_tests(test_cases, jwt_token)
+    run_result = run_security_tests(test_cases, jwt_token, username=username, password=password)
     execution_results = run_result.get("results", [])
     ai_analyses = _generate_security_analyses(execution_results)
     for idx, r in enumerate(execution_results):
@@ -1145,6 +1344,8 @@ def run_security(data: dict):
     """Endpoint séparé si le frontend veut re-runner les tests manuellement"""
     test_cases = data.get("test_cases", [])
     token      = data.get("token", "")
+    username   = data.get("username", "")
+    password   = data.get("password", "")
 
     if not test_cases:
         return {"error": "test_cases is required"}
@@ -1152,9 +1353,9 @@ def run_security(data: dict):
     print(f"[RUN-SECURITY] Running {len(test_cases)} security tests")
 
     from security_runner import _CACHED_TOKEN
-    jwt_token = token if token else _CACHED_TOKEN
+    jwt_token = token if token else (_CACHED_TOKEN if not (username and password) else "")
 
-    run_result = run_security_tests(test_cases, jwt_token)
+    run_result = run_security_tests(test_cases, jwt_token, username=username, password=password)
     
     ai_analyses = _generate_security_analyses(run_result["results"])
     for idx, r in enumerate(run_result["results"]):
@@ -1254,6 +1455,108 @@ def generate_regression(data: dict):
         },
     }
 
+def _build_real_elements_summary(scraped: dict) -> str:
+    """Transforme le résultat de scrape_internal en texte lisible pour le prompt LLM,
+    avec les VRAIS sélecteurs CSS confirmés — pas juste des labels."""
+    parts = []
+    confirmed_selectors = set()
+
+    sidebar = [i.get("text", "") for i in scraped.get("sidebar_items", []) if i.get("text")]
+    if sidebar:
+        parts.append("Sidebar navigation items: " + ", ".join(sidebar[:15]))
+        confirmed_selectors.add(".ant-menu-item")
+
+    cards = [c.get("title", "") for c in scraped.get("stat_cards", []) if c.get("title")]
+    if cards:
+        parts.append("Cards/modules visible on page (selector: .ant-card, body text via .ant-card-body): " + ", ".join(cards[:15]))
+        confirmed_selectors.add(".ant-card")
+        confirmed_selectors.add(".ant-card-body")
+
+    # ── Action buttons avec leurs VRAIS sélecteurs ────────────────────────────
+    action_buttons = scraped.get("action_buttons", [])
+    if action_buttons:
+        btn_lines = []
+        for b in action_buttons[:10]:
+            text = b.get("text", "")
+            css = b.get("css_selector", "")
+            if text and css:
+                btn_lines.append(f"'{text}' (selector: {css})")
+                confirmed_selectors.add(css)
+        if btn_lines:
+            parts.append("Buttons on page with their EXACT selector: " + "; ".join(btn_lines))
+
+    # ── Row action buttons (view/edit/delete dans le tableau) ────────────────
+    row_actions = scraped.get("row_action_buttons", [])
+    if row_actions:
+        row_labels = [r.get("text", "") for r in row_actions if r.get("text")]
+        if row_labels:
+            parts.append(
+                "Row action icons in the table (view/edit/delete per row), labels: "
+                + ", ".join(row_labels[:10])
+                + " — selector: .ant-table-tbody .anticon, .ant-table-tbody button"
+            )
+            confirmed_selectors.add(".ant-table-tbody .anticon")
+            confirmed_selectors.add(".ant-table-tbody button")
+
+    headings = [h.get("text", "") for h in scraped.get("headings", []) if h.get("text")]
+    if headings:
+        parts.append("Headings (selectors: h1, h2, h3): " + ", ".join(headings[:10]))
+        confirmed_selectors.add("h1, h2, h3")
+
+    header_els = scraped.get("header_elements", [])
+    if header_els:
+        parts.append("Header confirmed present (selector: .ant-layout-header)")
+        confirmed_selectors.add(".ant-layout-header")
+
+    breadcrumbs = scraped.get("breadcrumbs", [])
+    if breadcrumbs:
+        parts.append("Breadcrumb confirmed present (selector: .ant-breadcrumb)")
+        confirmed_selectors.add(".ant-breadcrumb")
+
+    sidebar_menu = scraped.get("sidebar_items", [])
+    if sidebar_menu:
+        confirmed_selectors.add(".ant-menu")
+
+    # ── Tables (data_tables + ant_tables) ─────────────────────────────────────
+    tables = scraped.get("data_tables", []) + scraped.get("ant_tables", [])
+    if tables:
+        parts.append(f"{len(tables)} data table(s) present (selector: .ant-table-wrapper)")
+        confirmed_selectors.add(".ant-table-wrapper")
+        confirmed_selectors.add(".ant-table")
+    else:
+        parts.append("NO table present — do NOT generate a test targeting .ant-table or .ant-table-wrapper")
+
+    # ── Filtres (filter_inputs / filter_buttons — capturés dans stat_cards) ──
+    filter_inputs = [c for c in scraped.get("stat_cards", []) if c.get("kind") == "filter_input"]
+    if filter_inputs:
+        labels = [f.get("title", "") for f in filter_inputs if f.get("title")]
+        parts.append("Filter fields present: " + ", ".join(labels[:10]) + " — selector: .ant-form-item")
+        confirmed_selectors.add(".ant-form-item")
+
+    filter_buttons = [c for c in scraped.get("stat_cards", []) if c.get("kind") == "filter_button"]
+    if filter_buttons:
+        parts.append("Filter button present — selector: .ant-btn-primary")
+        confirmed_selectors.add(".ant-btn-primary")
+
+    forms = scraped.get("forms", [])
+    if forms:
+        parts.append(f"{len(forms)} form(s) present (selector: form)")
+    else:
+        parts.append("NO standalone form/login present on this page — do NOT generate login-style form tests")
+
+    if not sidebar_menu:
+        parts.append("NO sidebar/menu present — do NOT use .ant-menu or .ant-menu-item")
+
+    if not parts:
+        return ""
+
+    selectors_line = (
+        "CONFIRMED selectors that exist on this page (use ONLY these exact strings, "
+        "copy them verbatim, no invented sub-variants): " + ", ".join(sorted(confirmed_selectors))
+    )
+
+    return "Real scraped elements on this page:\n" + "\n".join(f"- {p}" for p in parts) + "\n\n" + selectors_line
+
 
 @app.post("/generate-functional")
 def generate_functional(data: dict):
@@ -1262,7 +1565,6 @@ def generate_functional(data: dict):
     if not url:
         return {"error": "URL is required"}
 
-    # ── Extraire base_url (scheme + host + port) ──────────────────────────────
     from urllib.parse import urlparse
     parsed   = urlparse(url)
     base_url = f"{parsed.scheme}://{parsed.netloc}"
@@ -1272,12 +1574,45 @@ def generate_functional(data: dict):
     username = data.get("username", "")
     password = data.get("password", "")
     doc_text = get_doc_text(data)
+
+    has_captcha = False
+    is_login_url = "login" in url.lower()
+
+    if is_login_url:
+        try:
+            from scraper_internal import _scrape_login_page
+            login_probe = _scrape_login_page(url, wait_time=1500)
+            has_captcha = login_probe.get("has_captcha", False)
+            print(f"[FUNCTIONAL] captcha detection on {url} → has_captcha={has_captcha}")
+        except Exception as e:
+            print(f"[FUNCTIONAL] captcha detection failed: {e} — assuming no captcha")
+    else:
+        if not doc_text:
+            try:
+                from scraper_internal import scrape_internal
+                real_scraped = scrape_internal(
+                    target_url=url,
+                    username=username,
+                    password=password,
+                    wait_time=2000,
+                )
+                if "error" not in real_scraped:
+                    real_summary = _build_real_elements_summary(real_scraped)
+                    if real_summary:
+                        doc_text = real_summary
+                        print(f"[FUNCTIONAL] real content scraped — {len(real_summary)} chars used as doc_text")
+                else:
+                    print(f"[FUNCTIONAL] real scrape failed: {real_scraped.get('error')}")
+            except Exception as e:
+                print(f"[FUNCTIONAL] real scrape exception: {e} — falling back to DEFAULT_FEATURES")
+
     gen_result = generate_functional_tests(
-        base_url   = base_url,
-        target_url = url,
-        username   = username,
-        password   = password,
-        doc_text   = doc_text,
+        base_url    = base_url,
+        target_url  = url,
+        username    = username,
+        password    = password,
+        doc_text    = doc_text,
+        has_captcha = has_captcha,
     )
 
     test_cases = gen_result.get("test_cases", [])
@@ -1287,7 +1622,6 @@ def generate_functional(data: dict):
 
     print(f"[FUNCTIONAL] {len(test_cases)} tests generated for {gen_result.get('page')} — running...")
 
-    # ── 2. Playwright exécute les tests ───────────────────────────────────────
     generation_id = data.get("generation_id")
     project_id    = data.get("project_id")
     for tc in test_cases:
@@ -1333,49 +1667,48 @@ def generate_functional(data: dict):
             "ai":                ai_summary,
         },
     }
-    
-    # ── Performance Test Endpoint
+
+
 @app.post("/generate-performance")
 def generate_performance(data: dict):
     url        = data.get("url", "")
     test_types = data.get("test_types", ["load", "stress", "spike", "soak"])
- 
+
     if not url:
         return {"error": "URL is required"}
- 
+
     from urllib.parse import urlparse
     parsed   = urlparse(url)
     base_url = f"{parsed.scheme}://{parsed.netloc}"
- 
+
     print(f"[PERFORMANCE] base_url={base_url} | types={test_types}")
     doc_text = get_doc_text(data)
- 
-    # Step 1 — Generate k6 scripts with LLaMA
+
     gen_result = generate_performance_tests(
         base_url=base_url,
         test_types=test_types,
         doc_text=doc_text,
+        username=data.get("username", ""),
+        password=data.get("password", ""),
     )
     scripts = gen_result.get("scripts", {})
- 
+
     if not scripts:
         return {"error": "Failed to generate k6 scripts"}
- 
-    # Step 2 — Run k6 scripts
+
     run_result = run_performance_tests(
         scripts=scripts,
         base_url=base_url,
         username=data.get("username", ""),
         password=data.get("password", ""),
     )
- 
+
     execution_results = run_result.get("results", [])
     pass_count = run_result["pass_count"]
     fail_count = run_result["fail_count"]
     skip_count = run_result["skip_count"]
     pass_rate  = run_result["pass_rate"]
- 
-    # Build summary per test type
+
     summary = {}
     for test_type, rr in run_result.get("run_results", {}).items():
         summary[test_type] = {
@@ -1386,7 +1719,9 @@ def generate_performance(data: dict):
             "threshold_passes": rr.get("threshold_passes", []),
             "threshold_failures": rr.get("threshold_failures", []),
         }
- 
+
+    ai_summary = _generate_k6_summary(summary, execution_results, url)
+
     return {
         "url":       url,
         "framework": "k6",
@@ -1402,36 +1737,34 @@ def generate_performance(data: dict):
             "test_type":         "performance",
             "summary":           summary,
             "scripts":           {k: v["script"] for k, v in scripts.items()},
+            "ai":                ai_summary,
         },
     }
 
-    def sse(data: dict) -> str:
-        return f"data: {json.dumps(data)}\n\n"
- 
+
+def sse(data: dict) -> str:
+    return f"data: {json.dumps(data)}\n\n"
+
 async def stream_generate(data: dict):
     """
     Générateur SSE — appelle tes fonctions EXISTANTES
     et streame chaque résultat test par test.
     """
- 
+
     url       = data.get("url", "")
     framework = data.get("framework", "Selenium")
     test_type = data.get("test_type", "smoke").lower()
- 
-    # ── Connexion établie ────────────────────────────────────────────────────
+
     yield sse({"type": "log", "text": f"NexTest AI Engine — connecting to {url}"})
     await asyncio.sleep(0.05)
     yield sse({"type": "log", "text": f"Launching {framework} (headless)..."})
     await asyncio.sleep(0.05)
     yield sse({"type": "log", "text": "Scraping DOM and analyzing page structure..."})
     await asyncio.sleep(0.05)
- 
+
     try:
-        # ── APPELLE TES FONCTIONS EXISTANTES ─────────────────────────────────
-        # (les mêmes que dans tes endpoints actuels)
- 
         loop = asyncio.get_event_loop()
- 
+
         if test_type == "functional":
             from urllib.parse import urlparse
             base_url = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
@@ -1440,7 +1773,7 @@ async def stream_generate(data: dict):
             )
             test_cases = gen_result.get("test_cases", [])
             runner_fn  = lambda: run_functional_tests(test_cases=test_cases, base_url=base_url)
- 
+
         elif test_type == "security":
             frontend_url = url
             for suffix in ["/admin-anpe/login", "/admin-anpe", "/dashboard", "/reception"]:
@@ -1454,18 +1787,16 @@ async def stream_generate(data: dict):
             from security_runner import _CACHED_TOKEN
             jwt = data.get("token") or _CACHED_TOKEN
             runner_fn = lambda: run_security_tests(test_cases, jwt)
- 
+
         elif test_type == "regression":
             from urllib.parse import urlparse
             base_url = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
             gen_result = await loop.run_in_executor(
                 executor, lambda: generate_regression_tests(base_url=base_url, username=data.get("username", ""), password=data.get("password", ""))
-
             )
             test_cases = gen_result.get("test_cases", [])
             runner_fn  = lambda: run_regression_tests(test_cases=test_cases, base_url=base_url, username=data.get("username", ""), password=data.get("password", ""))
 
- 
         elif test_type == "api":
             from urllib.parse import urlparse
             parsed = urlparse(url)
@@ -1483,9 +1814,8 @@ async def stream_generate(data: dict):
             from api_runner import _CACHED_TOKEN
             jwt = data.get("token") or _CACHED_TOKEN
             runner_fn  = lambda: run_api_tests(test_cases, jwt)
- 
+
         else:
-            # smoke / performance / default → appelle /generate normal
             scraped = await loop.run_in_executor(
                 executor, lambda: scrape_page(url, wait_time=4000)
             )
@@ -1501,30 +1831,25 @@ async def stream_generate(data: dict):
             runner_fn  = lambda: run_selenium_real(
                 gen_result.get("script", ""), test_cases
             )
- 
-        # ── Annonce le nombre de tests ────────────────────────────────────────
+
         total = len(test_cases)
         yield sse({"type": "log", "text": f"AI generated {total} test cases — starting execution..."})
         yield sse({"type": "log", "text": "─" * 52})
         await asyncio.sleep(0.05)
- 
-        # ── Lance le runner dans un thread (non-bloquant) ─────────────────────
-        # Le runner retourne TOUS les résultats d'un coup.
-        # On les streame un par un pour l'affichage terminal.
+
         run_result = await loop.run_in_executor(executor, runner_fn)
         results    = run_result.get("results", [])
- 
+
         pass_count = 0
         fail_count = 0
         skip_count = 0
- 
+
         for i, r in enumerate(results):
             status = r.get("status", "skip")
             if status == "pass":  pass_count += 1
             elif status == "fail": fail_count += 1
             else:                  skip_count += 1
- 
-            # Stream ce résultat immédiatement
+
             yield sse({
                 "type":       "test_result",
                 "index":      i,
@@ -1545,18 +1870,16 @@ async def stream_generate(data: dict):
                 "skip_count": skip_count,
                 "progress":   round((i + 1) / total * 100),
             })
-            await asyncio.sleep(0.02)  # petit délai pour que React reçoive chaque event
- 
-        # ── Résumé final ──────────────────────────────────────────────────────
+            await asyncio.sleep(0.02)
+
         total_exec = pass_count + fail_count
         rate = round(pass_count / total_exec * 100) if total_exec else 0
- 
+
         yield sse({"type": "log", "text": "─" * 52})
         yield sse({"type": "log", "text": f"Execution complete — {pass_count} passed · {fail_count} failed · {skip_count} skipped"})
         yield sse({"type": "log", "text": f"Pass rate: {rate}% — Generating AI analysis report..."})
         yield sse({"type": "log", "text": "Done ✓"})
- 
-        # ── Événement COMPLETE — contient tout pour que React sauvegarde ──────
+
         yield sse({
             "type":       "complete",
             "results":    results,
@@ -1565,7 +1888,6 @@ async def stream_generate(data: dict):
             "skip_count": skip_count,
             "pass_rate":  rate,
             "total":      total,
-            # Inclure les scripts générés pour le téléchargement
             "script":            gen_result.get("script", ""),
             "script_selenium":   gen_result.get("script_selenium", ""),
             "script_playwright": gen_result.get("script_playwright", ""),
@@ -1576,14 +1898,14 @@ async def stream_generate(data: dict):
             "test_type":         test_type,
             "framework":         framework,
         })
- 
+
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
         print(f"[SSE ERROR] {e}\n{tb}")
         yield sse({"type": "error", "text": f"Error: {str(e)}"})
- 
- 
+
+
 @app.post("/generate-stream")
 async def generate_stream(request: FastAPIRequest):
     """

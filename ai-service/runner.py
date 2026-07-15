@@ -74,6 +74,8 @@ def _run_steps(steps: list) -> dict:
             "priority":         step.get("priority", "high"),
             "category":         step.get("category", "smoke"),
             "section":          step.get("section", "smoke"),
+            "expected":         step.get("expected", step.get("reason", "")),
+            "description":      step.get("description", step.get("expected", "")),
             "screenshot":       None,
         })
 
@@ -107,6 +109,38 @@ def _run_steps(steps: list) -> dict:
                 except Exception:
                     pass
                 return _fatal_result(f"Cannot load '{base_url}': {e}", len(steps))
+
+        # ── Login si credentials présents ────────────────────────────────
+        username, password, login_url = _extract_credentials(steps)
+        if username and password:
+            try:
+                from urllib.parse import urlparse
+                effective_login_url = login_url or f"{urlparse(base_url).scheme}://{urlparse(base_url).netloc}/login"
+                page.goto(effective_login_url, timeout=_NAV_TIMEOUT, wait_until="domcontentloaded")
+                page.wait_for_timeout(1000)
+                email_sel = (
+                    "input[type='email'], input[type='text'], input[name*='email' i], "
+                    "input[name*='username' i], input[placeholder*='email' i], "
+                    "input[placeholder*='mail' i], input[placeholder*='utilisateur' i]"
+                )
+                page.fill(email_sel, username)
+                page.fill("input[type='password']", password)
+                submit_sel = (
+                    "button[type='submit'], input[type='submit'], "
+                    "button:has-text('connecter'), button:has-text('login'), "
+                    "button:has-text('Se connecter'), button:has-text('Sign in')"
+                )
+                submit = page.query_selector(submit_sel)
+                if submit:
+                    submit.click()
+                try:
+                    page.wait_for_url(lambda u: "login" not in u.lower(), timeout=8000)
+                except Exception:
+                    pass
+                page.wait_for_timeout(1000)
+                _goto(page, base_url)
+            except Exception as e:
+                print(f"[RUNNER] Login failed: {e}")
 
         current_section = None
         for step in to_run:
@@ -161,6 +195,12 @@ def _extract_base_url(steps: list) -> str | None:
         if step.get("base_url"): return step["base_url"]
         if step.get("url"):      return step["url"]
     return None
+
+def _extract_credentials(steps: list):
+    for step in steps:
+        if step.get("username") and step.get("password"):
+            return step["username"], step["password"], step.get("login_url")
+    return None, None, None
 
 
 def _fatal_result(error: str, n_steps: int) -> dict:
@@ -376,6 +416,8 @@ def _run_one_step(page, step: dict, base_url: str) -> dict:
             "priority": step.get("priority", "medium"),
             "category": step.get("category", "functional"),
             "section": step.get("section", "general"),
+            "expected": step.get("expected", ""),
+            "description": step.get("description", step.get("expected", "")),
         }
 
     # Normalize selector
@@ -532,6 +574,8 @@ def _run_one_step(page, step: dict, base_url: str) -> dict:
         "priority":         step.get("priority", "medium"),
         "category":         step.get("category", step.get("type", "smoke")),
         "section":          step.get("section", "general"),
+        "expected":         step.get("expected", ""),
+        "description":      step.get("description", step.get("expected", "")),
     }
 
 
@@ -550,6 +594,8 @@ def _skip_result(name: str, step: dict, reason: str, duration: str) -> dict:
         "priority":         step.get("priority", "medium"),
         "category":         step.get("category", "functional"),
         "section":          step.get("section", "general"),
+        "expected":         step.get("expected", ""),
+        "description":      step.get("description", step.get("expected", "")),
     }
 
 

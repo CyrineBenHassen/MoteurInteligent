@@ -1053,7 +1053,7 @@ def _build_smoke_steps(scraped: dict) -> list:
     })
 
     candidates.append({
-        "name":        f"Load time acceptable ({load_time_ms}ms)",
+        "name":        "Load time acceptable",
         "selector":    "body",
         "type":        "performance",
         "tier":        1,

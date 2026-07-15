@@ -10,45 +10,52 @@ from alert_recorder import record_results
 #token for captcha
 _CACHED_TOKEN = os.getenv("ANPE_TOKEN")
 
+def _is_anpe(base_url: str) -> bool:
+    """ANPE = flux token/captcha (comportement historique, ne pas toucher).
+    Toute autre app interne = credentials classiques (username/password)."""
+    return "anpe" in (base_url or "").lower()
+
 def _inject_token(page, base_url: str, username: str = "", password: str = "") -> bool:
-    """Inject JWT token into browser localStorage — same token as api_runner.py"""
-    try:
-        print(f"[REGRESSION_RUNNER] Injecting token into browser...")
+    """
+    ANPE (captcha) → injecte le token JWT caché dans localStorage.
+    Toute autre app interne (sans captcha) → login classique via credentials.
+    """
+    if _is_anpe(base_url) and _CACHED_TOKEN:
+        try:
+            print(f"[REGRESSION_RUNNER] ANPE detected — injecting cached token...")
 
-        # 1. Ouvre le site d'abord (obligatoire pour accéder au localStorage)
-        page.goto(base_url, wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(2000)
+            page.goto(base_url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(2000)
 
-        # 2. Injecte le token dans localStorage
-        page.evaluate(f"""
-            () => {{
-                localStorage.setItem('token', '{_CACHED_TOKEN}');
-                localStorage.setItem('access_token', '{_CACHED_TOKEN}');
-                localStorage.setItem('authToken', '{_CACHED_TOKEN}');
-                localStorage.setItem('auth_token', '{_CACHED_TOKEN}');
-            }}
-        """)
+            page.evaluate(f"""
+                () => {{
+                    localStorage.setItem('token', '{_CACHED_TOKEN}');
+                    localStorage.setItem('access_token', '{_CACHED_TOKEN}');
+                    localStorage.setItem('authToken', '{_CACHED_TOKEN}');
+                    localStorage.setItem('auth_token', '{_CACHED_TOKEN}');
+                }}
+            """)
 
-        print(f"[REGRESSION_RUNNER] ✓ Token injected into localStorage")
+            print(f"[REGRESSION_RUNNER] ✓ Token injected into localStorage")
 
-        # 3. Va sur le dashboard directement
-        page.goto(f"{base_url}/dashboard", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(3000)
+            page.goto(f"{base_url}/dashboard", wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(3000)
 
-        current_url = page.url
-        print(f"[REGRESSION_RUNNER] After token injection URL: {current_url}")
+            current_url = page.url
+            print(f"[REGRESSION_RUNNER] After token injection URL: {current_url}")
 
-        if "login" not in current_url.lower():
-            print(f"[REGRESSION_RUNNER] ✓ Token injection successful!")
-            return True
-        else:
-            print(f"[REGRESSION_RUNNER] ✗ Token rejected — trying real login...")
-            return _login_form(page, base_url, username, password)
+            if "login" not in current_url.lower():
+                print(f"[REGRESSION_RUNNER] ✓ Token injection successful!")
+                return True
+            else:
+                print(f"[REGRESSION_RUNNER] ✗ Token rejected — trying real login...")
 
-    except Exception as e:
-        print(f"[REGRESSION_RUNNER] Token injection error: {e}")
-        return _login_form(page, base_url)
+        except Exception as e:
+            print(f"[REGRESSION_RUNNER] Token injection error: {e}")
 
+    # ── App générique (pas de captcha) — login classique credentials ──
+    print(f"[REGRESSION_RUNNER] Generic app — logging in with credentials...")
+    return _login_form(page, base_url, username, password)
 
 def _login_form(page, base_url: str, username: str = "", password: str = "") -> bool:
     """Fallback — login with form if token injection fails"""
@@ -118,7 +125,7 @@ def _run_one_regression(page, tc: dict, base_url: str) -> dict:
     try:
         # ── Navigate to page ─────────────────────────────────────────────────
         if action == "navigate" or not action:
-            if tc.get("requires_login", True):
+            if tc.get("requires_login", True) and _is_anpe(base_url):
                 page.evaluate(f"""
                     () => {{
                         localStorage.setItem('token', '{_CACHED_TOKEN}');
@@ -157,13 +164,14 @@ def _run_one_regression(page, tc: dict, base_url: str) -> dict:
                 page.goto(url, wait_until="networkidle", timeout=20000)
                 page.wait_for_timeout(5000)
             else:
-                page.evaluate(f"""
-                    () => {{
-                        localStorage.setItem('token', '{_CACHED_TOKEN}');
-                        localStorage.setItem('access_token', '{_CACHED_TOKEN}');
-                        localStorage.setItem('authToken', '{_CACHED_TOKEN}');
-                    }}
-                """)
+                if _is_anpe(base_url):
+                    page.evaluate(f"""
+                        () => {{
+                            localStorage.setItem('token', '{_CACHED_TOKEN}');
+                            localStorage.setItem('access_token', '{_CACHED_TOKEN}');
+                            localStorage.setItem('authToken', '{_CACHED_TOKEN}');
+                        }}
+                    """)
                 page.goto(url, wait_until="networkidle", timeout=20000)
                 page.wait_for_timeout(5000)
 

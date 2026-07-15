@@ -36,21 +36,34 @@ async def _inject_token(page, token: str, frontend_url: str, login_url: str = "/
     from urllib.parse import urlparse
     parsed = urlparse(frontend_url)
     clean_frontend = f"{parsed.scheme}://{parsed.netloc}"
-    
+
     if token:
         # ANPE → bypass captcha avec token
         await _safe_goto(page, f"{clean_frontend}{login_url}")
         await page.evaluate(f"localStorage.setItem('token', '{token}')")
         print(f"[SECURITY_RUNNER] Token injected into localStorage")
     elif username and password:
-        # Autre app → form login normal
+        # Autre app → form login normal (selectors génériques avec fallback)
         await _safe_goto(page, f"{clean_frontend}{login_url}")
-        await page.fill("input[type='email'], input[name='email']", username)
-        await page.fill("input[type='password']", password)
-        await page.click("button[type='submit']")
-        await page.wait_for_timeout(2000)
-        print(f"[SECURITY_RUNNER] Logged in with credentials")
-
+        email_sel = (
+            "#basic_email, input[type='email'], input[type='text'], "
+            "input[name*='email' i], input[name*='username' i], "
+            "input[placeholder*='email' i], input[placeholder*='mail' i]"
+        )
+        pwd_sel = "#basic_password, input[type='password']"
+        try:
+            await page.wait_for_selector(email_sel, timeout=10000)
+            await page.fill(email_sel, username)
+            await page.fill(pwd_sel, password)
+            submit = page.locator(
+                "button[type='submit'], input[type='submit'], "
+                "button:has-text('connecter'), button:has-text('Se connecter'), button:has-text('Sign in')"
+            ).first
+            await submit.click()
+            await page.wait_for_timeout(2500)
+            print(f"[SECURITY_RUNNER] Logged in with credentials")
+        except Exception as e:
+            print(f"[SECURITY_RUNNER] Credentials login failed: {e}")
 
 async def _run_one_playwright(tc: dict, token: str) -> dict:
     """Execute a single security test using Playwright"""
@@ -409,16 +422,19 @@ def _build_result(tc: dict, status: str, reason: str, duration_ms: int) -> dict:
     }
 
 
-def run_security_tests(test_cases: list, token: str = "") -> dict:
+def run_security_tests(test_cases: list, token: str = "", username: str = "", password: str = "") -> dict:
     """Main entry point — runs all security tests synchronously"""
 
-    jwt_token = token if token else _CACHED_TOKEN
+    jwt_token = token if token else (_CACHED_TOKEN if not (username and password) else "")
     print(f"[SECURITY_RUNNER] Running {len(test_cases)} security tests")
-    print(f"[SECURITY_RUNNER] Token: {'provided' if token else 'using cached'}")
+    print(f"[SECURITY_RUNNER] Token: {'provided' if token else ('cached (ANPE)' if jwt_token else 'none — using credentials')}")
 
     results = []
 
     for i, tc in enumerate(test_cases, 1):
+        if username and password and not tc.get("username"):
+            tc["username"] = username
+            tc["password"] = password
         print(f"[SECURITY_RUNNER] [{i}/{len(test_cases)}] "
               f"{tc.get('severity','?').upper()} | {tc.get('name','')}")
 

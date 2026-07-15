@@ -10,6 +10,9 @@ import {
 
 import CalendarView from './CalendarView';
 
+import { LogoSpinner } from '../dashboard/Dashboard';
+
+
 
 const FRAMEWORKS_BY_TYPE = {
   smoke:       ['Selenium', 'Cypress', 'Playwright'],
@@ -920,10 +923,11 @@ export default function ScheduledTasksPanel({ projects = [] }) {
           </div>
 
           {loading ? (
-            <div style={{ padding: '40px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} style={{ height: 16, borderRadius: 4, background: 'var(--border)', opacity: .5, width: `${80 - i * 10}%` }} />
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 32px', gap: 20 }}>
+              <LogoSpinner size={80} />
+              <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
+                Loading Scheduled Tasks...
+              </div>
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: '56px 24px', textAlign: 'center' }}>

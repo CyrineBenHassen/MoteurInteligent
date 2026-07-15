@@ -372,7 +372,31 @@ public function index()
     Generation::where('user_id', auth()->id())->delete();
     return response()->json(['message' => 'All history deleted successfully']);
 }
+    public function projectVerdict(Request $request)
+{
+    $request->validate([
+        'project_name' => 'required|string',
+        'tests'        => 'required|integer',
+        'pass_count'   => 'required|integer',
+        'fail_count'   => 'required|integer',
+        'pass_rate'    => 'required|integer',
+    ]);
 
+    try {
+        $response = Http::timeout(60)->post('http://127.0.0.1:8001/project-verdict', $request->only([
+            'project_name', 'tests', 'pass_count', 'fail_count', 'pass_rate',
+        ]));
+
+        if ($response->failed()) {
+            return response()->json(['error' => 'AI service error', 'detail' => $response->body()], 500);
+        }
+
+        return response()->json($response->json());
+    } catch (\Exception $e) {
+        Log::error('[NEXTEST] projectVerdict() exception', ['error' => $e->getMessage()]);
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
     public function analyze(Request $request)
     {
         $request->validate([
@@ -769,13 +793,15 @@ public function generateSecurity(Request $request)
     }
 
     $request->validate([
-        'url'        => 'required|url',
-        'project_id' => 'nullable|integer',
-        'categories' => 'nullable|array',
-        'anpe_token' => 'nullable|string',
-        'project_name' => 'nullable|string',   
-        'project_type' => 'nullable|string',   
-    ]);
+    'url'        => 'required|url',
+    'project_id' => 'nullable|integer',
+    'categories' => 'nullable|array',
+    'anpe_token' => 'nullable|string',
+    'project_name' => 'nullable|string',   
+    'project_type' => 'nullable|string',
+    'username'     => 'nullable|string',
+    'password'     => 'nullable|string',
+]);
 
     if ($request->has('data')) {
     $request->merge(json_decode($request->input('data'), true) ?? []);
@@ -787,12 +813,14 @@ $docText = $this->extractDocText($request);
     Log::info('[NEXTEST] generateSecurity()', ['url' => $url]);
 
     try {
-        $response = Http::timeout(180)->post('http://127.0.0.1:8001/generate-security', [
-            'url'        => $url,
-            'token'      => $request->anpe_token ?? '',
-            'categories' => $request->categories ?? null,
-            'doc_text'   => $docText,
-        ]);
+        $response = Http::timeout(300)->post('http://127.0.0.1:8001/generate-security', [
+    'url'        => $url,
+    'token'      => $request->anpe_token ?? '',
+    'categories' => $request->categories ?? null,
+    'doc_text'   => $docText,
+    'username'   => $request->username ?? '',
+    'password'   => $request->password ?? '',
+]);
 
         if ($response->failed()) {
             return response()->json(['error' => 'AI service error', 'detail' => $response->body()], 500);
@@ -804,10 +832,12 @@ $docText = $this->extractDocText($request);
         $testCases = $result['test_cases'] ?? [];
 
         // Run security tests
-        $runResponse = Http::timeout(180)->post('http://127.0.0.1:8001/run-security', [
-            'test_cases' => $testCases,
-            'token'      => $request->anpe_token ?? '',
-        ]);
+        $runResponse = Http::timeout(300)->post('http://127.0.0.1:8001/run-security', [
+    'test_cases' => $testCases,
+    'token'      => $request->anpe_token ?? '',
+    'username'   => $request->username ?? '',
+    'password'   => $request->password ?? '',
+]);
 
         $pass = 0; $fail = 0; $warn = 0;
         $executionResults = [];
@@ -884,6 +914,8 @@ $validated = $request->validate([
     'doc_files'  => 'nullable|array',
     'doc_files.*'=> 'nullable|file|mimes:pdf,txt,json,yaml,yml,md,docx|max:10240',
     'data'       => 'nullable|string',
+    'username'     => 'nullable|string',
+'   password'     => 'nullable|string',
 ]);
 
     $url       = $validated['url'];
@@ -1157,12 +1189,14 @@ public function generatePerformance(Request $request)
     try {
         // Performance tests take longer — timeout 600s
        $response = Http::timeout(900)->post('http://127.0.0.1:8001/generate-performance', [
-            'url'        => $url,
-            'framework'  => $framework,
-            'project_id' => $projectId,
-            'test_types' => $testTypes,
-            'doc_text'   => $docText,
-        ]);
+           'url'        => $url,
+    'framework'  => $framework,
+    'project_id' => $projectId,
+    'test_types' => $testTypes,
+    'doc_text'   => $docText,
+    'username'   => $request->username ?? '',
+    'password'   => $request->password ?? '',
+]);
  
         $data = $response->json();
  

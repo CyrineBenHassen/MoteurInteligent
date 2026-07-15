@@ -52,7 +52,7 @@ def _extract_pages_from_doc(doc_text: str, base_url: str) -> tuple:
         print(f"[SECURITY_GENERATOR] Doc extraction error: {e} — using defaults")
         return DEFAULT_PAGES, DEFAULT_LOGIN_URL
     
-def generate_security_tests(base_url: str, categories: list = None, doc_text: str = "") -> dict:
+def generate_security_tests(base_url: str, categories: list = None, doc_text: str = "", username: str = "", password: str = "") -> dict:
     """
     Generate frontend security tests for ANPE using Playwright + JWT token.
     Tests: auth, xss, session, navigation, headers, info_exposure
@@ -157,7 +157,6 @@ Return ONLY the JSON array. No markdown. No explanation."""
 
         test_cases = json.loads(raw)
 
-        # Normalize and clean
         cleaned = []
         for i, tc in enumerate(test_cases, 1):
             cleaned.append({
@@ -175,12 +174,12 @@ Return ONLY the JSON array. No markdown. No explanation."""
                 "check_headers":    tc.get("check_headers", []),
                 "forbidden_in_dom": tc.get("forbidden_in_dom", []),
                 "frontend_url":     frontend_url,
-                "login_url": login_url
+                "login_url": login_url,
+                "username":         username,
+                "password":         password,
             })
             
-            # Fixe les tests navigation (8 et 9) pour garantir nom/URL stables entre les runs
-        # Fixe les tests navigation (8 et 9) pour garantir nom/URL stables ET cohérents entre les runs
-        # Fixe les tests critiques pour garantir URL/test_type stables entre les runs
+            
         for tc in cleaned:
             if tc["id"] == 1:
                 tc["test_type"] = "no_token"

@@ -57,12 +57,15 @@ def record_results(results: list, base_url: str, test_type: str, framework: str,
         payload = {
             "generation_id": generation_id,
             "project_id":    project_id,
-            "url":           r.get("url", base_url),
+            "url": base_url,
             "test_type":     test_type,
             "framework":     framework,
             "test_name":     r.get("name", f"test_{recorded}"),
             "status":        status,
-        }
+            "reason":        r.get("reason", ""),
+            "duration_ms":   int(str(r.get("duration", "0")).replace("ms", "") or 0),
+
+}
 
         try:
             resp = requests.post(

@@ -14,7 +14,7 @@ class TestFlagController extends Controller
             'url'        => 'required|string',
             'test_type'  => 'required|string',
             'test_name'  => 'required|string',
-            'status'     => 'required|in:muted,stable',
+            'status' => 'required|in:muted,stable,ignored',
         ]);
 
         $flag = TestFlag::updateOrCreate(

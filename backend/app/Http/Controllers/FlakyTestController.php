@@ -17,7 +17,7 @@ class FlakyTestController extends Controller
    
     /*  Calcul du statut flaky pour un groupe d'exécutions                 */
 
-   private function computeStatus(iterable $window, string $key, $flags): array
+private function computeStatus(iterable $window, string $key, $flags): array
 {
     $window = collect($window)->reverse()->values();
     $n      = $window->count();
@@ -30,18 +30,30 @@ class FlakyTestController extends Controller
     }
     $score = $n > 1 ? (int) round($transitions / ($n - 1) * 100) : 0;
 
-    // ← AJOUTE : si beaucoup de fails même avec peu d'exécutions → warning
+    // ── Le score ne doit jamais être inférieur au taux d'échec réel de la fenêtre.
+    // Contrairement à un plancher fixe (30%), ce plancher est directement
+    // proportionnel aux données : 1 fail sur 10 runs → plancher 10%,
+    // 5 fails sur 10 runs → plancher 50%. Plus de valeur magique déconnectée.
     if ($n >= 2 && $fails > 0 && $passes > 0) {
-        $score = max($score, 30); // minimum 30% si déjà pass+fail
+        $failRate = (int) round($fails / $n * 100);
+        $score = max($score, $failRate);
     }
-    if ($n >= 1 && $fails > 0 && $passes === 0) {
+
+    if ($n >= 3 && $fails > 0 && $passes === 0) {
+    // Broken confirmé : au moins 3 échecs consécutifs, aucun succès — pas un coup de malchance isolé.
+    $statusLabel = 'broken';
+} elseif ($n >= 1 && $n < 3 && $fails > 0 && $passes === 0) {
+    // Pas assez de recul pour parler de "broken" : le test échoue, mais on lui laisse une marge.
     $statusLabel = 'critical';
+} elseif ($n >= 1 && $passes > 0 && $fails === 0) {
+    $statusLabel = 'stable';
 } else {
     $statusLabel = 'stable';
     if ($score > 50)     $statusLabel = 'critical';
     elseif ($score > 20) $statusLabel = 'flaky';
     elseif ($score > 0)  $statusLabel = 'warning';
 }
+
     if ($flag = $flags->get($key)) {
         $statusLabel = $flag->status;
     }
@@ -148,9 +160,19 @@ public function index(Request $request)
     $query = TestExecution::query()->orderByDesc('executed_at');
 
     if ($request->filled('project_id')) $query->where('project_id', $request->query('project_id'));
-    if ($request->filled('test_type'))  $query->where('test_type',  $request->query('test_type'));
-    if ($request->filled('date_from'))  $query->where('executed_at', '>=', $request->query('date_from'));
-    if ($request->filled('date_to'))    $query->where('executed_at', '<=', $request->query('date_to'));
+if ($request->filled('test_type'))  $query->where('test_type',  $request->query('test_type'));
+if ($request->filled('date_from'))  $query->where('executed_at', '>=', $request->query('date_from'));
+if ($request->filled('date_to'))    $query->where('executed_at', '<=', $request->query('date_to'));
+
+if ($request->filled('date_filter')) {
+    $now = now();
+    match ($request->query('date_filter')) {
+        'today' => $query->whereDate('executed_at', $now->toDateString()),
+        'week'  => $query->where('executed_at', '>=', $now->copy()->startOfWeek()),
+        'month' => $query->where('executed_at', '>=', $now->copy()->startOfMonth()),
+        default => null,
+    };
+}
 
     $executions = $query->get();
 
@@ -181,33 +203,40 @@ public function index(Request $request)
     }
 
     // ── ÉTAPE 2 : agréger par URL+type = une ligne parent
-    $statusRank = ['stable' => 0, 'warning' => 1, 'flaky' => 2, 'critical' => 3];
+$statusRank = [
+    'ignored'  => -1, // en dessous de stable : un test ignoré ne doit jamais masquer un vrai problème
+    'stable'   => 0,
+    'warning'  => 1,
+    'flaky'    => 2,
+    'critical' => 3,
+    'broken'   => 4,
+];
+$parentGroups = collect($individual)->groupBy(fn($t) =>
+    ($t['project_id'] ?? '') . '|' . $t['url'] . '|' . $t['test_type']
+);
 
-    $parentGroups = collect($individual)->groupBy(fn($t) =>
-        ($t['project_id'] ?? '') . '|' . $t['url'] . '|' . $t['test_type']
-    );
+$tests = [];
+foreach ($parentGroups as $key => $cases) {
+    $worst = $cases->sortByDesc(fn($c) => $statusRank[$c['status']] ?? 0)->first();
 
-    $tests = [];
-    foreach ($parentGroups as $key => $cases) {
-        $worst = $cases->sortByDesc(fn($c) => $statusRank[$c['status']] ?? 0)->first();
-
-        $tests[] = [
-            'url'              => $worst['url'],
-            'test_type'        => $worst['test_type'],
-            'test_name'        => $worst['test_name'], // fallback pour compat frontend
-            'project_id'       => $worst['project_id'],
-            'framework'        => $worst['framework'],
-            'status'           => $worst['status'],
-            'flakiness_score'  => (int) round($cases->avg('flakiness_score')),
-            'total_runs'       => $cases->sum('total_runs'),
-            'passes'           => $cases->sum('passes'),
-            'fails'            => $cases->sum('fails'),
-            'skips'            => $cases->sum('skips'),
-            'generation_id'    => $worst['generation_id'],
-            'last_execution'   => $cases->max('last_execution'),
-            'generation_count' => $cases->pluck('generation_id')->unique()->count(),
-        ];
-    }
+    $tests[] = [
+        'url'              => $worst['url'],
+        'test_type'        => $worst['test_type'],
+        'test_name'        => $worst['test_name'],
+        'project_id'       => $worst['project_id'],
+        'framework'        => $worst['framework'],
+        'status'           => $worst['status'],
+        // ── on affiche le score du pire test, pas une moyenne qui contredit le badge
+        'flakiness_score'  => $worst['flakiness_score'],
+        'total_runs'       => $cases->sum('total_runs'),
+        'passes'           => $cases->sum('passes'),
+        'fails'            => $cases->sum('fails'),
+        'skips'            => $cases->sum('skips'),
+        'generation_id'    => $worst['generation_id'],
+        'last_execution'   => $cases->max('last_execution'),
+        'generation_count' => $cases->pluck('generation_id')->unique()->count(),
+    ];
+}
 
     if ($request->filled('search')) {
         $s = mb_strtolower($request->query('search'));
@@ -217,21 +246,36 @@ public function index(Request $request)
     }
 
     if ($request->filled('status')) {
-        $st = $request->query('status');
-        $tests = array_values(array_filter($tests, fn($t) => $t['status'] === $st));
-    }
+    $st = $request->query('status');
+
+    // Clés des groupes (project_id|url|test_type) qui contiennent AU MOINS UN test
+    // avec ce statut — pas seulement le "pire" statut agrégé de la ligne.
+    $matchingKeys = collect($individual)
+        ->filter(fn($t) => $t['status'] === $st)
+        ->map(fn($t) => ($t['project_id'] ?? '') . '|' . $t['url'] . '|' . $t['test_type'])
+        ->unique()
+        ->flip();
+
+    $tests = array_values(array_filter($tests, function ($t) use ($matchingKeys) {
+        $key = ($t['project_id'] ?? '') . '|' . $t['url'] . '|' . $t['test_type'];
+        return isset($matchingKeys[$key]);
+    }));
+}
 
     usort($tests, fn($a, $b) => $b['flakiness_score'] <=> $a['flakiness_score']);
 
-    $totalTracked    = count($tests);
-    $flakyCount      = count(array_filter($tests, fn($t) => in_array($t['status'], ['flaky', 'critical'])));
-    $flakinessRate   = $totalTracked > 0 ? round($flakyCount / $totalTracked * 100) : 0;
+    // ── KPIs calculés sur les tests individuels ($individual), pas sur les lignes
+    // agrégées par URL ($tests) — sinon 1 seul test broken sur 12 donnerait 100%
+    // au lieu du vrai taux (~8%).
+    $totalIndividual = count($individual);
+    $flakyIndividual = count(array_filter($individual, fn($t) => in_array($t['status'], ['flaky', 'critical', 'broken'])));
+    $flakinessRate   = $totalIndividual > 0 ? round($flakyIndividual / $totalIndividual * 100) : 0;
     $totalExecutions = array_sum(array_column($tests, 'total_runs'));
     $failedRuns      = array_sum(array_column($tests, 'fails'));
 
     return response()->json([
         'kpis' => [
-            'total_flaky_tests' => $flakyCount,
+            'total_flaky_tests' => $flakyIndividual,
             'flakiness_rate'    => $flakinessRate,
             'total_executions'  => $totalExecutions,
             'failed_runs'       => $failedRuns,
@@ -253,6 +297,8 @@ public function index(Request $request)
             'framework'     => 'nullable|string',
             'test_name'     => 'required|string',
             'status'        => 'required|in:pass,fail,skip',
+            'reason'        => 'nullable|string',
+            'duration_ms'   => 'nullable|integer',
         ]);
 
         $key = ($data['project_id'] ?? '') . '|' . $data['url'] . '|' . $data['test_type'] . '|' . $data['test_name'];
@@ -284,6 +330,8 @@ public function index(Request $request)
             'test_name'     => $data['test_name'],
             'status'        => $data['status'],
             'executed_at'   => now(),
+            'reason'        => $data['reason'] ?? null,
+            'duration_ms'   => $data['duration_ms'] ?? null,
         ]);
 
         //Statut APRÈS l'insertion
@@ -535,6 +583,8 @@ public function destroyByUrl(Request $request)
 
     return response()->json(['deleted' => true]);
 }
+
+
 public function details(Request $request)
 {
     $request->validate([
@@ -562,11 +612,25 @@ public function details(Request $request)
         $stats  = $this->computeStatus($window, $key, $flags);
         $last   = $window->first();
 
-        // Override status pour les cas individuels
-        if ($stats['passes'] === 0 && $stats['fails'] > 0) {
-            $stats['status'] = 'broken';
-        } elseif ($stats['fails'] === 0 && $stats['passes'] > 0) {
-            $stats['status'] = 'stable';
+        
+
+        // ── V1 / V2 comparison adaptative (coupe l'historique en 2 moitiés égales) ──
+        $total = $group->count();
+        $comparison = null;
+
+        if ($total >= 4) {
+            $half     = intdiv($total, 2);
+            $v2Window = $group->take($half);          // moitié récente
+            $v1Window = $group->slice($half, $half);  // moitié précédente
+
+            $v2Stats = $this->computeRawStats($v2Window);
+            $v1Stats = $this->computeRawStats($v1Window);
+
+            $comparison = [
+                'v1'     => $v1Stats,
+                'v2'     => $v2Stats,
+                'reason' => $this->buildComparisonReason($v1Stats, $v2Stats),
+            ];
         }
 
         $cases[] = array_merge($stats, [
@@ -574,11 +638,81 @@ public function details(Request $request)
             'generation_id'  => $last->generation_id,
             'last_status'    => $last->status,
             'last_execution' => $last->executed_at,
+            'comparison'     => $comparison,
         ]);
     }
 
     usort($cases, fn($a, $b) => $b['flakiness_score'] <=> $a['flakiness_score']);
 
     return response()->json(['cases' => $cases]);
+}
+
+private function computeRawStats($window): array
+{
+    $n      = $window->count();
+    $passes = $window->where('status', 'pass')->count();
+    $fails  = $window->where('status', 'fail')->count();
+    $skips  = $n - $passes - $fails;
+    $rate   = $n > 0 ? round($passes / $n * 100) : 0;
+
+    $avgDuration = $n > 0
+        ? (int) round($window->avg('duration_ms'))
+        : 0;
+
+    // Raisons d'échec uniques et non vides sur cette fenêtre
+    $failReasons = $window->where('status', 'fail')
+        ->pluck('reason')
+        ->filter(fn($r) => filled($r))
+        ->unique()
+        ->values()
+        ->all();
+
+    return [
+        'total_runs'   => $n,
+        'passes'       => $passes,
+        'fails'        => $fails,
+        'skips'        => $skips,
+        'rate'         => $rate,
+        'avg_duration' => $avgDuration,
+        'fail_reasons' => $failReasons,
+    ];
+}
+
+private function buildComparisonReason(array $v1, array $v2): string
+{
+    $rateDelta     = $v2['rate'] - $v1['rate'];
+    $failDelta     = $v2['fails'] - $v1['fails'];
+    $skipDelta     = $v2['skips'] - $v1['skips'];
+    $durationDelta = $v2['avg_duration'] - $v1['avg_duration'];
+
+    $newReasons       = array_values(array_diff($v2['fail_reasons'], $v1['fail_reasons']));
+    $resolvedReasons  = array_values(array_diff($v1['fail_reasons'], $v2['fail_reasons']));
+
+    $parts = [];
+
+    if ($rateDelta < 0) {
+        $failTxt = $failDelta > 0 ? "+{$failDelta} failure(s)" : "{$failDelta} failure(s)";
+        $parts[] = "The success rate dropped from {$v1['rate']}% to {$v2['rate']}% ({$rateDelta}%), with {$failTxt} over the last {$v2['total_runs']} runs.";
+    } elseif ($rateDelta > 0) {
+        $parts[] = "The success rate improved from {$v1['rate']}% to {$v2['rate']}% (+{$rateDelta}%). This test is stabilizing.";
+    } elseif ($skipDelta !== 0) {
+        $parts[] = "Success rate stable ({$v2['rate']}%), but the number of skips changed ({$v1['skips']} → {$v2['skips']}).";
+    } elseif ($v2['rate'] === 100) {
+        $parts[] = "This test has been fully reliable across both periods — {$v2['total_runs']} consecutive runs, all passed. No instability detected.";
+    } else {
+        $parts[] = "This test remained consistent between the two periods, holding steady at {$v2['rate']}% success rate over " . ($v1['total_runs'] + $v2['total_runs']) . " runs.";
+    }
+    if (!empty($newReasons)) {
+        $parts[] = "New failure cause(s) appeared: " . implode('; ', $newReasons) . ".";
+    }
+    if (!empty($resolvedReasons)) {
+        $parts[] = "Previous failure cause(s) no longer occurring: " . implode('; ', $resolvedReasons) . ".";
+    }
+    if (abs($durationDelta) >= 500) { // seuil 500ms pour ignorer le bruit
+        $sign = $durationDelta > 0 ? '+' : '';
+        $parts[] = "Average execution time changed by {$sign}{$durationDelta}ms ({$v1['avg_duration']}ms → {$v2['avg_duration']}ms).";
+    }
+
+    return implode(' ', $parts);
 }
 }

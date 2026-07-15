@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLang } from '../../context/LanguageContext';
+import { LanguageSwitcher } from '../dashboard/LanguageSwitcher';
 import api from '../../api/axios';
 import './Onboarding.css';
 
@@ -12,68 +14,49 @@ import {
   ArrowLeft, ArrowRight, Check, Rocket
 } from 'lucide-react';
 
-
 const ROLES = [
   {
     id: 'developer',
     icon: <Code2 size={22} strokeWidth={1.8} />,
-    name: 'Developer',
-    desc: 'I write code and want to automate my tests',
   },
   {
     id: 'tester',
     icon: <Bug size={22} strokeWidth={1.8} />,
-    name: 'QA / Tester',
-    desc: 'I focus on quality assurance and test coverage',
   },
   {
     id: 'lead',
     icon: <LayoutGrid size={22} strokeWidth={1.8} />,
-    name: 'Tech Lead',
-    desc: 'I manage teams and care about overall quality',
   },
   {
     id: 'other',
     icon: <User size={22} strokeWidth={1.8} />,
-    name: 'Other',
-    desc: 'Student, researcher, or just exploring',
   },
 ];
 
 const INTERESTS = [
-  { id: 'smoke',       label: 'Smoke testing',    icon: <Flame size={14} /> },
-  { id: 'functional',  label: 'Functional tests', icon: <CheckCircle2 size={14} /> },
-  { id: 'performance', label: 'Performance',      icon: <Zap size={14} /> },
-  { id: 'selenium',    label: 'Selenium',         icon: <CircleDot size={14} /> },
-  { id: 'cypress',     label: 'Cypress',          icon: <Leaf size={14} /> },
-  { id: 'playwright',  label: 'Playwright',       icon: <Theater size={14} /> },
-  { id: 'reports',     label: 'Reports',          icon: <BarChart3 size={14} /> },
-  { id: 'ci',          label: 'CI/CD',            icon: <RefreshCw size={14} /> },
-  { id: 'security',    label: 'Security',         icon: <Shield size={14} /> },
-  { id: 'regression',  label: 'Regression',       icon: <RotateCcw size={14} /> },
-  // --- nouveaux ---
-  { id: 'api',         label: 'API Testing',      icon: <Webhook size={14} /> },
-  { id: 'seo',         label: 'SEO Testing',      icon: <Search size={14} /> },
-  { id: 'automation',  label: 'Automation',       icon: <Bot size={14} /> },
-  { id: 'k6',          label: 'k6',               icon: <Gauge size={14} /> },
-  { id: 'requests',    label: 'Requests',         icon: <Globe size={14} /> },
-  { id: 'postman',     label: 'Postman',          icon: <Send size={14} /> },
+  { id: 'smoke',       icon: <Flame size={14} /> },
+  { id: 'functional',  icon: <CheckCircle2 size={14} /> },
+  { id: 'performance', icon: <Zap size={14} /> },
+  { id: 'selenium',    icon: <CircleDot size={14} /> },
+  { id: 'cypress',     icon: <Leaf size={14} /> },
+  { id: 'playwright',  icon: <Theater size={14} /> },
+  { id: 'reports',     icon: <BarChart3 size={14} /> },
+  { id: 'ci',          icon: <RefreshCw size={14} /> },
+  { id: 'security',    icon: <Shield size={14} /> },
+  { id: 'regression',  icon: <RotateCcw size={14} /> },
+  { id: 'api',         icon: <Webhook size={14} /> },
+  { id: 'seo',         icon: <Search size={14} /> },
+  { id: 'automation',  icon: <Bot size={14} /> },
+  { id: 'k6',          icon: <Gauge size={14} /> },
+  { id: 'requests',    icon: <Globe size={14} /> },
+  { id: 'postman',     icon: <Send size={14} /> },
 ];
 
 const EXP_LEVELS = [
-  { id: 'beginner',     label: 'Beginner',      desc: '< 1 year' },
-  { id: 'intermediate', label: 'Intermediate',  desc: '1–3 years' },
-  { id: 'expert',       label: 'Expert',        desc: '3+ years' },
+  { id: 'beginner' },
+  { id: 'intermediate' },
+  { id: 'expert' },
 ];
-
-const ROLE_LABELS = {
-  developer: 'Developer',
-  tester:    'QA / Tester',
-  lead:      'Tech Lead',
-  other:     'Other',
-};
-
-
 
 function NexLogo() {
   return (
@@ -109,6 +92,7 @@ function NexLogo() {
     </div>
   );
 }
+
 function StepBar({ step, total }) {
   return (
     <div className="ob-step-bar">
@@ -119,43 +103,50 @@ function StepBar({ step, total }) {
   );
 }
 
-
-
 function StepRole({ selected, onSelect, onNext, onSkip }) {
+  const { t, lang } = useLang();
+  
   return (
     <div className="ob-screen">
-      <div className="ob-eyebrow">STEP 1 OF 3</div>
-      <h1 className="ob-title">What's your role?</h1>
-      <p className="ob-sub">This helps us personalize your dashboard and recommendations.</p>
+      <div className="ob-eyebrow">
+        {lang === 'ar' ? 'الخطوة 1 من 3' : lang === 'fr' ? 'ÉTAPE 1 SUR 3' : 'STEP 1 OF 3'}
+      </div>
+      <h1 className="ob-title">{t('whatRole')}</h1>
+      <p className="ob-sub">{t('onboardingDesc')}</p>
 
       <div className="ob-roles">
-        {ROLES.map(role => (
-          <button
-            key={role.id}
-            className={`ob-role-card${selected === role.id ? ' selected' : ''}`}
-            onClick={() => onSelect(role.id)}
-          >
-            <span className="ob-role-icon">{role.icon}</span>
-            <span className="ob-role-name">{role.name}</span>
-            <span className="ob-role-desc">{role.desc}</span>
-            {selected === role.id && (
-              <span className="ob-role-check">
-                <Check size={11} strokeWidth={3} />
-                  
-              </span>
-            )}
-          </button>
-        ))}
+        {ROLES.map(role => {
+          const name = t(`role${role.id.charAt(0).toUpperCase() + role.id.slice(1)}`);
+          const desc = t(`role${role.id.charAt(0).toUpperCase() + role.id.slice(1)}Desc`);
+          return (
+            <button
+              key={role.id}
+              className={`ob-role-card${selected === role.id ? ' selected' : ''}`}
+              onClick={() => onSelect(role.id)}
+            >
+              <span className="ob-role-icon">{role.icon}</span>
+              <span className="ob-role-name">{name}</span>
+              <span className="ob-role-desc">{desc}</span>
+              {selected === role.id && (
+                <span className="ob-role-check">
+                  <Check size={11} strokeWidth={3} />
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="ob-actions">
-        <button className="ob-skip" onClick={onSkip}>Skip for now</button>
+        <button className="ob-skip" onClick={onSkip}>
+          {lang === 'ar' ? 'تخطي الآن' : lang === 'fr' ? 'Passer pour le moment' : 'Skip for now'}
+        </button>
         <button
           className="ob-btn-next"
           disabled={!selected}
           onClick={onNext}
         >
-           Continue
+          {t('next')}
           <ArrowRight size={13} strokeWidth={2.5} />
         </button>
       </div>
@@ -163,14 +154,54 @@ function StepRole({ selected, onSelect, onNext, onSkip }) {
   );
 }
 
-
-
 function StepInterests({ interests, exp, onToggleInterest, onSelectExp, onNext, onBack }) {
+  const { t, lang } = useLang();
+
+  const interestLabel = (id) => {
+    const map = {
+      smoke: lang === 'ar' ? 'اختبار Smoke' : lang === 'fr' ? 'Test de fumée' : 'Smoke testing',
+      functional: lang === 'ar' ? 'اختبارات وظيفية' : lang === 'fr' ? 'Tests fonctionnels' : 'Functional tests',
+      performance: lang === 'ar' ? 'الأداء' : lang === 'fr' ? 'Performance' : 'Performance',
+      selenium: 'Selenium',
+      cypress: 'Cypress',
+      playwright: 'Playwright',
+      reports: lang === 'ar' ? 'التقارير' : lang === 'fr' ? 'Rapports' : 'Reports',
+      ci: 'CI/CD',
+      security: lang === 'ar' ? 'الأمان' : lang === 'fr' ? 'Sécurité' : 'Security',
+      regression: lang === 'ar' ? 'اختبارات التراجع' : lang === 'fr' ? 'Regression' : 'Regression',
+      api: 'API Testing',
+      seo: 'SEO Testing',
+      automation: lang === 'ar' ? 'الأتمتة' : lang === 'fr' ? 'Automatisation' : 'Automation',
+      k6: 'k6',
+      requests: lang === 'ar' ? 'الطلبات' : lang === 'fr' ? 'Requêtes' : 'Requests',
+      postman: 'Postman'
+    };
+    return map[id] || id;
+  };
+
+  const getExpLabel = (id) => {
+    return t(`exp${id.charAt(0).toUpperCase() + id.slice(1)}`);
+  };
+
+  const getExpDesc = (id) => {
+    if (id === 'beginner') return lang === 'ar' ? 'أقل من عام' : lang === 'fr' ? '< 1 an' : '< 1 year';
+    if (id === 'intermediate') return lang === 'ar' ? 'من عام إلى 3 أعوام' : lang === 'fr' ? '1–3 ans' : '1–3 years';
+    return lang === 'ar' ? 'أكثر من 3 أعوام' : lang === 'fr' ? 'Plus de 3 ans' : '3+ years';
+  };
+
   return (
     <div className="ob-screen">
-      <div className="ob-eyebrow">STEP 2 OF 3</div>
-      <h1 className="ob-title">What are you here for?</h1>
-      <p className="ob-sub">Select everything that applies — we'll tune your experience.</p>
+      <div className="ob-eyebrow">
+        {lang === 'ar' ? 'الخطوة 2 من 3' : lang === 'fr' ? 'ÉTAPE 2 SUR 3' : 'STEP 2 OF 3'}
+      </div>
+      <h1 className="ob-title">{t('whatInterests')}</h1>
+      <p className="ob-sub">
+        {lang === 'ar' 
+          ? 'اختر كل ما ينطبق — سنقوم بضبط تجربتك.' 
+          : lang === 'fr' 
+          ? 'Sélectionnez tout ce qui s\'applique — nous adapterons votre expérience.' 
+          : 'Select everything that applies — we\'ll tune your experience.'}
+      </p>
 
       <div className="ob-interests">
         {INTERESTS.map(item => (
@@ -180,12 +211,12 @@ function StepInterests({ interests, exp, onToggleInterest, onSelectExp, onNext, 
             onClick={() => onToggleInterest(item.id)}
           >
             <span className="ob-interest-icon">{item.icon}</span>
-            {item.label}
+            {interestLabel(item.id)}
           </button>
         ))}
       </div>
 
-      <div className="ob-exp-label">Your automation experience</div>
+      <div className="ob-exp-label">{t('experienceLevel')}</div>
       <div className="ob-exp-options">
         {EXP_LEVELS.map(lvl => (
           <button
@@ -193,8 +224,8 @@ function StepInterests({ interests, exp, onToggleInterest, onSelectExp, onNext, 
             className={`ob-exp-btn${exp === lvl.id ? ' selected' : ''}`}
             onClick={() => onSelectExp(lvl.id)}
           >
-            <span className="ob-exp-btn-label">{lvl.label}</span>
-            <span className="ob-exp-btn-desc">{lvl.desc}</span>
+            <span className="ob-exp-btn-label">{getExpLabel(lvl.id)}</span>
+            <span className="ob-exp-btn-desc">{getExpDesc(lvl.id)}</span>
           </button>
         ))}
       </div>
@@ -202,10 +233,10 @@ function StepInterests({ interests, exp, onToggleInterest, onSelectExp, onNext, 
       <div className="ob-actions">
         <button className="ob-btn-back" onClick={onBack}>
           <ArrowLeft size={13} strokeWidth={2.5} />
-          Back
+          {t('previous')}
         </button>
         <button className="ob-btn-next" onClick={onNext}>
-          Continue
+          {t('next')}
           <ArrowRight size={13} strokeWidth={2.5} />
         </button>
       </div>
@@ -213,16 +244,54 @@ function StepInterests({ interests, exp, onToggleInterest, onSelectExp, onNext, 
   );
 }
 
-
-
 function StepReady({ role, interests, exp, onBack, onFinish, loading }) {
-  const expLabel = EXP_LEVELS.find(l => l.id === exp)?.label;
+  const { t, lang } = useLang();
+  
+  const getRoleLabel = (id) => {
+    return t(`role${id.charAt(0).toUpperCase() + id.slice(1)}`);
+  };
+
+  const getExpLabel = (id) => {
+    return t(`exp${id.charAt(0).toUpperCase() + id.slice(1)}`);
+  };
+
+  const interestLabel = (id) => {
+    const map = {
+      smoke: lang === 'ar' ? 'Smoke' : lang === 'fr' ? 'Smoke' : 'Smoke testing',
+      functional: lang === 'ar' ? 'وظيفية' : lang === 'fr' ? 'Fonctionnel' : 'Functional',
+      performance: lang === 'ar' ? 'الأداء' : 'Performance',
+      selenium: 'Selenium',
+      cypress: 'Cypress',
+      playwright: 'Playwright',
+      reports: lang === 'ar' ? 'تقارير' : 'Rapports',
+      ci: 'CI/CD',
+      security: lang === 'ar' ? 'أمان' : lang === 'fr' ? 'Sécurité' : 'Security',
+      regression: lang === 'ar' ? 'تراجع' : lang === 'fr' ? 'Régression' : 'Regression',
+      api: 'API',
+      seo: 'SEO',
+      automation: lang === 'ar' ? 'أتمتة' : lang === 'fr' ? 'Automate' : 'Automation',
+      k6: 'k6',
+      requests: 'Requests',
+      postman: 'Postman'
+    };
+    return map[id] || id;
+  };
 
   return (
     <div className="ob-screen">
-      <div className="ob-eyebrow">YOU'RE ALL SET</div>
-      <h1 className="ob-title">Welcome to NexTest!</h1>
-      <p className="ob-sub">Here's your personalized setup. You can always update it in settings.</p>
+      <div className="ob-eyebrow">
+        {lang === 'ar' ? 'أنت جاهز تماماً' : lang === 'fr' ? 'VOUS ÊTES PRÊT' : "YOU'RE ALL SET"}
+      </div>
+      <h1 className="ob-title">
+        {lang === 'ar' ? 'مرحباً بك في NexTest!' : lang === 'fr' ? 'Bienvenue sur NexTest !' : 'Welcome to NexTest!'}
+      </h1>
+      <p className="ob-sub">
+        {lang === 'ar' 
+          ? 'إليك إعدادك المخصص. يمكنك دائماً تحديثه من الإعدادات.' 
+          : lang === 'fr' 
+          ? 'Voici votre configuration personnalisée. Vous pouvez toujours la modifier dans les paramètres.' 
+          : "Here's your personalized setup. You can always update it in settings."}
+      </p>
 
       <div className="ob-summary">
         <div className="ob-summary-row">
@@ -230,21 +299,21 @@ function StepReady({ role, interests, exp, onBack, onFinish, loading }) {
             <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
             </svg>
-            Role
+            {lang === 'ar' ? 'الدور' : lang === 'fr' ? 'Rôle' : 'Role'}
           </span>
-          <span className="ob-summary-val">{role ? ROLE_LABELS[role] : '—'}</span>
+          <span className="ob-summary-val">{role ? getRoleLabel(role) : '—'}</span>
         </div>
         <div className="ob-summary-row">
           <span className="ob-summary-label">
             <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
             </svg>
-            Interests
+            {lang === 'ar' ? 'الاهتمامات' : lang === 'fr' ? 'Intérêts' : 'Interests'}
           </span>
           <span className="ob-summary-val">
             {interests.length > 0
-              ? interests.slice(0, 4).map(id => INTERESTS.find(i => i.id === id)?.label).join(', ') + (interests.length > 4 ? ` +${interests.length - 4}` : '')
-              : 'All features'}
+              ? interests.slice(0, 4).map(id => interestLabel(id)).join(', ') + (interests.length > 4 ? ` +${interests.length - 4}` : '')
+              : (lang === 'ar' ? 'كل الميزات' : lang === 'fr' ? 'Toutes les fonctionnalités' : 'All features')}
           </span>
         </div>
         <div className="ob-summary-row">
@@ -252,9 +321,9 @@ function StepReady({ role, interests, exp, onBack, onFinish, loading }) {
             <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
-            Level
+            {lang === 'ar' ? 'المستوى' : lang === 'fr' ? 'Niveau' : 'Level'}
           </span>
-          <span className="ob-summary-val">{expLabel || '—'}</span>
+          <span className="ob-summary-val">{exp ? getExpLabel(exp) : '—'}</span>
         </div>
       </div>
 
@@ -262,7 +331,11 @@ function StepReady({ role, interests, exp, onBack, onFinish, loading }) {
         <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
         </svg>
-        Your dashboard is ready with personalized recommendations.
+        {lang === 'ar' 
+          ? 'لوحة التحكم الخاصة بك جاهزة الآن مع توصيات مخصصة.' 
+          : lang === 'fr' 
+          ? 'Votre tableau de bord est prêt avec des recommandations personnalisées.' 
+          : 'Your dashboard is ready with personalized recommendations.'}
       </div>
 
       <div className="ob-actions">
@@ -270,14 +343,14 @@ function StepReady({ role, interests, exp, onBack, onFinish, loading }) {
           <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             <path d="M19 12H5M12 5l-7 7 7 7"/>
           </svg>
-          Back
+          {t('previous')}
         </button>
         <button className="ob-btn-next ob-btn-finish" onClick={onFinish} disabled={loading}>
           {loading ? (
-            <><span className="spinner" /> Saving…</>
+            <><span className="spinner" /> {t('completeProfile')}</>
           ) : (
             <>
-              Go to Dashboard
+              {lang === 'ar' ? 'الذهاب إلى لوحة التحكم' : lang === 'fr' ? 'Aller au tableau de bord' : 'Go to Dashboard'}
               <ArrowRight size={13} strokeWidth={2.5} />
             </>
           )}
@@ -286,8 +359,6 @@ function StepReady({ role, interests, exp, onBack, onFinish, loading }) {
     </div>
   );
 }
-
-
 
 export default function Onboarding() {
   const [step,      setStep]      = useState(1);
@@ -299,7 +370,7 @@ export default function Onboarding() {
 
   const navigate  = useNavigate();
   const { setUser } = useAuth();
-
+  const { lang, setLanguage } = useLang();
 
   const goTo = (n) => {
     setAnimKey(k => k + 1);
@@ -309,25 +380,34 @@ export default function Onboarding() {
   const toggleInterest = (id) =>
     setInterests(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
- const handleFinish = async () => {
-  setLoading(true);
-  try {
-    const res = await api.post('/onboarding', { role, interests, experience: exp });
-    if (res.data?.user) {
-      setUser(res.data.user); // ← met onboarding_completed: true dans le context
+  const handleFinish = async () => {
+    setLoading(true);
+    try {
+      const res = await api.post('/onboarding', { role, interests, experience: exp });
+      if (res.data?.user) {
+        setUser(res.data.user);
+      }
+    } catch (err) {
+      console.error('[Onboarding] Save failed:', err);
+      setUser(prev => ({ ...prev, onboarding_completed: true }));
+    } finally {
+      setLoading(false);
+      navigate('/dashboard');
     }
-  } catch (err) {
-    console.error('[Onboarding] Save failed:', err);
-    // Force quand même le passage (non-bloquant)
-    setUser(prev => ({ ...prev, onboarding_completed: true }));
-  } finally {
-    setLoading(false);
-    navigate('/dashboard');
-  }
-};
+  };
 
   return (
     <div className="ob-root">
+      {/* Absolute positioning language switcher */}
+      <div style={{ 
+        position: 'absolute', 
+        top: '24px', 
+        [lang === 'ar' ? 'left' : 'right']: '24px', 
+        zIndex: 100 
+      }}>
+        <LanguageSwitcher lang={lang} setLang={setLanguage} />
+      </div>
+
       {/* Ambient background */}
       <div className="ob-bg" aria-hidden="true">
         <div className="ob-blob ob-blob-a" />

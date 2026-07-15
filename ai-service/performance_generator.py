@@ -6,6 +6,7 @@ import requests
 import urllib3
 from openai import OpenAI
 from dotenv import load_dotenv
+import base64
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 load_dotenv()
@@ -118,12 +119,11 @@ Documentation:
     except Exception as e:
         print(f"[PERF_GENERATOR] ✗ Doc extraction failed: {e}")
     return []
-
-def _probe_pages(base_url: str, pages_to_probe: list = None) -> list:
+def _probe_pages(base_url: str, auth_header: str = "", pages_to_probe: list = None) -> list:
     if pages_to_probe is None:
         pages_to_probe = GENERIC_PAGES
     available = []
-    headers = {"Authorization": f"Bearer {_CACHED_TOKEN}"}
+    headers = {"Authorization": auth_header} if auth_header else {}
     for page in pages_to_probe:
         try:
             r = requests.get(
@@ -173,7 +173,7 @@ def _validate_k6_script(script: str) -> tuple[bool, str]:
     return True, "OK"
 
 
-def _build_fallback_script(base_url: str, test_type: str, profile: dict, pages: list) -> str:
+def _build_fallback_script(base_url: str, test_type: str, profile: dict, pages: list, auth_header: str = "") -> str:
     """
     Generate a guaranteed-correct k6 script as fallback when LLaMA fails.
     This script is hand-crafted and always valid.
@@ -202,11 +202,10 @@ export let options = {{
 }};
 
 const BASE_URL = '{base_url}';
-const TOKEN    = '{_CACHED_TOKEN}';
 const PAGES    = {pages_js};
 
 const HEADERS = {{
-  'Authorization': `Bearer ${{TOKEN}}`,
+  'Authorization': '{auth_header}',
   'Content-Type': 'application/json',
 }};
 
@@ -231,7 +230,7 @@ export default function () {{
 
 
 def generate_k6_script_with_llama(
-    base_url: str, test_type: str, profile: dict, pages: list
+    base_url: str, test_type: str, profile: dict, pages: list, auth_header: str = ""
 ) -> str:
     """
     Use LLaMA to generate a k6 script.
@@ -245,7 +244,7 @@ def generate_k6_script_with_llama(
     prompt = f"""You are a k6 performance testing expert. Generate a complete k6 JavaScript script.
 
 Base URL: {base_url}
-Auth Token: {_CACHED_TOKEN}
+Auth Header: {auth_header}
 Test Type: {profile['name']}
 Description: {profile['description']}
 
@@ -264,7 +263,7 @@ MANDATORY REQUIREMENTS — the script will be rejected if any of these are missi
 2. SECOND LINE must be: import {{ sleep, check, group }} from 'k6';
 3. Must have: export let options = {{ insecureSkipTLSVerify: true, stages: [...], thresholds: {{...}} }}
 4. Must have: export default function () {{ ... }}
-5. Must use: http.get(url, {{ headers: {{ 'Authorization': 'Bearer {_CACHED_TOKEN}' }} }})
+5. Must use: http.get(url, {{ headers: {{ 'Authorization': '{auth_header}' }} }})
 6. Must use: check(res, {{ 'status is 200 or 302': (r) => r.status === 200 || r.status === 302 }})
 7. Must use: sleep(Math.random() * 2 + 1)
 8. Must use group() for organizing requests
@@ -300,7 +299,7 @@ Start directly with: import http from 'k6/http';"""
             return script
         else:
             print(f"[PERF_GENERATOR] ✗ LLaMA script invalid: {error} — using fallback")
-            fallback = _build_fallback_script(base_url, test_type, profile, pages)
+            fallback = _build_fallback_script(base_url, test_type, profile, pages, auth_header)
             print(f"[PERF_GENERATOR] ✓ Fallback script built ({len(fallback)} chars)")
             return fallback
 
@@ -309,9 +308,23 @@ Start directly with: import http from 'k6/http';"""
         return _build_fallback_script(base_url, test_type, profile, pages)
 
 
-def generate_performance_tests(base_url: str, test_types: list = None, doc_text: str = "") -> dict:
+def generate_performance_tests(base_url: str, test_types: list = None, doc_text: str = "",
+                                username: str = "", password: str = "") -> dict:
     if test_types is None:
         test_types = ["load", "stress", "spike", "soak"]
+
+    # ANPE = token bearer (comportement historique inchangé)
+    # Toute autre app interne (DGAC, etc.) = Basic Auth avec credentials
+    if "anpe" in base_url.lower():
+        auth_header = f"Bearer {_CACHED_TOKEN}"
+        print(f"[PERF_GENERATOR] Auth mode: Bearer (ANPE)")
+    elif username and password:
+        b64 = base64.b64encode(f"{username}:{password}".encode()).decode()
+        auth_header = f"Basic {b64}"
+        print(f"[PERF_GENERATOR] Auth mode: Basic ({username})")
+    else:
+        auth_header = ""
+        print(f"[PERF_GENERATOR] Auth mode: none (no credentials provided)")
 
     pages_to_probe = GENERIC_PAGES
     if doc_text:
@@ -320,7 +333,7 @@ def generate_performance_tests(base_url: str, test_types: list = None, doc_text:
             pages_to_probe = doc_pages
 
     print(f"[PERF_GENERATOR] Probing pages on {base_url}...")
-    pages = _probe_pages(base_url, pages_to_probe)
+    pages = _probe_pages(base_url, auth_header, pages_to_probe)
     print(f"[PERF_GENERATOR] {len(pages)} pages available")
     pages = pages[:5]
 
@@ -331,13 +344,12 @@ def generate_performance_tests(base_url: str, test_types: list = None, doc_text:
             continue
 
         profile = TEST_PROFILES[test_type]
-        script  = generate_k6_script_with_llama(base_url, test_type, profile, pages)
+        script  = generate_k6_script_with_llama(base_url, test_type, profile, pages, auth_header)
 
-        # Double-check with fallback
         is_valid, error = _validate_k6_script(script)
         if not is_valid:
             print(f"[PERF_GENERATOR] ✗ Even fallback failed ({error}) — forcing minimal script")
-            script = _build_fallback_script(base_url, test_type, profile, pages)
+            script = _build_fallback_script(base_url, test_type, profile, pages, auth_header)
 
         scripts[test_type] = {
             "name":        profile["name"],

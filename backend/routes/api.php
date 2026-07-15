@@ -39,6 +39,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/settings/update',  [SettingsController::class, 'update']);
 
     Route::post('/generate',             [GenerationController::class, 'generate']);
+    Route::post('/generations/project-verdict', [GenerationController::class, 'projectVerdict']);
+
     Route::post('/analyze',              [GenerationController::class, 'analyze']);
     Route::post('/crawl',                [GenerationController::class, 'crawl']);
     Route::post('/run',                  [GenerationController::class, 'run']);

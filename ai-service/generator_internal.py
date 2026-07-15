@@ -42,6 +42,9 @@ CRITICALITY_INTERNAL = {
     "user_profile":      {"score": 80,  "tier": 2, "optional": True},
     "export_button":     {"score": 65,  "tier": 3, "optional": True},
     "data_table":        {"score": 78,  "tier": 2, "optional": True},
+    "row_action":        {"score": 65,  "tier": 3, "optional": True},
+    "filter_input":      {"score": 70,  "tier": 2, "optional": True},
+    "filter_button":     {"score": 68,  "tier": 2, "optional": True},
     "search_input":      {"score": 72,  "tier": 2, "optional": True},
     "heading":           {"score": 82,  "tier": 1, "optional": False},
     "breadcrumb":        {"score": 60,  "tier": 3, "optional": True},
@@ -120,7 +123,7 @@ def _build_infra_steps(scraped: dict) -> list:
     )
     steps.append({
         **_make_step(
-            f"Load time acceptable ({load_ms}ms)",
+            "Load time acceptable",
             "body", "page_load",
             f"Load time must be < {LOAD_THRESHOLD_MS}ms", False,
         ),
@@ -301,37 +304,14 @@ def _build_dashboard_smoke_steps(scraped: dict) -> list:
             "aside, .sidebar, nav.sidebar, [class*='sidebar']", "sidebar",
             "Sidebar/left navigation menu is visible", False))
 
-    # 5. Sidebar item — uniquement l'item actif selon l'URL
-    url_str = scraped.get("url", "")
-    url_to_label = {
-        "/dashboard":                    "Tableau de bord",
-        "/statistiques":                 "Statistiques",
-        "/reception":                    "Boîte de reception",
-        "/outbox":                       "Boîte d'envoi",
-        "/gestion_commission":           "Gestion des commissions",
-        "/reunions":                     "Réunions",
-        "/visites":                      "Gestion des visites",
-        "/traitement_dossier_eie":       "Étude d'impact environnementaux",
-        "/traitement_dossier_ed":        "Étude de dépollution",
-        "/traitement_dossier_avis":      "Traitement des dossiers d'avis",
-        "/traitement_dossier_af":        "Avantages Fiscaux",
-        "/traitement_dossier_cc":        "Cahier des charges",
-        "/traitement_dossier_transaction": "Demande de transactions",
-    }
-
-    active_label = None
-    for path, label in url_to_label.items():
-        if path in url_str:
-            active_label = label
-            break
-
-    if active_label:
+    # 5. Sidebar item — l'item réellement marqué actif dans le DOM (générique)
+    active_item = next((s for s in sidebar_items if s.get("is_active")), None)
+    if active_item:
+        text = active_item.get("text", "")
+        css  = active_item.get("css_selector", ".ant-menu-item")
         _add(_make_step(
-            f"Sidebar item: '{active_label}'",
-            ".ant-menu-item",
-            "sidebar_item",
-            f"Sidebar menu item '{active_label}' is visible on this page",
-            False,
+            f"Sidebar item: '{text[:40]}'", css, "sidebar_item",
+            f"Active sidebar menu item '{text[:40]}' is visible", False,
         ))
     elif sidebar_items:
         first = sidebar_items[0]
@@ -363,16 +343,41 @@ def _build_dashboard_smoke_steps(scraped: dict) -> list:
             False,
         ))
 
-    # 6. Stat cards / dashboard tiles
+    # 6. Stat cards / dashboard tiles (branch by real kind, sample per kind — not a blind slice)
     stat_cards = scraped.get("stat_cards", [])
-    for card in stat_cards[:6]:
+    MAX_PER_KIND = {"stat_card": 4, "chart": 1, "table": 2, "filter_input": 6, "filter_button": 1}
+    kind_counts = {}
+    for card in stat_cards:
+        kind = card.get("kind", "stat_card")
+        limit = MAX_PER_KIND.get(kind, 3)
+        kind_counts[kind] = kind_counts.get(kind, 0) + 1
+        if kind_counts[kind] > limit:
+            continue
+
         css   = card.get("css_selector", "")
-        title = card.get("title", card.get("text", "stat card"))
-        if css and title:
-            _add(_make_step(
-                f"Stat card: '{title[:50]}'", css, "stat_card",
-                f"Dashboard stat card '{title[:50]}' is visible", True,
-            ))
+        title = card.get("title", card.get("text", "element"))
+        if not (css and title):
+            continue
+        css   = card.get("css_selector", "")
+        title = card.get("title", card.get("text", "element"))
+        kind  = card.get("kind", "stat_card")
+        if not (css and title):
+            continue
+
+        if kind == "chart":
+            continue  # déjà géré par le bloc Charts ci-dessous
+        elif kind == "filter_input":
+            _add(_make_step(f"Filter field: '{title[:50]}'", css, "filter_input",
+                f"Filter input '{title[:50]}' is visible", True))
+        elif kind == "filter_button":
+            _add(_make_step(f"Filter button: '{title[:50]}'", css, "filter_button",
+                f"Filter button '{title[:50]}' is visible", True))
+        elif kind == "table":
+            _add(_make_step(f"Data table: '{title[:50]}'", css, "data_table",
+                f"Data table '{title[:50]}' is visible", True))
+        else:
+            _add(_make_step(f"Stat card: '{title[:50]}'", css, "stat_card",
+                f"Dashboard stat card '{title[:50]}' is visible", True))
             
     # ── Charts ────────────────────────────────────────────────────────────────
     charts = [c for c in scraped.get("stat_cards", []) if c.get("css_selector") == ".recharts-responsive-container"]
@@ -429,6 +434,17 @@ def _build_dashboard_smoke_steps(scraped: dict) -> list:
                 f"Data table visible ({rows} rows)", css, "data_table",
                 f"Data table with {rows} rows is visible on dashboard", True,
             ))
+            
+    # 11b. Row action buttons (view/edit/delete icons in table)
+    row_actions = scraped.get("row_action_buttons", [])
+    if row_actions:
+        labels = sorted({a.get("text", "") for a in row_actions if a.get("text")})
+        label_str = ", ".join(labels[:4]) if labels else f"{len(row_actions)} icons"
+        css = row_actions[0].get("css_selector", ".ant-table-tbody .anticon")
+        _add(_make_step(
+            f"Row actions present: '{label_str}'", css, "row_action",
+            f"Action icons/buttons ({label_str}) are visible in table rows", True,
+        ))
 
     # 12. Breadcrumb
     breadcrumbs = scraped.get("breadcrumbs", [])
@@ -531,7 +547,33 @@ def _build_selenium_script(steps: list, url: str) -> str:
     return "\n".join(lines)
 
 
-def _build_playwright_script(steps: list, url: str) -> str:
+def _build_playwright_script(steps: list, url: str, username=None, password=None, login_url=None) -> str:
+    from urllib.parse import urlparse
+    effective_login_url = login_url or f"{urlparse(url).scheme}://{urlparse(url).netloc}/login"
+
+    login_lines = []
+    if username and password:
+        login_lines = [
+            f"        pg.goto('{effective_login_url}', wait_until='domcontentloaded', timeout=30000)",
+            "        pg.wait_for_timeout(1000)",
+            "        email_sel = (\"input[type='email'], input[type='text'], input[name*='email' i], \"",
+            "                     \"input[name*='username' i], input[placeholder*='email' i], \"",
+            "                     \"input[placeholder*='mail' i], input[placeholder*='utilisateur' i]\")",
+            f"        pg.fill(email_sel, '{username}')",
+            f"        pg.fill(\"input[type='password']\", '{password}')",
+            "        submit_sel = (\"button[type='submit'], input[type='submit'], \"",
+            "                      \"button:has-text('connecter'), button:has-text('login'), \"",
+            "                      \"button:has-text('Se connecter'), button:has-text('Sign in')\")",
+            "        submit = pg.query_selector(submit_sel)",
+            "        if submit:",
+            "            submit.click()",
+            "        try:",
+            "            pg.wait_for_url(lambda u: 'login' not in u.lower(), timeout=8000)",
+            "        except Exception:",
+            "            pass",
+            "        pg.wait_for_timeout(1000)",
+        ]
+
     lines = [
         "from playwright.sync_api import sync_playwright, expect",
         "import pytest", "",
@@ -548,6 +590,7 @@ def _build_playwright_script(steps: list, url: str) -> str:
         "            ignore_https_errors=True,",
         "        )",
         "        pg = ctx.new_page()",
+        *login_lines,
         "        pg.goto(BASE_URL, wait_until='domcontentloaded', timeout=30000)",
         "        yield pg",
         "        browser.close()", "",
@@ -606,7 +649,7 @@ def _build_cypress_script(steps: list, url: str) -> str:
     return "\n".join(lines)
 
 
-def _build_scripts(steps: list, url: str, framework: str) -> dict:
+def _build_scripts(steps: list, url: str, framework: str, username=None, password=None, login_url=None) -> dict:
     fw = framework.lower()
     result = {
         "script":            "",
@@ -618,7 +661,7 @@ def _build_scripts(steps: list, url: str, framework: str) -> dict:
         result["script_selenium"] = _build_selenium_script(steps, url)
         result["script"]          = result["script_selenium"]
     elif fw == "playwright":
-        result["script_playwright"] = _build_playwright_script(steps, url)
+        result["script_playwright"] = _build_playwright_script(steps, url, username, password, login_url)
         result["script"]            = result["script_playwright"]
     elif fw == "cypress":
         result["script_cypress"] = _build_cypress_script(steps, url)
@@ -639,6 +682,9 @@ def generate_internal_tests(
     scraped:   dict,
     framework: str  = "playwright",
     doc_text:  str  = "",
+    username:  str  = None,
+    password:  str  = None,
+    login_url: str  = None,
 ) -> dict:
     """
     Main entry point for internal back office smoke tests.
@@ -695,12 +741,16 @@ def generate_internal_tests(
         step["id"]       = i
         step["base_url"] = url
         step["test_type"] = "smoke"
+        step["username"]  = username
+        step["password"]  = password
+        step["login_url"] = login_url
         step.setdefault("status",    "pending")
         step.setdefault("suite",     "")
         step.setdefault("assertion", None)
 
     # 7. Build scripts
-    scripts = _build_scripts(final, url, framework)
+    scripts = _build_scripts(final, url, framework, username, password, login_url)
+
 
     # 8. Stats
     passed  = sum(1 for s in final if s.get("status") == "pass")
