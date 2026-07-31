@@ -50,11 +50,11 @@ export default function LoginPage() {
 
             <div className="benefits-list">
               {[
-                { title: 'Automated DOM Crawling',     desc: 'Instantly maps every interactive element of your app' },
-                { title: 'AI-Generated Test Cases',    desc: 'Covers functional flows, edge cases & error scenarios' },
-                { title: 'Selenium & Cypress Scripts', desc: 'Production-ready code, zero manual effort' },
-                { title: 'Downloadable PDF Report',    desc: 'Full documentation of every generated test' },
-              ].map((item, i, arr) => (
+  { title: 'Intelligent Web Application Analysis', desc: 'Explores your app and identifies interactive elements' },
+  { title: 'AI-Powered Test Case Generation',       desc: 'Generates functional scenarios and edge cases' },
+  { title: 'Automated Test Script Generation',      desc: 'Scripts for Selenium, Cypress, Playwright, Pytest, K6 & Newman' },
+  { title: 'Comprehensive Test Reports',            desc: 'Full reports with results, logs, and AI analysis' },
+].map((item, i, arr) => (
                 <div key={i}>
                   <div className="benefit-item">
                     <div className="benefit-check">✓</div>

@@ -10,7 +10,7 @@ from analyzer import analyze_error
 from runner import run_selenium_script
 from runner_selenium import run_selenium_real
 from fastapi.responses import Response
-from pdf_generator import generate_pdf
+from pdf_generator import generate_pdf, generate_performance_xlsx, generate_k6_xlsx
 from seo_pdf_generator import generate_seo_pdf
 #internal test
 from scraper_internal import scrape_internal
@@ -53,6 +53,8 @@ from chatbot import router as chatbot_router
 
 
 from pydantic import BaseModel
+
+from seo_pdf_generator import generate_seo_pdf, generate_seo_xlsx
 
 
 
@@ -539,6 +541,87 @@ Rules:
     except Exception as e:
         print(f"[K6 AI SUMMARY] error: {e}")
         return {} 
+def _generate_performance_summary(perf_data: dict, execution_results: list, url: str) -> dict:
+    """Summary + recommendations + action_plan pour Performance (Playwright) — même format que k6/regression/functional."""
+    if not _groq_client_smoke or not perf_data:
+        return {}
+
+    metrics = perf_data.get("metrics", {})
+    score   = perf_data.get("global_score", 0)
+    fail_lines = []
+    for r in execution_results:
+        if r.get("status") == "fail":
+            detail = r.get("description") or r.get("suite") or "—"
+            fail_lines.append(f"- {r.get('name','')}: {detail}")
+
+    pass_count = sum(1 for r in execution_results if r.get("status") == "pass")
+    fail_count = sum(1 for r in execution_results if r.get("status") == "fail")
+
+    metrics_text = (
+        f"Load Time: {metrics.get('load_time_ms')}ms | FCP: {metrics.get('fcp_ms')}ms | "
+        f"LCP: {metrics.get('lcp_ms')}ms | TTI: {metrics.get('tti_ms')}ms | "
+        f"Requests: {metrics.get('request_count')} | Total Size: {metrics.get('total_size_kb')}KB | "
+        f"JS: {metrics.get('js_size_kb')}KB | DOM Elements: {metrics.get('dom_size')}"
+    )
+
+    if not fail_lines:
+        prompt = f"""You are a senior performance engineer. All {pass_count} performance metrics passed on {url} (score: {score}/100).
+
+Measured metrics:
+{metrics_text}
+
+Since everything passed, suggest 2-3 PROACTIVE improvements a performance engineer should still consider (e.g. further optimization opportunities, monitoring gaps, edge cases like slow 3G networks not yet tested).
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview confirming all metrics passed and overall performance health",
+  "recommendations": [
+    {{"priority": "low|medium", "category": "images|javascript|css|server|caching|network", "issue": "opportunity not currently tested", "fix": "concrete suggestion"}}
+  ],
+  "action_plan": ["optional next step 1", "optional next step 2"]
+}}
+
+Rules:
+- Max 3 items in recommendations, priority should be low or medium (nothing is broken).
+- Be specific to the metrics listed above, no generic filler, no markdown fences."""
+    else:
+        checks_text = "\n".join(fail_lines)
+        prompt = f"""You are a senior performance engineer. Analyze these FAILED performance metrics for {url} (score: {score}/100, {fail_count} failed out of {pass_count + fail_count}).
+
+Measured metrics:
+{metrics_text}
+
+Failed checks:
+{checks_text}
+
+Respond ONLY with valid JSON in this exact shape, no markdown:
+{{
+  "summary": "2-3 sentence overview mentioning how many metrics failed and overall performance health",
+  "recommendations": [
+    {{"priority": "high|medium|low", "category": "images|javascript|css|server|caching|network", "issue": "what failed", "fix": "concrete actionable fix"}}
+  ],
+  "action_plan": ["step 1", "step 2", "step 3"]
+}}
+
+Rules:
+- Max 6 items in recommendations, ordered by priority (high first).
+- Max 3 items in action_plan.
+- Reference the actual metric values shown above.
+- Be specific, no generic filler, no markdown fences."""
+
+    try:
+        response = _groq_client_smoke.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        return json.loads(raw)
+    except Exception as e:
+        print(f"[PERFORMANCE AI SUMMARY] error: {e}")
+        return {}
 def _generate_api_summary(results: list, url: str) -> dict:
     """Summary + recommendations + action_plan pour API — même format que regression/functional."""
     if not _groq_client_smoke or not results:
@@ -840,6 +923,12 @@ def generate(data: dict):
                 framework,
                 metrics=metrics,
             )
+            ai_summary = _generate_performance_summary(
+                result.get("performance", {}),
+                result.get("test_cases", []),
+                url,
+            )
+            result["ai"] = ai_summary
 
         return {
             "url":           url,
@@ -988,6 +1077,7 @@ async def run_tests(data: dict):
         "duration_s": run_result.get("duration_s", 0),
         "raw_output": "",
         "ai":         ai_summary, 
+        "screenshot": run_result.get("screenshot"),
     }
 class ProjectVerdictRequest(BaseModel):
     project_name: str
@@ -1046,12 +1136,91 @@ def generate_pdf_report(data: dict):
     except Exception as e:
         import traceback
         print(f"[PDF] ERROR: {e}")
+        traceback.print_exc() 
         print(traceback.format_exc())
         return {"error": str(e), "traceback": traceback.format_exc()}
     
 
+#Rapport XLSX
+@app.post("/generate-seo-xlsx")
+def generate_seo_xlsx_report(data: dict):
+    try:
+        print(f"[XLSX] Received data keys: {list(data.keys())}")
 
+        from seo_pdf_generator import generate_seo_xlsx
+        xlsx_bytes = generate_seo_xlsx(data)
 
+        print(f"[XLSX] Generated {len(xlsx_bytes)} bytes")
+
+        if len(xlsx_bytes) < 100:
+            print(f"[XLSX] WARNING — too small, content: {xlsx_bytes}")
+            return {"error": f"XLSX too small: {xlsx_bytes}"}
+
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=nextest_seo_report.xlsx"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[XLSX] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
+#Rapport XLSX — Performance
+@app.post("/generate-performance-xlsx")
+def generate_performance_xlsx_report(data: dict):
+    try:
+        print(f"[XLSX-PERF] Received data keys: {list(data.keys())}")
+
+        tests     = data.get('execution_results') or data.get('test_cases') or []
+        perf_data = data.get('performance', {}) or {}
+        ai_data   = data.get('ai', {}) or {}
+
+        xlsx_bytes = generate_performance_xlsx(data, tests, perf_data, ai_data)
+
+        print(f"[XLSX-PERF] Generated {len(xlsx_bytes)} bytes")
+
+        if len(xlsx_bytes) < 100:
+            print(f"[XLSX-PERF] WARNING — too small, content: {xlsx_bytes}")
+            return {"error": f"XLSX too small: {xlsx_bytes}"}
+
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=nextest_performance_report.xlsx"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[XLSX-PERF] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
+#Rapport XLSX — k6 Performance
+@app.post("/generate-k6-xlsx")
+def generate_k6_xlsx_report(data: dict):
+    try:
+        print(f"[XLSX-K6] Received data keys: {list(data.keys())}")
+
+        tests   = data.get('execution_results') or data.get('test_cases') or []
+        summary = data.get('summary') or {}
+
+        xlsx_bytes = generate_k6_xlsx(data, tests, summary)
+
+        print(f"[XLSX-K6] Generated {len(xlsx_bytes)} bytes")
+
+        if len(xlsx_bytes) < 100:
+            print(f"[XLSX-K6] WARNING — too small, content: {xlsx_bytes}")
+            return {"error": f"XLSX too small: {xlsx_bytes}"}
+
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=nextest_k6_performance_report.xlsx"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[XLSX-K6] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
 #Generate interne
 @app.post("/generate-internal")
 def generate_internal(data: dict):

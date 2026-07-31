@@ -59,19 +59,24 @@ const XIcon = () => (
     <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
   </svg>
 );
-
+const MinusIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+    <path d="M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+  </svg>
+);
 const SparkleIcon = () => (
   <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
     <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" fill="#a5b4fc" opacity=".8"/>
   </svg>
 );
-
-export default function NextestChatbot({ theme = 'dark' }) {
-  const isLight = theme === 'light';
+export default function NextestChatbot({ theme = 'dark', open, onToggle, visible = true, onHide }) {
   const [, forceUpdate] = useState(0);
   useEffect(() => { forceUpdate(v => v + 1); }, [theme]);
 
-  const [open,     setOpen]     = useState(false);
+    const isLight = theme === 'light';
+
+
+  
   const [messages, setMessages] = useState([{
     id: 1, from: 'bot', lang: 'fr', source: 'kb',
     text: 'Bonjour ! 👋 Je suis **Nextest AI** — je réponds uniquement aux questions sur Nextest : tests, frameworks, projets, résultats, exports. Comment puis-je vous aider ?',
@@ -123,7 +128,7 @@ export default function NextestChatbot({ theme = 'dark' }) {
   const headerSub = { fr: 'Spécialiste Nextest · Instantané', en: 'Nextest specialist · Instant', ar: 'متخصص Nextest · فوري' };
   const tooltipText = { fr: 'Demandez à Nextest AI', en: 'Ask Nextest AI', ar: 'اسأل Nextest AI' };
   const placeholder = { fr: 'Posez une question sur Nextest…', en: 'Ask anything about Nextest…', ar: 'اسأل أي شيء عن Nextest…' };
-
+if (!visible) return null;
   return (
     <>
     <style key={theme}>{`
@@ -242,11 +247,11 @@ export default function NextestChatbot({ theme = 'dark' }) {
             whiteSpace:'nowrap',
             boxShadow:isLight?'0 4px 16px rgba(15,23,41,.12)':'0 4px 20px rgba(0,0,0,.4)',
             animation:'nxcSlideIn .4s cubic-bezier(.34,1.4,.64,1) both',cursor:'pointer',
-          }} onClick={() => setOpen(true)}>
+          }} onClick={() => onToggle(true)}>
             👋 Need assistance? I'm here to help.
           </div>
         )}
-        <button className="nxc-fab" onClick={() => setOpen(v => !v)}>
+        <button className="nxc-fab" onClick={() => onToggle(v => !v)}>
           {pulse && <span className="nxc-ring" />}
           <span className="nxc-online-dot" />
           {unread > 0 && !open && <span className="nxc-badge">{unread > 9 ? '9+' : unread}</span>}
@@ -264,7 +269,10 @@ export default function NextestChatbot({ theme = 'dark' }) {
               {headerSub[uiLang] || headerSub.en}
             </div>
           </div>
-          <button className="nxc-xbtn" onClick={() => setOpen(false)} aria-label="Close"><XIcon /></button>
+          <button className="nxc-xbtn" onClick={() => onToggle(false)} aria-label="Minimize" style={{ marginRight: 4 }}>
+  <MinusIcon />
+</button>
+<button className="nxc-xbtn" onClick={() => onHide()} aria-label="Close"><XIcon /></button>
         </div>
 
         <div className="nxc-msgs" role="log" aria-live="polite">

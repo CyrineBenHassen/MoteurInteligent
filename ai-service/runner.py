@@ -100,9 +100,13 @@ def _run_steps(steps: list) -> dict:
         page = context.new_page()
         page.set_default_timeout(_TIMEOUT)
 
+        page_screenshot_b64 = None
         if base_url:
             try:
                 _goto(page, base_url)
+                page_screenshot_b64 = base64.b64encode(
+                    page.screenshot(full_page=False)
+                ).decode("utf-8")
             except Exception as e:
                 try:
                     browser.close()
@@ -178,6 +182,7 @@ def _run_steps(steps: list) -> dict:
         "total":      total,
         "duration_s": duration,
         "raw_output": "",
+        "screenshot": page_screenshot_b64,
     }
     
 def _goto(page, url: str):

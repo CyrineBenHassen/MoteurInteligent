@@ -58,54 +58,117 @@ def _inject_token(page, base_url: str, username: str = "", password: str = "") -
     return _login_form(page, base_url, username, password)
 
 def _login_form(page, base_url: str, username: str = "", password: str = "") -> bool:
-    """Fallback — login with form if token injection fails"""
+    """Générique — login via formulaire credentials (username/password), sans token/captcha."""
     try:
         login_url = f"{base_url}/login"
         page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(3000)
+        page.wait_for_timeout(2000)
 
         print(f"[REGRESSION_RUNNER] Trying form login at {login_url}")
         print(f"[REGRESSION_RUNNER] Title: {page.title()} | URL: {page.url}")
 
-        # Debug inputs
         inputs = page.query_selector_all("input")
         for inp in inputs:
             print(f"[REGRESSION_RUNNER] Input: type={inp.get_attribute('type')} name={inp.get_attribute('name')}")
 
-        for sel in ["input[type='email']", "input[name='email']", "input:nth-of-type(1)"]:
+        # ── Username field ── (couvre type=email, name=email/username, ou simple type=text comme DGAC)
+        username_selectors = [
+            "input[type='email']",
+            "input[name='email']",
+            "input[name='username']",
+            "input[autocomplete='username']",
+            "input[type='text']",
+        ]
+        username_filled = False
+        for sel in username_selectors:
             try:
-                if page.is_visible(sel):
-                    page.fill(sel, username)
+                el = page.locator(sel).first
+                if el.count() > 0 and el.is_visible():
+                    el.fill(username)
+                    username_filled = True
+                    print(f"[REGRESSION_RUNNER] ✓ Username filled via '{sel}'")
                     break
-            except:
+            except Exception:
                 continue
 
+        # ── Password field ──
+        password_filled = False
         for sel in ["input[type='password']", "input[name='password']"]:
             try:
-                if page.is_visible(sel):
-                    page.fill(sel, password)
+                el = page.locator(sel).first
+                if el.count() > 0 and el.is_visible():
+                    el.fill(password)
+                    password_filled = True
+                    print(f"[REGRESSION_RUNNER] ✓ Password filled via '{sel}' | user='{username}' | pwd_len={len(password)}")
                     break
-            except:
+            except Exception:
                 continue
 
-        for sel in ["button[type='submit']", "form button", "button:has-text('Connexion')"]:
+        if not username_filled or not password_filled:
+            print(f"[REGRESSION_RUNNER] ✗ Champs introuvables (user={username_filled}, pwd={password_filled})")
+            return False
+
+        # ── Submit ──
+        submit_selectors = [
+            "button[type='submit']",
+            "input[type='submit']",
+            "form button",
+            "button:has-text('Connexion')",
+            "button:has-text('Login')",
+            "button:has-text('Se connecter')",
+        ]
+        clicked = False
+        for sel in submit_selectors:
             try:
-                if page.is_visible(sel):
-                    page.click(sel)
+                el = page.locator(sel).first
+                if el.count() > 0 and el.is_visible():
+                    el.click()
+                    clicked = True
+                    print(f"[REGRESSION_RUNNER] ✓ Submit clicked via '{sel}'")
                     break
-            except:
+            except Exception:
                 continue
 
-        page.wait_for_timeout(5000)
+        if not clicked:
+            try:
+                page.locator("input[type='password']").first.press("Enter")
+                clicked = True
+                print(f"[REGRESSION_RUNNER] ✓ Submitted via Enter key")
+            except Exception:
+                pass
+
+        page.wait_for_timeout(4000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=8000)
+        except Exception:
+            pass
+
         current_url = page.url
-        success = "login" not in current_url.lower()
+        password_still_present = False
+        try:
+            password_still_present = page.locator("input[type='password']").first.is_visible()
+        except Exception:
+            pass
+        success = ("login" not in current_url.lower()) and not password_still_present
         print(f"[REGRESSION_RUNNER] Form login: {'✓' if success else '✗'} | URL: {current_url}")
+
+        if not success:
+            try:
+                body_text = page.locator("body").inner_text()[:500]
+                print(f"[REGRESSION_RUNNER] Page content after failed login: {body_text}")
+            except Exception:
+                pass
+            try:
+                page.screenshot(path="login_debug.png")
+                print("[REGRESSION_RUNNER] Screenshot saved: login_debug.png")
+            except Exception:
+                pass
+
         return success
 
     except Exception as e:
         print(f"[REGRESSION_RUNNER] Form login error: {e}")
         return False
-
 
 def _run_one_regression(page, tc: dict, base_url: str) -> dict:
     """Execute a single regression test"""

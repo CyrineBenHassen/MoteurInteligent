@@ -1,6 +1,8 @@
 import os
 import json
+import base64
 import traceback
+import time
 from datetime import datetime
 from groq import Groq
 from seo_analyzer import analyze_seo, compute_seo_score
@@ -11,15 +13,28 @@ from alert_recorder import record_results
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
+_OFFICIAL_CHECK_KEYWORDS = [
+    "https", "http", "title", "meta description", "h1", "h2",
+    "alt", "viewport", "canonical", "open graph", "og:", "schema",
+    "robots.txt", "sitemap.xml", "word count", "load",
+]
+
+def _filter_official(items):
+    return [i for i in items if any(kw in i.lower() for kw in _OFFICIAL_CHECK_KEYWORDS)]
 
 # LLaMA global recommendations
 def _generate_seo_recommendations(analysis: dict, score: int) -> dict:
     if not groq_client:
         return {"summary": "Groq API key not configured.", "recommendations": [], "action_plan": []}
 
-    issues_text   = "\n".join(f"- {i}" for i in analysis["issues"])   or "None"
-    warnings_text = "\n".join(f"- {w}" for w in analysis["warnings"]) or "None"
-    passed_text   = "\n".join(f"- {p}" for p in analysis["passed"])   or "None"
+    filtered_issues   = _filter_official(analysis["issues"])
+    filtered_warnings = _filter_official(analysis["warnings"])
+    filtered_passed   = _filter_official(analysis["passed"])
+    
+
+    issues_text   = "\n".join(f"- {i}" for i in filtered_issues)   or "None"
+    warnings_text = "\n".join(f"- {w}" for w in filtered_warnings) or "None"
+    passed_text   = "\n".join(f"- {p}" for p in filtered_passed)   or "None"
 
     prompt = f"""You are an expert SEO auditor. Analyze the following SEO audit results for the URL: {analysis['url']}
 
@@ -60,8 +75,7 @@ Respond ONLY with a valid JSON object (no markdown, no backticks) with this exac
   ]
 }}
 
-Focus on the most impactful improvements. Provide at most 6 recommendations ordered by priority."""
-
+Focus on the most impactful improvements. Only base your recommendations on the 17 checks listed above (issues, warnings, passed) — do not invent or suggest checks outside this list. Do NOT mention any technical error type (SSL, timeout, connection error, etc.) unless it appears verbatim in the ISSUES or WARNINGS lists above — describe only the SEO outcome, never a hypothetical cause you were not given. Provide at most 6 recommendations ordered by priority."""
     try:
         response = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -423,25 +437,36 @@ if __name__ == "__main__":
     results = run_seo_audit(TARGET_URL)
     print_report(results)
 '''
-# ── Main runner
 def run_seo_test(url: str) -> dict:
     started_at = datetime.now().isoformat()
+    _t0 = time.time()
 
+    
     try:
-        analysis  = analyze_seo(url)
-        score     = compute_seo_score(analysis)
-        ai_result = _generate_seo_recommendations(analysis, score)
-        test_cases = _build_test_cases(analysis, ai_result)
+        analysis = analyze_seo(url)
+        test_cases = _build_test_cases(analysis)
 
-        total  = len(test_cases)
+        total = len(test_cases)
         passed = sum(1 for t in test_cases if t["status"] == "pass")
         failed = total - passed
+        score = round((passed / total) * 100) if total > 0 else 0
+
+        ai_result = _generate_seo_recommendations(analysis, score)
+
+        # Raw PNG bytes can't survive FastAPI's JSON serialization on /generate-seo,
+        # so we base64-encode a copy for the top-level "screenshot" key, then strip
+        # the raw bytes out of `analysis` too (it's also embedded in the response
+        # below and would otherwise trip the same UnicodeDecodeError).
+        screenshot_bytes = analysis.get("screenshot")
+        screenshot_b64 = base64.b64encode(screenshot_bytes).decode("utf-8") if screenshot_bytes else None
+        analysis["screenshot"] = None
 
         return {
             "success":     True,
             "url":         url,
             "started_at":  started_at,
             "finished_at": datetime.now().isoformat(),
+            "execution_time": round(time.time() - _t0, 2),
             "seo_score":   score,
             "summary": {
                 "total":     total,
@@ -453,6 +478,7 @@ def run_seo_test(url: str) -> dict:
             "test_cases": test_cases,
             "ai":         ai_result,
             "script":     _generate_seo_script(url),
+            "screenshot": screenshot_b64,
         }
 
     except Exception as e:
@@ -468,4 +494,5 @@ def run_seo_test(url: str) -> dict:
             "analysis":    {},
             "test_cases":  [],
             "ai":          {"summary": "Error occurred", "recommendations": [], "action_plan": []},
+            "screenshot":  None,
         }

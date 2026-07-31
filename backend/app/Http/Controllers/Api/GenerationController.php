@@ -130,7 +130,7 @@ $docText = $this->extractDocText($request);
             $executionResults = [];
             $aiSummary = null;   
             $testCasesToRun = $framework === 'Both' ? $testCasesSelenium : $testCases;
-
+            $pageScreenshot = null;
             if (!empty($testCasesToRun)) {
                 $runResponse = Http::timeout(600)->post('http://127.0.0.1:8001/run', [
                 'script'     => $framework === 'Both' ? $scriptSelenium : $script,
@@ -146,7 +146,8 @@ $docText = $this->extractDocText($request);
                     $skip             = $runData['skip_count'] ?? 0;
                     $rate             = $runData['pass_rate']  ?? 0;
                     $executionResults = $runData['results']    ?? [];
-                    $aiSummary        = $runData['ai']         ?? null;   
+                    $aiSummary        = $runData['ai']         ?? null; 
+                    $pageScreenshot   = $runData['screenshot']  ?? null;  
 
                     
 $executionResultsForDb = array_map(function($r) {
@@ -184,7 +185,10 @@ $executionResultsForDb = array_map(function($r) {
                 'pass_rate'           => $rate,
                 'page_type'           => $pageType,
                 'scraped'             => $scraped,
-                'result'              => $aiSummary ? ['ai' => $aiSummary] : null, 
+                'result'              => ($aiSummary || $pageScreenshot) ? [
+                    'ai'         => $aiSummary,
+                    'screenshot' => $pageScreenshot,
+                ] : null,
             ]);
 
             #n8n notification
@@ -265,7 +269,8 @@ $executionResultsForDb = array_map(function($r) {
             'pass_rate'           => $rate,
             'page_type'           => 'general',
             'scraped'             => $scraped,
-            'performance_data' => $performance,
+            'performance_data'    => $performance,
+            'result'              => ['ai' => $result['ai'] ?? null],
         ]);
         $this->notifyN8n($generation, $pass, $fail, $skip, $rate, $url, $framework, 'performance');
 
@@ -462,10 +467,27 @@ public function downloadPdf($id)
 
         
         if ($testType === 'seo') {
-            $payload['seo_score'] = $fullResult['seo_score'] ?? 0;
-            $payload['analysis']  = $fullResult['analysis']  ?? [];
-            $payload['ai']        = $fullResult['ai']        ?? [];
+            $payload['seo_score']      = $fullResult['seo_score']      ?? 0;
+            $payload['analysis']       = $fullResult['analysis']       ?? [];
+            $payload['ai']             = $fullResult['ai']             ?? [];
+            $payload['screenshot']     = $fullResult['screenshot']     ?? null;
+            $payload['execution_time'] = $fullResult['execution_time'] ?? null;
         }
+
+        if ($testType === 'performance') {
+            $performanceData = $generation->performance_data ?? [];
+            if (is_string($performanceData)) {
+                $performanceData = json_decode($performanceData, true) ?? [];
+            }
+            $payload['performance'] = $performanceData;
+            $payload['framework']   = $generation->framework;
+            $payload['ai']          = $fullResult['ai'] ?? [];
+        }
+
+        if ($testType === 'smoke') {
+    $payload['ai'] = $fullResult['ai'] ?? [];
+    $payload['screenshot'] = $fullResult['screenshot'] ?? null;
+}
 
         $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-pdf', $payload);
 
@@ -487,8 +509,98 @@ public function downloadPdf($id)
 }
 
 
+public function downloadXlsx($id)
+{
+    $generation = Generation::where('user_id', auth()->id())->findOrFail($id);
 
+    $isK6 = $generation->test_type === 'performance' && $generation->framework === 'k6';
 
+    if (!in_array($generation->test_type, ['seo', 'performance'])) {
+        return response()->json(['error' => 'XLSX export is only available for SEO or Performance reports'], 422);
+    }
+
+    $fullResult = $generation->result ?? [];
+    if (is_string($fullResult)) {
+        $fullResult = json_decode($fullResult, true) ?? [];
+    }
+
+    try {
+        // ── K6 PERFORMANCE ──────────────────────────────────────────
+        if ($isK6) {
+            $testCases = $generation->execution_results
+                ?? $generation->test_cases
+                ?? $fullResult['execution_results']
+                ?? $fullResult['test_cases']
+                ?? [];
+
+            $summary = $fullResult['summary'] ?? [];
+
+            $payload = [
+                'url'               => $generation->url,
+                'framework'         => 'k6',
+                'test_cases'        => $testCases,
+                'execution_results' => $testCases,
+                'summary'           => $summary,
+            ];
+
+            $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-k6-xlsx', $payload);
+            $filename = "k6_performance_report_{$id}.xlsx";
+
+        // ── PERFORMANCE PUBLIC (Playwright) ─────────────────────────
+        } elseif ($generation->test_type === 'performance') {
+            $performanceData = $generation->performance_data ?? [];
+            if (is_string($performanceData)) {
+                $performanceData = json_decode($performanceData, true) ?? [];
+            }
+
+            $payload = [
+                'url'               => $generation->url,
+                'framework'         => $generation->framework,
+                'test_type'         => 'performance',
+                'test_cases'        => $generation->test_cases ?? [],
+                'execution_results' => $generation->execution_results ?? $generation->test_cases ?? [],
+                'performance'       => $performanceData,
+                'ai'                => $fullResult['ai'] ?? [],
+            ];
+
+            $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-performance-xlsx', $payload);
+            $filename = "performance_report_{$id}.xlsx";
+
+        // ── SEO ──────────────────────────────────────────────────────
+        } else {
+            $payload = [
+                'url'               => $generation->url,
+                'seo_score'         => $fullResult['seo_score']      ?? 0,
+                'summary'           => $fullResult['summary']        ?? [
+                    'passed'    => $generation->pass_count ?? 0,
+                    'failed'    => $generation->fail_count ?? 0,
+                    'total'     => ($generation->pass_count ?? 0) + ($generation->fail_count ?? 0),
+                    'pass_rate' => $generation->pass_rate ?? 0,
+                ],
+                'test_cases'        => $generation->test_cases ?? [],
+                'ai'                => $fullResult['ai']        ?? [],
+                'execution_time'    => $fullResult['execution_time'] ?? null,
+                'screenshot'        => $fullResult['screenshot'] ?? null,
+            ];
+
+            $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-seo-xlsx', $payload);
+            $filename = "seo_report_{$id}.xlsx";
+        }
+
+        if ($response->failed()) {
+            return response()->json(['error' => 'XLSX generation failed', 'detail' => $response->body()], 500);
+        }
+
+        return response($response->body(), 200, [
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('[XLSX] downloadXlsx error', ['error' => $e->getMessage()]);
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
 
 private function generateHtmlBytes(Generation $generation): string
 {
@@ -915,8 +1027,7 @@ $validated = $request->validate([
     'doc_files.*'=> 'nullable|file|mimes:pdf,txt,json,yaml,yml,md,docx|max:10240',
     'data'       => 'nullable|string',
     'username'     => 'nullable|string',
-'   password'     => 'nullable|string',
-]);
+    'password'     => 'nullable|string',]);
 
     $url       = $validated['url'];
     $framework = $validated['framework'] ?? 'Playwright';
@@ -928,11 +1039,13 @@ $validated = $request->validate([
 $docText = $this->extractDocText($request);
 
     try {
-        $response = Http::timeout(300)->post('http://127.0.0.1:8001/generate-regression', [
+      $response = Http::timeout(300)->post('http://127.0.0.1:8001/generate-regression', [
     'url'        => $url,
     'framework'  => $framework,
     'project_id' => $projectId,
-    'doc_text'   => $docText,   
+    'doc_text'   => $docText,
+    'username'   => $validated['username'] ?? '',
+    'password'   => $validated['password'] ?? '',
 ]);
         $data = $response->json();
 

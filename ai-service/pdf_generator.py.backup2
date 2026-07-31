@@ -6832,7 +6832,7 @@ def _build_check_icon(size_mm, color_hex):
         fillColor=white, strokeColor=None,
     ))
     return dr
-def _build_certificate_card(perf_data: dict, url: str, title: str = "CERTIFICATE OF PERFORMANCE ANALYSIS"):
+def _build_certificate_card(perf_data: dict, url: str):
     """Certificat de performance — carte moderne, bordure colorée, badges."""
     score = perf_data.get('global_score', 0)
     grade, grade_color = _grade_from_score(score)
@@ -6845,9 +6845,9 @@ def _build_certificate_card(perf_data: dict, url: str, title: str = "CERTIFICATE
     icon_wrap.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER')]))
 
     eyebrow = Paragraph(
-    f'<font color="#94a3b8" size="7.5"><b>{title}</b></font>',
-    ParagraphStyle('CertEyebrow', fontSize=7.5, fontName='Helvetica-Bold',
-                    leading=10, alignment=TA_CENTER))
+        '<font color="#94a3b8" size="7.5"><b>CERTIFICATE OF PERFORMANCE ANALYSIS</b></font>',
+        ParagraphStyle('CertEyebrow', fontSize=7.5, fontName='Helvetica-Bold',
+                        leading=10, alignment=TA_CENTER))
 
     website_line = Paragraph(
         f'<font color="#1e293b" size="12"><b>{url}</b></font>',
@@ -6887,9 +6887,10 @@ def _build_certificate_card(perf_data: dict, url: str, title: str = "CERTIFICATE
         ('ROUNDEDCORNERS', [10, 10, 10, 10]),
     ]))
 
-    pills_row = Table([[grade_pill, '', label_pill]], colWidths=[28*mm, 8*mm, 34*mm])
+    pills_row = Table([[grade_pill, label_pill]], colWidths=[28*mm, 34*mm])
     pills_row.setStyle(TableStyle([
         ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
+        ('LEFTPADDING',  (1,0), (1,0),   6),
     ]))
     pills_wrap = Table([[pills_row]], colWidths=[168*mm])
     pills_wrap.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER')]))
@@ -9698,15 +9699,14 @@ def build_smoke_screenshot(elements, generation_data: dict, scraped: dict):
     """
     import base64, os
  
-    block = []
-    block.append(section_header('', 'Page Screenshot', SMOKE_ACCENT))
-    block.append(Spacer(1, 4))
-    block.append(Paragraph(
+    elements.append(section_header('', 'Page Screenshot', SMOKE_ACCENT))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(
         '<font color="#64748b" size="7.5"><i>'
         'Visual snapshot of the page as captured by Playwright at test execution time.'
         '</i></font>',
         ParagraphStyle('SmShotInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    block.append(Spacer(1, 8))
+    elements.append(Spacer(1, 8))
  
     result_obj = generation_data.get('result', {}) or {}
     raw = (generation_data.get('screenshot') or result_obj.get('screenshot')
@@ -9720,17 +9720,17 @@ def build_smoke_screenshot(elements, generation_data: dict, scraped: dict):
                 b64_part = raw.split(',', 1)[1]
                 img_bytes = base64.b64decode(b64_part)
                 buf = BytesIO(img_bytes)
-                img_flowable = RLImage(buf, 120*mm, height=68*mm, kind='proportional')
+                img_flowable = RLImage(buf, width=150*mm, height=90*mm, kind='proportional')
             elif isinstance(raw, str) and os.path.exists(raw):
-                img_flowable = RLImage(raw, 120*mm, height=68*mm, kind='proportional')
+                img_flowable = RLImage(raw, width=150*mm, height=90*mm, kind='proportional')
             elif isinstance(raw, (bytes, bytearray)):
                 buf = BytesIO(raw)
-                img_flowable = RLImage(buf, 120*mm, height=68*mm, kind='proportional')
+                img_flowable = RLImage(buf, width=150*mm, height=90*mm, kind='proportional')
             elif isinstance(raw, str) and len(raw) > 200:
                 # assume raw base64 without data: prefix
                 img_bytes = base64.b64decode(raw)
                 buf = BytesIO(img_bytes)
-                img_flowable = RLImage(buf, 120*mm, height=68*mm, kind='proportional')
+                img_flowable = RLImage(buf, width=150*mm, height=90*mm, kind='proportional')
         except Exception as e:
             print(f"[SMOKE PDF] screenshot decode error: {e}")
             img_flowable = None
@@ -9744,7 +9744,7 @@ def build_smoke_screenshot(elements, generation_data: dict, scraped: dict):
             ('TOPPADDING',    (0,0), (-1,-1), 8),
             ('BOTTOMPADDING', (0,0), (-1,-1), 8),
         ]))
-        block.append(framed)
+        elements.append(framed)
     else:
         placeholder = Table([[Paragraph(
             '<font color="#94a3b8" size="8.5">No screenshot was captured for this run — '
@@ -9761,9 +9761,8 @@ def build_smoke_screenshot(elements, generation_data: dict, scraped: dict):
             ('TOPPADDING',    (0,0), (-1,-1), 24),
             ('BOTTOMPADDING', (0,0), (-1,-1), 24),
         ]))
-        block.append(placeholder)
-        
-    elements.append(KeepTogether(block))
+        elements.append(placeholder)
+ 
     elements.append(Spacer(1, 16))
  
  
@@ -9905,7 +9904,7 @@ def build_smoke_environment_info(elements, generation_data: dict, tests: list):
 def build_smoke_ai_analysis(elements, ai_data: dict, tests: list, score: int, pass_rate: int, url: str):
     elements.append(section_header('', 'AI Analysis', HexColor('#4f46e5')))
     elements.append(Spacer(1, 6))
-
+ 
     ai_summary_text = (ai_data or {}).get('summary', '')
     if not ai_summary_text:
         total = len(tests) or 1
@@ -9919,38 +9918,21 @@ def build_smoke_ai_analysis(elements, ai_data: dict, tests: list, score: int, pa
     elements.append(Paragraph(f'<font color="#475569" size="8.5">{ai_summary_text}</font>',
                                ParagraphStyle('SmAIIntro', fontSize=8.5, fontName='Helvetica', leading=13)))
     elements.append(Spacer(1, 10))
-
-    BLOCKING_TYPES = {'body', 'heading', 'main_content', 'auth'}
-    HIGH_PRIORITY_TYPES = {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl', 'performance'}
-
-    def _is_high_priority_fail(t):
-        if t.get('status') != 'fail':
-            return False
-        priority = (t.get('priority') or t.get('severity') or '').lower()
-        return priority in ('high', 'critical') or t.get('type') in HIGH_PRIORITY_TYPES
-
-    critical_fail = any(t.get('status') == 'fail' and t.get('type') in BLOCKING_TYPES for t in tests)
-    high_priority_fail_count = sum(1 for t in tests if _is_high_priority_fail(t))
+ 
+    critical_fail = any(t.get('status') == 'fail' and t.get('type') in
+                         {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl'} for t in tests)
     fail_count = sum(1 for t in tests if t.get('status') == 'fail')
-
-    if critical_fail:
-        deployment_note = "Critical failures detected — deployment should be paused until resolved."
-    elif high_priority_fail_count > 0:
-        deployment_note = f"{high_priority_fail_count} high-priority issue(s) detected — review before promoting to production."
-    else:
-        deployment_note = "No critical failures detected — the build is a reasonable candidate for the next testing phase."
-
     stability_text = (
         f'The application demonstrates {"critical instability" if critical_fail else "overall stability"} '
         f'with a {pass_rate}% pass rate across {len(tests)} checks. '
         f'{"Navigation reliability is compromised — key routing elements failed." if any(t.get("status")=="fail" and t.get("type") in ("navigation","nav_link") for t in tests) else "Navigation reliability is confirmed — routing elements are operational."} '
         f'{"UI rendering shows gaps in critical areas." if fail_count > 0 else "UI rendering quality is consistent across all tested elements."} '
-        f'{deployment_note}'
+        f'{"Critical failures detected — deployment should be paused until resolved." if critical_fail else "No critical failures detected — the build is a reasonable candidate for the next testing phase."}'
     )
     elements.append(Paragraph(f'<font color="#475569" size="8.5">{stability_text}</font>',
                                ParagraphStyle('SmAIStability', fontSize=8.5, fontName='Helvetica', leading=13)))
     elements.append(Spacer(1, 12))
-
+ 
     # ── Per-area narrative subsections ──
     subsection_defs = [
         ('Performance of Critical UI', 'structure',      '#8b5cf6'),
@@ -9974,14 +9956,11 @@ def build_smoke_ai_analysis(elements, ai_data: dict, tests: list, score: int, pa
         elements.append(Spacer(1, 4))
         elements.append(_smoke_insight_box(text, color, label="Summary"))
         elements.append(Spacer(1, 10))
-
+ 
     # ── Deployment readiness ──
     if critical_fail:
         depl_text = 'Deployment NOT recommended — critical smoke checks failed (core page structure, auth, or connectivity).'
         depl_color = '#ef4444'
-    elif high_priority_fail_count > 0:
-        depl_text = f'Deployment possible with caution — {high_priority_fail_count} high-priority issue(s) detected. Review before promoting to production.'
-        depl_color = '#f59e0b'
     elif fail_count > 0:
         depl_text = f'Deployment possible with caution — {fail_count} non-critical check(s) failed. Review before promoting to production.'
         depl_color = '#f59e0b'
@@ -10045,16 +10024,7 @@ def build_smoke_ai_recommendations_table(elements, ai_data: dict):
             ParagraphStyle('SmNoRecb', fontSize=8, fontName='Helvetica')))
     elements.append(Spacer(1, 16))
  
-def _dbg(label, fn, *args, **kwargs):
-    """Diagnostic wrapper: pinpoint which build_smoke_* function raises NoneType len() errors."""
-    try:
-        return fn(*args, **kwargs)
-    except Exception as e:
-        import traceback
-        print(f"[SMOKE DEBUG] FAILED in: {label}")
-        traceback.print_exc()
-        raise
-
+ 
 # ─────────────────────────────────────────────────────────────────────────────
 # REPLACED — main generator, reordered to the requested structure
 # ─────────────────────────────────────────────────────────────────────────────
@@ -10185,49 +10155,28 @@ def _generate_smoke_public_pdf(generation_data: dict, tests: list, scraped: dict
         'auth, HTTP/SSL, load time) count more than optional elements — which is why the two numbers can differ.'
         '</i></font>', ParagraphStyle('SmRateNote2', fontSize=7, fontName='Helvetica', leading=9)))
     elements.append(Spacer(1, 20))
-
-    _dbg("build_smoke_overview_hero", build_smoke_overview_hero, elements, tests, ai_data, score, score_label, score_color, pass_rate, url)
-
+ 
     _smoke_chapter_header(elements, '1', 'Visual & Score Overview')
-
-    _dbg("build_smoke_key_metrics_cards", build_smoke_key_metrics_cards, elements, generation_data, tests)
-
+ 
     # ── 2. SCREENSHOT ─────────────────────────────────────────────────────
-    _dbg("build_smoke_screenshot", build_smoke_screenshot, elements, generation_data, scraped)
+    build_smoke_screenshot(elements, generation_data, scraped)
  
     # ── 3. SCORE ──────────────────────────────────────────────────────────
-    _dbg("build_smoke_score_hero", build_smoke_score_hero, elements, score, score_label, score_color)
+    build_smoke_score_hero(elements, score, score_label, score_color)
  
     _smoke_chapter_header(elements, '2', 'Test Coverage')
  
     # ── 4. METHODOLOGY (includes scenario plan) ──────────────────────────
-    _dbg("build_smoke_methodology", build_smoke_methodology, elements, tests, url)
+    build_smoke_methodology(elements, tests, url)
  
     # ── 5. RESULTS BY CATEGORY ────────────────────────────────────────────
-    _dbg("build_smoke_category_summary", build_smoke_category_summary, elements, tests)
+    build_smoke_category_summary(elements, tests)
  
     _smoke_chapter_header(elements, '3', 'Charts & Detailed Results')
  
     # ── 6. CHARTS ─────────────────────────────────────────────────────────
     try:
-        chart_img, cats_data = _make_smoke_category_chart(tests)
-
-        # Texte gris descriptif — AVANT le graphique
-        cat_desc = (
-            'This chart compares the number of passed and failed checks across each '
-            'smoke test category, helping you quickly spot which areas need attention.'
-        )
-
-        # AI Analysis — APRÈS le graphique
-        worst_cat = max(cats_data, key=lambda c: cats_data[c]['fail']) if cats_data else None
-        if worst_cat and cats_data[worst_cat]['fail'] > 0:
-            cat_insight = (
-                f'{worst_cat} currently has the most failures '
-                f'({cats_data[worst_cat]["fail"]}) — this is the category to prioritize first.'
-            )
-        else:
-            cat_insight = 'No category shows any failures — coverage is currently clean across the board.'
-
+        chart_img, _ = _make_smoke_category_chart(tests)
         framed = Table([[chart_img]], colWidths=[161*mm])
         framed.setStyle(TableStyle([
             ('BOX', (0,0), (-1,-1), 1, SMOKE_ACCENT),
@@ -10237,38 +10186,18 @@ def _generate_smoke_public_pdf(generation_data: dict, tests: list, scraped: dict
             ('BOTTOMPADDING', (0,0), (-1,-1), 8),
         ]))
         elements.append(section_header('', 'Category Breakdown Chart', SMOKE_ACCENT))
-        elements.append(Spacer(1, 4))
+        elements.append(Spacer(1, 6))
         elements.append(Paragraph(
-            f'<font color="#64748b" size="7.5"><i>{cat_desc}</i></font>',
-            ParagraphStyle('SmCatDesc', fontSize=7.5, fontName='Helvetica', leading=10)))
+            '<font color="#64748b" size="7.5"><i>Passed vs Failed checks per public category.</i></font>',
+            ParagraphStyle('SmCBInfo2', fontSize=7.5, fontName='Helvetica', leading=10)))
         elements.append(Spacer(1, 8))
         elements.append(framed)
-        elements.append(Spacer(1, 6))
-        elements.append(_smoke_insight_box(cat_insight, '#0EA5E9'))
         elements.append(Spacer(1, 16))
     except Exception as e:
         print(f"[SMOKE PDF] category chart error: {e}")
-
+ 
     try:
         dist_img = _make_smoke_status_bar_chart(tests)
-
-        # Texte gris descriptif — AVANT le graphique
-        dist_desc = (
-            'This chart shows the overall distribution of test outcomes — how many checks '
-            'passed, failed, or were skipped during this smoke run.'
-        )
-
-        # AI Analysis — APRÈS le graphique
-        pass_c  = sum(1 for t in tests if t.get('status') == 'pass')
-        fail_c  = sum(1 for t in tests if t.get('status') == 'fail')
-        skip_c  = sum(1 for t in tests if t.get('status') not in ('pass', 'fail'))
-        total_c = pass_c + fail_c + skip_c or 1
-        dist_insight = (
-            f'Out of {total_c} executed checks: {pass_c} passed ({round(pass_c/total_c*100)}%), '
-            f'{fail_c} failed ({round(fail_c/total_c*100)}%), and {skip_c} skipped '
-            f'({round(skip_c/total_c*100)}%).'
-        )
-
         framed_dist = Table([[dist_img]], colWidths=[161*mm])
         framed_dist.setStyle(TableStyle([
             ('BOX', (0,0), (-1,-1), 1, SMOKE_ACCENT),
@@ -10278,70 +10207,43 @@ def _generate_smoke_public_pdf(generation_data: dict, tests: list, scraped: dict
             ('BOTTOMPADDING', (0,0), (-1,-1), 8),
         ]))
         elements.append(section_header('', 'Pass / Fail / Skipped Distribution', SMOKE_ACCENT))
-        elements.append(Spacer(1, 4))
-        elements.append(Paragraph(
-            f'<font color="#64748b" size="7.5"><i>{dist_desc}</i></font>',
-            ParagraphStyle('SmDistDesc', fontSize=7.5, fontName='Helvetica', leading=10)))
         elements.append(Spacer(1, 8))
         elements.append(framed_dist)
-        elements.append(Spacer(1, 6))
-        elements.append(_smoke_insight_box(dist_insight, '#0EA5E9'))
         elements.append(Spacer(1, 16))
     except Exception as e:
         print(f"[SMOKE PDF] status chart error: {e}")
-
-    _dbg("build_smoke_execution_timeline", build_smoke_execution_timeline, elements, generation_data, tests)
-
+ 
     # ── 7. DETAILED RESULTS ──────────────────────────────────────────────
-    _dbg("build_smoke_detailed_results", build_smoke_detailed_results, elements, tests)
-
-    _dbg("build_smoke_top_findings", build_smoke_top_findings, elements, tests, scraped)
-
+    build_smoke_detailed_results(elements, tests)
+ 
     _smoke_chapter_header(elements, '4', 'AI Insights & Recommendations')
  
     # ── 8. AI ANALYSIS ───────────────────────────────────────────────────
-    _dbg("build_smoke_ai_analysis", build_smoke_ai_analysis, elements, ai_data, tests, score, pass_rate, url)
+    build_smoke_ai_analysis(elements, ai_data, tests, score, pass_rate, url)
  
     # ── 9. AI RECOMMENDATIONS ────────────────────────────────────────────
-    _dbg("build_smoke_ai_recommendations_table", build_smoke_ai_recommendations_table, elements, ai_data)
+    build_smoke_ai_recommendations_table(elements, ai_data)
  
     # ── 10. ACTION PLAN ──────────────────────────────────────────────────
-    _dbg("build_smoke_action_plan", build_smoke_action_plan, elements, ai_data)
-    _dbg("build_smoke_executive_summary", build_smoke_executive_summary, elements, ai_data, score, url)
+    build_smoke_action_plan(elements, ai_data)
+    build_smoke_executive_summary(elements, ai_data, score, url)
  
     _smoke_chapter_header(elements, '5', 'Execution Context & Verdict')
  
     # ── 11. ENVIRONMENT & EXECUTION INFO ─────────────────────────────────
-    _dbg("build_smoke_environment_info", build_smoke_environment_info, elements, generation_data, tests)
+    build_smoke_environment_info(elements, generation_data, tests)
  
     # ── 12. FINAL VERDICT ────────────────────────────────────────────────
     elements.append(section_header('', 'Final AI Verdict', SMOKE_ACCENT))
     elements.append(Spacer(1, 6))
-
-    BLOCKING_TYPES_VERDICT = {'body', 'heading', 'main_content', 'auth'}
-    HIGH_PRIORITY_TYPES_VERDICT = {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl', 'performance'}
-
-    def _is_high_priority_fail_verdict(t):
-        if t.get('status') != 'fail':
-            return False
-        priority = (t.get('priority') or t.get('severity') or '').lower()
-        return priority in ('high', 'critical') or t.get('type') in HIGH_PRIORITY_TYPES_VERDICT
-
-    critical_fail = any(t.get('status') == 'fail' and t.get('type') in BLOCKING_TYPES_VERDICT for t in tests)
-    high_priority_fail_count = sum(1 for t in tests if _is_high_priority_fail_verdict(t))
-
+    critical_fail = any(t.get('status') == 'fail' and t.get('type') in
+                         {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl'} for t in tests)
     if critical_fail:
         vc, vb, vbrd, vi = '#ef4444', HexColor('#fef2f2'), RED, '🔴'
         risk_level = 'HIGH'
         vt = (f'Smoke Test FAILED — critical checks did not pass on {url}. Core page structure, '
               f'authentication, or connectivity issues were detected. Deployment is NOT recommended '
               f'until these are resolved.')
-    elif high_priority_fail_count > 0:
-        vc, vb, vbrd, vi = '#b45309', HexColor('#fffbeb'), ORANGE, '🟡'
-        risk_level = 'MEDIUM'
-        vt = (f'Smoke Test passed with {high_priority_fail_count} high-priority issue(s) on {url}. '
-              f'Core functionality is operational, but the failed security check should be reviewed '
-              f'before deployment.')
     elif fail_count > 0:
         vc, vb, vbrd, vi = '#b45309', HexColor('#fffbeb'), ORANGE, '🟡'
         risk_level = 'MEDIUM'
@@ -10352,7 +10254,7 @@ def _generate_smoke_public_pdf(generation_data: dict, tests: list, scraped: dict
         risk_level = 'LOW'
         vt = (f'Smoke Test PASSED — all {pass_count} checks succeeded on {url}. The application is '
               f'stable and ready to proceed to deeper functional and regression testing.')
-
+ 
     final_tbl = Table([[Paragraph(
         f'<font color="{vc}" size="9"><b>{vi}  Final AI Verdict</b></font><br/>'
         f'<font color="{vc}" size="8">{vt}</font><br/><br/>'
@@ -10376,24 +10278,18 @@ def _generate_smoke_public_pdf(generation_data: dict, tests: list, scraped: dict
     ]))
     elements.append(final_tbl)
     elements.append(Spacer(1, 20))
-
+ 
     # Certificate
     elements.append(section_header('', 'Certificate of Smoke Test Validation', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Official validation summary confirming the outcome of this smoke test run — '
-        'issued automatically by NexTest AI based on the results above.'
-        '</i></font>',
-        ParagraphStyle('CertSectionInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
+    elements.append(Spacer(1, 6))
     smoke_cert_data = {
         'global_score': score,
         'score_label':  score_label,
         'score_color':  score_color,
     }
-    elements.append(_build_certificate_card(smoke_cert_data, url, title="CERTIFICATE OF SMOKE TEST VALIDATION"))
-    build_smoke_certificate_details(elements, generation_data, tests, score, url)
+    elements.append(_build_certificate_card(smoke_cert_data, url))
+    elements.append(Spacer(1, 10))
+ 
     doc.build(elements, onFirstPage=on_page_smoke, onLaterPages=on_page_smoke)
     return buffer.getvalue()
 
@@ -10433,7 +10329,6 @@ def build_smoke_action_plan(elements, ai_data: dict):
 
 
 def build_smoke_executive_summary(elements, ai_data: dict, score: int, url: str):
-    
     """Executive Summary — Top Priority Actions, same pattern as k6 report."""
     recs = (ai_data or {}).get('recommendations', []) or []
     if not recs:
@@ -10473,353 +10368,7 @@ def build_smoke_executive_summary(elements, ai_data: dict, score: int, url: str)
     )
     elements.append(_smoke_insight_box(insight, '#c9a227'))
     elements.append(Spacer(1, 8))
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW #1 — Smoke Test Overview (Hero Section)
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_overview_hero(elements, tests: list, ai_data: dict, score: int, score_label: str,
-                               score_color: str, pass_rate: int, url: str):
-    fail_count = sum(1 for t in tests if t.get('status') == 'fail')
-    critical_fail = any(
-        t.get('status') == 'fail' and t.get('type') in
-        {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl'}
-        for t in tests
-    )
-
-    if critical_fail:
-        overall_status, status_color = 'CRITICAL ISSUES', '#ef4444'
-        risk_level, risk_color = 'HIGH', '#ef4444'
-        deploy_text, deploy_color = 'NOT READY', '#ef4444'
-        status_explain = (
-            'One or more critical checks failed (page load, headings, main content, auth, HTTP status, '
-            'or SSL). These affect core functionality — deployment is not recommended until resolved.')
-    elif fail_count > 0:
-        overall_status, status_color = 'PASSED W/ WARNINGS', '#f59e0b'
-        risk_level, risk_color = 'MEDIUM', '#f59e0b'
-        deploy_text, deploy_color = 'READY W/ CAUTION', '#f59e0b'
-        status_explain = (
-            f'All critical checks passed, but {fail_count} secondary check(s) failed (e.g. images, '
-            f'pagination, minor UI elements). The application remains functional — review the failing '
-            f'checks below before deploying with confidence.')
-    else:
-        overall_status, status_color = 'ALL CHECKS PASSED', '#10b981'
-        risk_level, risk_color = 'LOW', '#10b981'
-        deploy_text, deploy_color = 'READY', '#10b981'
-        status_explain = (
-            'Every check passed, including all critical ones. The application is stable and ready to '
-            'move to the next testing phase.')
-
-    elements.append(section_header('', 'Smoke Test Overview', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        f'<font color="#64748b" size="7.5"><i>{status_explain}</i></font>',
-        ParagraphStyle('SmStatusExplain', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    def _hero_stat(label, value, color):
-        return Table([[Paragraph(
-            f'<font color="#94a3b8" size="7"><b>{label}</b></font><br/>'
-            f'<font color="{color}" size="12"><b>{value}</b></font>',
-            ParagraphStyle('HeroStat', fontSize=10, fontName='Helvetica', leading=16,
-                           alignment=TA_CENTER))
-        ]], colWidths=[40*mm], style=[
-            ('BACKGROUND', (0,0), (-1,-1), LIGHT_BG),
-            ('BOX', (0,0), (-1,-1), 1, HexColor(color)),
-            ('TOPPADDING', (0,0), (-1,-1), 10),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ])
-
-    row = Table([[
-        _hero_stat('OVERALL STATUS', overall_status, status_color),
-        _hero_stat('QUALITY SCORE', f'{score}/100', score_color),
-        _hero_stat('RISK LEVEL', risk_level, risk_color),
-        _hero_stat('DEPLOYMENT', deploy_text, deploy_color),
-    ]], colWidths=[42*mm]*4)
-    row.setStyle(TableStyle([
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('PADDING', (0,0), (-1,-1), 3),
-    ]))
-    elements.append(row)
-    elements.append(Spacer(1, 10))
-
-    ai_summary_text = (ai_data or {}).get('summary', '')
-    if not ai_summary_text:
-        pass_count = sum(1 for t in tests if t.get('status') == 'pass')
-        total = len(tests) or 1
-        ai_summary_text = (
-            f'This smoke run executed {total} critical checks on <b>{url}</b>, with {pass_count} passed '
-            f'and {fail_count} failed ({pass_rate}% pass rate). '
-            + ('Critical failures were detected and should be resolved before deployment.' if critical_fail
-               else 'No critical failures were detected — the build is a reasonable candidate for the next testing phase.')
-        )
-    elements.append(_smoke_insight_box(ai_summary_text, '#4f46e5', label='AI Summary'))
-    elements.append(Spacer(1, 16))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW #2 — Key Metrics Cards
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_key_metrics_cards(elements, generation_data: dict, tests: list):
-    elements.append(section_header('', 'Key Metrics', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Snapshot of this run\'s execution footprint — how long it took, how many checks fell into '
-        'each category, and where the critical checks are concentrated.'
-        '</i></font>',
-        ParagraphStyle('SmKMInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    def _parse_ms(d):
-        try:
-            s = str(d)
-            if s.endswith('ms'): return float(s.replace('ms', '') or 0)
-            if s.endswith('s'):  return float(s.replace('s', '') or 0) * 1000
-        except Exception:
-            pass
-        return 0
-
-    durations_ms = [_parse_ms(t.get('duration', '0')) for t in tests]
-    total_ms = sum(durations_ms)
-    avg_ms   = (total_ms / len(durations_ms)) if durations_ms else 0
-
-    HIGH_TYPES = {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl', 'performance'}
-    critical_count = sum(
-    1 for t in tests
-    if t.get('status') == 'fail' and (
-        (t.get('priority') or t.get('severity') or '').lower() in ('high', 'critical')
-        or t.get('type') in HIGH_TYPES
-    )
-)
-
-    cat_counts = {'Navigation': 0, 'Rendering': 0, 'Security': 0}
-    for t in tests:
-        label, _ = _smoke_category_label(t)
-        if label == 'Navigation': cat_counts['Navigation'] += 1
-        elif label == 'Rendering': cat_counts['Rendering'] += 1
-        elif label == 'Security': cat_counts['Security'] += 1
-
-    metrics = [
-        ('EXECUTION TIME',    f'{total_ms/1000:.2f}s' if total_ms else 'N/A', '#0EA5E9'),
-        ('CRITICAL CHECKS',   str(critical_count),                            '#ef4444'),
-        ('NAVIGATION CHECKS', str(cat_counts['Navigation']),                  '#10b981'),
-        ('RENDERING CHECKS',  str(cat_counts['Rendering']),                   '#8b5cf6'),
-        ('SECURITY CHECKS',   str(cat_counts['Security']),                    '#f59e0b'),
-        ('AVG TEST DURATION', f'{avg_ms:.0f}ms' if avg_ms else 'N/A',         '#ec4899'),
-    ]
-
-    def _metric_card(label, value, color):
-        cell = Table([[Paragraph(
-            f'<font color="{color}" size="7"><b>{label}</b></font><br/>'
-            f'<font color="#1e293b" size="11"><b>{value}</b></font>',
-            ParagraphStyle('KeyMetricC', fontSize=9, fontName='Helvetica', leading=15,
-                           alignment=TA_CENTER))
-        ]], colWidths=[54*mm])
-        cell.setStyle(TableStyle([
-            ('BACKGROUND',    (0,0), (-1,-1), WHITE),
-            ('BOX',           (0,0), (-1,-1), 1, HexColor(color)),
-            ('LINEABOVE',     (0,0), (-1,0),  3, HexColor(color)),
-            ('TOPPADDING',    (0,0), (-1,-1), 10),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-            ('ALIGN',         (0,0), (-1,-1), 'CENTER'),
-        ]))
-        return cell
-
-    card_rows = []
-    for i in range(0, len(metrics), 3):
-        chunk = metrics[i:i+3]
-        row_cells = [_metric_card(l, v, c) for l, v, c in chunk]
-        while len(row_cells) < 3:
-            row_cells.append(Paragraph('', ParagraphStyle('KeyMetricEmpty')))
-        card_rows.append(row_cells)
-
-    outer = Table(card_rows, colWidths=[56*mm]*3)
-    outer.setStyle(TableStyle([
-        ('ALIGN',  (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('PADDING',(0,0), (-1,-1), 3),
-    ]))
-    elements.append(outer)
-    elements.append(Spacer(1, 16))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW #3 — Execution Timeline
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_execution_timeline(elements, generation_data: dict, tests: list):
-    elements.append(section_header('', 'Execution Timeline', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Sequential phases of this smoke test run, from browser launch to report generation.'
-        '</i></font>', ParagraphStyle('SmTLInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    def _has(catkey):
-        return any(_smoke_category_label(t)[0].lower().replace(' ', '') == catkey for t in tests)
-
-    steps = [
-        ('Browser Started',   generation_data.get('browser', 'Chromium (headless)'), True),
-        ('Navigate to URL',   generation_data.get('url', ''), True),
-        ('DOM Loaded',        'Page structure captured', True),
-        ('Rendering Checks',  'Structure, headings, main content', _has('rendering')),
-        ('Navigation Checks', 'Menus, links, routing', _has('navigation')),
-        ('Image Validation',  'Image presence and loading', _has('images')),
-        ('Form Validation',   'Input fields and submission', _has('forms')),
-        ('AI Analysis',       'Recommendations and scoring', True),
-        ('Report Generated',  datetime.now().strftime('%Y-%m-%d %H:%M'), True),
-    ]
-
-    rows = []
-    for i, (title, detail, executed) in enumerate(steps):
-        dot_color = '#10b981' if executed else '#cbd5e1'
-        num_badge = Table([[Paragraph(
-            f'<font color="white" size="8"><b>{i+1}</b></font>',
-            ParagraphStyle('TLNum', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER))
-        ]], colWidths=[7*mm], rowHeights=[7*mm])
-        num_badge.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), HexColor(dot_color)),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ]))
-        text_cell = Paragraph(
-            f'<font color="#1e293b" size="8.5"><b>{title}</b></font><br/>'
-            f'<font color="#94a3b8" size="7">{detail}</font>',
-            ParagraphStyle('TLText', fontSize=8.5, fontName='Helvetica', leading=11))
-        rows.append([num_badge, text_cell])
-
-    tbl = Table(rows, colWidths=[10*mm, 158*mm])
-    tbl.setStyle(TableStyle([
-        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
-        ('TOPPADDING',    (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('LINEBEFORE',    (0,0), (0,-1),  1.5, HexColor('#e2e8f0')),
-        ('LEFTPADDING',   (1,0), (1,-1),  10),
-    ]))
-    elements.append(tbl)
-    elements.append(Spacer(1, 16))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW #4 — Top Findings
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_top_findings(elements, tests: list, scraped: dict):
-    elements.append(section_header('', 'Top Findings', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Quick-glance summary of the most relevant outcomes from this run.'
-        '</i></font>', ParagraphStyle('SmTFInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    fails, passes = [], []
-    for t in tests:
-        name, status = t.get('name', ''), t.get('status')
-        if status == 'pass':
-            passes.append(name)
-        elif status == 'fail':
-            reason = t.get('reason', '')
-            fails.append(name + (f' — {reason[:60]}' if reason else ''))
-
-    display_list = [(False, f) for f in fails[:8]] + [(True, f) for f in passes[:8]]
-    if not display_list:
-        elements.append(Paragraph('<font color="#94a3b8" size="8">No findings to display.</font>',
-                                   ParagraphStyle('SmTFNone', fontSize=8, fontName='Helvetica')))
-        elements.append(Spacer(1, 16))
-        return
-
-    rows = []
-    for ok, text in display_list:
-        icon, color = ('✓', '#10b981') if ok else ('⚠', '#ef4444')
-        rows.append([Paragraph(
-            f'<font color="{color}" size="10"><b>{icon}</b></font>  '
-            f'<font color="#1e293b" size="8">{text[:90]}</font>',
-            ParagraphStyle('SmTFItem', fontSize=8, fontName='Helvetica', leading=13))])
-
-    tbl = Table(rows, colWidths=[168*mm])
-    tbl.setStyle(TableStyle([
-        ('LEFTPADDING',   (0,0), (-1,-1), 10),
-        ('TOPPADDING',    (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('LINEBELOW',     (0,0), (-1,-1), 0.3, BORDER),
-        ('BACKGROUND',    (0,0), (-1,-1), HexColor('#fafafa')),
-    ]))
-    elements.append(tbl)
-    elements.append(Spacer(1, 16))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW #5 — Enhanced Certificate Details
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_certificate_details(elements, generation_data: dict, tests: list, score: int, url: str):
-    grade, _ = _grade_from_score(score)
-
-    total_ms = 0
-    try:
-        for t in tests:
-            d = str(t.get('duration', '0'))
-            if d.endswith('ms'): total_ms += float(d.replace('ms', '') or 0)
-            elif d.endswith('s'): total_ms += float(d.replace('s', '') or 0) * 1000
-    except Exception:
-        pass
-    exec_time_disp = f'{total_ms/1000:.2f}s' if total_ms else 'N/A'
-
-    details = [
-        ('Validation Date',       datetime.now().strftime('%Y-%m-%d  %H:%M'), '#0EA5E9', HexColor('#f0f9ff')),
-        ('Framework',             generation_data.get('framework', 'Playwright'), '#0EA5E9', HexColor('#f0f9ff')),
-        ('Browser',               generation_data.get('browser', 'Chromium (headless)'), '#6366f1', HexColor('#eef2ff')),
-        ('Viewport',              generation_data.get('viewport', '1920×1080'), '#6366f1', HexColor('#eef2ff')),
-        ('Execution Time',        exec_time_disp, '#8b5cf6', HexColor('#f5f3ff')),
-        ('Smoke Quality Score',   f'{score}/100', '#8b5cf6', HexColor('#f5f3ff')),
-        ('Overall Grade',         grade, '#10b981', HexColor('#f0fdf4')),
-        ('AI Validation Status',  'Verified by NexTest AI', '#10b981', HexColor('#f0fdf4')),
-    ]
-
-    rows = []
-    row_styles = []
-    for i in range(0, len(details), 2):
-        chunk = details[i:i+2]
-        row = [Paragraph(
-            f'<font color="{color}" size="7.5"><b>{lbl}</b></font><br/>'
-            f'<font color="#1e293b" size="9">{val}</font>',
-            ParagraphStyle('CertDet', fontSize=8, fontName='Helvetica', leading=12))
-            for lbl, val, color, bg in chunk]
-        if len(row) < 2:
-            row.append(Paragraph('', ParagraphStyle('CertDetEmpty')))
-        rows.append(row)
-        ri = len(rows) - 1
-        left_color = chunk[0][2]
-        row_bg = chunk[0][3]
-        row_styles.append(('BACKGROUND',  (0, ri), (-1, ri), row_bg))
-        row_styles.append(('LINEBEFORE',  (0, ri), (0, ri), 3, HexColor(left_color)))
-        if len(chunk) > 1:
-            row_styles.append(('LINEBEFORE', (1, ri), (1, ri), 1, BORDER_DARK))
-
-    det_tbl = Table(rows, colWidths=[84*mm, 84*mm])
-    det_tbl.setStyle(TableStyle([
-        ('BOX',           (0,0), (-1,-1), 0.8, BORDER_DARK),
-        ('LINEBELOW',     (0,0), (-1,-2), 0.3, BORDER),
-        ('LEFTPADDING',   (0,0), (-1,-1), 10),
-        ('TOPPADDING',    (0,0), (-1,-1), 8),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
-    ] + row_styles))
-    elements.append(KeepTogether([
-        Spacer(1, 8),
-        Paragraph(
-            '<font color="#64748b" size="7.5"><i>'
-            'Technical details of this validation run — environment, timing, and scoring — '
-            'provided for traceability and audit purposes.'
-            '</i></font>',
-            ParagraphStyle('CertDetInfo', fontSize=7.5, fontName='Helvetica', leading=10)),
-        Spacer(1, 6),
-        det_tbl,
-    ]))
-    elements.append(Spacer(1, 10))
-
-    
+    return buffer.getvalue()
 def generate_pdf(generation_data: dict) -> bytes:
     test_type = generation_data.get('test_type') or \
                 generation_data.get('result', {}).get('test_type', 'smoke')
@@ -10904,16 +10453,7 @@ def generate_pdf(generation_data: dict) -> bytes:
         print(f"[SMOKE PDF] ai_data keys found: {list(ai_data_smoke.keys())} | "
               f"recs={len(ai_data_smoke.get('recommendations', []))} | "
               f"action_plan={len(ai_data_smoke.get('action_plan', []))}")
-        try:
-            result = _generate_smoke_public_pdf(generation_data, tests, scraped_smoke, ai_data_smoke)
-            print(f"[SMOKE PDF] _generate_smoke_public_pdf returned: type={type(result)}, "
-                  f"len={len(result) if result is not None else 'N/A (None!)'}")
-            return result
-        except Exception as e:
-            import traceback
-            print(f"[SMOKE PDF] EXCEPTION inside _generate_smoke_public_pdf: {e}")
-            traceback.print_exc()
-            raise
+        return _generate_smoke_public_pdf(generation_data, tests, scraped_smoke, ai_data_smoke)
     # ── REGRESSION ───────────────────────────────────────────────────────────
     if test_type == 'regression':
         tests = (

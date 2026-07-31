@@ -3,8 +3,49 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
 import time
 import re
+from playwright.sync_api import sync_playwright
+
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 
+
+import ssl
+import requests.adapters
+
+class LegacySSLAdapter(requests.adapters.HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        ctx = ssl.create_default_context()
+        ctx.options |= 0x4  # SSL_OP_LEGACY_SERVER_CONNECT
+        kwargs["ssl_context"] = ctx
+        return super().init_poolmanager(*args, **kwargs)
+    
+def _fetch_rendered_page(url: str, timeout_ms: int = 15000, load_time_runs: int = 3):
+    load_times = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(
+            user_agent="Mozilla/5.0 (compatible; NexTestSEOBot/1.0)",
+            viewport={"width": 1366, "height": 768},
+        )
+        html = None
+        status_code = None
+        screenshot_bytes = None
+        for i in range(load_time_runs):
+            start = time.time()
+            resp = page.goto(url, timeout=timeout_ms, wait_until="load")
+            elapsed = round((time.time() - start) * 1000)
+            load_times.append(elapsed)
+            if i == load_time_runs - 1:
+                status_code = resp.status if resp else 200
+                html = page.content()
+                page.wait_for_timeout(1500)
+                try:
+                    screenshot_bytes = page.screenshot(full_page=False, type="png")
+                except Exception as e:
+                    print(f"[SEO DEBUG] Screenshot capture failed: {e}")
+        browser.close()
+        median_load_time = sorted(load_times)[len(load_times) // 2]
+    return status_code, html, screenshot_bytes, median_load_time
 
 def analyze_seo(url: str) -> dict:
     """
@@ -41,6 +82,7 @@ def analyze_seo(url: str) -> dict:
         "og_description": None,
         "has_schema_markup": False,
         "word_count": 0,
+        "screenshot": None,
         "issues": [],
         "warnings": [],
         "passed": [],
@@ -54,19 +96,21 @@ def analyze_seo(url: str) -> dict:
     else:
         results["issues"].append("Site is not using HTTPS")
 
-    #Fetch page
     try:
-        start = time.time()
-        response = requests.get(url, timeout=15, headers={
-            "User-Agent": "Mozilla/5.0 (compatible; NexTestSEOBot/1.0)"
-        }, verify=False)
-        elapsed = round((time.time() - start) * 1000)
-        results["load_time_ms"] = elapsed
-        results["status_code"] = response.status_code
-        results["accessible"] = response.status_code == 200
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_fetch_rendered_page, url, 15000)
+            status_code, html, screenshot_bytes, median_load_time = future.result(timeout=45)
 
-        if response.status_code != 200:
-            results["issues"].append(f"Page returned status code {response.status_code}")
+        elapsed = median_load_time
+        results["load_time_ms"] = elapsed
+        
+        results["status_code"] = status_code
+        results["accessible"] = status_code == 200
+        results["screenshot"] = screenshot_bytes
+
+        if status_code != 200:
+            print(f"[SEO DEBUG] Non-200 response: {status_code} for {url}")
+            results["issues"].append(f"Page returned status code {status_code}")
             return results
 
         if elapsed > 3000:
@@ -77,10 +121,11 @@ def analyze_seo(url: str) -> dict:
             results["passed"].append(f"Good page load time: {elapsed}ms")
 
     except Exception as e:
+        print(f"[SEO DEBUG] EXCEPTION during fetch: {type(e).__name__}: {e}")
         results["issues"].append(f"Page not accessible: {str(e)}")
         return results
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    soup = BeautifulSoup(html, "html.parser")
 
     #Title
     title_tag = soup.find("title")
@@ -212,31 +257,38 @@ def analyze_seo(url: str) -> dict:
     else:
         results["passed"].append(f"Good word count: {results['word_count']} words")
 
-    #Robots.txt
+   # Robots.txt
     try:
         robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
-        r = requests.get(robots_url, timeout=5, verify=False)
+        session = requests.Session()
+        session.mount("https://", LegacySSLAdapter())
+        r = session.get(robots_url, timeout=5, headers={"User-Agent": "Mozilla/5.0 (compatible; NexTestSEOBot/1.0)"})
         if r.status_code == 200 and "user-agent" in r.text.lower():
             results["has_robots_txt"] = True
             results["passed"].append("robots.txt found")
         else:
             results["warnings"].append("robots.txt not found or invalid")
-    except:
-        results["warnings"].append("Could not check robots.txt")
+    except requests.exceptions.RequestException as e:
+        results["warnings"].append(f"Could not check robots.txt: {e}")
 
-    #Sitemap
+    # Sitemap
     try:
         sitemap_url = f"{parsed.scheme}://{parsed.netloc}/sitemap.xml"
-        r = requests.get(sitemap_url, timeout=5, verify=False)
-        if r.status_code == 200 and "urlset" in r.text.lower():
+        session = requests.Session()
+        session.mount("https://", LegacySSLAdapter())
+        r = session.get(sitemap_url, timeout=5, headers={"User-Agent": "Mozilla/5.0 (compatible; NexTestSEOBot/1.0)"})
+        content_lower = r.text.lower()
+        if r.status_code == 200 and ("urlset" in content_lower or "sitemapindex" in content_lower):
             results["has_sitemap"] = True
             results["passed"].append("sitemap.xml found")
         else:
             results["warnings"].append("sitemap.xml not found")
-    except:
-        results["warnings"].append("Could not check sitemap.xml")
+    except requests.exceptions.RequestException as e:
+        results["warnings"].append(f"Could not check sitemap.xml: {e}")
 
     return results
+
+    
 
 
 def compute_seo_score(analysis: dict) -> int:

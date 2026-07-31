@@ -30,7 +30,18 @@ def run_performance(url: str) -> dict:
         page_cold = context_cold.new_page()
         resources = []
         page_cold.on("response", lambda r: resources.append({"url": r.url, "status": r.status}))
+        page_cold.add_init_script("""
+            window.__lcpValue = 0;
+            try {
+                new PerformanceObserver((list) => {
+                    const entries = list.getEntries();
+                    const last = entries[entries.length - 1];
+                    if (last) window.__lcpValue = last.startTime;
+                }).observe({ type: 'largest-contentful-paint', buffered: true });
+            } catch (e) {}
+        """)
 
+        
         t_nav_start = time.time()
         try:
             page_cold.goto(url, timeout=_NAV_TIMEOUT, wait_until="networkidle")
@@ -61,7 +72,7 @@ def run_performance(url: str) -> dict:
             const fcp = fcpEntry ? Math.round(fcpEntry.startTime) : null;
             const loadTime = nav.loadEventEnd ? Math.round(nav.loadEventEnd - nav.fetchStart) : null;
             const tti = nav.domInteractive ? Math.round(nav.domInteractive - nav.fetchStart) : null;
-            const lcp_approx = nav.domContentLoadedEventEnd ? Math.round(nav.domContentLoadedEventEnd - nav.fetchStart) : null;
+const lcp_real = window.__lcpValue ? Math.round(window.__lcpValue) : (nav.domContentLoadedEventEnd ? Math.round(nav.domContentLoadedEventEnd - nav.fetchStart) : null);
             let jsSize = 0, cssSize = 0, imgSize = 0, totalSize = 0;
             let jsCount = 0, cssCount = 0, imgCount = 0;
             resources.forEach(r => {
@@ -74,7 +85,7 @@ def run_performance(url: str) -> dict:
             });
             const domSize = document.querySelectorAll('*').length;
             return {
-                load_time_ms: loadTime, fcp_ms: fcp, lcp_ms: lcp_approx, tti_ms: tti,
+                load_time_ms: loadTime, fcp_ms: fcp, lcp_ms: lcp_real, tti_ms: tti,
                 ttfb_ms: nav.responseStart ? Math.round(nav.responseStart - nav.fetchStart) : null,
                 dns_ms: nav.domainLookupEnd ? Math.round(nav.domainLookupEnd - nav.domainLookupStart) : null,
                 connect_ms: nav.connectEnd ? Math.round(nav.connectEnd - nav.connectStart) : null,

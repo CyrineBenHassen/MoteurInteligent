@@ -73,6 +73,8 @@ Route::delete('/flaky-tests/flag', [TestFlagController::class, 'destroy']);
     Route::post('/generate-internal', [GenerationController::class, 'generateInternal']);
     
     
+Route::get('/generations/{id}/xlsx', [GenerationController::class, 'downloadXlsx']);
+
 
 
     Route::get('/projects',                      [ProjectController::class, 'index']);

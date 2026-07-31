@@ -95,16 +95,32 @@ export default function RegisterPage() {
           <div className="left-headline">
             <h1>Smart Testing<br />Starts <span className="gold">Here</span></h1>
             <div className="gold-line" />
-            <p>Stop writing tests manually. Our generative AI engine crawls your web app, identifies interactive elements, and instantly produces Selenium,Cypress and Playwright automation scripts.</p>
+            <p>Join NexTest and simplify your testing process with AI-powered test generation, multi-framework automation scripts, and intelligent analysis of your web applications.</p>
           </div>
 
           <div className="steps">
-            {[
-              { n: '01', t: 'Sign up for free', d: 'Instant access — no setup, no credit card' },
-              { n: '02', t: 'Submit your app URL', d: 'Drop a URL and let the engine do the rest' },
-              { n: '03', t: 'AI generates test cases', d: 'Covers functional scenarios, edge cases & error flows automatically' },
-              { n: '04', t: 'Download Selenium & Cypress scripts', d: 'Production-ready scripts with a full PDF report, zero manual effort' },
-            ].map((s, i, arr) => (
+  {[
+    { 
+      n: '01', 
+      t: 'Create your account', 
+      d: 'Register quickly and access the NexTest platform' 
+    },
+    { 
+      n: '02', 
+      t: 'Set up your profile', 
+      d: 'Configure your account preferences and workspace settings' 
+    },
+    { 
+      n: '03', 
+      t: 'Start creating tests', 
+      d: 'Provide your application and generate AI-powered test cases' 
+    },
+    { 
+      n: '04', 
+      t: 'Automate your testing workflow', 
+      d: 'Export multi-framework scripts and analyze detailed reports' 
+    },
+  ].map((s, i, arr) => (
               <div className="step" key={s.n}>
                 <div className="step-left">
                   <div className="step-num">{s.n}</div>

@@ -10,9 +10,14 @@ const TRANSLATIONS = {
     stats:       'Stats',
     signIn:      'Sign In',
     getStarted:  'Get Started',
-    heroLead:    <>Provide your web application's URL — the engine analyzes your interface,
-                    generates functional test cases, and exports ready-to-use
-                    <strong> multi-framework</strong> scripts (Selenium, Cypress, Playwright). In seconds.</>,
+    heroLead: (
+  <>
+    Provide your web application's URL — NexTest supports both public and
+    internal applications, analyzes your interface using AI, generates automated
+    test cases across multiple testing types, and exports ready-to-use
+    <strong> multi-framework</strong> automation scripts. In seconds.
+  </>
+),
     startFree:   'Start for free',
     seeHow:      'See how it works',
     trust:       ['No credit card', 'Open-source AI', 'Results in 60s'],

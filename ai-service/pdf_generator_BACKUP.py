@@ -4,7 +4,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.colors import HexColor, white, black
 from reportlab.graphics.shapes import Drawing, Circle, Polygon
 from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.platypus import Flowable
 from io import BytesIO
@@ -4176,50 +4176,6 @@ Return ONLY the JSON array, no markdown, no explanation. Maximum 6 items."""
     except Exception as e:
         print(f"[Groq K6 Plan] Error: {e}")
         return []
-    
-def _k6_fallback_insight(kind: str, summary: dict, tests: list) -> str:
-    """Data-driven fallback insight — used only if the AI-generated insight is unavailable."""
-    TYPE_LABELS = {'load': 'Load Test', 'stress': 'Stress Test', 'spike': 'Spike Test', 'soak': 'Soak Test'}
-
-    if kind == 'p95':
-        vals = {}
-        for k, label in TYPE_LABELS.items():
-            v = (summary.get(k, {}).get('metrics') or {}).get('http_req_duration_p95')
-            try:
-                vals[label] = float(str(v).replace('ms', '').strip())
-            except (TypeError, ValueError):
-                continue
-        if not vals:
-            return 'Response time data was not available for this run.'
-        fastest, slowest = min(vals, key=vals.get), max(vals, key=vals.get)
-        return (f'The {fastest} recorded the lowest p95 response time at {vals[fastest]:.0f} ms, '
-                f'while the {slowest} peaked at {vals[slowest]:.0f} ms — both remaining within '
-                f'their configured thresholds.')
-
-    if kind == 'throughput':
-        vals = {}
-        for k, label in TYPE_LABELS.items():
-            v = (summary.get(k, {}).get('metrics') or {}).get('http_reqs_per_second')
-            if v is not None:
-                vals[label] = float(v)
-        if not vals:
-            return 'Throughput data was not available for this run.'
-        best = max(vals, key=vals.get)
-        return (f'Throughput ranged from {min(vals.values()):.1f} to {max(vals.values()):.1f} req/s '
-                f'across all profiles, with the {best} sustaining the highest rate at '
-                f'{vals[best]:.1f} req/s.')
-
-    if kind == 'breakdown':
-        pass_count = sum(1 for t in tests if t.get('status') == 'pass')
-        fail_count = sum(1 for t in tests if t.get('status') == 'fail')
-        total = len(tests) or 1
-        if fail_count == 0:
-            return (f'All {total} threshold validations passed across every executed load profile, '
-                    f'confirming consistent reliability with no failures or warnings detected.')
-        return (f'{fail_count} of {total} threshold validation(s) failed — review the affected '
-                f'test type(s) above before promoting this build.')
-
-    return 'Analysis unavailable for this chart.'
 def _call_groq_chart_insights(summary: dict, tests: list) -> dict:
     """Call Groq to generate one-sentence AI analysis for each of the 4 charts."""
     try:
@@ -4317,73 +4273,7 @@ def _k6_score_label(score: int) -> str:
     if score >= 50: return 'Fair'
     if score >= 25: return 'Poor'
     return 'Critical'
-def build_k6_execution_configuration(elements, generation_data: dict, summary: dict, tests: list):
-    """Execution Configuration — clean info card summarizing how this k6 run was configured."""
-    PURPLE_K6 = HexColor('#7D64FF')
-
-    url             = generation_data.get('url', '—')
-    framework       = generation_data.get('framework', 'k6')
-    nextest_version = generation_data.get('nextest_version', '1.0.0')
-    environment     = generation_data.get('environment', 'Production')
-
-    max_vus = 0
-    total_duration = 0.0
-    for type_data in summary.values():
-        metrics = type_data.get('metrics') or {}
-        try:
-            max_vus = max(max_vus, int(metrics.get('vus_max') or 0))
-        except (TypeError, ValueError):
-            pass
-        try:
-            total_duration += float(type_data.get('duration_seconds') or 0)
-        except (TypeError, ValueError):
-            pass
-
-    url_display = url.replace('https://', '').replace('http://', '')
-    if len(url_display) > 40:
-        url_display = url_display[:40] + '…'
-
-    rows = [
-        ('Tool', 'k6'),
-        ('Framework', framework),
-        ('Target', url_display),
-        ('Load Profiles', f'{len(summary)}  ({", ".join(k.title() for k in summary)})'),
-        ('Maximum Virtual Users', str(max_vus) if max_vus else 'N/A'),
-        ('Total Test Duration', f'{total_duration:.0f} s' if total_duration else 'N/A'),
-        ('Test Generation Date', datetime.now().strftime('%Y-%m-%d %H:%M')),
-        ('Test Environment', environment),
-        ('Report Version', f'NexTest {nextest_version}'),
-    ]
-
-    elements.append(section_header('', 'Execution Configuration', PURPLE_K6))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Parameters used to configure and execute this k6 performance run.'
-        '</i></font>',
-        ParagraphStyle('ExecCfgInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    cfg_rows = []
-    for i, (label, value) in enumerate(rows):
-        cfg_rows.append([
-            Paragraph(f'<font color="#64748b" size="8.5"><b>{label}</b></font>',
-                      ParagraphStyle(f'ECL{i}', fontSize=8.5, fontName='Helvetica-Bold', leading=12)),
-            Paragraph(f'<font color="#1e293b" size="9">{value}</font>',
-                      ParagraphStyle(f'ECV{i}', fontSize=9, fontName='Helvetica', leading=12)),
-        ])
-    tbl = Table(cfg_rows, colWidths=[58*mm, 110*mm])
-    tbl.setStyle(TableStyle([
-        ('BACKGROUND',    (0,0), (0,-1), LIGHT_BG),
-        ('ROWBACKGROUNDS',(0,0), (-1,-1), [WHITE, LIGHT_BG]),
-        ('PADDING',       (0,0), (-1,-1), 7),
-        ('LINEBELOW',     (0,0), (-1,-2), 0.4, BORDER),
-        ('BOX',           (0,0), (-1,-1), 0.8, PURPLE_K6),
-        ('LEFTPADDING',   (0,0), (0,-1), 10),
-        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
-    ]))
-    elements.append(tbl)
-    elements.append(Spacer(1, 16))
+ 
  
 def build_k6_score_hero(elements, score: int, score_color: str, tests: list, summary: dict, url: str):
     """Jauge circulaire + verdict + résumé — équivalent k6 de build_performance_score_hero()."""
@@ -4695,212 +4585,6 @@ def build_k6_executive_summary(elements, action_plan: list, score: int, url: str
     elements.append(_perf_insight_box(insight, '#c9a227'))
     elements.append(Spacer(1, 8))
     
-def _k6_make_bar_comparison_chart(summary: dict, metric_key: str, metric_label: str, unit: str):
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from io import BytesIO as BIO
-    from reportlab.platypus import Image as RLImage
-
-    TYPE_LABELS = ['Load', 'Stress', 'Spike', 'Soak']
-    TYPE_KEYS   = ['load', 'stress', 'spike', 'soak']
-    COLORS      = ['#6366f1', '#ef4444', '#f59e0b', '#0ea5e9']
-
-    vals = []
-    for k in TYPE_KEYS:
-        raw = (summary.get(k, {}).get('metrics') or {}).get(metric_key)
-        try:
-            v = float(str(raw).replace('ms', '').strip()) if raw is not None else 0
-        except (TypeError, ValueError):
-            v = 0
-        vals.append(v)
-
-    plt.rcParams.update({'font.family': 'DejaVu Sans', 'axes.spines.top': False, 'axes.spines.right': False})
-    fig, ax = plt.subplots(figsize=(8, 3), facecolor='white')
-    ax.set_facecolor('#f8fafc')
-    x = np.arange(len(TYPE_LABELS))
-    bars = ax.bar(x, vals, width=0.55, color=COLORS, edgecolor='white', linewidth=1.5, zorder=3)
-    top = max(vals + [1])
-    for bar, v in zip(bars, vals):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + top*0.02,
-                 f'{v:.1f}{unit}', ha='center', va='bottom', fontsize=8.5, fontweight='bold', color='#1e293b')
-    ax.set_xticks(x)
-    ax.set_xticklabels(TYPE_LABELS, fontsize=9, color='#475569', fontweight='bold')
-    ax.set_ylabel(metric_label, fontsize=8, color='#64748b')
-    ax.grid(axis='y', color='#f1f5f9', linewidth=1, zorder=0)
-    ax.set_ylim(bottom=0, top=top * 1.3)
-    fig.text(0.02, 0.95, metric_label + ' by Test Type', fontsize=10.5, fontweight='bold', color='#1e293b', va='top')
-    plt.subplots_adjust(top=0.82, bottom=0.15, left=0.09, right=0.97)
-    buf = BIO()
-    fig.savefig(buf, format='png', dpi=170, bbox_inches='tight', facecolor='white')
-    plt.close()
-    buf.seek(0)
-    img = RLImage(buf, width=155*mm, height=54*mm)
-    return img, dict(zip(TYPE_LABELS, vals))
-
-
-def _k6_chart_caption(kind: str, vals: dict, unit: str) -> str:
-    INTRO = {
-        'p95': 'The 95th-percentile response time reflects the experience of the slowest 5% of requests — '
-               'the metric most sensitive to latency spikes under load.',
-        'throughput': 'Throughput measures how many requests per second the application sustained under '
-                      'each profile, indicating raw processing capacity.',
-        'error': 'Error rate tracks the share of failed HTTP requests — any non-zero value here signals '
-                 'reliability issues that threshold checks alone may not capture.',
-        'vus': 'Maximum Virtual Users shows the peak concurrency reached in each profile, giving context '
-               'for how demanding the corresponding load pattern was.',
-    }
-    if not vals or all(v == 0 for v in vals.values()):
-        data_note = 'No data was recorded for this metric on this run.'
-    else:
-        lower_is_better = kind in ('p95', 'error')
-        best_label  = min(vals, key=vals.get) if lower_is_better else max(vals, key=vals.get)
-        worst_label = max(vals, key=vals.get) if lower_is_better else min(vals, key=vals.get)
-        data_note = (f'{best_label} performed best at {vals[best_label]:.1f}{unit}, '
-                     f'while {worst_label} recorded the highest value at {vals[worst_label]:.1f}{unit}.')
-    return INTRO.get(kind, '') + ' ' + data_note
-
-
-def build_k6_comparison_charts(elements, summary: dict, k6_score: int, k6_score_color: str):
-    PURPLE_K6 = HexColor('#7D64FF')
-    elements.append(section_header('', 'Performance Comparison Charts', PURPLE_K6))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Side-by-side comparison of key metrics across the four load profiles.'
-        '</i></font>',
-        ParagraphStyle('CompChartsInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    def _framed(img):
-        t = Table([[img]], colWidths=[161*mm])
-        t.setStyle(TableStyle([
-            ('BOX', (0,0), (-1,-1), 1, PURPLE_K6),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('TOPPADDING', (0,0), (-1,-1), 6),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ]))
-        return t
-
-    def _caption(text):
-        return Paragraph(
-            f'<font color="#475569" size="8"><i>{text}</i></font>',
-            ParagraphStyle('CompCaption', fontSize=8, fontName='Helvetica-Oblique', leading=11))
-
-    img, vals = _k6_make_bar_comparison_chart(summary, 'http_req_duration_p95', 'p95 Response Time (ms)', 'ms')
-    elements.append(_caption(_k6_chart_caption('p95', vals, 'ms')))
-    elements.append(Spacer(1, 4))
-    elements.append(_framed(img))
-    elements.append(Spacer(1, 6))
-
-    img, vals = _k6_make_bar_comparison_chart(summary, 'http_reqs_per_second', 'Throughput (req/s)', '/s')
-    elements.append(_caption(_k6_chart_caption('throughput', vals, '/s')))
-    elements.append(Spacer(1, 4))
-    elements.append(_framed(img))
-    elements.append(Spacer(1, 6))
-
-    img, vals = _k6_make_bar_comparison_chart(summary, 'http_req_failed_rate', 'Error Rate (%)', '%')
-    elements.append(_caption(_k6_chart_caption('error', vals, '%')))
-    elements.append(Spacer(1, 4))
-    elements.append(_framed(img))
-    elements.append(Spacer(1, 6))
-
-    img, vals = _k6_make_bar_comparison_chart(summary, 'vus_max', 'Maximum Virtual Users', '')
-    elements.append(_caption(_k6_chart_caption('vus', vals, '')))
-    elements.append(Spacer(1, 4))
-    elements.append(_framed(img))
-    elements.append(Spacer(1, 8))
-
-    elements.append(Paragraph('<font color="#1e293b" size="10"><b>Performance Score Overview</b></font>',
-                               ParagraphStyle('ScoreOvH', fontSize=10, fontName='Helvetica-Bold')))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'The Performance Score aggregates threshold pass rate, response-time stability, and error rate '
-        'across all four load profiles into a single weighted indicator (0-100).'
-        '</i></font>',
-        ParagraphStyle('ScoreOvInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 6))
-
-    gauge_img = _make_score_gauge(k6_score, k6_score_color)
-
-    if k6_score >= 90:
-        score_verdict = 'Excellent — the application handled all tested load conditions with minimal degradation.'
-    elif k6_score >= 75:
-        score_verdict = 'Good — performance is solid overall, with minor room for tuning under peak conditions.'
-    elif k6_score >= 50:
-        score_verdict = ('Acceptable — the application meets baseline expectations but shows measurable '
-                          'strain under stress or sustained load.')
-    else:
-        score_verdict = ('Critical — significant performance issues were detected; review the failing '
-                          'profiles before this build is promoted.')
-
-    ranges_note = Paragraph(
-        '<font color="#64748b" size="7.5">'
-        '<font color="#10b981"><b>90-100 Excellent</b></font> &nbsp;·&nbsp; '
-        '<font color="#22c55e"><b>75-89 Good</b></font> &nbsp;·&nbsp; '
-        '<font color="#f59e0b"><b>50-74 Acceptable</b></font> &nbsp;·&nbsp; '
-        '<font color="#ef4444"><b>0-49 Critical</b></font><br/><br/>'
-        f'<font color="#1e293b">{score_verdict}</font></font>',
-        ParagraphStyle('RangesNote', fontSize=7.5, fontName='Helvetica', leading=11))
-
-    row = Table([[gauge_img, ranges_note]], colWidths=[56*mm, 105*mm])
-    row.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOX', (0,0), (-1,-1), 1, PURPLE_K6),
-        ('BACKGROUND', (0,0), (-1,-1), LIGHT_BG),
-        ('LEFTPADDING', (0,0), (-1,-1), 12),
-        ('TOPPADDING', (0,0), (-1,-1), 10),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-    ]))
-    elements.append(row)
-    elements.append(Spacer(1, 10))
-
-
-
-def _k6_chapter_header(elements, number: str, title: str):
-    """Premium numbered section divider — badge numéro + titre.
-    Style enterprise réutilisé pour chaque section majeure (01-05)."""
-    PURPLE_K6 = HexColor('#7D64FF')
-    num_display = str(number).zfill(2)  # 1 -> "01", 2 -> "02", ...
-
-    # Badge numéro — taille réduite
-    badge = Table([[Paragraph(
-        f'<font color="white" size="13"><b>{num_display}</b></font>',
-        ParagraphStyle('ChapNum', fontSize=13, fontName='Helvetica-Bold',
-                        alignment=TA_CENTER, leading=15))
-    ]], colWidths=[14*mm], rowHeights=[14*mm])
-    badge.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), PURPLE_K6),
-        ('VALIGN',     (0,0), (-1,-1), 'MIDDLE'),
-        ('ALIGN',      (0,0), (-1,-1), 'CENTER'),
-    ]))
-
-    # Eyebrow label + titre, empilés
-    title_block = Table([
-        [Paragraph(f'<font color="#94a3b8" size="7"><b>SECTION {num_display}</b></font>',
-                   ParagraphStyle('ChapEyebrow', fontSize=7, fontName='Helvetica-Bold', leading=8.5))],
-        [Paragraph(f'<font color="#1e293b" size="14"><b>{title}</b></font>',
-                   ParagraphStyle('ChapTitle', fontSize=14, fontName='Helvetica-Bold', leading=17))],
-    ], colWidths=[148*mm])
-    title_block.setStyle(TableStyle([
-        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING',    (0,0), (-1,0), 0),
-        ('BOTTOMPADDING', (0,0), (-1,0), 2),
-        ('TOPPADDING',    (0,1), (-1,1), 0),
-        ('BOTTOMPADDING', (0,1), (-1,1), 0),
-        ('LEFTPADDING',   (0,0), (-1,-1), 0),
-    ]))
-
-    row = Table([[badge, title_block]], colWidths=[17*mm, 151*mm])
-    row.setStyle(TableStyle([
-        ('VALIGN',      (0,0), (-1,-1), 'MIDDLE'),
-        ('LEFTPADDING', (0,0), (-1,-1), 0),
-    ]))
-
-    elements.append(Spacer(1, 10))
-    elements.append(row)
-    elements.append(HRFlowable(width='100%', thickness=2, color=PURPLE_K6,
-                                spaceBefore=6, spaceAfter=12))
     
 def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes:
     buffer    = BytesIO()
@@ -4933,9 +4617,9 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
         rightMargin=20*mm, leftMargin=22*mm,
-        topMargin=57*mm, bottomMargin=20*mm
+        topMargin=58*mm, bottomMargin=20*mm
     )
-    
+
     def on_page_k6(canvas, doc):
         W, H = A4
         canvas.saveState()
@@ -5014,8 +4698,6 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
     elements.append(info_tbl)
     elements.append(Spacer(1, 20))
 
-    _k6_chapter_header(elements, '1', 'Test Execution Summary')
-
     # ── 2. EXECUTIVE SUMMARY ────────────────────────────────────────────────
     elements.append(section_header('', 'Executive Summary', PURPLE_K6))
     elements.append(Spacer(1, 6))
@@ -5058,15 +4740,12 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
     elements.append(Spacer(1, 16))
 
     build_k6_score_hero(elements, k6_score, k6_score_color, tests, summary, url)
-
-    elements.append(PageBreak())
     build_k6_key_metrics_table(elements, tests, summary)
 
     # ── 3. PERFORMANCE TEST SCENARIOS ───────────────────────────────────────
     build_k6_scenarios(elements, tests, url)
 
     # ── 3.5. RESULTS BY TEST TYPE ────────────────────────────────────────────
-    elements.append(PageBreak())
     build_k6_category_summary(elements, tests, summary)
 
     # ── 4. DETAILED RESULTS BY TEST TYPE ────────────────────────────────────
@@ -5195,31 +4874,12 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
 
     elements.append(Spacer(1, 8))
 
-    _k6_chapter_header(elements, '2', 'Performance Analysis')
-
-    build_k6_comparison_charts(elements, summary, k6_score, k6_score_color)
-
     # ── Charts + AI insights (used by sections 5, 6, 8) ─────────────────────
     chart_insights = _call_groq_chart_insights(summary, tests)
     charts = _make_charts(summary, tests)
 
     # ── Action Plan via Groq (used by sections 11.5 and 12) ──────────────────
     action_plan = _call_groq_k6_plan(tests, url, summary)
-    if not action_plan:
-        action_plan = []
-        for tk in ('load', 'stress', 'spike', 'soak'):
-            if tk not in summary:
-                continue
-            tk_label = {'load': 'Load Test', 'stress': 'Stress Test', 'spike': 'Spike Test', 'soak': 'Soak Test'}[tk]
-            action_plan.append({
-                'scenario': f'Continuous Performance Monitoring — {tk_label}',
-                'category': 'Monitoring',
-                'priority': 'LOW',
-                'action': f'Track p95 and error rate for {tk_label} over time to catch regressions early.',
-                'responsible': 'DevOps',
-                'deadline': 'Next Sprint',
-                'status': 'To Do',
-            })
 
     def _center_img(img, total_width=168):
         t = Table([[img]], colWidths=[total_width*mm])
@@ -5250,11 +4910,11 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
             Paragraph(
                 f'<font color="#64748b" size="7.5"><i>{intro_text}</i></font>',
                 ParagraphStyle('ChartIntro', fontSize=7.5, fontName='Helvetica', leading=10)),
-            Spacer(1, 6),
+            Spacer(1, 8),
             _center_img(chart_img),
-            Spacer(1, 4),
+            Spacer(1, 6),
             _insight_box(chart_insights.get(insight_key, fallback_text), insight_color),
-            Spacer(1, 10),
+            Spacer(1, 20),
         ])
 
     # ── 5. RESPONSE TIME ANALYSIS ───────────────────────────────────────────
@@ -5262,14 +4922,14 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
         '', 'Response Time Analysis',
         'Response time at the 95th percentile for each test type — lower is better. '
         'Shows how the application responds under Load, Stress, Spike, and Soak conditions.',
-        charts[0], 'p95', '#6366f1', _k6_fallback_insight('p95', summary, tests)))
+        charts[0], 'p95', '#6366f1', 'Response time analysis unavailable.'))
 
     # ── 6. THROUGHPUT ANALYSIS ──────────────────────────────────────────────
     elements.append(_chart_section(
         '', 'Throughput Analysis',
         'Requests handled per second for each test type — higher is better. '
         'Indicates how much traffic the application can sustain under each load profile.',
-        charts[1], 'throughput', '#f59e0b', _k6_fallback_insight('throughput', summary, tests)))
+        charts[1], 'throughput', '#f59e0b', 'Throughput analysis unavailable.'))
 
     # ── 7. THRESHOLD VALIDATION ──────────────────────────────────────────────
     elements.append(section_header('', 'Threshold Validation', PURPLE_K6))
@@ -5362,9 +5022,7 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
         '', 'Pass / Fail Distribution',
         'Distribution of passed, warned, and failed checks for each test type — '
         'highlights which load profile needs the most attention.',
-        charts[3], 'breakdown', '#8b5cf6', _k6_fallback_insight('breakdown', summary, tests)))
-
-    _k6_chapter_header(elements, '3', 'Test Details')
+        charts[3], 'breakdown', '#8b5cf6', 'Breakdown analysis unavailable.'))
 
     # ── 9. EXECUTION ENVIRONMENT ─────────────────────────────────────────────
     build_k6_environment_info(elements, generation_data, summary)
@@ -5451,41 +5109,20 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
     rel_recs  = []
     ux_recs   = []
 
-    _PROFILE_REC = {
-        'load': {
-            'pass': lambda p95, d: (f'Load Test — response latency remained consistently below threshold '
-                                     f'throughout the {d}s execution, with a p95 of {p95}. No optimization is currently required.'),
-            'fail': lambda p95, d: (f'Load Test — p95 response time reached {p95} over {d}s, exceeding the '
-                                     f'configured threshold under baseline traffic. Investigate slow endpoints before scaling further.'),
-        },
-        'stress': {
-            'pass': lambda p95, d: (f'Stress Test — the application sustained peak concurrent users while '
-                                     f'maintaining a p95 response time of {p95} over {d}s with zero request failures, '
-                                     f'indicating efficient backend scaling. Continue monitoring this metric after major backend deployments.'),
-            'fail': lambda p95, d: (f'Stress Test — p95 response time degraded to {p95} under peak load ({d}s), '
-                                     f'signaling a scaling bottleneck. Profile backend resource usage under this concurrency level.'),
-        },
-        'spike': {
-            'pass': lambda p95, d: (f'Spike Test — the system absorbed a sudden traffic increase without '
-                                     f'response-time degradation (p95: {p95}). Current burst-handling capability appears stable; '
-                                     f'future tests with higher concurrency are recommended to validate scalability limits.'),
-            'fail': lambda p95, d: (f'Spike Test — response time spiked to {p95} during the burst, above the '
-                                     f'configured threshold. Consider autoscaling or rate-limiting to absorb sudden load increases.'),
-        },
-        'soak': {
-            'pass': lambda p95, d: (f'Soak Test — the application demonstrated stable long-duration execution '
-                                     f'({d}s) with a consistent p95 of {p95} and no reliability degradation observed.'),
-            'fail': lambda p95, d: (f'Soak Test — p95 response time drifted to {p95} over the {d}s sustained run, '
-                                     f'a pattern consistent with memory leaks or resource exhaustion. Investigate long-running resource usage.'),
-        },
-    }
     for type_key, type_data in summary.items():
         metrics  = type_data.get('metrics') or {}
-        p95      = metrics.get('http_req_duration_p95', 'N/A')
+        p95      = metrics.get('http_req_duration_p95', '')
+        cfg      = TYPE_CONFIG.get(type_key, {'label': type_key})
         status   = type_data.get('status', 'pass')
         duration = type_data.get('duration_seconds', '-')
-        template = _PROFILE_REC.get(type_key, _PROFILE_REC['load'])
-        perf_recs.append(template['fail' if status == 'fail' else 'pass'](p95, duration))
+        if status == 'fail':
+            perf_recs.append(
+                f'{cfg["label"]} exceeded its response-time threshold (p95: {p95}, duration: {duration}s). '
+                f'Investigate slow endpoints and review server-side timeout/threshold configuration for this profile.')
+        else:
+            perf_recs.append(
+                f'{cfg["label"]} completed in {duration}s with a p95 of {p95}, within the target range. '
+                f'No immediate action required — continue tracking this metric across future releases.')
     if not perf_recs:
         perf_recs.append('No performance data available. Check k6 output format.')
 
@@ -5520,8 +5157,6 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
         ux_recs.append(
             'No user-facing errors were observed during any of the tested load profiles. End users should '
             'experience consistent response times and no failed requests under traffic comparable to this test.')
-
-    _k6_chapter_header(elements, '4', 'AI Insights & Recommendations')
 
     # ── Quick-glance summary table ────────────────────────────────────────
     build_k6_recommendations_table(elements, perf_recs, rel_recs, ux_recs)
@@ -5573,11 +5208,8 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
     vt   = (f'k6 Performance Test FAILED — {fail_count} of {total} threshold(s) were exceeded. '
             f'Address the failing checks identified above before promoting this build to production.') if fail_count > 0 else \
            (f'k6 Performance Test PASSED — all {pass_count} threshold checks were met across every load '
-            f'profile ({profiles_run}). The evaluated application demonstrated excellent performance across '
-            f'all {len(summary)} k6 load profiles: response times remained well below configured limits, '
-            f'throughput stayed stable under increasing load, and no request failures were detected. These '
-            f'results indicate a robust and scalable backend architecture capable of sustaining concurrent '
-            f'traffic while maintaining consistent service quality.')
+            f'profile. The application demonstrates stable performance under the tested traffic patterns; '
+            f'no corrective action is required at this time.')
 
     final_tbl = Table([[Paragraph(
         f'<font color="{vc}" size="9"><b>{vi}  Final AI Verdict</b></font><br/>'
@@ -5606,8 +5238,6 @@ def _generate_k6_pdf(generation_data: dict, tests: list, summary: dict) -> bytes
 
     # ── EXECUTIVE SUMMARY ────────────────────────────────────────────────
     build_k6_executive_summary(elements, action_plan, k6_score, url)
-
-    _k6_chapter_header(elements, '5', 'Report Conclusion')
 
     # ── 12. CERTIFICATE OF PERFORMANCE ANALYSIS ─────────────────────────────
     elements.append(section_header('', 'Certificate of Performance Analysis', PURPLE_K6))
@@ -6832,7 +6462,7 @@ def _build_check_icon(size_mm, color_hex):
         fillColor=white, strokeColor=None,
     ))
     return dr
-def _build_certificate_card(perf_data: dict, url: str, title: str = "CERTIFICATE OF PERFORMANCE ANALYSIS"):
+def _build_certificate_card(perf_data: dict, url: str):
     """Certificat de performance — carte moderne, bordure colorée, badges."""
     score = perf_data.get('global_score', 0)
     grade, grade_color = _grade_from_score(score)
@@ -6845,9 +6475,9 @@ def _build_certificate_card(perf_data: dict, url: str, title: str = "CERTIFICATE
     icon_wrap.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER')]))
 
     eyebrow = Paragraph(
-    f'<font color="#94a3b8" size="7.5"><b>{title}</b></font>',
-    ParagraphStyle('CertEyebrow', fontSize=7.5, fontName='Helvetica-Bold',
-                    leading=10, alignment=TA_CENTER))
+        '<font color="#94a3b8" size="7.5"><b>CERTIFICATE OF PERFORMANCE ANALYSIS</b></font>',
+        ParagraphStyle('CertEyebrow', fontSize=7.5, fontName='Helvetica-Bold',
+                        leading=10, alignment=TA_CENTER))
 
     website_line = Paragraph(
         f'<font color="#1e293b" size="12"><b>{url}</b></font>',
@@ -6887,25 +6517,26 @@ def _build_certificate_card(perf_data: dict, url: str, title: str = "CERTIFICATE
         ('ROUNDEDCORNERS', [10, 10, 10, 10]),
     ]))
 
-    pills_row = Table([[grade_pill, '', label_pill]], colWidths=[28*mm, 8*mm, 34*mm])
+    pills_row = Table([[grade_pill, label_pill]], colWidths=[28*mm, 34*mm])
     pills_row.setStyle(TableStyle([
         ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
+        ('LEFTPADDING',  (1,0), (1,0),   6),
     ]))
     pills_wrap = Table([[pills_row]], colWidths=[168*mm])
     pills_wrap.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER')]))
 
     body = Table([
-        [Spacer(1, 10)],
+        [Spacer(1, 16)],
         [icon_wrap],
-        [Spacer(1, 6)],
-        [eyebrow],
-        [Spacer(1, 4)],
-        [website_line],
-        [Spacer(1, 8)],
-        [score_line],
-        [Spacer(1, 6)],
-        [pills_wrap],
         [Spacer(1, 10)],
+        [eyebrow],
+        [Spacer(1, 6)],
+        [website_line],
+        [Spacer(1, 12)],
+        [score_line],
+        [Spacer(1, 10)],
+        [pills_wrap],
+        [Spacer(1, 16)],
     ], colWidths=[168*mm])
     body.setStyle(TableStyle([
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
@@ -8062,6 +7693,13 @@ def _find_k6_test(tests, type_label, keyword):
     return None
  
  
+def _call_groq_k6_plan(tests, url, summary):
+    return []
+ 
+ 
+def _call_groq_chart_insights(summary, tests):
+    return {}
+ 
  
 _K6_TYPE_CONFIG_XLSX = {
     "load":   {"label": "Load Test",   "color": "6366F1"},
@@ -8079,263 +7717,16 @@ _K6_CHECK_PLAN_XLSX = [
     ("Max Virtual Users",      "Peak concurrent virtual users reached during the run",           "SCALABILITY", "MEDIUM"),
     ("k6 Checks Pass Rate",    "Percentage of k6 assertions (checks) that passed — must exceed 95%", "RELIABILITY", "HIGH"),
 ]
-
-from openpyxl.drawing.image import Image as XLImage
-
-def _k6_png_p95_chart(summary: dict) -> BytesIO:
-    import matplotlib.pyplot as plt
-    import numpy as np
-    TYPE_LABELS = ['Load', 'Stress', 'Spike', 'Soak']
-    TYPE_KEYS   = ['load', 'stress', 'spike', 'soak']
-    p95_vals = []
-    for k in TYPE_KEYS:
-        val = summary.get(k, {}).get('metrics', {}).get('http_req_duration_p95')
-        try:
-            ms = float(str(val).replace('ms', '').replace('s', '000').strip()) if val else 0
-        except Exception:
-            ms = 0
-        p95_vals.append(ms)
-    x_pos = np.arange(len(TYPE_LABELS))
-    plt.rcParams.update({'font.family': 'DejaVu Sans', 'axes.spines.top': False, 'axes.spines.right': False})
-    fig, ax = plt.subplots(figsize=(8, 3.2), facecolor='white')
-    ax.set_facecolor('#f8fafc')
-    ax.fill_between(x_pos, p95_vals, alpha=0.08, color='#6366f1', zorder=1)
-    ax.plot(x_pos, p95_vals, '-', color='#6366f1', linewidth=2.5, zorder=3)
-    for x, y in zip(x_pos, p95_vals):
-        ax.scatter(x, y, s=120, color='white', edgecolors='#6366f1', linewidth=2.5, zorder=5)
-        ax.scatter(x, y, s=30, color='#6366f1', zorder=6)
-        ax.annotate(f'{y:.0f}ms', (x, y), xytext=(0, 16), textcoords='offset points',
-                    ha='center', va='bottom', fontsize=8.5, fontweight='bold', color='#1e293b',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='#e2e8f0', linewidth=0.8))
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(TYPE_LABELS, fontsize=9, color='#475569', fontweight='bold')
-    ax.set_ylabel('Response Time (ms)', fontsize=8, color='#64748b')
-    ax.grid(axis='y', color='#f1f5f9', linewidth=1)
-    ax.set_ylim(bottom=0, top=max(p95_vals) * 1.35 if max(p95_vals) > 0 else 10)
-    fig.text(0.02, 0.97, 'p95 Response Time by Test Type', fontsize=11, fontweight='bold', color='#1e293b', va='top')
-    plt.subplots_adjust(top=0.85, bottom=0.15, left=0.08, right=0.97)
-    buf = BytesIO()
-    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close()
-    buf.seek(0)
-    return buf
-
-
-def _k6_png_throughput_chart(summary: dict) -> BytesIO:
-    import matplotlib.pyplot as plt
-    import numpy as np
-    TYPE_LABELS = ['Load', 'Stress', 'Spike', 'Soak']
-    TYPE_KEYS   = ['load', 'stress', 'spike', 'soak']
-    COLORS = ['#6366f1', '#ef4444', '#f59e0b', '#0ea5e9']
-    rps_vals = []
-    for k in TYPE_KEYS:
-        val = summary.get(k, {}).get('metrics', {}).get('http_reqs_per_second')
-        rps_vals.append(float(val) if val is not None else 0)
-    x_pos = np.arange(len(TYPE_LABELS))
-    plt.rcParams.update({'font.family': 'DejaVu Sans', 'axes.spines.top': False, 'axes.spines.right': False})
-    fig, ax = plt.subplots(figsize=(8, 3.2), facecolor='white')
-    ax.set_facecolor('#f8fafc')
-    bars = ax.bar(x_pos, rps_vals, width=0.55, color=COLORS, edgecolor='white', linewidth=1.5)
-    for bar, v in zip(bars, rps_vals):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(rps_vals)*0.02,
-                 f'{v:.1f}/s', ha='center', va='bottom', fontsize=9, fontweight='bold', color='#1e293b')
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(TYPE_LABELS, fontsize=9, color='#475569', fontweight='bold')
-    ax.set_ylabel('Requests / second', fontsize=8, color='#64748b')
-    ax.grid(axis='y', color='#f1f5f9', linewidth=1)
-    ax.set_ylim(bottom=0, top=max(rps_vals) * 1.3 if max(rps_vals) > 0 else 10)
-    fig.text(0.02, 0.97, 'Throughput (req/s) by Test Type', fontsize=11, fontweight='bold', color='#1e293b', va='top')
-    plt.subplots_adjust(top=0.85, bottom=0.15, left=0.08, right=0.97)
-    buf = BytesIO()
-    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close()
-    buf.seek(0)
-    return buf
-
-def _k6_png_error_rate_chart(summary: dict) -> BytesIO:
-    import matplotlib.pyplot as plt
-    import numpy as np
-    TYPE_LABELS = ['Load', 'Stress', 'Spike', 'Soak']
-    TYPE_KEYS   = ['load', 'stress', 'spike', 'soak']
-    COLORS = ['#6366f1', '#ef4444', '#f59e0b', '#0ea5e9']
-    err_vals = []
-    for k in TYPE_KEYS:
-        val = summary.get(k, {}).get('metrics', {}).get('http_req_failed_rate')
-        try:
-            err_vals.append(float(val) if val is not None else 0)
-        except Exception:
-            err_vals.append(0)
-    x_pos = np.arange(len(TYPE_LABELS))
-    plt.rcParams.update({'font.family': 'DejaVu Sans', 'axes.spines.top': False, 'axes.spines.right': False})
-    fig, ax = plt.subplots(figsize=(8, 3.2), facecolor='white')
-    ax.set_facecolor('#f8fafc')
-    bars = ax.bar(x_pos, err_vals, width=0.55, color=COLORS, edgecolor='white', linewidth=1.5)
-    top = max(err_vals + [1])
-    for bar, v in zip(bars, err_vals):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + top*0.03,
-                 f'{v:.2f}%', ha='center', va='bottom', fontsize=9, fontweight='bold', color='#1e293b')
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(TYPE_LABELS, fontsize=9, color='#475569', fontweight='bold')
-    ax.set_ylabel('Error Rate (%)', fontsize=8, color='#64748b')
-    ax.grid(axis='y', color='#f1f5f9', linewidth=1)
-    ax.set_ylim(bottom=0, top=top * 1.35)
-    fig.text(0.02, 0.97, 'Error Rate (%) by Test Type', fontsize=11, fontweight='bold', color='#1e293b', va='top')
-    plt.subplots_adjust(top=0.85, bottom=0.15, left=0.08, right=0.97)
-    buf = BytesIO()
-    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close()
-    buf.seek(0)
-    return buf
-
-
-def _k6_png_vus_chart(summary: dict) -> BytesIO:
-    import matplotlib.pyplot as plt
-    import numpy as np
-    TYPE_LABELS = ['Load', 'Stress', 'Spike', 'Soak']
-    TYPE_KEYS   = ['load', 'stress', 'spike', 'soak']
-    COLORS = ['#6366f1', '#ef4444', '#f59e0b', '#0ea5e9']
-    vus_vals = []
-    for k in TYPE_KEYS:
-        val = summary.get(k, {}).get('metrics', {}).get('vus_max')
-        try:
-            vus_vals.append(int(val) if val is not None else 0)
-        except Exception:
-            vus_vals.append(0)
-    x_pos = np.arange(len(TYPE_LABELS))
-    plt.rcParams.update({'font.family': 'DejaVu Sans', 'axes.spines.top': False, 'axes.spines.right': False})
-    fig, ax = plt.subplots(figsize=(8, 3.2), facecolor='white')
-    ax.set_facecolor('#f8fafc')
-    bars = ax.bar(x_pos, vus_vals, width=0.55, color=COLORS, edgecolor='white', linewidth=1.5)
-    top = max(vus_vals + [1])
-    for bar, v in zip(bars, vus_vals):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + top*0.02,
-                 f'{v}', ha='center', va='bottom', fontsize=9, fontweight='bold', color='#1e293b')
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(TYPE_LABELS, fontsize=9, color='#475569', fontweight='bold')
-    ax.set_ylabel('Max Virtual Users', fontsize=8, color='#64748b')
-    ax.grid(axis='y', color='#f1f5f9', linewidth=1)
-    ax.set_ylim(bottom=0, top=top * 1.3)
-    fig.text(0.02, 0.97, 'Maximum Virtual Users by Test Type', fontsize=11, fontweight='bold', color='#1e293b', va='top')
-    plt.subplots_adjust(top=0.85, bottom=0.15, left=0.08, right=0.97)
-    buf = BytesIO()
-    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close()
-    buf.seek(0)
-    return buf
-
-def _k6_png_breakdown_chart(tests: list) -> BytesIO:
-    import matplotlib.pyplot as plt
-    import numpy as np
-    TYPE_LABELS = ['Load', 'Stress', 'Spike', 'Soak']
-    TYPE_KEYS   = ['load', 'stress', 'spike', 'soak']
-    type_stats = {k: {'p': 0, 'f': 0, 's': 0} for k in TYPE_KEYS}
-    for t in tests:
-        name = t.get('name', '')
-        key = 'load'
-        if 'Stress' in name: key = 'stress'
-        elif 'Spike' in name: key = 'spike'
-        elif 'Soak' in name: key = 'soak'
-        s = t.get('status', 'skip')
-        if s == 'pass': type_stats[key]['p'] += 1
-        elif s == 'fail': type_stats[key]['f'] += 1
-        else: type_stats[key]['s'] += 1
-    x = np.arange(len(TYPE_LABELS))
-    w = 0.25
-    p_vals = [type_stats[k]['p'] for k in TYPE_KEYS]
-    s_vals = [type_stats[k]['s'] for k in TYPE_KEYS]
-    f_vals = [type_stats[k]['f'] for k in TYPE_KEYS]
-    plt.rcParams.update({'font.family': 'DejaVu Sans', 'axes.spines.top': False, 'axes.spines.right': False})
-    fig, ax = plt.subplots(figsize=(8, 3.2), facecolor='white')
-    ax.set_facecolor('#f8fafc')
-    ax.bar(x - w, p_vals, w, color='#10b981', label='Passed', edgecolor='white')
-    ax.bar(x,     s_vals, w, color='#f59e0b', label='Warn/Skip', edgecolor='white')
-    ax.bar(x + w, f_vals, w, color='#ef4444', label='Failed', edgecolor='white')
-    ax.set_xticks(x)
-    ax.set_xticklabels(TYPE_LABELS, fontsize=9, color='#475569', fontweight='bold')
-    ax.set_ylabel('Count', fontsize=8, color='#64748b')
-    ax.grid(axis='y', color='#f1f5f9', linewidth=1)
-    ax.legend(fontsize=7.5, frameon=True, loc='upper right')
-    fig.text(0.02, 0.97, 'Pass / Warn / Fail by Test Type', fontsize=11, fontweight='bold', color='#1e293b', va='top')
-    plt.subplots_adjust(top=0.85, bottom=0.15, left=0.08, right=0.97)
-    buf = BytesIO()
-    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close()
-    buf.seek(0)
-    return buf
-
-
-def _k6_png_score_gauge(score: int, color_hex: str) -> BytesIO:
-    import matplotlib.pyplot as plt
-    import numpy as np
-    fig = plt.figure(figsize=(3.2, 3.2), facecolor='white')
-    ax = fig.add_axes([0.05, 0.05, 0.9, 0.9], projection='polar')
-    ax.set_theta_zero_location('N')
-    ax.set_ylim(0, 1.3)
-    ax.axis('off')
-    start_angle = -np.pi * 0.75
-    total_angle = np.pi * 1.5
-    track_theta = np.linspace(start_angle, start_angle + total_angle, 200)
-    ax.plot(track_theta, [1]*200, color='#e2e8f0', linewidth=15, solid_capstyle='round')
-    score_angle = start_angle + total_angle * (max(0, min(100, score)) / 100)
-    fg_theta = np.linspace(start_angle, score_angle, 200)
-    ax.plot(fg_theta, [1]*200, color=color_hex, linewidth=15, solid_capstyle='round')
-    ax_text = fig.add_axes([0, 0, 1, 1])
-    ax_text.axis('off')
-    ax_text.set_xlim(0, 1); ax_text.set_ylim(0, 1)
-    ax_text.text(0.5, 0.52, f'{score}', ha='center', va='center', fontsize=32, fontweight='bold', color=color_hex)
-    ax_text.text(0.5, 0.38, '/ 100', ha='center', va='center', fontsize=11, color='#94a3b8')
-    buf = BytesIO()
-    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close(fig)
-    buf.seek(0)
-    return buf
-
-def _xlsx_section_header(ws, section_num: str, section_title: str, url: str = ""):
-    """Bandeau d'en-tête professionnel et cohérent — utilisé sur toutes les feuilles du rapport k6."""
-    PURPLE = "7D64FF"
-    ws.sheet_view.showGridLines = False
-
-    # IMPORTANT: on fusionne chaque ligne séparément (pas un bloc A1:J3) —
-    # sinon seule A1 reste écrivable et écrire dans A2/A3 lève
-    # "AttributeError: 'MergedCell' object attribute 'value' is read-only"
-    ws.merge_cells("A1:J1")
-    ws.merge_cells("A2:J2")
-    ws.merge_cells("A3:J3")
-    for r_ in range(1, 4):
-        for c_ in range(1, 11):
-            ws.cell(row=r_, column=c_).fill = PatternFill("solid", fgColor="0A0F1E")
-
-    brand = ws.cell(row=1, column=1, value="NEXTEST  —  k6 Performance Test Report")
-    brand.font = Font(name=_XLSX_FONT, bold=True, size=12, color="FFFFFF")
-    brand.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-
-    sec = ws.cell(row=2, column=1, value=f"{section_num}   {section_title}")
-    sec.font = Font(name=_XLSX_FONT, bold=True, size=16, color=PURPLE)
-    sec.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-
-    meta = f"Generated {datetime.now().strftime('%B %d, %Y  •  %H:%M')}"
-    if url:
-        meta = f"{url}   •   {meta}"
-    m = ws.cell(row=3, column=1, value=meta)
-    m.font = Font(name=_XLSX_FONT, italic=True, size=9, color="94A3B8")
-    m.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-
-    ws.row_dimensions[1].height = 18
-    ws.row_dimensions[2].height = 26
-    ws.row_dimensions[3].height = 16
-    ws.row_dimensions[4].height = 8
-
-    return 6  # première ligne libre pour le contenu
 def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes:
     url       = generation_data.get("url", "")
     framework = generation_data.get("framework", "k6")
-
+ 
     pass_count = sum(1 for t in tests if t.get("status") == "pass")
     fail_count = sum(1 for t in tests if t.get("status") == "fail")
     skip_count = sum(1 for t in tests if t.get("status") in ("skip", "warn"))
     total      = len(tests) or 1
     pass_rate  = round(pass_count / total * 100)
-
+ 
     k6_score = pass_rate
     if fail_count:
         k6_score = max(0, k6_score - fail_count * 8)
@@ -8343,13 +7734,10 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
     score_color = "10B981" if k6_score >= 80 else "F59E0B" if k6_score >= 50 else "EF4444"
     rate_color  = "10B981" if pass_rate >= 80 else "F59E0B" if pass_rate >= 50 else "EF4444"
     score_label = _k6_score_label(k6_score)
-    quality_score = k6_score
-    risk = "LOW" if quality_score >= 80 else "MEDIUM" if quality_score >= 60 else "HIGH"
-    risk_color = "10B981" if risk == "LOW" else "F59E0B" if risk == "MEDIUM" else "EF4444"
-
+ 
     TYPE_ORDER = ["load", "stress", "spike", "soak"]
     profiles_run = ", ".join(_K6_TYPE_CONFIG_XLSX[k]["label"] for k in TYPE_ORDER if k in summary)
-
+ 
     def _parse_ms(val):
         try:
             s = str(val).replace("ms", "").strip()
@@ -8358,7 +7746,7 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             return float(s) if val not in (None, "") else 0
         except Exception:
             return 0
-
+ 
     def _metric_display(metrics, key, suffix="", digits=1, default="N/A"):
         v = metrics.get(key)
         if v is None:
@@ -8366,7 +7754,7 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         if isinstance(v, (int, float)):
             return f"{v:.{digits}f}{suffix}"
         return f"{v}{suffix}"
-
+ 
     # ── Recommendations text (same logic as PDF) ────────────────────────────
     perf_recs, rel_recs, ux_recs = [], [], []
     for tk in TYPE_ORDER:
@@ -8388,7 +7776,7 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
                 f'No immediate action required — continue tracking this metric across future releases.')
     if not perf_recs:
         perf_recs.append("No performance data available. Check k6 output format.")
-
+ 
     failed_tests = [t for t in tests if t.get("status") == "fail"]
     if failed_tests:
         for t in failed_tests[:3]:
@@ -8401,7 +7789,7 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
     skip_tests = [t for t in tests if t.get("status") not in ("pass", "fail")]
     if skip_tests:
         rel_recs.append(f"{len(skip_tests)} test(s) warn/skip — verify k6 metric output format.")
-
+ 
     for tk in TYPE_ORDER:
         if tk not in summary:
             continue
@@ -8419,58 +7807,64 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         ux_recs.append(
             "No user-facing errors were observed during any of the tested load profiles. End users should "
             "experience consistent response times and no failed requests under traffic comparable to this test.")
-
-    verdict_pass = fail_count == 0
-    verdict_text = (
-        f"k6 Performance Test PASSED — all {pass_count} threshold checks were met across every load profile "
-        f"({profiles_run}). Response times remained well below configured limits, throughput stayed stable "
-        f"under increasing load, and no request failures were detected. These results indicate a robust and "
-        f"scalable backend architecture capable of sustaining concurrent traffic while maintaining consistent "
-        f"service quality."
-        if verdict_pass else
-        f"k6 Performance Test FAILED — {fail_count} of {total} threshold(s) were exceeded. Address the "
-        f"failing checks identified in this report before promoting this build to production."
-    )
-
-    action_plan = _call_groq_k6_plan(tests, url, summary)
-    if not action_plan:
-        action_plan = []
-        for tk in ('load', 'stress', 'spike', 'soak'):
-            if tk not in summary:
-                continue
-            tk_label = {'load': 'Load Test', 'stress': 'Stress Test', 'spike': 'Spike Test', 'soak': 'Soak Test'}[tk]
-            action_plan.append({
-                'scenario': f'Continuous Performance Monitoring — {tk_label}',
-                'category': 'Monitoring',
-                'priority': 'LOW',
-                'action': f'Track p95 and error rate for {tk_label} over time to catch regressions early.',
-                'responsible': 'DevOps',
-                'deadline': 'Next Sprint',
-                'status': 'To Do',
-            })
+ 
+    action_plan    = _call_groq_k6_plan(tests, url, summary)
     chart_insights = _call_groq_chart_insights(summary, tests)
-
+ 
     wb = Workbook()
+ 
     STATUS_COLOR = {"pass": ("10B981", "D1FAE5"), "fail": ("EF4444", "FEE2E2"), "skip": ("F59E0B", "FFFBEB")}
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 01_Executive_Summary — Overall score, Pass rate, KPIs, Executive summary
-    # ═══════════════════════════════════════════════════════════════════════
-    ws1 = wb.active
-    ws1.title = "01_Executive_Summary"
-    r = _xlsx_section_header(ws1, "01", "Executive Summary", url)
-
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 1 — Overview (cover + executive summary intro + stats + score)
+    # ══════════════════════════════════════════════════════════════════════
+    ws = wb.active
+    ws.title = "Overview"
+    ws.sheet_view.showGridLines = False
+ 
+    ws.merge_cells("A1:H3")
+    for r_ in range(1, 4):
+        for c_ in range(1, 9):
+            ws.cell(row=r_, column=c_).fill = PatternFill("solid", fgColor="0A0F1E")
+    ws["A1"] = "NEXTEST — k6 Performance Test Report"
+    ws["A1"].font = Font(name=_XLSX_FONT, bold=True, size=20, color="7D64FF")
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
+ 
+    ws.merge_cells("A4:H4")
+    ws["A4"] = f'Generated {datetime.now().strftime("%B %d, %Y  •  %H:%M")}'
+    ws["A4"].font = Font(name=_XLSX_FONT, italic=True, size=9, color="64748B")
+ 
+    info_rows = [
+        ("URL", url),
+        ("Framework", "k6 Load Testing"),
+        ("Test Type", "Performance Test"),
+        ("Test Profiles", profiles_run or "N/A"),
+        ("Generated", datetime.now().strftime("%Y-%m-%d %H:%M")),
+    ]
+    r = 6
+    for lbl, val in info_rows:
+        lc = ws.cell(row=r, column=1, value=lbl)
+        lc.font = Font(name=_XLSX_FONT, bold=True, color="64748B", size=9)
+        lc.fill = PatternFill("solid", fgColor="F8FAFC")
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=6)
+        vc = ws.cell(row=r, column=2, value=val)
+        vc.font = Font(name=_XLSX_FONT, size=10, color="1E293B")
+        for col in range(1, 7):
+            ws.cell(row=r, column=col).border = _XLSX_BORDER
+        r += 1
+ 
+    r += 1
     exec_intro = (
         f'This k6 performance audit exercised {url} across {profiles_run} load profiles, executing '
         f'{total} threshold checks with {fail_count} failure(s). '
         + ('Response time, throughput, and error-rate metrics all remained within their target '
            'thresholds, confirming that the application handles the tested traffic patterns without '
            'degradation.' if fail_count == 0 else
-           'Review the failing checks in this report before promoting this build to production.')
+           'Review the failing checks below before promoting this build to production.')
     )
-    r = _add_wrapped_text(ws1, r, exec_intro, Font(name=_XLSX_FONT, size=9, color="475569"), end_col=8)
+    r = _add_wrapped_text(ws, r, exec_intro, Font(name=_XLSX_FONT, size=9, color="475569"), end_col=8)
     r += 1
-
+ 
     stats = [
         ("PASSED", pass_count, "10B981", "D1FAE5"),
         ("FAILED", fail_count, "EF4444", "FEE2E2"),
@@ -8481,59 +7875,38 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
     ]
     col = 1
     for lbl, val, color, bg in stats:
-        c1 = ws1.cell(row=r, column=col, value=val)
+        c1 = ws.cell(row=r, column=col, value=val)
         c1.font = Font(name=_XLSX_FONT, bold=True, size=18, color=color)
         c1.alignment = Alignment(horizontal="center", vertical="center")
         c1.fill = PatternFill("solid", fgColor=bg)
         c1.border = _XLSX_BORDER
-        c2 = ws1.cell(row=r + 1, column=col, value=lbl)
+        c2 = ws.cell(row=r + 1, column=col, value=lbl)
         c2.font = Font(name=_XLSX_FONT, bold=True, size=8, color="64748B")
         c2.alignment = Alignment(horizontal="center", vertical="center")
         c2.fill = PatternFill("solid", fgColor=bg)
         c2.border = _XLSX_BORDER
         col += 1
-    ws1.row_dimensions[r].height = 22
-    ws1.row_dimensions[r + 1].height = 18
+    ws.row_dimensions[r].height = 22
+    ws.row_dimensions[r + 1].height = 18
     r += 3
-
-    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
-    c = ws1.cell(row=r, column=1,
+ 
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    c = ws.cell(row=r, column=1,
                 value="Pass Rate reflects the raw proportion of threshold checks that succeeded, while the "
                       "Performance Score applies severity weighting to failed checks and response-time degradation.")
     c.font = Font(name=_XLSX_FONT, italic=True, size=8, color="94A3B8")
     c.alignment = Alignment(wrap_text=True, vertical="top")
     r += 2
-
-    ws1.cell(row=r, column=1, value="Performance Score").font = Font(
+ 
+    ws.cell(row=r, column=1, value="Performance Score").font = Font(
         name=_XLSX_FONT, bold=True, size=12, color="1E293B")
     r += 1
     score_box_start = r
-
-    # ── Top accent bar ──
-    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
-    for col_ in range(1, 9):
-        ws1.cell(row=r, column=col_).fill = PatternFill("solid", fgColor=score_color)
-    ws1.row_dimensions[r].height = 5
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    c = ws.cell(row=r, column=1, value=f"{k6_score}/100  —  {score_label.upper()}")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=16, color=score_color)
     r += 1
-
-    # ── Big centered score ──
-    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
-    c = ws1.cell(row=r, column=1, value=f"{k6_score}/100")
-    c.font = Font(name=_XLSX_FONT, bold=True, size=26, color=score_color)
-    c.alignment = Alignment(horizontal="center", vertical="center")
-    ws1.row_dimensions[r].height = 34
-    r += 1
-
-    # ── Label pill ──
-    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
-    c = ws1.cell(row=r, column=1, value=score_label.upper())
-    c.font = Font(name=_XLSX_FONT, bold=True, size=13, color=score_color)
-    c.alignment = Alignment(horizontal="center", vertical="center")
-    r += 1
-
-    ws1.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
-    r += 1  # spacer row inside the card
-
+ 
     if fail_count == 0:
         analysis_text = (
             f'{url} successfully met all {total} performance thresholds across the {profiles_run} '
@@ -8545,70 +7918,31 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             f'{url} did not meet {fail_count} of {total} performance thresholds across the '
             f'{profiles_run} load profiles. Review the failing checks in this report before '
             f'promoting this build to production.')
-
-    text_start_row = r
-    r = _add_wrapped_text(ws1, r, analysis_text, Font(name=_XLSX_FONT, size=9, color="475569"),
-                           fill="F8FAFC", end_col=8)
-    score_box_end = r - 1  # no more artificial padding here — box hugs the real content
-
-    # ── Fill the whole card with a soft background, then draw a clean outer border ──
-    for row_ in range(score_box_start + 1, score_box_end + 1):
-        for col_ in range(1, 9):
-            cell = ws1.cell(row=row_, column=col_)
-            if cell.fill.fgColor.rgb in (None, "00000000"):
-                cell.fill = PatternFill("solid", fgColor="F8FAFC")
-
-    thin = Side(style="thin", color=score_color)
-    for col_ in range(1, 9):
-        top = ws1.cell(row=score_box_start, column=col_)
-        bottom = ws1.cell(row=score_box_end, column=col_)
-        top.border = Border(top=thin, left=top.border.left, right=top.border.right)
-        bottom.border = Border(bottom=thin, left=bottom.border.left, right=bottom.border.right)
+    r = _add_wrapped_text(ws, r, analysis_text, Font(name=_XLSX_FONT, size=9, color="475569"), fill="F8FAFC", end_col=8)
+    score_box_end = r - 1
+ 
     for row_ in range(score_box_start, score_box_end + 1):
-        left = ws1.cell(row=row_, column=1)
-        right = ws1.cell(row=row_, column=8)
-        left.border = Border(left=thin, top=left.border.top, bottom=left.border.bottom)
-        right.border = Border(right=thin, top=right.border.top, bottom=right.border.bottom)
-
-    _perf_xlsx_autofit(ws1, [20, 22, 14, 14, 14, 14, 14, 14])
-    ws1.freeze_panes = "A6"
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 02_Overview — General report information, Test metadata
-    # ═══════════════════════════════════════════════════════════════════════
-    ws2 = wb.create_sheet("02_Overview")
-    r = _xlsx_section_header(ws2, "02", "Overview", url)
-
-    info_rows = [
-        ("URL", url),
-        ("Framework", "k6 Load Testing"),
-        ("Test Type", "Performance Test"),
-        ("Test Profiles", profiles_run or "N/A"),
-        ("Total Checks Executed", total),
-        ("Generated", datetime.now().strftime("%Y-%m-%d %H:%M")),
-    ]
-    for lbl, val in info_rows:
-        lc = ws2.cell(row=r, column=1, value=lbl)
-        lc.font = Font(name=_XLSX_FONT, bold=True, color="64748B", size=9)
-        lc.fill = PatternFill("solid", fgColor="F8FAFC")
-        ws2.merge_cells(start_row=r, start_column=2, end_row=r, end_column=6)
-        vc = ws2.cell(row=r, column=2, value=val)
-        vc.font = Font(name=_XLSX_FONT, size=10, color="1E293B")
-        for col in range(1, 7):
-            ws2.cell(row=r, column=col).border = _XLSX_BORDER
-        r += 1
-    _perf_xlsx_autofit(ws2, [22, 24, 14, 14, 14, 14])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 03_Key_Metrics
-    # ═══════════════════════════════════════════════════════════════════════
-    ws3 = wb.create_sheet("03_Key_Metrics")
-    r = _xlsx_section_header(ws3, "03", "Key Metrics", url)
-    hdr_row = r
-    _perf_xlsx_header_row(ws3, r, ["Test Type", "Metric", "Value", "Status"])
-    ws3.freeze_panes = f"A{hdr_row + 1}"
-    r += 1
-
+        for col_ in range(1, 9):
+            cell = ws.cell(row=row_, column=col_)
+            cell.border = Border(
+                left=Side(style="thin", color=score_color),
+                right=Side(style="thin", color=score_color),
+                top=Side(style="thin", color=score_color),
+                bottom=Side(style="thin", color=score_color),
+            )
+ 
+    _perf_xlsx_autofit(ws, [20, 22, 14, 14, 14, 14, 14, 14])
+    ws.freeze_panes = "A6"
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 2 — Key Metrics (quick-glance table, matches PDF exactly)
+    # ══════════════════════════════════════════════════════════════════════
+    ws2 = wb.create_sheet("Key Metrics")
+    ws2.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws2, 1, ["Test Type", "Metric", "Value", "Status"])
+    ws2.freeze_panes = "A2"
+ 
+    row = 2
     for tk in TYPE_ORDER:
         if tk not in summary:
             continue
@@ -8625,28 +7959,28 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             sc, bg = STATUS_COLOR.get(status, ("94A3B8", "FFFFFF"))
             vals = [cfg["label"], label, value, (status or "N/A").upper()]
             for col_i, v in enumerate(vals, start=1):
-                c = ws3.cell(row=r, column=col_i, value=v)
+                c = ws2.cell(row=row, column=col_i, value=v)
                 c.font = Font(name=_XLSX_FONT, size=9, bold=(col_i in (1, 4)),
                               color=(cfg["color"] if col_i == 1 else sc if col_i == 4 else "1E293B"))
                 c.alignment = Alignment(horizontal="center" if col_i in (3, 4) else "left", vertical="center")
                 c.border = _XLSX_BORDER
                 if col_i == 4:
                     c.fill = PatternFill("solid", fgColor=bg)
-            r += 1
-    _perf_xlsx_autofit(ws3, [18, 22, 16, 12])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 04_Test_Scenarios
-    # ═══════════════════════════════════════════════════════════════════════
-    ws4 = wb.create_sheet("04_Test_Scenarios")
-    r = _xlsx_section_header(ws4, "04", "Test Scenarios", url)
-    hdr_row = r
-    _perf_xlsx_header_row(ws4, r, ["Test Type", "#", "Scenario", "Category", "Priority", "Tested"])
-    ws4.freeze_panes = f"A{hdr_row + 1}"
-    r += 1
-
+            row += 1
+    _perf_xlsx_title(ws2, "🔑  KEY METRICS", "7D64FF")
+    _perf_xlsx_autofit(ws2, [18, 22, 16, 12])
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 3 — Test Scenarios (44-row planned test plan)
+    # ══════════════════════════════════════════════════════════════════════
+    ws3 = wb.create_sheet("Test Scenarios")
+    ws3.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws3, 1, ["Test Type", "#", "Scenario", "Category", "Priority", "Tested"])
+    ws3.freeze_panes = "A2"
+ 
     CAT_COLOR = {"PERFORMANCE": "6366F1", "RELIABILITY": "EF4444", "SCALABILITY": "0EA5E9"}
     PRI_COLOR = {"HIGH": "EF4444", "MEDIUM": "F59E0B", "LOW": "10B981"}
+    row = 2
     for tk in TYPE_ORDER:
         if tk not in summary:
             continue
@@ -8656,7 +7990,7 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             was_tested = any(title in t.get("name", "") for t in group_tests)
             vals = [cfg["label"], i, f"{title} — {desc}", cat, pri, "Yes" if was_tested else "No"]
             for col_i, v in enumerate(vals, start=1):
-                c = ws4.cell(row=r, column=col_i, value=v)
+                c = ws3.cell(row=row, column=col_i, value=v)
                 c.font = Font(name=_XLSX_FONT, size=9,
                               color=(cfg["color"] if col_i == 1 else
                                      CAT_COLOR.get(cat, "64748B") if col_i == 4 else
@@ -8666,20 +8000,24 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
                 c.alignment = Alignment(horizontal="center" if col_i in (2, 4, 5, 6) else "left",
                                          vertical="top", wrap_text=(col_i == 3))
                 c.border = _XLSX_BORDER
-            ws4.row_dimensions[r].height = 24
-            r += 1
-    _perf_xlsx_autofit(ws4, [16, 5, 55, 16, 12, 10])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 05_Results_by_Test_Type — Load / Stress / Spike / Soak
-    # ═══════════════════════════════════════════════════════════════════════
-    ws5 = wb.create_sheet("05_Results_by_Test_Type")
-    r = _xlsx_section_header(ws5, "05", "Results by Test Type", url)
-
-    type_hdr_row = r
-    _perf_xlsx_header_row(ws5, r, ["Test Type", "Total", "Passed", "Failed", "Pass Rate", "Duration (s)", "Status"])
-    r += 1
-
+            ws3.row_dimensions[row].height = 24
+            row += 1
+    _perf_xlsx_title(ws3, "🎯  k6 PERFORMANCE TEST SCENARIOS", "7D64FF")
+    _perf_xlsx_autofit(ws3, [16, 5, 55, 16, 12, 10])
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 4 — Results by Test Type (summary table+chart, then full metric
+    #            cards per type — matches PDF "Results by Test Type" +
+    #            "Detailed Results by Test Type" sections)
+    # ══════════════════════════════════════════════════════════════════════
+    ws4 = wb.create_sheet("Results by Test Type")
+    ws4.sheet_view.showGridLines = False
+ 
+    ws4.cell(row=1, column=1, value="Results by Test Type").font = Font(
+        name=_XLSX_FONT, bold=True, size=13, color="1E293B")
+    type_hdr_row = 3
+    _perf_xlsx_header_row(ws4, type_hdr_row, ["Test Type", "Total", "Passed", "Failed", "Pass Rate", "Duration (s)", "Status"])
+ 
     type_stats = {}
     for t in tests:
         name = t.get("name", "")
@@ -8694,7 +8032,8 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         if s == "pass": type_stats[tk]["pass"] += 1
         elif s == "fail": type_stats[tk]["fail"] += 1
         else: type_stats[tk]["skip"] += 1
-
+ 
+    r = type_hdr_row + 1
     for tk in TYPE_ORDER:
         if tk not in type_stats and tk not in summary:
             continue
@@ -8707,7 +8046,7 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {"label": tk, "color": "64748B"})
         vals = [cfg["label"], d["total"], d["pass"], d["fail"], f"{rate}%", duration, verdict]
         for i, v in enumerate(vals, start=1):
-            cell = ws5.cell(row=r, column=i, value=v)
+            cell = ws4.cell(row=r, column=i, value=v)
             cell.font = Font(name=_XLSX_FONT, size=9, bold=(i in (1, 7)),
                               color=(cfg["color"] if i == 1 else
                                      ("EF4444" if (i == 7 and verdict == "FAIL") else
@@ -8717,15 +8056,15 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             cell.border = _XLSX_BORDER
         r += 1
     type_chart_end = r - 1
-
+ 
     if type_chart_end >= type_hdr_row + 1:
         chart = BarChart()
         chart.type = "col"
         chart.title = "Pass / Fail by Test Type"
         chart.y_axis.title = "Checks"
-        cats_ref = Reference(ws5, min_col=1, min_row=type_hdr_row + 1, max_row=type_chart_end)
-        pass_ref = Reference(ws5, min_col=3, min_row=type_hdr_row, max_row=type_chart_end)
-        fail_ref = Reference(ws5, min_col=4, min_row=type_hdr_row, max_row=type_chart_end)
+        cats_ref = Reference(ws4, min_col=1, min_row=type_hdr_row + 1, max_row=type_chart_end)
+        pass_ref = Reference(ws4, min_col=3, min_row=type_hdr_row, max_row=type_chart_end)
+        fail_ref = Reference(ws4, min_col=4, min_row=type_hdr_row, max_row=type_chart_end)
         chart.add_data(pass_ref, titles_from_data=True)
         chart.add_data(fail_ref, titles_from_data=True)
         chart.set_categories(cats_ref)
@@ -8733,13 +8072,13 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         chart.series[1].graphicalProperties.solidFill = "EF4444"
         chart.width = 16
         chart.height = 8
-        ws5.add_chart(chart, f"I{type_hdr_row}")
-
+        ws4.add_chart(chart, f"I{type_hdr_row}")
+ 
     r += 2
-    ws5.cell(row=r, column=1, value="Detailed Metrics by Test Type").font = Font(
+    ws4.cell(row=r, column=1, value="Detailed Metrics by Test Type").font = Font(
         name=_XLSX_FONT, bold=True, size=13, color="1E293B")
     r += 2
-
+ 
     for tk in TYPE_ORDER:
         if tk not in summary:
             continue
@@ -8748,15 +8087,16 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         metrics = type_data.get("metrics") or {}
         duration = type_data.get("duration_seconds", "-")
         status = type_data.get("status", "pass")
-
-        ws5.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-        c = ws5.cell(row=r, column=1, value=f'{cfg["label"]}  —  Duration: {duration}s  —  {status.upper()}')
+ 
+        ws4.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+        c = ws4.cell(row=r, column=1,
+                      value=f'{cfg["label"]}  —  Duration: {duration}s  —  {status.upper()}')
         c.font = Font(name=_XLSX_FONT, bold=True, size=11, color=cfg["color"])
         c.fill = PatternFill("solid", fgColor="F8FAFC")
         for col_i in range(1, 8):
-            ws5.cell(row=r, column=col_i).border = _XLSX_BORDER
+            ws4.cell(row=r, column=col_i).border = _XLSX_BORDER
         r += 1
-
+ 
         metric_pairs = [
             ("p95 Response", metrics.get("http_req_duration_p95", "N/A")),
             ("Avg Response", metrics.get("http_req_duration_avg", "N/A")),
@@ -8771,45 +8111,48 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             chunk = metric_pairs[j:j + 4]
             for k, (label, value) in enumerate(chunk):
                 col_i = k * 2 + 1
-                lc = ws5.cell(row=r, column=col_i, value=label)
+                lc = ws4.cell(row=r, column=col_i, value=label)
                 lc.font = Font(name=_XLSX_FONT, size=8, color="94A3B8")
                 lc.border = _XLSX_BORDER
-                vc = ws5.cell(row=r, column=col_i + 1, value=value)
+                vc = ws4.cell(row=r, column=col_i + 1, value=value)
                 vc.font = Font(name=_XLSX_FONT, size=9, bold=True, color="1E293B")
                 vc.border = _XLSX_BORDER
             r += 1
-
+ 
         th_passes = type_data.get("threshold_passes", [])
         th_failures = type_data.get("threshold_failures", [])
         for th in th_passes:
-            ws5.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-            c = ws5.cell(row=r, column=1, value=f"✓ {th}")
+            ws4.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+            c = ws4.cell(row=r, column=1, value=f"✓ {th}")
             c.font = Font(name=_XLSX_FONT, size=8, color="10B981")
             for col_i in range(1, 8):
-                ws5.cell(row=r, column=col_i).border = _XLSX_BORDER
+                ws4.cell(row=r, column=col_i).border = _XLSX_BORDER
             r += 1
         for th in th_failures:
-            ws5.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-            c = ws5.cell(row=r, column=1, value=f"✗ {th}")
+            ws4.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+            c = ws4.cell(row=r, column=1, value=f"✗ {th}")
             c.font = Font(name=_XLSX_FONT, size=8, color="EF4444")
             for col_i in range(1, 8):
-                ws5.cell(row=r, column=col_i).border = _XLSX_BORDER
+                ws4.cell(row=r, column=col_i).border = _XLSX_BORDER
             r += 1
         r += 1
-
-    _perf_xlsx_autofit(ws5, [18, 14, 14, 14, 14, 14, 14])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 06_Performance_Analysis — charts, visual analysis, comparison graphs
-    # ═══════════════════════════════════════════════════════════════════════
-    ws6 = wb.create_sheet("06_Performance_Analysis")
-    r = _xlsx_section_header(ws6, "06", "Performance Analysis", url)
-
-    ws6.cell(row=r, column=1, value="p95 Response Time by Test Type").font = Font(
+ 
+    _perf_xlsx_autofit(ws4, [18, 14, 14, 14, 14, 14, 14])
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 5 — Charts & Analysis (p95, throughput, pass/fail — all 3 real
+    #            charts together, each with its AI Analysis directly below)
+    # ══════════════════════════════════════════════════════════════════════
+    ws5 = wb.create_sheet("Charts & Analysis")
+    ws5.sheet_view.showGridLines = False
+ 
+    r = 1
+    # ── p95 Response Time ───────────────────────────────────────────────────
+    ws5.cell(row=r, column=1, value="p95 Response Time by Test Type").font = Font(
         name=_XLSX_FONT, bold=True, size=12, color="1E293B")
     r += 1
     p95_hdr_row = r
-    _perf_xlsx_header_row(ws6, r, ["Test Type", "p95 (ms)"])
+    _perf_xlsx_header_row(ws5, r, ["Test Type", "p95 (ms)"])
     r += 1
     p95_vals = {}
     for tk in TYPE_ORDER:
@@ -8819,19 +8162,30 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         ms = _parse_ms(metrics.get("http_req_duration_p95"))
         p95_vals[tk] = ms
         cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {"label": tk, "color": "64748B"})
-        c1 = ws6.cell(row=r, column=1, value=cfg["label"])
+        c1 = ws5.cell(row=r, column=1, value=cfg["label"])
         c1.font = Font(name=_XLSX_FONT, bold=True, size=9, color=cfg["color"])
         c1.border = _XLSX_BORDER
-        c2 = ws6.cell(row=r, column=2, value=round(ms, 1))
+        c2 = ws5.cell(row=r, column=2, value=round(ms, 1))
         c2.font = Font(name=_XLSX_FONT, size=9, color="1E293B")
         c2.alignment = Alignment(horizontal="center")
         c2.border = _XLSX_BORDER
         r += 1
-    img_buf = _k6_png_p95_chart(summary)
-    xl_img = XLImage(img_buf)
-    xl_img.width, xl_img.height = 560, 220
-    ws6.add_image(xl_img, f"D{p95_hdr_row}")
-    r = max(r, p95_hdr_row + 14)
+    p95_end_row = r - 1
+ 
+    if p95_end_row >= p95_hdr_row + 1:
+        line_chart = LineChart()
+        line_chart.title = "p95 Response Time by Test Type"
+        line_chart.y_axis.title = "Response Time (ms)"
+        cats_ref = Reference(ws5, min_col=1, min_row=p95_hdr_row + 1, max_row=p95_end_row)
+        data_ref = Reference(ws5, min_col=2, min_row=p95_hdr_row, max_row=p95_end_row)
+        line_chart.add_data(data_ref, titles_from_data=True)
+        line_chart.set_categories(cats_ref)
+        line_chart.series[0].graphicalProperties.line.solidFill = "6366F1"
+        line_chart.series[0].graphicalProperties.line.width = 25000
+        line_chart.width = 16
+        line_chart.height = 8
+        ws5.add_chart(line_chart, f"D{p95_hdr_row}")
+ 
     r += 1
     if p95_vals:
         fastest = min(p95_vals, key=p95_vals.get)
@@ -8840,16 +8194,17 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             f'{_K6_TYPE_CONFIG_XLSX[fastest]["label"]} is the fastest profile at {p95_vals[fastest]:.1f}ms p95, '
             f'while {_K6_TYPE_CONFIG_XLSX[slowest]["label"]} is the slowest at {p95_vals[slowest]:.1f}ms p95, '
             f'both within their configured thresholds.')
-        r = _add_wrapped_text(ws6, r, f"AI Analysis: {p95_insight}",
+        r = _add_wrapped_text(ws5, r, f"AI Analysis: {p95_insight}",
                                Font(name=_XLSX_FONT, size=9, italic=True, color="6366F1"),
                                fill="F8FAFC", end_col=8)
     r += 2
-
-    ws6.cell(row=r, column=1, value="Throughput (req/s) by Test Type").font = Font(
+ 
+    # ── Throughput ───────────────────────────────────────────────────────────
+    ws5.cell(row=r, column=1, value="Throughput (req/s) by Test Type").font = Font(
         name=_XLSX_FONT, bold=True, size=12, color="1E293B")
     r += 1
     thr_hdr_row = r
-    _perf_xlsx_header_row(ws6, r, ["Test Type", "Throughput (req/s)"])
+    _perf_xlsx_header_row(ws5, r, ["Test Type", "Throughput (req/s)"])
     r += 1
     thr_vals = {}
     for tk in TYPE_ORDER:
@@ -8862,35 +8217,47 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             rps = 0
         thr_vals[tk] = rps
         cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {"label": tk, "color": "64748B"})
-        c1 = ws6.cell(row=r, column=1, value=cfg["label"])
+        c1 = ws5.cell(row=r, column=1, value=cfg["label"])
         c1.font = Font(name=_XLSX_FONT, bold=True, size=9, color=cfg["color"])
         c1.border = _XLSX_BORDER
-        c2 = ws6.cell(row=r, column=2, value=round(rps, 1))
+        c2 = ws5.cell(row=r, column=2, value=round(rps, 1))
         c2.font = Font(name=_XLSX_FONT, size=9, color="1E293B")
         c2.alignment = Alignment(horizontal="center")
         c2.border = _XLSX_BORDER
         r += 1
-    img_buf = _k6_png_throughput_chart(summary)
-    xl_img = XLImage(img_buf)
-    xl_img.width, xl_img.height = 560, 220
-    ws6.add_image(xl_img, f"D{thr_hdr_row}")
-    r = max(r, thr_hdr_row + 14)
+    thr_end_row = r - 1
+ 
+    if thr_end_row >= thr_hdr_row + 1:
+        bar_chart = BarChart()
+        bar_chart.type = "col"
+        bar_chart.title = "Throughput (req/s) by Test Type"
+        bar_chart.y_axis.title = "Requests / second"
+        cats_ref = Reference(ws5, min_col=1, min_row=thr_hdr_row + 1, max_row=thr_end_row)
+        data_ref = Reference(ws5, min_col=2, min_row=thr_hdr_row, max_row=thr_end_row)
+        bar_chart.add_data(data_ref, titles_from_data=True)
+        bar_chart.set_categories(cats_ref)
+        bar_chart.series[0].graphicalProperties.solidFill = "F59E0B"
+        bar_chart.width = 16
+        bar_chart.height = 8
+        ws5.add_chart(bar_chart, f"D{thr_hdr_row}")
+ 
     r += 1
     if thr_vals:
         highest = max(thr_vals, key=thr_vals.get)
         thr_insight = chart_insights.get("throughput") or (
             f'{_K6_TYPE_CONFIG_XLSX[highest]["label"]} sustains the highest throughput at '
             f'{thr_vals[highest]:.1f} req/s, showing the application\'s capacity under that load pattern.')
-        r = _add_wrapped_text(ws6, r, f"AI Analysis: {thr_insight}",
+        r = _add_wrapped_text(ws5, r, f"AI Analysis: {thr_insight}",
                                Font(name=_XLSX_FONT, size=9, italic=True, color="F59E0B"),
                                fill="F8FAFC", end_col=8)
     r += 2
-
-    ws6.cell(row=r, column=1, value="Pass / Warn / Fail by Test Type").font = Font(
+ 
+    # ── Pass / Fail Distribution (real chart, not a reference) ──────────────
+    ws5.cell(row=r, column=1, value="Pass / Warn / Fail by Test Type").font = Font(
         name=_XLSX_FONT, bold=True, size=12, color="1E293B")
     r += 1
     pf_hdr_row = r
-    _perf_xlsx_header_row(ws6, r, ["Test Type", "Passed", "Warn/Skip", "Failed"])
+    _perf_xlsx_header_row(ws5, r, ["Test Type", "Passed", "Warn/Skip", "Failed"])
     r += 1
     for tk in TYPE_ORDER:
         if tk not in type_stats and tk not in summary:
@@ -8899,16 +8266,30 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {"label": tk, "color": "64748B"})
         vals = [cfg["label"], d["pass"], d["skip"], d["fail"]]
         for col_i, v in enumerate(vals, start=1):
-            c = ws6.cell(row=r, column=col_i, value=v)
+            c = ws5.cell(row=r, column=col_i, value=v)
             c.font = Font(name=_XLSX_FONT, size=9, bold=(col_i == 1), color=(cfg["color"] if col_i == 1 else "1E293B"))
             c.alignment = Alignment(horizontal="center" if col_i > 1 else "left")
             c.border = _XLSX_BORDER
         r += 1
-    img_buf = _k6_png_breakdown_chart(tests)
-    xl_img = XLImage(img_buf)
-    xl_img.width, xl_img.height = 560, 220
-    ws6.add_image(xl_img, f"F{pf_hdr_row}")
-    r = max(r, pf_hdr_row + 14)
+    pf_end_row = r - 1
+ 
+    if pf_end_row >= pf_hdr_row + 1:
+        pf_chart = BarChart()
+        pf_chart.type = "col"
+        pf_chart.grouping = "clustered"
+        pf_chart.title = "Pass / Warn / Fail by Test Type"
+        pf_chart.y_axis.title = "Count"
+        cats_ref = Reference(ws5, min_col=1, min_row=pf_hdr_row + 1, max_row=pf_end_row)
+        data_ref = Reference(ws5, min_col=2, min_row=pf_hdr_row, max_row=pf_end_row, max_col=4)
+        pf_chart.add_data(data_ref, titles_from_data=True)
+        pf_chart.set_categories(cats_ref)
+        pf_chart.series[0].graphicalProperties.solidFill = "10B981"
+        pf_chart.series[1].graphicalProperties.solidFill = "F59E0B"
+        pf_chart.series[2].graphicalProperties.solidFill = "EF4444"
+        pf_chart.width = 16
+        pf_chart.height = 8
+        ws5.add_chart(pf_chart, f"F{pf_hdr_row}")
+ 
     r += 1
     breakdown_insight = chart_insights.get("breakdown") or (
         "All threshold validations completed without failures or warnings, demonstrating "
@@ -8916,106 +8297,20 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         if fail_count == 0 else
         f"{fail_count} threshold check(s) failed — see the Threshold Validation sheet for the "
         f"profile(s) responsible.")
-    r = _add_wrapped_text(ws6, r, f"AI Analysis: {breakdown_insight}",
+    r = _add_wrapped_text(ws5, r, f"AI Analysis: {breakdown_insight}",
                            Font(name=_XLSX_FONT, size=9, italic=True, color="8B5CF6"),
                            fill="F8FAFC", end_col=8)
-    r += 2
-
-    # ── Error Rate (%) by Test Type — présent dans le PDF, manquant du XLSX ──
-    ws6.cell(row=r, column=1, value="Error Rate (%) by Test Type").font = Font(
-        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
-    r += 1
-    err_hdr_row = r
-    _perf_xlsx_header_row(ws6, r, ["Test Type", "Error Rate (%)"])
-    r += 1
-    err_vals = {}
-    for tk in TYPE_ORDER:
-        if tk not in summary:
-            continue
-        metrics = (summary.get(tk) or {}).get("metrics") or {}
-        try:
-            err = float(metrics.get("http_req_failed_rate") or 0)
-        except Exception:
-            err = 0
-        err_vals[tk] = err
-        cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {"label": tk, "color": "64748B"})
-        c1 = ws6.cell(row=r, column=1, value=cfg["label"])
-        c1.font = Font(name=_XLSX_FONT, bold=True, size=9, color=cfg["color"])
-        c1.border = _XLSX_BORDER
-        c2 = ws6.cell(row=r, column=2, value=round(err, 2))
-        c2.font = Font(name=_XLSX_FONT, size=9, color="1E293B")
-        c2.alignment = Alignment(horizontal="center")
-        c2.border = _XLSX_BORDER
-        r += 1
-    img_buf = _k6_png_error_rate_chart(summary)
-    xl_img = XLImage(img_buf)
-    xl_img.width, xl_img.height = 560, 220
-    ws6.add_image(xl_img, f"D{err_hdr_row}")
-    r = max(r, err_hdr_row + 14)
-    r += 1
-    if err_vals:
-        worst = max(err_vals, key=err_vals.get)
-        err_insight = (
-            f'{_K6_TYPE_CONFIG_XLSX[worst]["label"]} recorded the highest error rate at {err_vals[worst]:.2f}%.'
-            if err_vals[worst] > 0 else
-            'No HTTP request failures were recorded across any of the tested load profiles.')
-        r = _add_wrapped_text(ws6, r, f"AI Analysis: {err_insight}",
-                               Font(name=_XLSX_FONT, size=9, italic=True, color="EF4444"),
-                               fill="F8FAFC", end_col=8)
-    r += 2
-
-    # ── Maximum Virtual Users — présent dans le PDF, manquant du XLSX ────────
-    ws6.cell(row=r, column=1, value="Maximum Virtual Users by Test Type").font = Font(
-        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
-    r += 1
-    vus_hdr_row = r
-    _perf_xlsx_header_row(ws6, r, ["Test Type", "Max VUs"])
-    r += 1
-    vus_vals = {}
-    for tk in TYPE_ORDER:
-        if tk not in summary:
-            continue
-        metrics = (summary.get(tk) or {}).get("metrics") or {}
-        try:
-            vus = int(metrics.get("vus_max") or 0)
-        except Exception:
-            vus = 0
-        vus_vals[tk] = vus
-        cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {"label": tk, "color": "64748B"})
-        c1 = ws6.cell(row=r, column=1, value=cfg["label"])
-        c1.font = Font(name=_XLSX_FONT, bold=True, size=9, color=cfg["color"])
-        c1.border = _XLSX_BORDER
-        c2 = ws6.cell(row=r, column=2, value=vus)
-        c2.font = Font(name=_XLSX_FONT, size=9, color="1E293B")
-        c2.alignment = Alignment(horizontal="center")
-        c2.border = _XLSX_BORDER
-        r += 1
-    img_buf = _k6_png_vus_chart(summary)
-    xl_img = XLImage(img_buf)
-    xl_img.width, xl_img.height = 560, 220
-    ws6.add_image(xl_img, f"D{vus_hdr_row}")
-    r = max(r, vus_hdr_row + 14)
-    r += 1
-    if vus_vals:
-        peak = max(vus_vals, key=vus_vals.get)
-        vus_insight = (
-            f'{_K6_TYPE_CONFIG_XLSX[peak]["label"]} reached the highest peak concurrency at '
-            f'{vus_vals[peak]} virtual users, giving context for how demanding this load pattern was.')
-        r = _add_wrapped_text(ws6, r, f"AI Analysis: {vus_insight}",
-                               Font(name=_XLSX_FONT, size=9, italic=True, color="0EA5E9"),
-                               fill="F8FAFC", end_col=8)
-
-    _perf_xlsx_autofit(ws6, [20, 18, 14, 14, 14, 14, 14, 14])
-    # ═══════════════════════════════════════════════════════════════════════
-    # 07_Threshold_Validation
-    # ═══════════════════════════════════════════════════════════════════════
-    ws7 = wb.create_sheet("07_Threshold_Validation")
-    r = _xlsx_section_header(ws7, "07", "Threshold Validation", url)
-    hdr_row = r
-    _perf_xlsx_header_row(ws7, r, ["Section", "Load", "Stress", "Spike", "Soak", "Status"])
-    ws7.freeze_panes = f"A{hdr_row + 1}"
-    r += 1
-
+ 
+    _perf_xlsx_autofit(ws5, [20, 18, 14, 14, 14, 14, 14, 14])
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 6 — Threshold Validation
+    # ══════════════════════════════════════════════════════════════════════
+    ws6 = wb.create_sheet("Threshold Validation")
+    ws6.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws6, 1, ["Section", "Load", "Stress", "Spike", "Soak", "Status"])
+    ws6.freeze_panes = "A2"
+ 
     SECTION_ORDER = ["Response Time", "Error Rate", "Throughput", "Scalability", "Reliability", "Thresholds"]
     grouped = {s: {"load": {"total": 0, "fail": 0}, "stress": {"total": 0, "fail": 0},
                    "spike": {"total": 0, "fail": 0}, "soak": {"total": 0, "fail": 0}} for s in SECTION_ORDER}
@@ -9031,7 +8326,8 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         grouped[section][tk]["total"] += 1
         if t.get("status") == "fail":
             grouped[section][tk]["fail"] += 1
-
+ 
+    row = 2
     for section in SECTION_ORDER:
         d = grouped[section]
         any_fail = any(v["fail"] > 0 for v in d.values())
@@ -9042,25 +8338,24 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             vals.append(f'{dd["total"]} ({dd["fail"]} fail)' if dd["fail"] > 0 else (dd["total"] if dd["total"] else "—"))
         vals.append("FAIL" if any_fail else "PASS")
         for col_i, v in enumerate(vals, start=1):
-            c = ws7.cell(row=r, column=col_i, value=v)
+            c = ws6.cell(row=row, column=col_i, value=v)
             c.font = Font(name=_XLSX_FONT, size=9, bold=(col_i in (1, 6)),
                           color=("EF4444" if (col_i == 6 and any_fail) else "10B981" if col_i == 6 else "1E293B"))
             c.fill = PatternFill("solid", fgColor=row_bg)
             c.alignment = Alignment(horizontal="center" if col_i > 1 else "left", vertical="center")
             c.border = _XLSX_BORDER
-        r += 1
-    _perf_xlsx_autofit(ws7, [22, 18, 18, 18, 18, 12])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 08_Environment
-    # ═══════════════════════════════════════════════════════════════════════
-    ws8 = wb.create_sheet("08_Environment")
-    r = _xlsx_section_header(ws8, "08", "Execution Environment", url)
-    hdr_row = r
-    _perf_xlsx_header_row(ws8, r, ["Property", "Value"])
-    ws8.freeze_panes = f"A{hdr_row + 1}"
-    r += 1
-
+        row += 1
+    _perf_xlsx_title(ws6, "✓  THRESHOLD VALIDATION", "7D64FF")
+    _perf_xlsx_autofit(ws6, [22, 18, 18, 18, 18, 12])
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 7 — Environment
+    # ══════════════════════════════════════════════════════════════════════
+    ws7 = wb.create_sheet("Environment")
+    ws7.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws7, 1, ["Property", "Value"])
+    ws7.freeze_panes = "A2"
+ 
     now_env = datetime.now()
     url_display = url.replace("https://", "").replace("http://", "")
     env_items = [
@@ -9071,28 +8366,29 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         ("NexTest Version", generation_data.get("nextest_version", "1.0.0")),
         ("Framework", "k6 Load Testing"),
     ]
+    r = 2
     for lbl, val in env_items:
-        c1 = ws8.cell(row=r, column=1, value=lbl)
+        c1 = ws7.cell(row=r, column=1, value=lbl)
         c1.font = Font(name=_XLSX_FONT, bold=True, size=9, color="7D64FF")
         c1.fill = PatternFill("solid", fgColor="F8FAFC")
         c1.border = _XLSX_BORDER
-        c2 = ws8.cell(row=r, column=2, value=val)
+        c2 = ws7.cell(row=r, column=2, value=val)
         c2.font = Font(name=_XLSX_FONT, size=9, color="1E293B")
         c2.border = _XLSX_BORDER
         r += 1
-    _perf_xlsx_autofit(ws8, [24, 40])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 09_Detailed_Test_Results
-    # ═══════════════════════════════════════════════════════════════════════
-    ws9 = wb.create_sheet("09_Detailed_Test_Results")
-    r = _xlsx_section_header(ws9, "09", "Detailed Test Results", url)
-    hdr_row = r
-    _perf_xlsx_header_row(ws9, r, ["#", "Test Name", "Type", "Section", "Status", "Result / Value"])
-    ws9.freeze_panes = f"A{hdr_row + 1}"
-    r += 1
-
+    _perf_xlsx_title(ws7, "⚙️  EXECUTION ENVIRONMENT", "7D64FF")
+    _perf_xlsx_autofit(ws7, [24, 40])
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 8 — Detailed Test Results (one row per assertion)
+    # ══════════════════════════════════════════════════════════════════════
+    ws8 = wb.create_sheet("Detailed Test Results")
+    ws8.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws8, 1, ["#", "Test Name", "Type", "Section", "Status", "Result / Value"])
+    ws8.freeze_panes = "A2"
+ 
     for idx, t in enumerate(tests, start=1):
+        row = idx + 1
         status = t.get("status", "skip")
         s_color, s_bg = STATUS_COLOR.get(status, ("94A3B8", "FFFFFF"))
         name = t.get("name", "")
@@ -9105,7 +8401,7 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         suite = t.get("suite", "-")
         vals = [idx, name, cfg["label"], section, status.upper(), suite]
         for col_i, v in enumerate(vals, start=1):
-            c = ws9.cell(row=r, column=col_i, value=v)
+            c = ws8.cell(row=row, column=col_i, value=v)
             c.font = Font(name=_XLSX_FONT, size=9,
                           color=(cfg["color"] if col_i == 3 else s_color if col_i == 5 else "1E293B"),
                           bold=(col_i in (3, 5)))
@@ -9114,19 +8410,17 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             c.border = _XLSX_BORDER
             if col_i == 5:
                 c.fill = PatternFill("solid", fgColor=s_bg)
-        ws9.row_dimensions[r].height = 20
-        r += 1
-    _perf_xlsx_autofit(ws9, [5, 42, 14, 18, 12, 45])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 10_AI_Recommendations
-    # ═══════════════════════════════════════════════════════════════════════
-    ws10 = wb.create_sheet("10_AI_Recommendations")
-    r = _xlsx_section_header(ws10, "10", "AI Recommendations", url)
-    hdr_row = r
-    _perf_xlsx_header_row(ws10, r, ["Priority", "Category", "Issue"])
-    r += 1
-
+        ws8.row_dimensions[row].height = 20
+    _perf_xlsx_title(ws8, "🔬  DETAILED TEST RESULTS", "0D9488")
+    _perf_xlsx_autofit(ws8, [5, 42, 14, 18, 12, 45])
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 9 — AI Recommendations (table + categorized bullets + verdict)
+    # ══════════════════════════════════════════════════════════════════════
+    ws9 = wb.create_sheet("AI Recommendations")
+    ws9.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws9, 1, ["Priority", "Category", "Issue"])
+ 
     categorized = (
         [("PERFORMANCE", "HIGH" if "exceeded" in r_ else "MEDIUM", r_) for r_ in perf_recs] +
         [("RELIABILITY", "HIGH" if r_.lower().startswith("fix") else "LOW", r_) for r_ in rel_recs] +
@@ -9134,76 +8428,89 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
     )
     PRI_BG = {"HIGH": "FEE2E2", "MEDIUM": "FFFBEB", "LOW": "D1FAE5"}
     PRI_COLOR2 = {"HIGH": "EF4444", "MEDIUM": "F59E0B", "LOW": "10B981"}
+    r = 2
     for category, priority, issue in categorized:
         vals = [priority, category, issue]
         for col_i, v in enumerate(vals, start=1):
-            c = ws10.cell(row=r, column=col_i, value=v)
+            c = ws9.cell(row=r, column=col_i, value=v)
             c.font = Font(name=_XLSX_FONT, size=9, bold=(col_i == 1),
                           color=PRI_COLOR2.get(priority, "F59E0B") if col_i == 1 else "1E293B")
             c.alignment = Alignment(vertical="top", wrap_text=(col_i == 3),
                                      horizontal="center" if col_i == 1 else "left")
             c.fill = PatternFill("solid", fgColor=PRI_BG.get(priority, "FFFBEB"))
             c.border = _XLSX_BORDER
-        ws10.row_dimensions[r].height = 28
+        ws9.row_dimensions[r].height = 28
         r += 1
-
+ 
     r += 2
-    ws10.cell(row=r, column=1, value="Performance Analysis").font = Font(
+    ws9.cell(row=r, column=1, value="Performance Analysis").font = Font(
         name=_XLSX_FONT, bold=True, size=11, color="F59E0B")
     r += 1
     for rec_text in perf_recs:
-        r = _add_wrapped_text(ws10, r, f"• {rec_text}", Font(name=_XLSX_FONT, size=9, color="475569"), end_col=3, min_rows=1)
+        r = _add_wrapped_text(ws9, r, f"• {rec_text}", Font(name=_XLSX_FONT, size=9, color="475569"), end_col=3, min_rows=1)
     r += 1
-
-    ws10.cell(row=r, column=1, value="Reliability & Fixes").font = Font(
+ 
+    ws9.cell(row=r, column=1, value="Reliability & Fixes").font = Font(
         name=_XLSX_FONT, bold=True, size=11, color="4F46E5")
     r += 1
     for rec_text in rel_recs:
-        r = _add_wrapped_text(ws10, r, f"• {rec_text}", Font(name=_XLSX_FONT, size=9, color="475569"), end_col=3, min_rows=1)
+        r = _add_wrapped_text(ws9, r, f"• {rec_text}", Font(name=_XLSX_FONT, size=9, color="475569"), end_col=3, min_rows=1)
     r += 1
-
-    ws10.cell(row=r, column=1, value="User Impact").font = Font(
+ 
+    ws9.cell(row=r, column=1, value="User Impact").font = Font(
         name=_XLSX_FONT, bold=True, size=11, color="10B981")
     r += 1
     for rec_text in ux_recs:
-        r = _add_wrapped_text(ws10, r, f"• {rec_text}", Font(name=_XLSX_FONT, size=9, color="475569"), end_col=3, min_rows=1)
+        r = _add_wrapped_text(ws9, r, f"• {rec_text}", Font(name=_XLSX_FONT, size=9, color="475569"), end_col=3, min_rows=1)
     r += 2
-
-    verdict_label = "PASS" if verdict_pass else "FAIL"
+ 
+    # ── Final AI Verdict (matches PDF placement — right before Action Plan) ─
+    verdict_pass = fail_count == 0
     verdict_color = "10B981" if verdict_pass else "EF4444"
     verdict_bg = "D1FAE5" if verdict_pass else "FEE2E2"
-    ws10.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
-    c = ws10.cell(row=r, column=1, value=f"[{verdict_label}] Final AI Verdict")
+    verdict_label = "PASS" if verdict_pass else "FAIL"
+    quality_score = k6_score
+    risk = "LOW" if quality_score >= 80 else "MEDIUM" if quality_score >= 60 else "HIGH"
+    verdict_text = (
+        f"k6 Performance Test PASSED — all {pass_count} threshold checks were met across every load "
+        f"profile. The application demonstrates stable performance under the tested traffic patterns; "
+        f"no corrective action is required at this time."
+        if verdict_pass else
+        f"k6 Performance Test FAILED — {fail_count} of {total} threshold(s) were exceeded. Address the "
+        f"failing checks identified above before promoting this build to production."
+    )
+    ws9.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
+    c = ws9.cell(row=r, column=1, value=f"[{verdict_label}] Final AI Verdict")
     c.font = Font(name=_XLSX_FONT, bold=True, size=12, color=verdict_color)
     r += 1
-    r = _add_wrapped_text(ws10, r, verdict_text, Font(name=_XLSX_FONT, size=9, color=verdict_color),
-                           fill=verdict_bg, end_col=3)
-    ws10.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
-    c = ws10.cell(row=r, column=1,
+    r2 = _add_wrapped_text(ws9, r, verdict_text, Font(name=_XLSX_FONT, size=9, color=verdict_color),
+                            fill=verdict_bg, end_col=3)
+    r = r2
+    ws9.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
+    c = ws9.cell(row=r, column=1,
                   value=f"Quality Score: {quality_score}/100   |   Risk Level: {risk}")
     c.font = Font(name=_XLSX_FONT, bold=True, size=10, color="1E293B")
-
-    _perf_xlsx_autofit(ws10, [14, 18, 90])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 11_Action_Plan — AI-generated action plan, Top priority actions
-    # ═══════════════════════════════════════════════════════════════════════
-    ws11 = wb.create_sheet("11_Action_Plan")
-    r = _xlsx_section_header(ws11, "11", "Action Plan", url)
-    hdr_row = r
-    _perf_xlsx_header_row(ws11, r, ["#", "Scenario", "Category", "Priority", "Action", "Responsible", "Deadline", "Status"])
-    ws11.freeze_panes = f"A{hdr_row + 1}"
-    r += 1
-
+ 
+    _perf_xlsx_autofit(ws9, [14, 18, 90])
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 10 — Action Plan
+    # ══════════════════════════════════════════════════════════════════════
+    ws10 = wb.create_sheet("Action Plan")
+    ws10.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws10, 1, ["#", "Scenario", "Category", "Priority", "Action", "Responsible", "Deadline", "Status"])
+    ws10.freeze_panes = "A2"
+ 
     ACT_PRI_BG = {"HIGH": "FEE2E2", "MEDIUM": "FFFBEB", "LOW": "D1FAE5"}
     ACT_PRI_COLOR = {"HIGH": "EF4444", "MEDIUM": "F59E0B", "LOW": "10B981"}
+    r = 2
     for i, item in enumerate(action_plan, start=1):
         priority = item.get("priority", "MEDIUM")
         vals = [i, item.get("scenario", ""), item.get("category", ""), priority,
                 item.get("action", ""), item.get("responsible", ""), item.get("deadline", ""),
                 item.get("status", "To Do")]
         for col_i, v in enumerate(vals, start=1):
-            c = ws11.cell(row=r, column=col_i, value=v)
+            c = ws10.cell(row=r, column=col_i, value=v)
             c.font = Font(name=_XLSX_FONT, size=9, bold=(col_i == 4),
                           color=ACT_PRI_COLOR.get(priority, "F59E0B") if col_i == 4 else "1E293B")
             c.alignment = Alignment(vertical="top", wrap_text=(col_i in (2, 5)),
@@ -9211,14 +8518,23 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
             if col_i == 4:
                 c.fill = PatternFill("solid", fgColor=ACT_PRI_BG.get(priority, "FFFBEB"))
             c.border = _XLSX_BORDER
-        ws11.row_dimensions[r].height = 32
+        ws10.row_dimensions[r].height = 32
         r += 1
-
+    _perf_xlsx_title(ws10, "📋  AI-GENERATED ACTION PLAN", "C9A227")
+    _perf_xlsx_autofit(ws10, [5, 26, 16, 12, 30, 14, 14, 12])
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 11 — Executive Summary (Top Priority Actions only, as in PDF)
+    # ══════════════════════════════════════════════════════════════════════
+    ws11 = wb.create_sheet("Executive Summary")
+    ws11.sheet_view.showGridLines = False
+ 
+    r = 1
+    ws11.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+    c = ws11.cell(row=r, column=1, value="Top Priority Actions")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=13, color="1E293B")
     r += 2
-    ws11.cell(row=r, column=1, value="Top Priority Actions").font = Font(
-        name=_XLSX_FONT, bold=True, size=13, color="1E293B")
-    r += 2
-
+ 
     PRI_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
     top_actions = sorted(action_plan, key=lambda x: PRI_ORDER.get(x.get("priority", "MEDIUM"), 1))[:2]
     for i, item in enumerate(top_actions, start=1):
@@ -9232,7 +8548,7 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         c.alignment = Alignment(wrap_text=True, vertical="top")
         ws11.row_dimensions[r].height = 26
         r += 2
-
+ 
     if top_actions:
         if k6_score >= 90:
             insight = (
@@ -9247,1579 +8563,899 @@ def generate_k6_xlsx(generation_data: dict, tests: list, summary: dict) -> bytes
         r = _add_wrapped_text(ws11, r, f"AI Analysis: {insight}",
                                Font(name=_XLSX_FONT, size=9, italic=True, color="4F46E5"),
                                fill="F8FAFC", end_col=4)
-
-    _perf_xlsx_autofit(ws11, [5, 26, 16, 12, 30, 14, 14, 12])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 12_Certificate
-    # ═══════════════════════════════════════════════════════════════════════
-    ws12 = wb.create_sheet("12_Certificate")
-    r = _xlsx_section_header(ws12, "12", "Certificate of Performance Analysis", url)
-
+ 
+    _perf_xlsx_autofit(ws11, [24, 24, 24, 24])
+ 
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 12 — Certificate
+    # ══════════════════════════════════════════════════════════════════════
+    ws12 = wb.create_sheet("Certificate")
+    ws12.sheet_view.showGridLines = False
+ 
     grade, grade_color_hex = _grade_from_score(k6_score)
     grade_color = grade_color_hex.lstrip("#").upper()
-
-    r += 1
-    ws12.merge_cells(f"A{r}:D{r}")
-    c = ws12.cell(row=r, column=1, value=url)
+ 
+    ws12.merge_cells("A1:D1")
+    c = ws12.cell(row=1, column=1, value="CERTIFICATE OF PERFORMANCE ANALYSIS")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=13, color="94A3B8")
+    c.alignment = Alignment(horizontal="center")
+ 
+    ws12.merge_cells("A3:D3")
+    c = ws12.cell(row=3, column=1, value=url)
     c.font = Font(name=_XLSX_FONT, italic=True, size=12, color="1E293B")
     c.alignment = Alignment(horizontal="center")
-    r += 2
-
-    ws12.merge_cells(f"A{r}:D{r}")
-    c = ws12.cell(row=r, column=1, value=f"{k6_score} / 100")
+ 
+    ws12.merge_cells("A5:D5")
+    c = ws12.cell(row=5, column=1, value=f"{k6_score} / 100")
     c.font = Font(name=_XLSX_FONT, bold=True, size=30, color=score_color)
     c.alignment = Alignment(horizontal="center")
-    r += 2
-
-    _score_border = Border(left=Side(style="thin", color=score_color), right=Side(style="thin", color=score_color),
-                            top=Side(style="thin", color=score_color), bottom=Side(style="thin", color=score_color))
-
-    ws12.merge_cells(f"A{r}:B{r}")
-    for col_ in (1, 2):
-        cc = ws12.cell(row=r, column=col_)
-        cc.fill = PatternFill("solid", fgColor=grade_color)
-        cc.alignment = Alignment(horizontal="center", vertical="center")
-    c = ws12.cell(row=r, column=1, value=f"GRADE {grade}")
+ 
+    ws12.merge_cells("A7:B7")
+    c = ws12.cell(row=7, column=1, value=f"GRADE {grade}")
     c.font = Font(name=_XLSX_FONT, bold=True, size=11, color="FFFFFF")
-
-    ws12.merge_cells(f"C{r}:D{r}")
-    for col_ in (3, 4):
-        cc = ws12.cell(row=r, column=col_)
-        cc.border = _score_border
-        cc.alignment = Alignment(horizontal="center", vertical="center")
-    c = ws12.cell(row=r, column=3, value=score_label.upper())
+    c.fill = PatternFill("solid", fgColor=grade_color)
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws12.merge_cells("C7:D7")
+    c = ws12.cell(row=7, column=3, value=score_label.upper())
     c.font = Font(name=_XLSX_FONT, bold=True, size=11, color=score_color)
+    c.border = Border(left=Side(style="thin", color=score_color), right=Side(style="thin", color=score_color),
+                       top=Side(style="thin", color=score_color), bottom=Side(style="thin", color=score_color))
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws12.row_dimensions[7].height = 22
+ 
+    ws12.merge_cells("A9:D9")
+    c = ws12.cell(row=9, column=1, value=f'Validated by NexTest AI  •  {datetime.now().strftime("%Y-%m-%d")}')
+    c.font = Font(name=_XLSX_FONT, italic=True, size=8, color="94A3B8")
+    c.alignment = Alignment(horizontal="center")
+ 
+    _perf_xlsx_autofit(ws12, [20, 20, 20, 20])
+ 
+    # ── Ordre final des feuilles — suit exactement le flux du PDF ──────────
+    pdf_order = [
+        "Overview",
+        "Key Metrics",
+        "Test Scenarios",
+        "Results by Test Type",
+        "Charts & Analysis",
+        "Threshold Validation",
+        "Environment",
+        "Detailed Test Results",
+        "AI Recommendations",
+        "Action Plan",
+        "Executive Summary",
+        "Certificate",
+    ]
+    wb._sheets = [wb[name] for name in pdf_order if name in wb.sheetnames]
+ 
+    buffer = BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+    url         = generation_data.get('url', '')
+    framework   = generation_data.get('framework', 'k6')
 
-    ws12.row_dimensions[r].height = 22
+    pass_count = sum(1 for t in tests if t.get('status') == 'pass')
+    fail_count = sum(1 for t in tests if t.get('status') == 'fail')
+    skip_count = sum(1 for t in tests if t.get('status') in ('skip', 'warn'))
+    total      = len(tests) or 1
+    pass_rate  = round(pass_count / total * 100)
+
+    k6_score = pass_rate
+    if fail_count:
+        k6_score = max(0, k6_score - fail_count * 8)
+    k6_score = min(100, k6_score)
+    score_color = "10B981" if k6_score >= 80 else "F59E0B" if k6_score >= 50 else "EF4444"
+    rate_color  = "10B981" if pass_rate >= 80 else "F59E0B" if pass_rate >= 50 else "EF4444"
+    score_label = _k6_score_label(k6_score)
+
+    profiles_run = ', '.join(_K6_TYPE_CONFIG_XLSX[k]['label'] for k in ('load', 'stress', 'spike', 'soak') if k in summary)
+
+    # ── Recommendations (same logic as _generate_k6_pdf) ──────────────────
+    perf_recs, rel_recs, ux_recs = [], [], []
+    for type_key, type_data in summary.items():
+        metrics  = type_data.get('metrics') or {}
+        p95      = metrics.get('http_req_duration_p95', '')
+        cfg      = _K6_TYPE_CONFIG_XLSX.get(type_key, {'label': type_key})
+        status   = type_data.get('status', 'pass')
+        duration = type_data.get('duration_seconds', '-')
+        if status == 'fail':
+            perf_recs.append(
+                f'{cfg["label"]} exceeded its response-time threshold (p95: {p95}, duration: {duration}s). '
+                f'Investigate slow endpoints and review server-side timeout/threshold configuration for this profile.')
+        else:
+            perf_recs.append(
+                f'{cfg["label"]} completed in {duration}s with a p95 of {p95}, within the target range. '
+                f'No immediate action required — continue tracking this metric across future releases.')
+    if not perf_recs:
+        perf_recs.append('No performance data available. Check k6 output format.')
+
+    failed_tests = [t for t in tests if t.get('status') == 'fail']
+    if failed_tests:
+        for t in failed_tests[:3]:
+            rel_recs.append(f'Fix "{t.get("name","")[:50]}" — threshold exceeded: {t.get("suite","")[:60]}')
+    else:
+        rel_recs.append(
+            'All k6 threshold checks passed across every load profile — no reliability regressions '
+            'detected in this run. Re-run this suite after significant backend or infrastructure changes '
+            'to confirm behavior remains stable.')
+    skip_tests = [t for t in tests if t.get('status') not in ('pass', 'fail')]
+    if skip_tests:
+        rel_recs.append(f'{len(skip_tests)} test(s) warn/skip — verify k6 metric output format.')
+
+    for type_key, type_data in summary.items():
+        metrics  = type_data.get('metrics') or {}
+        err_rate = metrics.get('http_req_failed_rate')
+        checks   = metrics.get('checks_rate')
+        cfg      = _K6_TYPE_CONFIG_XLSX.get(type_key, {'label': type_key})
+        if err_rate is not None and float(err_rate) > 1:
+            ux_recs.append(f'{cfg["label"]}: error rate {err_rate:.1f}% — users experience failures under this load profile.')
+        elif checks is not None:
+            ux_recs.append(
+                f'{cfg["label"]}: check pass rate {checks:.1f}% — '
+                f'user-facing assertions {"pass" if float(checks) >= 95 else "need attention"}.')
+    if not ux_recs:
+        ux_recs.append(
+            'No user-facing errors were observed during any of the tested load profiles. End users should '
+            'experience consistent response times and no failed requests under traffic comparable to this test.')
+
+    # ── Action plan via Groq (same as PDF) ──────────────────────────────────
+    action_plan = _call_groq_k6_plan(tests, url, summary)
+
+    # ── Chart insights via Groq (same as PDF) ─────────────────────────────
+    chart_insights = _call_groq_chart_insights(summary, tests)
+
+    wb = Workbook()
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 1 — Overview
+    # ══════════════════════════════════════════════════════════════════════
+    ws = wb.active
+    ws.title = "Overview"
+    ws.sheet_view.showGridLines = False
+
+    ws.merge_cells("A1:H3")
+    for r_ in range(1, 4):
+        for c_ in range(1, 9):
+            ws.cell(row=r_, column=c_).fill = PatternFill("solid", fgColor="0A0F1E")
+    ws["A1"] = "NEXTEST — k6 Performance Test Report"
+    ws["A1"].font = Font(name=_XLSX_FONT, bold=True, size=20, color="7D64FF")
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
+
+    ws.merge_cells("A4:H4")
+    ws["A4"] = f"Generated {datetime.now().strftime('%B %d, %Y  •  %H:%M')}"
+    ws["A4"].font = Font(name=_XLSX_FONT, italic=True, size=9, color="64748B")
+
+    info_rows = [
+        ("URL", url),
+        ("Framework", "k6 Load Testing"),
+        ("Test Type", "Performance Test"),
+        ("Test Profiles", profiles_run or 'N/A'),
+        ("Generated", datetime.now().strftime("%Y-%m-%d %H:%M")),
+    ]
+    r = 6
+    for lbl, val in info_rows:
+        lc = ws.cell(row=r, column=1, value=lbl)
+        lc.font = Font(name=_XLSX_FONT, bold=True, color="64748B", size=9)
+        lc.fill = PatternFill("solid", fgColor="F8FAFC")
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=6)
+        vc = ws.cell(row=r, column=2, value=val)
+        vc.font = Font(name=_XLSX_FONT, size=10, color="1E293B")
+        for col in range(1, 7):
+            ws.cell(row=r, column=col).border = _XLSX_BORDER
+        r += 1
+
+    r += 2
+    stats = [
+        ("PASSED", pass_count, "10B981", "D1FAE5"),
+        ("FAILED", fail_count, "EF4444", "FEE2E2"),
+        ("WARN/SKIP", skip_count, "F59E0B", "FEF3C7"),
+        ("PASS RATE", f"{pass_rate}%", rate_color,
+         "D1FAE5" if pass_rate >= 80 else "FEF3C7" if pass_rate >= 50 else "FEE2E2"),
+        ("TOTAL", total, "3B82F6", "DBEAFE"),
+    ]
+    col = 1
+    for lbl, val, color, bg in stats:
+        c1 = ws.cell(row=r, column=col, value=val)
+        c1.font = Font(name=_XLSX_FONT, bold=True, size=18, color=color)
+        c1.alignment = Alignment(horizontal="center", vertical="center")
+        c1.fill = PatternFill("solid", fgColor=bg)
+        c1.border = _XLSX_BORDER
+        c2 = ws.cell(row=r + 1, column=col, value=lbl)
+        c2.font = Font(name=_XLSX_FONT, bold=True, size=8, color="64748B")
+        c2.alignment = Alignment(horizontal="center", vertical="center")
+        c2.fill = PatternFill("solid", fgColor=bg)
+        c2.border = _XLSX_BORDER
+        col += 1
+    ws.row_dimensions[r].height = 22
+    ws.row_dimensions[r + 1].height = 18
+    r += 3
+
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+    c = ws.cell(row=r, column=1,
+                value="Pass Rate reflects the raw proportion of threshold checks that succeeded, while the "
+                      "Performance Score applies severity weighting to failed checks and response-time degradation.")
+    c.font = Font(name=_XLSX_FONT, italic=True, size=8, color="94A3B8")
+    c.alignment = Alignment(wrap_text=True, vertical="top")
     r += 2
 
-    ws12.merge_cells(f"A{r}:D{r}")
-    c = ws12.cell(row=r, column=1,
-                  value=f'Validated by NexTest AI  •  {datetime.now().strftime("%Y-%m-%d")}')
+    # ── Performance Score box ───────────────────────────────────────────────
+    ws.cell(row=r, column=1, value="Performance Score").font = Font(
+        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
+    r += 1
+    score_box_start = r
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+    c = ws.cell(row=r, column=1, value=f"{k6_score}/100  —  {score_label.upper()}")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=16, color=score_color)
+    r += 1
+
+    import math
+    def _add_wrapped_text(ws, r, text, font, chars_per_line=95, min_rows=2, fill=None):
+        n_rows = max(min_rows, math.ceil(len(text) / chars_per_line) + 1)
+        ws.merge_cells(start_row=r, start_column=1, end_row=r + n_rows - 1, end_column=6)
+        c = ws.cell(row=r, column=1, value=text)
+        c.font = font
+        c.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
+        if fill:
+            for row_ in range(r, r + n_rows):
+                for col_ in range(1, 7):
+                    ws.cell(row=row_, column=col_).fill = PatternFill("solid", fgColor=fill)
+        return r + n_rows
+
+    if fail_count == 0:
+        analysis_text = (f'{url} successfully met all {total} performance thresholds across the {profiles_run} '
+                          f'load profiles. Response times, throughput, and error rates all remained within their '
+                          f'target ranges, demonstrating stable and reliable performance under the tested traffic '
+                          f'conditions. Continued monitoring under real-world load is still recommended.')
+    else:
+        analysis_text = (f'{url} did not meet {fail_count} of {total} performance thresholds across the '
+                          f'{profiles_run} load profiles. Review the failing checks in this report before '
+                          f'promoting this build to production.')
+    r = _add_wrapped_text(ws, r, analysis_text, Font(name=_XLSX_FONT, size=9, color="475569"), fill="F8FAFC")
+    score_box_end = r - 1
+
+    for row_ in range(score_box_start, score_box_end + 1):
+        for col_ in range(1, 7):
+            cell = ws.cell(row=row_, column=col_)
+            cell.border = Border(
+                left=Side(style="thin", color=score_color),
+                right=Side(style="thin", color=score_color),
+                top=Side(style="thin", color=score_color),
+                bottom=Side(style="thin", color=score_color),
+            )
+    r += 2
+
+    # ── Results by Test Type + chart ────────────────────────────────────────
+    ws.cell(row=r, column=1, value="Results by Test Type").font = Font(
+        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
+    r += 1
+    type_hdr_row = r
+    _perf_xlsx_header_row(ws, r, ["Test Type", "Total", "Passed", "Failed", "Pass Rate", "Duration (s)", "Status"])
+    r += 1
+
+    type_stats = {}
+    for t in tests:
+        name = t.get('name', '')
+        tk = 'load'
+        if 'Stress' in name: tk = 'stress'
+        elif 'Spike' in name: tk = 'spike'
+        elif 'Soak' in name: tk = 'soak'
+        if tk not in type_stats:
+            type_stats[tk] = {'pass': 0, 'fail': 0, 'skip': 0, 'total': 0}
+        type_stats[tk]['total'] += 1
+        s = t.get('status', 'skip')
+        if s == 'pass': type_stats[tk]['pass'] += 1
+        elif s == 'fail': type_stats[tk]['fail'] += 1
+        else: type_stats[tk]['skip'] += 1
+
+    for tk in ('load', 'stress', 'spike', 'soak'):
+        if tk not in type_stats and tk not in summary:
+            continue
+        d = type_stats.get(tk, {'pass': 0, 'fail': 0, 'skip': 0, 'total': 0})
+        sum_data = summary.get(tk, {})
+        duration = sum_data.get('duration_seconds', '—')
+        rate = round(d['pass'] / d['total'] * 100) if d['total'] > 0 else 0
+        verdict = "PASS" if d['fail'] == 0 else "FAIL"
+        row_bg = "D1FAE5" if d['fail'] == 0 else "FEE2E2"
+        cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {'label': tk, 'color': '64748B'})
+        vals = [cfg['label'], d['total'], d['pass'], d['fail'], f"{rate}%", duration, verdict]
+        for i, v in enumerate(vals, start=1):
+            cell = ws.cell(row=r, column=i, value=v)
+            cell.font = Font(name=_XLSX_FONT, size=9, bold=(i in (1, 7)),
+                              color=(cfg['color'] if i == 1 else
+                                     ("EF4444" if (i == 7 and verdict == "FAIL") else
+                                      "10B981" if (i == 7 and verdict == "PASS") else "1E293B")))
+            cell.fill = PatternFill("solid", fgColor=row_bg)
+            cell.alignment = Alignment(horizontal="center" if i > 1 else "left", vertical="center")
+            cell.border = _XLSX_BORDER
+        r += 1
+
+    type_chart_end = r - 1
+    if type_chart_end >= type_hdr_row + 1:
+        chart = BarChart()
+        chart.type = "col"
+        chart.title = "Pass / Fail by Test Type"
+        chart.y_axis.title = "Checks"
+        cats_ref = Reference(ws, min_col=1, min_row=type_hdr_row + 1, max_row=type_chart_end)
+        pass_ref = Reference(ws, min_col=3, min_row=type_hdr_row, max_row=type_chart_end)
+        fail_ref = Reference(ws, min_col=4, min_row=type_hdr_row, max_row=type_chart_end)
+        chart.add_data(pass_ref, titles_from_data=True)
+        chart.add_data(fail_ref, titles_from_data=True)
+        chart.set_categories(cats_ref)
+        chart.series[0].graphicalProperties.solidFill = "10B981"
+        chart.series[1].graphicalProperties.solidFill = "EF4444"
+        chart.width = 18
+        chart.height = 9
+        ws.add_chart(chart, f"A{type_chart_end + 2}")
+
+    _perf_xlsx_autofit(ws, [20, 10, 10, 10, 12, 14, 12])
+    ws.freeze_panes = "A6"
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 2 — Key Metrics (full 8 metrics + threshold detail per type)
+    # ══════════════════════════════════════════════════════════════════════
+    ws2 = wb.create_sheet("Key Metrics")
+    ws2.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws2, 1, ["Test Type", "Metric", "Value", "Status"])
+    ws2.freeze_panes = "A2"
+
+    STATUS_COLOR = {"pass": ("10B981", "D1FAE5"), "fail": ("EF4444", "FEE2E2"), "skip": ("F59E0B", "FFFBEB")}
+    row = 2
+    for tk in ('load', 'stress', 'spike', 'soak'):
+        if tk not in summary:
+            continue
+        cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {'label': tk, 'color': '64748B'})
+        type_data = summary.get(tk) or {}
+        metrics = type_data.get('metrics') or {}
+        checks = [
+            ('p95 Response Time', metrics.get('http_req_duration_p95', 'N/A'), 'Response Time p95'),
+            ('Average Response Time', metrics.get('http_req_duration_avg', 'N/A'), 'Average Response Time'),
+            ('Throughput', f"{metrics.get('http_reqs_per_second', 0):.1f}/s" if metrics.get('http_reqs_per_second') is not None else 'N/A', 'Throughput (req/s)'),
+            ('Error Rate', f"{metrics.get('http_req_failed_rate', 0):.1f}%" if metrics.get('http_req_failed_rate') is not None else 'N/A', 'Error Rate'),
+            ('Max Virtual Users', str(metrics.get('vus_max', 'N/A')), 'Max Virtual Users'),
+            ('Iterations', str(metrics.get('iterations', 'N/A')), None),
+            ('Data Received', metrics.get('data_received', 'N/A'), None),
+            ('Checks Rate', f"{metrics.get('checks_rate', 0):.1f}%" if metrics.get('checks_rate') is not None else 'N/A', 'k6 Checks Pass Rate'),
+        ]
+        for label, value, keyword in checks:
+            t = _find_k6_test(tests, cfg['label'], keyword) if keyword else None
+            status = t.get('status') if t else None
+            sc, bg = STATUS_COLOR.get(status, ("94A3B8", "FFFFFF"))
+            vals = [cfg['label'], label, value, (status or 'N/A').upper()]
+            for col, v in enumerate(vals, start=1):
+                c = ws2.cell(row=row, column=col, value=v)
+                c.font = Font(name=_XLSX_FONT, size=9, bold=(col in (1, 4)),
+                              color=(cfg['color'] if col == 1 else sc if col == 4 else "1E293B"))
+                c.alignment = Alignment(horizontal="center" if col in (3, 4) else "left", vertical="center")
+                c.border = _XLSX_BORDER
+                if col == 4:
+                    c.fill = PatternFill("solid", fgColor=bg)
+            row += 1
+
+        # ── Threshold pass/fail detail for this test type ──────────────────
+        th_passes   = type_data.get('threshold_passes', [])
+        th_failures = type_data.get('threshold_failures', [])
+        for th in th_passes:
+            ws2.merge_cells(start_row=row, start_column=2, end_row=row, end_column=4)
+            c1 = ws2.cell(row=row, column=1, value=cfg['label'])
+            c1.font = Font(name=_XLSX_FONT, size=8, italic=True, color=cfg['color'])
+            c1.border = _XLSX_BORDER
+            c2 = ws2.cell(row=row, column=2, value=f"✓ Threshold: {th}")
+            c2.font = Font(name=_XLSX_FONT, size=8, italic=True, color="10B981")
+            for col in range(1, 5):
+                ws2.cell(row=row, column=col).border = _XLSX_BORDER
+            row += 1
+        for th in th_failures:
+            ws2.merge_cells(start_row=row, start_column=2, end_row=row, end_column=4)
+            c1 = ws2.cell(row=row, column=1, value=cfg['label'])
+            c1.font = Font(name=_XLSX_FONT, size=8, italic=True, color=cfg['color'])
+            c1.border = _XLSX_BORDER
+            c2 = ws2.cell(row=row, column=2, value=f"✗ Threshold: {th}")
+            c2.font = Font(name=_XLSX_FONT, size=8, italic=True, color="EF4444")
+            for col in range(1, 5):
+                ws2.cell(row=row, column=col).border = _XLSX_BORDER
+            row += 1
+
+    _perf_xlsx_title(ws2, "🔑  KEY METRICS", "7D64FF")
+    _perf_xlsx_autofit(ws2, [18, 26, 16, 12])
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET — Charts & Analysis (p95, throughput, pass/fail breakdown)
+    # ══════════════════════════════════════════════════════════════════════
+    wsc = wb.create_sheet("Charts & Analysis")
+    wsc.sheet_view.showGridLines = False
+
+    TYPE_ORDER_CHARTS = ['load', 'stress', 'spike', 'soak']
+
+    def _parse_ms(val):
+        try:
+            s = str(val).replace('ms', '').strip()
+            if s.endswith('s'):
+                return float(s[:-1]) * 1000
+            return float(s) if val else 0
+        except Exception:
+            return 0
+
+    r = 1
+    # ── p95 Response Time chart ─────────────────────────────────────────────
+    wsc.cell(row=r, column=1, value="p95 Response Time by Test Type").font = Font(
+        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
+    r += 1
+    p95_hdr_row = r
+    _perf_xlsx_header_row(wsc, r, ["Test Type", "p95 (ms)"])
+    r += 1
+    p95_vals = {}
+    for tk in TYPE_ORDER_CHARTS:
+        if tk not in summary:
+            continue
+        metrics = (summary.get(tk) or {}).get('metrics') or {}
+        ms = _parse_ms(metrics.get('http_req_duration_p95'))
+        p95_vals[tk] = ms
+        cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {'label': tk, 'color': '64748B'})
+        c1 = wsc.cell(row=r, column=1, value=cfg['label'])
+        c1.font = Font(name=_XLSX_FONT, bold=True, size=9, color=cfg['color'])
+        c1.border = _XLSX_BORDER
+        c2 = wsc.cell(row=r, column=2, value=round(ms, 1))
+        c2.font = Font(name=_XLSX_FONT, size=9, color="1E293B")
+        c2.alignment = Alignment(horizontal="center")
+        c2.border = _XLSX_BORDER
+        r += 1
+    p95_end_row = r - 1
+
+    if p95_end_row >= p95_hdr_row + 1:
+        line_chart = LineChart()
+        line_chart.title = "p95 Response Time by Test Type"
+        line_chart.y_axis.title = "Response Time (ms)"
+        cats_ref = Reference(wsc, min_col=1, min_row=p95_hdr_row + 1, max_row=p95_end_row)
+        data_ref = Reference(wsc, min_col=2, min_row=p95_hdr_row, max_row=p95_end_row)
+        line_chart.add_data(data_ref, titles_from_data=True)
+        line_chart.set_categories(cats_ref)
+        line_chart.series[0].graphicalProperties.line.solidFill = "6366F1"
+        line_chart.series[0].graphicalProperties.line.width = 25000
+        line_chart.width = 16
+        line_chart.height = 8
+        wsc.add_chart(line_chart, f"D{p95_hdr_row}")
+
+    r += 1
+    if p95_vals:
+        fastest = min(p95_vals, key=p95_vals.get)
+        slowest = max(p95_vals, key=p95_vals.get)
+        p95_insight = chart_insights.get('p95') or (
+            f"{_K6_TYPE_CONFIG_XLSX[fastest]['label']} is the fastest profile at {p95_vals[fastest]:.1f}ms p95, "
+            f"while {_K6_TYPE_CONFIG_XLSX[slowest]['label']} is the slowest at {p95_vals[slowest]:.1f}ms p95, "
+            f"both within their configured thresholds."
+        )
+        wsc.merge_cells(start_row=r, start_column=1, end_row=r + 2, end_column=8)
+        c = wsc.cell(row=r, column=1, value=f"AI Analysis: {p95_insight}")
+        c.font = Font(name=_XLSX_FONT, size=9, italic=True, color="6366F1")
+        c.alignment = Alignment(wrap_text=True, vertical="top")
+        c.fill = PatternFill("solid", fgColor="F8FAFC")
+        for row_ in range(r, r + 3):
+            for col_ in range(1, 9):
+                wsc.cell(row=row_, column=col_).border = _XLSX_BORDER
+        r += 4
+    r += 12
+
+    # ── Throughput chart ────────────────────────────────────────────────────
+    wsc.cell(row=r, column=1, value="Throughput (req/s) by Test Type").font = Font(
+        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
+    r += 1
+    thr_hdr_row = r
+    _perf_xlsx_header_row(wsc, r, ["Test Type", "Throughput (req/s)"])
+    r += 1
+    thr_vals = {}
+    for tk in TYPE_ORDER_CHARTS:
+        if tk not in summary:
+            continue
+        metrics = (summary.get(tk) or {}).get('metrics') or {}
+        try:
+            rps = float(metrics.get('http_reqs_per_second') or 0)
+        except Exception:
+            rps = 0
+        thr_vals[tk] = rps
+        cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {'label': tk, 'color': '64748B'})
+        c1 = wsc.cell(row=r, column=1, value=cfg['label'])
+        c1.font = Font(name=_XLSX_FONT, bold=True, size=9, color=cfg['color'])
+        c1.border = _XLSX_BORDER
+        c2 = wsc.cell(row=r, column=2, value=round(rps, 1))
+        c2.font = Font(name=_XLSX_FONT, size=9, color="1E293B")
+        c2.alignment = Alignment(horizontal="center")
+        c2.border = _XLSX_BORDER
+        r += 1
+    thr_end_row = r - 1
+
+    if thr_end_row >= thr_hdr_row + 1:
+        bar_chart = BarChart()
+        bar_chart.type = "col"
+        bar_chart.title = "Throughput (req/s) by Test Type"
+        bar_chart.y_axis.title = "Requests / second"
+        cats_ref = Reference(wsc, min_col=1, min_row=thr_hdr_row + 1, max_row=thr_end_row)
+        data_ref = Reference(wsc, min_col=2, min_row=thr_hdr_row, max_row=thr_end_row)
+        bar_chart.add_data(data_ref, titles_from_data=True)
+        bar_chart.set_categories(cats_ref)
+        bar_chart.series[0].graphicalProperties.solidFill = "F59E0B"
+        bar_chart.width = 16
+        bar_chart.height = 8
+        wsc.add_chart(bar_chart, f"D{thr_hdr_row}")
+
+    r += 1
+    if thr_vals:
+        highest = max(thr_vals, key=thr_vals.get)
+        thr_insight = chart_insights.get('throughput') or (
+            f"{_K6_TYPE_CONFIG_XLSX[highest]['label']} sustains the highest throughput at "
+            f"{thr_vals[highest]:.1f} req/s, showing the application's capacity under that load pattern."
+        )
+        wsc.merge_cells(start_row=r, start_column=1, end_row=r + 2, end_column=8)
+        c = wsc.cell(row=r, column=1, value=f"AI Analysis: {thr_insight}")
+        c.font = Font(name=_XLSX_FONT, size=9, italic=True, color="F59E0B")
+        c.alignment = Alignment(wrap_text=True, vertical="top")
+        c.fill = PatternFill("solid", fgColor="F8FAFC")
+        for row_ in range(r, r + 3):
+            for col_ in range(1, 9):
+                wsc.cell(row=row_, column=col_).border = _XLSX_BORDER
+        r += 4
+    r += 12
+
+    # ── Pass/Fail Distribution — AI insight (chart itself lives in Overview) ─
+    wsc.cell(row=r, column=1, value="Pass / Fail Distribution — AI Analysis").font = Font(
+        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
+    r += 1
+    breakdown_insight = chart_insights.get('breakdown') or (
+        "All threshold validations completed without failures or warnings, demonstrating "
+        "consistent reliability across every executed load profile."
+        if fail_count == 0 else
+        f"{fail_count} threshold check(s) failed — see the Threshold Validation sheet for the "
+        f"profile(s) responsible."
+    )
+    wsc.merge_cells(start_row=r, start_column=1, end_row=r + 2, end_column=8)
+    c = wsc.cell(row=r, column=1, value=f"AI Analysis: {breakdown_insight}")
+    c.font = Font(name=_XLSX_FONT, size=9, italic=True, color="8B5CF6")
+    c.alignment = Alignment(wrap_text=True, vertical="top")
+    c.fill = PatternFill("solid", fgColor="F8FAFC")
+    for row_ in range(r, r + 3):
+        for col_ in range(1, 9):
+            wsc.cell(row=row_, column=col_).border = _XLSX_BORDER
+    r += 4
+    wsc.cell(row=r, column=1, value=
+        "Note: see the 'Pass / Fail by Test Type' chart on the Overview sheet for the visual breakdown."
+    ).font = Font(name=_XLSX_FONT, size=8, italic=True, color="94A3B8")
+
+    _perf_xlsx_autofit(wsc, [22, 18, 12, 12, 12, 12, 12, 12])
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 3 — Test Scenarios (test plan)
+    # ══════════════════════════════════════════════════════════════════════
+    ws3 = wb.create_sheet("Test Scenarios")
+    ws3.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws3, 1, ["Test Type", "#", "Scenario", "Category", "Priority", "Tested"])
+    ws3.freeze_panes = "A2"
+
+    CAT_COLOR = {"PERFORMANCE": "6366F1", "RELIABILITY": "EF4444", "SCALABILITY": "0EA5E9"}
+    PRI_COLOR = {"HIGH": "EF4444", "MEDIUM": "F59E0B", "LOW": "10B981"}
+    row = 2
+    for tk in ('load', 'stress', 'spike', 'soak'):
+        if tk not in summary and tk not in type_stats:
+            continue
+        cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {'label': tk, 'color': '64748B'})
+        group_tests = [t for t in tests if f'[{cfg["label"]}]'.lower() in t.get('name', '').lower()]
+        for i, (title, desc, cat, pri) in enumerate(_K6_CHECK_PLAN_XLSX, start=1):
+            was_tested = any(title in t.get('name', '') for t in group_tests)
+            vals = [cfg['label'], i, f"{title} — {desc}", cat, pri, "Yes" if was_tested else "No"]
+            for col, v in enumerate(vals, start=1):
+                c = ws3.cell(row=row, column=col, value=v)
+                c.font = Font(name=_XLSX_FONT, size=9,
+                              color=(cfg['color'] if col == 1 else
+                                     CAT_COLOR.get(cat, "64748B") if col == 4 else
+                                     PRI_COLOR.get(pri, "F59E0B") if col == 5 else
+                                     ("10B981" if was_tested else "94A3B8") if col == 6 else "1E293B"),
+                              bold=(col in (1, 4, 5, 6)))
+                c.alignment = Alignment(horizontal="center" if col in (2, 4, 5, 6) else "left",
+                                         vertical="top", wrap_text=(col == 3))
+                c.border = _XLSX_BORDER
+            ws3.row_dimensions[row].height = 24
+            row += 1
+    _perf_xlsx_title(ws3, "🎯  k6 PERFORMANCE TEST SCENARIOS", "7D64FF")
+    _perf_xlsx_autofit(ws3, [16, 5, 55, 16, 12, 10])
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 4 — Detailed Results (one row per assertion)
+    # ══════════════════════════════════════════════════════════════════════
+    ws4 = wb.create_sheet("Detailed Results")
+    ws4.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws4, 1, ["#", "Test Name", "Type", "Section", "Status", "Result / Value"])
+    ws4.freeze_panes = "A2"
+
+    for idx, t in enumerate(tests, start=1):
+        row = idx + 1
+        status = t.get('status', 'skip')
+        s_color, s_bg = STATUS_COLOR.get(status, ("94A3B8", "FFFFFF"))
+        name = t.get('name', '')
+        tk = 'load'
+        if 'Stress' in name: tk = 'stress'
+        elif 'Spike' in name: tk = 'spike'
+        elif 'Soak' in name: tk = 'soak'
+        cfg = _K6_TYPE_CONFIG_XLSX.get(tk, {'label': tk, 'color': '64748B'})
+        section = t.get('section', '-')
+        suite = t.get('suite', '-')
+        vals = [idx, name, cfg['label'], section, status.upper(), suite]
+        for col, v in enumerate(vals, start=1):
+            c = ws4.cell(row=row, column=col, value=v)
+            c.font = Font(name=_XLSX_FONT, size=9,
+                          color=(cfg['color'] if col == 3 else s_color if col == 5 else "1E293B"),
+                          bold=(col in (3, 5)))
+            c.alignment = Alignment(horizontal="center" if col in (1, 3, 4, 5) else "left",
+                                     vertical="top", wrap_text=(col == 6))
+            c.border = _XLSX_BORDER
+            if col == 5:
+                c.fill = PatternFill("solid", fgColor=s_bg)
+        ws4.row_dimensions[row].height = 20
+    _perf_xlsx_title(ws4, "🔬  DETAILED TEST RESULTS", "0D9488")
+    _perf_xlsx_autofit(ws4, [5, 42, 14, 18, 12, 45])
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 5 — Threshold Validation (cross-tab section x type)
+    # ══════════════════════════════════════════════════════════════════════
+    ws5 = wb.create_sheet("Threshold Validation")
+    ws5.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws5, 1, ["Section", "Load", "Stress", "Spike", "Soak", "Status"])
+    ws5.freeze_panes = "A2"
+
+    SECTION_ORDER = ['Response Time', 'Error Rate', 'Throughput', 'Scalability', 'Reliability', 'Thresholds']
+    grouped = {s: {'load': {'total': 0, 'fail': 0}, 'stress': {'total': 0, 'fail': 0},
+                   'spike': {'total': 0, 'fail': 0}, 'soak': {'total': 0, 'fail': 0}} for s in SECTION_ORDER}
+    for t in tests:
+        name = t.get('name', '')
+        section = t.get('section', 'Thresholds')
+        if section not in grouped:
+            continue
+        tk = 'load'
+        if 'Stress' in name: tk = 'stress'
+        elif 'Spike' in name: tk = 'spike'
+        elif 'Soak' in name: tk = 'soak'
+        grouped[section][tk]['total'] += 1
+        if t.get('status') == 'fail':
+            grouped[section][tk]['fail'] += 1
+
+    row = 2
+    for section in SECTION_ORDER:
+        d = grouped[section]
+        any_fail = any(v['fail'] > 0 for v in d.values())
+        row_bg = "FEE2E2" if any_fail else "D1FAE5"
+        vals = [section]
+        for tk in ('load', 'stress', 'spike', 'soak'):
+            dd = d[tk]
+            vals.append(f"{dd['total']} ({dd['fail']} fail)" if dd['fail'] > 0 else (dd['total'] if dd['total'] else '—'))
+        vals.append("FAIL" if any_fail else "PASS")
+        for col, v in enumerate(vals, start=1):
+            c = ws5.cell(row=row, column=col, value=v)
+            c.font = Font(name=_XLSX_FONT, size=9, bold=(col in (1, 6)),
+                          color=("EF4444" if (col == 6 and any_fail) else "10B981" if col == 6 else "1E293B"))
+            c.fill = PatternFill("solid", fgColor=row_bg)
+            c.alignment = Alignment(horizontal="center" if col > 1 else "left", vertical="center")
+            c.border = _XLSX_BORDER
+        row += 1
+    _perf_xlsx_title(ws5, "✓  THRESHOLD VALIDATION", "7D64FF")
+    _perf_xlsx_autofit(ws5, [22, 18, 18, 18, 18, 12])
+     # ══════════════════════════════════════════════════════════════════════
+    # SHEET — Environment
+    # ══════════════════════════════════════════════════════════════════════
+    wse = wb.create_sheet("Environment")
+    wse.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(wse, 1, ["Property", "Value"])
+    wse.freeze_panes = "A2"
+
+    now_env = datetime.now()
+    url_display = url.replace('https://', '').replace('http://', '')
+    env_items = [
+        ("Load Generator",  "k6"),
+        ("Target URL",      url_display),
+        ("Execution Time",  now_env.strftime('%H:%M')),
+        ("Test Profiles",   f"{len(summary)} ({', '.join(k.title() for k in summary)})"),
+        ("NexTest Version", generation_data.get('nextest_version', '1.0.0')),
+        ("Framework",       "k6 Load Testing"),
+    ]
+    r = 2
+    for lbl, val in env_items:
+        c1 = wse.cell(row=r, column=1, value=lbl)
+        c1.font = Font(name=_XLSX_FONT, bold=True, size=9, color="7D64FF")
+        c1.fill = PatternFill("solid", fgColor="F8FAFC")
+        c1.border = _XLSX_BORDER
+        c2 = wse.cell(row=r, column=2, value=val)
+        c2.font = Font(name=_XLSX_FONT, size=9, color="1E293B")
+        c2.border = _XLSX_BORDER
+        r += 1
+    _perf_xlsx_title(wse, "⚙️  EXECUTION ENVIRONMENT", "7D64FF")
+    _perf_xlsx_autofit(wse, [24, 40])
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 6 — AI Recommendations
+    # ══════════════════════════════════════════════════════════════════════
+    ws6 = wb.create_sheet("AI Recommendations")
+    ws6.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws6, 1, ["Priority", "Category", "Issue"])
+
+    categorized = (
+        [('PERFORMANCE', 'HIGH' if 'exceeded' in r else 'MEDIUM', r) for r in perf_recs] +
+        [('RELIABILITY', 'HIGH' if r.lower().startswith('fix') else 'LOW', r) for r in rel_recs] +
+        [('UX', 'MEDIUM' if 'error rate' in r.lower() else 'LOW', r) for r in ux_recs]
+    )
+    PRI_BG    = {"HIGH": "FEE2E2", "MEDIUM": "FFFBEB", "LOW": "D1FAE5"}
+    PRI_COLOR2 = {"HIGH": "EF4444", "MEDIUM": "F59E0B", "LOW": "10B981"}
+    r = 2
+    for category, priority, issue in categorized:
+        vals = [priority, category, issue]
+        for col, v in enumerate(vals, start=1):
+            c = ws6.cell(row=r, column=col, value=v)
+            c.font = Font(name=_XLSX_FONT, size=9, bold=(col == 1),
+                          color=PRI_COLOR2.get(priority, "F59E0B") if col == 1 else "1E293B")
+            c.alignment = Alignment(vertical="top", wrap_text=(col == 3),
+                                     horizontal="center" if col == 1 else "left")
+            c.fill = PatternFill("solid", fgColor=PRI_BG.get(priority, "FFFBEB"))
+            c.border = _XLSX_BORDER
+        ws6.row_dimensions[r].height = 28
+        r += 1
+    _perf_xlsx_title(ws6, "🤖  AI RECOMMENDATIONS", "4F46E5")
+    _perf_xlsx_autofit(ws6, [12, 16, 90])
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 7 — Action Plan
+    # ══════════════════════════════════════════════════════════════════════
+    ws7 = wb.create_sheet("Action Plan")
+    ws7.sheet_view.showGridLines = False
+    _perf_xlsx_header_row(ws7, 1, ["#", "Scenario", "Category", "Priority", "Action", "Responsible", "Deadline", "Status"])
+    ws7.freeze_panes = "A2"
+
+    ACT_PRI_BG    = {"HIGH": "FEE2E2", "MEDIUM": "FFFBEB", "LOW": "D1FAE5"}
+    ACT_PRI_COLOR = {"HIGH": "EF4444", "MEDIUM": "F59E0B", "LOW": "10B981"}
+    r = 2
+    for i, item in enumerate(action_plan, start=1):
+        priority = item.get('priority', 'MEDIUM')
+        vals = [i, item.get('scenario', ''), item.get('category', ''), priority,
+                item.get('action', ''), item.get('responsible', ''), item.get('deadline', ''),
+                item.get('status', 'To Do')]
+        for col, v in enumerate(vals, start=1):
+            c = ws7.cell(row=r, column=col, value=v)
+            c.font = Font(name=_XLSX_FONT, size=9, bold=(col == 4),
+                          color=ACT_PRI_COLOR.get(priority, "F59E0B") if col == 4 else "1E293B")
+            c.alignment = Alignment(vertical="top", wrap_text=(col in (2, 5)),
+                                     horizontal="center" if col in (1, 4, 6, 7, 8) else "left")
+            if col == 4:
+                c.fill = PatternFill("solid", fgColor=ACT_PRI_BG.get(priority, "FFFBEB"))
+            c.border = _XLSX_BORDER
+        ws7.row_dimensions[r].height = 32
+        r += 1
+    _perf_xlsx_title(ws7, "📋  AI-GENERATED ACTION PLAN", "C9A227")
+    _perf_xlsx_autofit(ws7, [5, 26, 16, 12, 30, 14, 14, 12])
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 8 — Executive Summary
+    # ══════════════════════════════════════════════════════════════════════
+    ws8 = wb.create_sheet("Executive Summary")
+    ws8.sheet_view.showGridLines = False
+
+    verdict_pass = fail_count == 0
+    verdict_color = "10B981" if verdict_pass else "EF4444"
+    verdict_bg = "D1FAE5" if verdict_pass else "FEE2E2"
+    verdict_label = "PASS" if verdict_pass else "FAIL"
+    verdict_text = (
+        f"k6 Performance Test PASSED — all {pass_count} threshold checks were met across every load profile. "
+        f"The application demonstrates stable performance under the tested traffic patterns."
+        if verdict_pass else
+        f"k6 Performance Test FAILED — {fail_count} of {total} threshold(s) were exceeded. Address the "
+        f"failing checks identified in this report before promoting this build to production."
+    )
+
+    ws8.merge_cells("A1:D1")
+    c = ws8.cell(row=1, column=1, value=f"[{verdict_label}] Final AI Verdict")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=13, color=verdict_color)
+    ws8.merge_cells("A2:D4")
+    c = ws8.cell(row=2, column=1, value=verdict_text)
+    c.font = Font(name=_XLSX_FONT, size=10, color=verdict_color)
+    c.alignment = Alignment(wrap_text=True, vertical="top")
+    for row in range(2, 5):
+        for col in range(1, 5):
+            ws8.cell(row=row, column=col).fill = PatternFill("solid", fgColor=verdict_bg)
+
+    r = 6
+    ws8.merge_cells(f"A{r}:D{r}")
+    c = ws8.cell(row=r, column=1,
+                 value=f"Quality Score: {k6_score}/100  |  Pass Rate: {pass_rate}%  |  "
+                       f"Checks: {pass_count} passed / {fail_count} failed / {total} total")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=10, color="1E293B")
+    r += 3
+
+    ws8.cell(row=r, column=1, value="Top Priority Actions").font = Font(
+        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
+    r += 1
+    PRI_ORDER = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+    top_actions = sorted(action_plan, key=lambda x: PRI_ORDER.get(x.get('priority', 'MEDIUM'), 1))[:2]
+    for i, item in enumerate(top_actions, start=1):
+        ws8.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+        c = ws8.cell(row=r, column=1, value=f"{i}. {item.get('category','—').upper()} — {item.get('scenario','')}")
+        c.font = Font(name=_XLSX_FONT, bold=True, size=10, color="C9A227")
+        r += 1
+        ws8.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+        c = ws8.cell(row=r, column=1, value=item.get('action', '—'))
+        c.font = Font(name=_XLSX_FONT, size=9, color="475569")
+        c.alignment = Alignment(wrap_text=True, vertical="top")
+        ws8.row_dimensions[r].height = 26
+        r += 2
+
+    if top_actions:
+        if k6_score >= 90:
+            insight = (f'These {len(top_actions)} action(s) are proactive optimizations rather than corrections — '
+                       f'the current score of {k6_score}/100 for {url} already reflects a healthy performance '
+                       f'baseline. Applying them helps preserve headroom as traffic grows.')
+        else:
+            insight = (f'Addressing these {len(top_actions)} action(s) targets the largest contributors to the '
+                       f'current score of {k6_score}/100 for {url}. Re-run the k6 suite after applying them to '
+                       f'confirm improvement.')
+        ws8.merge_cells(f"A{r}:D{r+2}")
+        c = ws8.cell(row=r, column=1, value=f"AI Analysis: {insight}")
+        c.font = Font(name=_XLSX_FONT, size=9, italic=True, color="4F46E5")
+        c.alignment = Alignment(wrap_text=True, vertical="top")
+        c.fill = PatternFill("solid", fgColor="F8FAFC")
+
+    _perf_xlsx_autofit(ws8, [24, 24, 24, 24])
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SHEET 9 — Certificate
+    # ══════════════════════════════════════════════════════════════════════
+    ws9 = wb.create_sheet("Certificate")
+    ws9.sheet_view.showGridLines = False
+
+    grade, grade_color_hex = _grade_from_score(k6_score)
+    grade_color = grade_color_hex.lstrip('#').upper()
+
+    ws9.merge_cells("A1:D1")
+    c = ws9.cell(row=1, column=1, value="CERTIFICATE OF PERFORMANCE ANALYSIS")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=13, color="94A3B8")
+    c.alignment = Alignment(horizontal="center")
+
+    ws9.merge_cells("A3:D3")
+    c = ws9.cell(row=3, column=1, value=url)
+    c.font = Font(name=_XLSX_FONT, italic=True, size=12, color="1E293B")
+    c.alignment = Alignment(horizontal="center")
+
+    ws9.merge_cells("A5:D5")
+    c = ws9.cell(row=5, column=1, value=f"{k6_score} / 100")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=30, color=score_color)
+    c.alignment = Alignment(horizontal="center")
+
+    ws9.merge_cells("A7:B7")
+    c = ws9.cell(row=7, column=1, value=f"GRADE {grade}")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=11, color="FFFFFF")
+    c.fill = PatternFill("solid", fgColor=grade_color)
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws9.merge_cells("C7:D7")
+    c = ws9.cell(row=7, column=3, value=score_label.upper())
+    c.font = Font(name=_XLSX_FONT, bold=True, size=11, color=score_color)
+    c.border = Border(left=Side(style="thin", color=score_color), right=Side(style="thin", color=score_color),
+                       top=Side(style="thin", color=score_color), bottom=Side(style="thin", color=score_color))
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws9.row_dimensions[7].height = 22
+
+    ws9.merge_cells("A9:D9")
+    c = ws9.cell(row=9, column=1, value=f"Validated by NexTest AI  •  {datetime.now().strftime('%Y-%m-%d')}")
     c.font = Font(name=_XLSX_FONT, italic=True, size=8, color="94A3B8")
     c.alignment = Alignment(horizontal="center")
 
-    _perf_xlsx_autofit(ws12, [20, 20, 20, 20])
+    _perf_xlsx_autofit(ws9, [20, 20, 20, 20])
 
-    # ── Ordre final des feuilles — respecte exactement la structure demandée ─
-    sheet_order = [
-        "01_Executive_Summary", "02_Overview", "03_Key_Metrics", "04_Test_Scenarios",
-        "05_Results_by_Test_Type", "06_Performance_Analysis", "07_Threshold_Validation",
-        "08_Environment", "09_Detailed_Test_Results", "10_AI_Recommendations",
-        "11_Action_Plan", "12_Certificate",
+    # ── Réordonner les feuilles pour suivre le flux du PDF ──────────────────
+    pdf_order = [
+        "Overview",
+        "Key Metrics",
+        "Test Scenarios",
+        "Detailed Results",
+        "Charts & Analysis",
+        "Threshold Validation",
+        "Environment",
+        "AI Recommendations",
+        "Action Plan",
+        "Executive Summary",
+        "Certificate",
     ]
-    wb._sheets = [wb[name] for name in sheet_order if name in wb.sheetnames]
-    wb.active = 0
+    wb._sheets = [wb[name] for name in pdf_order if name in wb.sheetnames]
 
     buffer = BytesIO()
     wb.save(buffer)
     return buffer.getvalue()
-# ═════════════════════════════════════════════════════════════════════════════
-# SMOKE TEST — PUBLIC REPORT (k6-style premium layout)
-# ═════════════════════════════════════════════════════════════════════════════
-
-SMOKE_ACCENT = HexColor('#0EA5E9')   # sky blue accent for smoke reports
-
-# category (from generator.py CATEGORY_MAP) -> (Display Label, color hex)
-SMOKE_CATEGORY_META = {
-    'structure':     ('Rendering',      '#8b5cf6'),
-    'security':      ('Security',       '#ef4444'),
-    'action':        ('Navigation',     '#10b981'),   # CTA buttons treated as nav actions
-    'navigation':    ('Navigation',     '#10b981'),
-    'form':          ('Forms',          '#f59e0b'),
-    'branding':      ('Branding',       '#ec4899'),
-    'content':       ('Rendering',      '#8b5cf6'),
-    'accessibility': ('Accessibility',  '#0ea5e9'),
-    'technical':     ('Security',       '#ef4444'),
-    'performance':   ('Rendering',      '#8b5cf6'),
-}
-
-SMOKE_CATEGORY_ORDER = ['Navigation', 'Branding', 'Forms', 'Images', 'Security', 'Accessibility', 'Rendering']
-
-
-def _smoke_category_label(test: dict) -> tuple:
-    """Maps a raw test's category/type to one of the 7 public smoke categories."""
-    cat  = (test.get('category') or '').lower()
-    typ  = (test.get('type') or '').lower()
-    name = (test.get('name') or '').lower()
-
-    if typ == 'image' or 'image' in name:
-        return 'Images', '#ec4899'
-    if typ in ('logo',) or 'logo' in name or cat == 'branding':
-        return 'Branding', '#ec4899'
-    if typ in ('navigation', 'nav_link', 'cta', 'pagination') or cat in ('navigation', 'action'):
-        return 'Navigation', '#10b981'
-    if typ in ('input_field',) or cat == 'form':
-        return 'Forms', '#f59e0b'
-    if typ in ('http_status', 'ssl') or cat in ('security', 'technical'):
-        return 'Security', '#ef4444'
-    if typ in ('lang_switch',) or cat == 'accessibility':
-        return 'Accessibility', '#0ea5e9'
-    return 'Rendering', '#8b5cf6'
-
-
-def _smoke_chapter_header(elements, number: str, title: str):
-    """Premium numbered section divider — same visual language as the k6 report."""
-    num_display = str(number).zfill(2)
-
-    badge = Table([[Paragraph(
-        f'<font color="white" size="13"><b>{num_display}</b></font>',
-        ParagraphStyle('SmChapNum', fontSize=13, fontName='Helvetica-Bold',
-                        alignment=TA_CENTER, leading=15))
-    ]], colWidths=[14*mm], rowHeights=[14*mm])
-    badge.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), SMOKE_ACCENT),
-        ('VALIGN',     (0,0), (-1,-1), 'MIDDLE'),
-        ('ALIGN',      (0,0), (-1,-1), 'CENTER'),
-    ]))
-
-    title_block = Table([
-        [Paragraph(f'<font color="#94a3b8" size="7"><b>SECTION {num_display}</b></font>',
-                   ParagraphStyle('SmChapEyebrow', fontSize=7, fontName='Helvetica-Bold', leading=8.5))],
-        [Paragraph(f'<font color="#1e293b" size="14"><b>{title}</b></font>',
-                   ParagraphStyle('SmChapTitle', fontSize=14, fontName='Helvetica-Bold', leading=17))],
-    ], colWidths=[148*mm])
-    title_block.setStyle(TableStyle([
-        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING',    (0,0), (-1,0), 0),
-        ('BOTTOMPADDING', (0,0), (-1,0), 2),
-        ('TOPPADDING',    (0,1), (-1,1), 0),
-        ('BOTTOMPADDING', (0,1), (-1,1), 0),
-        ('LEFTPADDING',   (0,0), (-1,-1), 0),
-    ]))
-
-    row = Table([[badge, title_block]], colWidths=[17*mm, 151*mm])
-    row.setStyle(TableStyle([
-        ('VALIGN',      (0,0), (-1,-1), 'MIDDLE'),
-        ('LEFTPADDING', (0,0), (-1,-1), 0),
-    ]))
-
-    elements.append(Spacer(1, 10))
-    elements.append(row)
-    elements.append(HRFlowable(width='100%', thickness=2, color=SMOKE_ACCENT, spaceBefore=6, spaceAfter=12))
-
-
-def _smoke_insight_box(text, color, width=161, label="AI Analysis"):
-    tbl = Table([[Paragraph(
-        f'<font color="{color}" size="7.5"><b>{label}: </b></font>'
-        f'<font color="#475569" size="7.5">{text}</font>',
-        ParagraphStyle('SmInsight', fontSize=7.5, fontName='Helvetica', leading=11))
-    ]], colWidths=[width*mm])
-    tbl.setStyle(TableStyle([
-        ('BACKGROUND',    (0,0), (-1,-1), HexColor('#f8fafc')),
-        ('BOX',           (0,0), (-1,-1), 0.8, HexColor(color)),
-        ('LINEBEFORE',    (0,0), (0,-1),  3,   HexColor(color)),
-        ('LEFTPADDING',   (0,0), (-1,-1), 10),
-        ('RIGHTPADDING',  (0,0), (-1,-1), 10),
-        ('TOPPADDING',    (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-    ]))
-    return tbl
-
-
-def _compute_smoke_score(tests: list) -> tuple:
-    """Weighted smoke score — HIGH-tier checks (body/heading/auth/http/ssl/load) count more."""
-    if not tests:
-        return 0, 'Critical', '#ef4444'
-
-    HIGH_TYPES = {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl', 'performance'}
-    total_weight = 0
-    earned_weight = 0
-    for t in tests:
-        w = 3 if t.get('type') in HIGH_TYPES else 1
-        total_weight += w
-        if t.get('status') == 'pass':
-            earned_weight += w
-
-    score = round(earned_weight / total_weight * 100) if total_weight else 0
-    if score >= 90:
-        label, color = 'Excellent', '#10b981'
-    elif score >= 75:
-        label, color = 'Good', '#22c55e'
-    elif score >= 50:
-        label, color = 'Acceptable', '#f59e0b'
-    else:
-        label, color = 'Critical', '#ef4444'
-    return score, label, color
-
-
-def _make_smoke_category_chart(tests: list):
-    """Passed vs Failed by category — bar chart, same visual family as k6/performance charts."""
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from io import BytesIO as BIO
-    from reportlab.platypus import Image as RLImage
-
-    cats = {c: {'pass': 0, 'fail': 0} for c in SMOKE_CATEGORY_ORDER}
-    for t in tests:
-        label, _ = _smoke_category_label(t)
-        if t.get('status') == 'pass':
-            cats[label]['pass'] += 1
-        elif t.get('status') == 'fail':
-            cats[label]['fail'] += 1
-
-    labels = [c for c in SMOKE_CATEGORY_ORDER if cats[c]['pass'] + cats[c]['fail'] > 0]
-    if not labels:
-        labels = SMOKE_CATEGORY_ORDER
-
-    p = [cats[c]['pass'] for c in labels]
-    f = [cats[c]['fail'] for c in labels]
-
-    plt.rcParams.update({'font.family': 'DejaVu Sans', 'axes.spines.top': False, 'axes.spines.right': False})
-    fig, ax = plt.subplots(figsize=(8, 3.4), facecolor='white')
-    ax.set_facecolor('#f8fafc')
-    x = np.arange(len(labels))
-    ax.bar(x, p, width=0.55, color='#10b981', edgecolor='white', label='Passed', zorder=3)
-    ax.bar(x, f, width=0.55, bottom=p, color='#ef4444', edgecolor='white', label='Failed', zorder=3)
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=8.5, color='#475569', fontweight='bold', rotation=15)
-    ax.set_ylabel('Checks', fontsize=8, color='#64748b')
-    ax.grid(axis='y', color='#f1f5f9', linewidth=1, zorder=0)
-    ax.legend(fontsize=8, frameon=False, loc='upper right')
-    fig.text(0.02, 0.97, 'Category Breakdown Chart', fontsize=11, fontweight='bold', color='#1e293b', va='top')
-    plt.subplots_adjust(top=0.85, bottom=0.2, left=0.08, right=0.97)
-    buf = BIO()
-    fig.savefig(buf, format='png', dpi=170, bbox_inches='tight', facecolor='white')
-    plt.close()
-    buf.seek(0)
-    return RLImage(buf, width=155*mm, height=68*mm), cats
-
-def _make_smoke_status_bar_chart(tests: list):
-    """Pass/Fail/Skipped distribution — horizontal bar chart (replaces donut)."""
-    import matplotlib.pyplot as plt
-    from io import BytesIO as BIO
-    from reportlab.platypus import Image as RLImage
-
-    pass_c = sum(1 for t in tests if t.get('status') == 'pass')
-    fail_c = sum(1 for t in tests if t.get('status') == 'fail')
-    skip_c = sum(1 for t in tests if t.get('status') not in ('pass', 'fail'))
-    total  = pass_c + fail_c + skip_c or 1
-
-    labels = ['Passed', 'Failed', 'Skipped']
-    values = [pass_c, fail_c, skip_c]
-    colors = ['#10b981', '#ef4444', '#f59e0b']
-
-    plt.rcParams.update({'font.family': 'DejaVu Sans', 'axes.spines.top': False, 'axes.spines.right': False})
-    fig, ax = plt.subplots(figsize=(8, 3.2), facecolor='white')
-    ax.set_facecolor('#f8fafc')
-    y_pos = range(len(labels))
-    bars = ax.barh(y_pos, values, color=colors, edgecolor='white', height=0.55, zorder=3)
-    max_v = max(values) or 1
-    for bar, v in zip(bars, values):
-        pct = round(v / total * 100)
-        ax.text(bar.get_width() + max_v * 0.02, bar.get_y() + bar.get_height()/2,
-                 f'{v}  ({pct}%)', va='center', fontsize=9.5, fontweight='bold', color='#1e293b')
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=10, color='#475569', fontweight='bold')
-    ax.set_xlabel('Checks', fontsize=8, color='#64748b')
-    ax.set_xlim(0, max_v * 1.35)
-    ax.grid(axis='x', color='#f1f5f9', linewidth=1, zorder=0)
-    ax.invert_yaxis()
-    fig.text(0.02, 0.95, 'Pass / Fail / Skipped Distribution', fontsize=11, fontweight='bold', color='#1e293b', va='top')
-    plt.subplots_adjust(top=0.82, bottom=0.16, left=0.14, right=0.95)
-    buf = BIO()
-    fig.savefig(buf, format='png', dpi=170, bbox_inches='tight', facecolor='white')
-    plt.close()
-    buf.seek(0)
-    return RLImage(buf, width=155*mm, height=62*mm)
-
-def build_smoke_category_summary(elements, tests: list):
-    """Results by Category — Total/Passed/Failed/Pass Rate/Verdict per public category."""
-    elements.append(section_header('', 'Results by Category', SMOKE_ACCENT))
-    elements.append(Spacer(1, 8))
-
-    cats = {c: {'pass': 0, 'fail': 0, 'total': 0} for c in SMOKE_CATEGORY_ORDER}
-    for t in tests:
-        label, _ = _smoke_category_label(t)
-        cats[label]['total'] += 1
-        if t.get('status') == 'pass':
-            cats[label]['pass'] += 1
-        elif t.get('status') == 'fail':
-            cats[label]['fail'] += 1
-
-    hdr = [
-        Paragraph('<font color="#ffffff"><b>Category</b></font>', ParagraphStyle('SmCH1', fontSize=8, fontName='Helvetica-Bold')),
-        Paragraph('<font color="#ffffff"><b>Total</b></font>', ParagraphStyle('SmCH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Passed</b></font>', ParagraphStyle('SmCH3', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Failed</b></font>', ParagraphStyle('SmCH4', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Pass Rate</b></font>', ParagraphStyle('SmCH5', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Verdict</b></font>', ParagraphStyle('SmCH6', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-    ]
-    rows = [hdr]
-    row_styles = []
-    for cat in SMOKE_CATEGORY_ORDER:
-        d = cats[cat]
-        if d['total'] == 0:
-            continue
-        rate = round(d['pass'] / d['total'] * 100)
-        rate_color = '#10b981' if rate == 100 else '#f59e0b' if rate >= 60 else '#ef4444'
-        verdict = 'PASS' if d['fail'] == 0 else 'FAIL'
-        vc = '#10b981' if d['fail'] == 0 else '#ef4444'
-        row_bg = HexColor('#f0fdf4') if d['fail'] == 0 else HexColor('#fef2f2')
-        rows.append([
-            Paragraph(f'<font color="#1e293b"><b>{cat}</b></font>', ParagraphStyle('SmCC', fontSize=8, fontName='Helvetica-Bold')),
-            Paragraph(f'<font color="#1e293b"><b>{d["total"]}</b></font>', ParagraphStyle('SmCT', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="#10b981"><b>{d["pass"]}</b></font>', ParagraphStyle('SmCP', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="#ef4444"><b>{d["fail"]}</b></font>', ParagraphStyle('SmCF', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="{rate_color}"><b>{rate}%</b></font>', ParagraphStyle('SmCR', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="{vc}"><b>{verdict}</b></font>', ParagraphStyle('SmCV', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        ])
-        ri = len(rows) - 1
-        row_styles.append(('BACKGROUND', (0, ri), (-1, ri), row_bg))
-
-    tbl = Table(rows, colWidths=[36*mm, 22*mm, 22*mm, 22*mm, 26*mm, 40*mm], repeatRows=1)
-    tbl.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), NAVY),
-        ('PADDING',    (0,0), (-1,-1), 8),
-        ('LINEBELOW',  (0,0), (-1,-1), 0.4, BORDER),
-        ('BOX',        (0,0), (-1,-1), 0.8, SMOKE_ACCENT),
-        ('VALIGN',     (0,0), (-1,-1), 'MIDDLE'),
-        ('ALIGN',      (1,0), (5,-1), 'CENTER'),
-    ] + row_styles))
-    elements.append(tbl)
-    elements.append(Spacer(1, 16))
-
-
-def build_smoke_scenarios_table(elements, tests: list, url: str):
-    """Planned Smoke Test Scenarios table."""
-    elements.append(section_header('', 'Smoke Test Scenarios', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        f'<font color="#64748b" size="7.5"><i>'
-        f'Planned smoke checks for <b>{url}</b> — {len(tests)} scenarios validating '
-        f'the most critical functionalities before deeper testing.</i></font>',
-        ParagraphStyle('SmScInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    hdr = [
-        Paragraph('<font color="#ffffff"><b>#</b></font>', ParagraphStyle('SmSH0', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Scenario</b></font>', ParagraphStyle('SmSH1', fontSize=8, fontName='Helvetica-Bold')),
-        Paragraph('<font color="#ffffff"><b>Category</b></font>', ParagraphStyle('SmSH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Priority</b></font>', ParagraphStyle('SmSH3', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Expected</b></font>', ParagraphStyle('SmSH4', fontSize=8, fontName='Helvetica-Bold')),
-    ]
-    rows = [hdr]
-    row_styles = []
-    for i, t in enumerate(tests):
-        cat_label, cat_color = _smoke_category_label(t)
-        priority = (t.get('priority') or 'medium').lower()
-        pc = PRIORITY_COLORS.get(priority, '#f59e0b')
-        expected = t.get('reason') or t.get('expected') or t.get('description') or 'Element present and visible'
-        rows.append([
-            Paragraph(f'<font color="#64748b"><b>{i+1}</b></font>', ParagraphStyle('SmSID', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<b><font color="#1e293b" size="8">{t.get("name","")}</font></b>', ParagraphStyle('SmSN', fontSize=8, fontName='Helvetica', leading=11)),
-            Paragraph(f'<font color="{cat_color}"><b>{cat_label.upper()}</b></font>', ParagraphStyle('SmSC', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="{pc}"><b>{priority.upper()}</b></font>', ParagraphStyle('SmSP', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="#475569" size="7">{expected[:75]}</font>', ParagraphStyle('SmSE', fontSize=7, fontName='Helvetica', leading=10)),
-        ])
-        if i % 2 == 1:
-            row_styles.append(('BACKGROUND', (0, i+1), (-1, i+1), LIGHT_BG))
-
-    tbl = Table(rows, colWidths=[8*mm, 56*mm, 26*mm, 20*mm, 58*mm], repeatRows=1)
-    tbl.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), NAVY),
-        ('PADDING',    (0,0), (-1,-1), 7),
-        ('LINEBELOW',  (0,0), (-1,-1), 0.4, BORDER),
-        ('BOX',        (0,0), (-1,-1), 0.8, SMOKE_ACCENT),
-        ('VALIGN',     (0,0), (-1,-1), 'TOP'),
-        ('ALIGN',      (0,0), (0,-1), 'CENTER'),
-        ('ALIGN',      (2,0), (3,-1), 'CENTER'),
-        ('LINEBEFORE', (2,1), (2,-1), 1, BORDER),
-        ('LINEBEFORE', (4,1), (4,-1), 1, BORDER),
-    ] + row_styles))
-    elements.append(tbl)
-    elements.append(Spacer(1, 16))
-
-
-def build_smoke_detailed_results(elements, tests: list):
-    """Detailed Smoke Results table — real Playwright execution data."""
-    elements.append(section_header('', 'Detailed Smoke Results', TEAL))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Real results from Playwright execution. Every value comes directly from the test runner.'
-        '</i></font>', ParagraphStyle('SmDRInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    hdr = [
-        Paragraph('<font color="#ffffff"><b>#</b></font>', ParagraphStyle('SmDH0', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Test Name</b></font>', ParagraphStyle('SmDH1', fontSize=8, fontName='Helvetica-Bold')),
-        Paragraph('<font color="#ffffff"><b>Category</b></font>', ParagraphStyle('SmDH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Status</b></font>', ParagraphStyle('SmDH3', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Result / Reason</b></font>', ParagraphStyle('SmDH4', fontSize=8, fontName='Helvetica-Bold')),
-        Paragraph('<font color="#ffffff"><b>Duration</b></font>', ParagraphStyle('SmDH5', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-    ]
-    rows = [hdr]
-    row_styles = []
-    for i, t in enumerate(tests):
-        status  = t.get('status', 'skip')
-        sc      = '#10b981' if status == 'pass' else '#ef4444' if status == 'fail' else '#f59e0b'
-        s_label = '✓  PASS' if status == 'pass' else '✗  FAIL' if status == 'fail' else '■  SKIP'
-        s_bg    = HexColor('#f0fdf4') if status == 'pass' else HexColor('#fef2f2') if status == 'fail' else HexColor('#fffbeb')
-        cat_label, cat_color = _smoke_category_label(t)
-        reason  = t.get('reason') or t.get('reason_pass') or t.get('suite') or t.get('reason_skip') or t.get('error') or '—'
-        duration = t.get('duration', '—')
-        rows.append([
-            Paragraph(f'<font color="#64748b"><b>{i+1}</b></font>', ParagraphStyle('SmDID', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<b><font color="#1e293b" size="8">{t.get("name","")}</font></b>', ParagraphStyle('SmDN', fontSize=8, fontName='Helvetica', leading=11)),
-            Paragraph(f'<font color="{cat_color}"><b>{cat_label.upper()}</b></font>', ParagraphStyle('SmDC', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="{sc}"><b>{s_label}</b></font>', ParagraphStyle('SmDS', fontSize=7.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="#475569" size="7">{str(reason)[:90]}</font>', ParagraphStyle('SmDR', fontSize=7, fontName='Helvetica', leading=10)),
-            Paragraph(f'<font color="#64748b" size="7"><b>{duration}</b></font>', ParagraphStyle('SmDD', fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        ])
-        row_styles.append(('BACKGROUND', (3, i+1), (3, i+1), s_bg))
-
-    tbl = Table(rows, colWidths=[8*mm, 46*mm, 24*mm, 20*mm, 52*mm, 18*mm], repeatRows=1)
-    tbl.setStyle(TableStyle([
-        ('BACKGROUND',    (0,0), (-1,0), NAVY),
-        ('ROWBACKGROUNDS',(0,1), (-1,-1), [WHITE, LIGHT_BG]),
-        ('PADDING',       (0,0), (-1,-1), 7),
-        ('LINEBELOW',     (0,0), (-1,-1), 0.4, BORDER),
-        ('BOX',           (0,0), (-1,-1), 0.8, TEAL),
-        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
-        ('ALIGN',         (0,0), (0,-1), 'CENTER'),
-        ('ALIGN',         (2,0), (3,-1), 'CENTER'),
-        ('ALIGN',         (5,0), (5,-1), 'CENTER'),
-        ('LINEBEFORE',    (4,1), (4,-1), 1, BORDER),
-    ] + row_styles))
-    elements.append(tbl)
-    elements.append(Spacer(1, 16))
-
-def build_smoke_screenshot(elements, generation_data: dict, scraped: dict):
-    """
-    Renders the page screenshot captured during the smoke run, if available.
-    Looks in, in order:
-      - generation_data['screenshot']            (base64 str or file path)
-      - generation_data['result']['screenshot']
-      - scraped['screenshot']
-    Falls back to a clean placeholder note if nothing is found, instead of
-    silently skipping the section (keeps report structure predictable).
-    """
-    import base64, os
- 
-    block = []
-    block.append(section_header('', 'Page Screenshot', SMOKE_ACCENT))
-    block.append(Spacer(1, 4))
-    block.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Visual snapshot of the page as captured by Playwright at test execution time.'
-        '</i></font>',
-        ParagraphStyle('SmShotInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    block.append(Spacer(1, 8))
- 
-    result_obj = generation_data.get('result', {}) or {}
-    raw = (generation_data.get('screenshot') or result_obj.get('screenshot')
-           or (scraped or {}).get('screenshot'))
- 
-    img_flowable = None
-    if raw:
-        try:
-            if isinstance(raw, str) and raw.startswith('data:image'):
-                # data:image/png;base64,....
-                b64_part = raw.split(',', 1)[1]
-                img_bytes = base64.b64decode(b64_part)
-                buf = BytesIO(img_bytes)
-                img_flowable = RLImage(buf, 120*mm, height=68*mm, kind='proportional')
-            elif isinstance(raw, str) and os.path.exists(raw):
-                img_flowable = RLImage(raw, 120*mm, height=68*mm, kind='proportional')
-            elif isinstance(raw, (bytes, bytearray)):
-                buf = BytesIO(raw)
-                img_flowable = RLImage(buf, 120*mm, height=68*mm, kind='proportional')
-            elif isinstance(raw, str) and len(raw) > 200:
-                # assume raw base64 without data: prefix
-                img_bytes = base64.b64decode(raw)
-                buf = BytesIO(img_bytes)
-                img_flowable = RLImage(buf, 120*mm, height=68*mm, kind='proportional')
-        except Exception as e:
-            print(f"[SMOKE PDF] screenshot decode error: {e}")
-            img_flowable = None
- 
-    if img_flowable:
-        framed = Table([[img_flowable]], colWidths=[161*mm])
-        framed.setStyle(TableStyle([
-            ('BOX',           (0,0), (-1,-1), 1, SMOKE_ACCENT),
-            ('BACKGROUND',    (0,0), (-1,-1), WHITE),
-            ('ALIGN',         (0,0), (-1,-1), 'CENTER'),
-            ('TOPPADDING',    (0,0), (-1,-1), 8),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ]))
-        block.append(framed)
-    else:
-        placeholder = Table([[Paragraph(
-            '<font color="#94a3b8" size="8.5">No screenshot was captured for this run — '
-            'this section is populated automatically when Playwright screenshot capture '
-            'is enabled during test execution.</font>',
-            ParagraphStyle('SmShotPH', fontSize=8.5, fontName='Helvetica',
-                           alignment=TA_CENTER, leading=12))
-        ]], colWidths=[161*mm])
-        placeholder.setStyle(TableStyle([
-            ('BOX',           (0,0), (-1,-1), 0.8, BORDER_DARK),
-            ('BACKGROUND',    (0,0), (-1,-1), LIGHT_BG),
-            ('ALIGN',         (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
-            ('TOPPADDING',    (0,0), (-1,-1), 24),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 24),
-        ]))
-        block.append(placeholder)
-        
-    elements.append(KeepTogether(block))
-    elements.append(Spacer(1, 16))
- 
- 
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW — Score section (extracted from the old inline hero block)
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_score_hero(elements, score: int, score_label: str, score_color: str):
-    elements.append(section_header('', 'Smoke Quality Score', HexColor(score_color)))
-    elements.append(Spacer(1, 10))
-    try:
-        gauge_img = _make_score_gauge(score, score_color)
-    except Exception:
-        gauge_img = None
- 
-    right_col = [
-        Paragraph(f'<font color="{score_color}" size="15"><b>{score_label}</b></font>',
-                  ParagraphStyle('SmHeroLabel', fontSize=15, fontName='Helvetica-Bold', leading=18)),
-        Spacer(1, 6),
-        Paragraph(
-            '<font color="#475569" size="8.5">Smoke Quality Score weighs critical checks (page load, '
-            'HTTP/SSL, auth, navigation) more heavily than optional elements (images, pagination). '
-            'Excellent ≥ 90 · Good ≥ 75 · Acceptable ≥ 50 · Critical below.</font>',
-            ParagraphStyle('SmHeroDesc', fontSize=8.5, fontName='Helvetica', leading=13)),
-    ]
-    if gauge_img:
-        row = Table([[gauge_img, right_col]], colWidths=[56*mm, 112*mm])
-    else:
-        row = Table([[right_col]], colWidths=[168*mm])
-    row.setStyle(TableStyle([
-        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
-        ('ALIGN',         (0,0), (0,0), 'CENTER'),
-        ('BOX',           (0,0), (-1,-1), 1.2, HexColor(score_color)),
-        ('BACKGROUND',    (0,0), (-1,-1), LIGHT_BG),
-        ('LEFTPADDING',   (0,0), (-1,-1), 14),
-        ('RIGHTPADDING',  (0,0), (-1,-1), 14),
-        ('TOPPADDING',    (0,0), (-1,-1), 14),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 14),
-    ]))
-    elements.append(row)
-    elements.append(Spacer(1, 18))
- 
- 
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW — Methodology section (extracted, now includes the scenario table)
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_methodology(elements, tests: list, url: str):
-    elements.append(section_header('', 'Smoke Test Methodology', SMOKE_ACCENT))
-    elements.append(Spacer(1, 6))
-    elements.append(Paragraph(
-        'Smoke Testing validates the most critical functionalities of the application before deeper '
-        'testing proceeds — page accessibility, HTTP response, navigation, branding, essential UI '
-        'elements, images, forms, security indicators, and basic rendering. Tests are executed '
-        'automatically using Playwright in headless Chromium, checking element presence and visibility '
-        'against the live DOM.',
-        ParagraphStyle('SmMethoTxt', fontSize=8.5, fontName='Helvetica', leading=13,
-                       textColor=HexColor('#475569'))))
-    elements.append(Spacer(1, 16))
-    build_smoke_scenarios_table(elements, tests, url)
- 
- 
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW — Environment & Execution Info (was missing entirely)
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_environment_info(elements, generation_data: dict, tests: list):
-    now = datetime.now()
- 
-    browser_disp = generation_data.get('browser', 'Chromium (headless)')
-    total_ms = 0
-    try:
-        for t in tests:
-            d = str(t.get('duration', '0'))
-            if d.endswith('ms'):
-                total_ms += float(d.replace('ms', '') or 0)
-            elif d.endswith('s'):
-                total_ms += float(d.replace('s', '') or 0) * 1000
-    except Exception:
-        total_ms = 0
-    exec_time_disp = f'{total_ms/1000:.2f}s' if total_ms else 'N/A'
- 
-    items = [
-        ('BROWSER',         browser_disp,                                    '#0EA5E9'),
-        ('FRAMEWORK',       generation_data.get('framework', 'Playwright'),  '#6366f1'),
-        ('VIEWPORT',        generation_data.get('viewport', '1920×1080'),    '#f59e0b'),
-        ('EXECUTION TIME',  exec_time_disp,                                  '#8b5cf6'),
-        ('CHECKS RUN',      str(len(tests)),                                 '#10b981'),
-        ('NEXTEST VERSION', generation_data.get('nextest_version', '1.0.0'), '#ec4899'),
-    ]
- 
-    def _env_card(label, value, color):
-        cell = Table([[Paragraph(
-            f'<font color="{color}" size="7"><b>{label}</b></font><br/>'
-            f'<font color="#1e293b" size="10.5"><b>{value}</b></font>',
-            ParagraphStyle('SmEnvC', fontSize=9, fontName='Helvetica', leading=15,
-                           alignment=TA_CENTER))
-        ]], colWidths=[54*mm])
-        cell.setStyle(TableStyle([
-            ('BACKGROUND',    (0,0), (-1,-1), WHITE),
-            ('BOX',           (0,0), (-1,-1), 1, HexColor(color)),
-            ('LINEABOVE',     (0,0), (-1,0),  3, HexColor(color)),
-            ('TOPPADDING',    (0,0), (-1,-1), 10),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-            ('ALIGN',         (0,0), (-1,-1), 'CENTER'),
-        ]))
-        return cell
- 
-    card_rows = []
-    for i in range(0, len(items), 3):
-        row_items = items[i:i+3]
-        row_cells = [_env_card(l, v, c) for l, v, c in row_items]
-        while len(row_cells) < 3:
-            row_cells.append(Paragraph('', ParagraphStyle('SmEnvEmpty')))
-        card_rows.append(row_cells)
- 
-    outer = Table(card_rows, colWidths=[56*mm]*3)
-    outer.setStyle(TableStyle([
-        ('ALIGN',  (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('PADDING',(0,0), (-1,-1), 3),
-    ]))
-    elements.append(KeepTogether([
-        section_header('', 'Environment & Execution Info', SMOKE_ACCENT),
-        Spacer(1, 6),
-        Paragraph(
-            '<font color="#64748b" size="7.5"><i>'
-            'Browser, viewport, and framework used to run this smoke audit — '
-            'for reproducibility of the results above.'
-            '</i></font>',
-            ParagraphStyle('SmEnvInfo', fontSize=7.5, fontName='Helvetica', leading=10)),
-        Spacer(1, 6),
-        outer,
-    ]))
-    elements.append(Spacer(1, 16))
- 
- 
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW — AI Analysis (narrative half, split out of the old
-# build_smoke_ai_recommendations so table + narrative are separate sections)
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_ai_analysis(elements, ai_data: dict, tests: list, score: int, pass_rate: int, url: str):
-    elements.append(section_header('', 'AI Analysis', HexColor('#4f46e5')))
-    elements.append(Spacer(1, 6))
-
-    ai_summary_text = (ai_data or {}).get('summary', '')
-    if not ai_summary_text:
-        total = len(tests) or 1
-        pass_count = sum(1 for t in tests if t.get('status') == 'pass')
-        fail_count = sum(1 for t in tests if t.get('status') == 'fail')
-        ai_summary_text = (
-            f'This smoke audit validated {total} critical checks on <b>{url}</b>, with {pass_count} passed '
-            f'and {fail_count} failed. Smoke testing confirms whether the application\'s core functionalities '
-            f'are operational before deeper testing proceeds.'
-        )
-    elements.append(Paragraph(f'<font color="#475569" size="8.5">{ai_summary_text}</font>',
-                               ParagraphStyle('SmAIIntro', fontSize=8.5, fontName='Helvetica', leading=13)))
-    elements.append(Spacer(1, 10))
-
-    BLOCKING_TYPES = {'body', 'heading', 'main_content', 'auth'}
-    HIGH_PRIORITY_TYPES = {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl', 'performance'}
-
-    def _is_high_priority_fail(t):
-        if t.get('status') != 'fail':
-            return False
-        priority = (t.get('priority') or t.get('severity') or '').lower()
-        return priority in ('high', 'critical') or t.get('type') in HIGH_PRIORITY_TYPES
-
-    critical_fail = any(t.get('status') == 'fail' and t.get('type') in BLOCKING_TYPES for t in tests)
-    high_priority_fail_count = sum(1 for t in tests if _is_high_priority_fail(t))
-    fail_count = sum(1 for t in tests if t.get('status') == 'fail')
-
-    if critical_fail:
-        deployment_note = "Critical failures detected — deployment should be paused until resolved."
-    elif high_priority_fail_count > 0:
-        deployment_note = f"{high_priority_fail_count} high-priority issue(s) detected — review before promoting to production."
-    else:
-        deployment_note = "No critical failures detected — the build is a reasonable candidate for the next testing phase."
-
-    stability_text = (
-        f'The application demonstrates {"critical instability" if critical_fail else "overall stability"} '
-        f'with a {pass_rate}% pass rate across {len(tests)} checks. '
-        f'{"Navigation reliability is compromised — key routing elements failed." if any(t.get("status")=="fail" and t.get("type") in ("navigation","nav_link") for t in tests) else "Navigation reliability is confirmed — routing elements are operational."} '
-        f'{"UI rendering shows gaps in critical areas." if fail_count > 0 else "UI rendering quality is consistent across all tested elements."} '
-        f'{deployment_note}'
-    )
-    elements.append(Paragraph(f'<font color="#475569" size="8.5">{stability_text}</font>',
-                               ParagraphStyle('SmAIStability', fontSize=8.5, fontName='Helvetica', leading=13)))
-    elements.append(Spacer(1, 12))
-
-    # ── Per-area narrative subsections ──
-    subsection_defs = [
-        ('Performance of Critical UI', 'structure',      '#8b5cf6'),
-        ('Navigation Analysis',        'navigation',     '#10b981'),
-        ('Forms Analysis',             'form',           '#f59e0b'),
-        ('Accessibility Analysis',     'accessibility',  '#0ea5e9'),
-        ('Branding Analysis',          'branding',       '#ec4899'),
-    ]
-    for title, catkey, color in subsection_defs:
-        related = [t for t in tests if _smoke_category_label(t)[0].lower().replace(' ', '') == catkey.replace('_', '')]
-        total_n = len(related)
-        if total_n == 0:
-            continue
-        fail_n = sum(1 for t in related if t.get('status') == 'fail')
-        if fail_n == 0:
-            text = f'All {total_n} {title.split()[0].lower()} check(s) passed — this area is fully operational with no issues detected.'
-        else:
-            failing = [t.get('name', '') for t in related if t.get('status') == 'fail'][:3]
-            text = f'{fail_n} of {total_n} check(s) failed in this area: {", ".join(failing)}. Investigate before deployment.'
-        elements.append(sub_section_header(title, color))
-        elements.append(Spacer(1, 4))
-        elements.append(_smoke_insight_box(text, color, label="Summary"))
-        elements.append(Spacer(1, 10))
-
-    # ── Deployment readiness ──
-    if critical_fail:
-        depl_text = 'Deployment NOT recommended — critical smoke checks failed (core page structure, auth, or connectivity).'
-        depl_color = '#ef4444'
-    elif high_priority_fail_count > 0:
-        depl_text = f'Deployment possible with caution — {high_priority_fail_count} high-priority issue(s) detected. Review before promoting to production.'
-        depl_color = '#f59e0b'
-    elif fail_count > 0:
-        depl_text = f'Deployment possible with caution — {fail_count} non-critical check(s) failed. Review before promoting to production.'
-        depl_color = '#f59e0b'
-    else:
-        depl_text = 'Deployment ready — all smoke checks passed, application is stable for the next testing phase.'
-        depl_color = '#10b981'
-    elements.append(sub_section_header('Deployment Readiness', depl_color))
-    elements.append(Spacer(1, 4))
-    elements.append(_smoke_insight_box(depl_text, depl_color, label="Summary"))
-    elements.append(Spacer(1, 16))
- 
- 
-# ─────────────────────────────────────────────────────────────────────────────
-# UPDATED — AI Recommendations (table only now; narrative moved above)
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_ai_recommendations_table(elements, ai_data: dict):
-    """Priority/Category/Issue/Fix table only. Narrative lives in build_smoke_ai_analysis."""
-    recs = (ai_data or {}).get('recommendations', []) or []
- 
-    elements.append(section_header('', 'AI Recommendations', HexColor('#4f46e5')))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Consolidated recommendations derived from execution evidence and page profile analysis.'
-        '</i></font>', ParagraphStyle('SmRSInfo2', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
- 
-    if recs:
-        hdr = [
-            Paragraph('<font color="#ffffff"><b>Priority</b></font>', ParagraphStyle('SmRH1b', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph('<font color="#ffffff"><b>Category</b></font>', ParagraphStyle('SmRH2b', fontSize=8, fontName='Helvetica-Bold')),
-            Paragraph('<font color="#ffffff"><b>Issue</b></font>', ParagraphStyle('SmRH3b', fontSize=8, fontName='Helvetica-Bold')),
-            Paragraph('<font color="#ffffff"><b>Recommended Fix</b></font>', ParagraphStyle('SmRH4b', fontSize=8, fontName='Helvetica-Bold')),
-        ]
-        rows = [hdr]
-        row_styles = []
-        for i, rec in enumerate(recs):
-            priority = (rec.get('priority') or 'medium').lower()
-            pc = PRIORITY_COLORS.get(priority, '#f59e0b')
-            rows.append([
-                Paragraph(f'<font color="{pc}"><b>{priority.upper()}</b></font>', ParagraphStyle('SmRPb', fontSize=7.5, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-                Paragraph(f'<font color="#4f46e5" size="7.5"><b>{(rec.get("category","") or "").upper()}</b></font>', ParagraphStyle('SmRCb', fontSize=7.5, fontName='Helvetica-Bold')),
-                Paragraph(f'<font color="#1e293b" size="7.5">{rec.get("issue","")[:70]}</font>', ParagraphStyle('SmRIb', fontSize=7.5, fontName='Helvetica', leading=10)),
-                Paragraph(f'<font color="#475569" size="7.5">{rec.get("fix","")[:80]}</font>', ParagraphStyle('SmRFb', fontSize=7.5, fontName='Helvetica', leading=10)),
-            ])
-            if i % 2 == 1:
-                row_styles.append(('BACKGROUND', (0, i+1), (-1, i+1), LIGHT_BG))
-        tbl = Table(rows, colWidths=[20*mm, 26*mm, 56*mm, 66*mm], repeatRows=1)
-        tbl.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), NAVY),
-            ('PADDING',    (0,0), (-1,-1), 7),
-            ('LINEBELOW',  (0,0), (-1,-1), 0.4, BORDER),
-            ('BOX',        (0,0), (-1,-1), 0.8, HexColor('#4f46e5')),
-            ('VALIGN',     (0,0), (-1,-1), 'TOP'),
-            ('ALIGN',      (0,0), (0,-1), 'CENTER'),
-        ] + row_styles))
-        elements.append(tbl)
-    else:
-        elements.append(Paragraph(
-            '<font color="#94a3b8" size="8">No specific issues flagged by AI for this run.</font>',
-            ParagraphStyle('SmNoRecb', fontSize=8, fontName='Helvetica')))
-    elements.append(Spacer(1, 16))
- 
-def _dbg(label, fn, *args, **kwargs):
-    """Diagnostic wrapper: pinpoint which build_smoke_* function raises NoneType len() errors."""
-    try:
-        return fn(*args, **kwargs)
-    except Exception as e:
-        import traceback
-        print(f"[SMOKE DEBUG] FAILED in: {label}")
-        traceback.print_exc()
-        raise
-
-# ─────────────────────────────────────────────────────────────────────────────
-# REPLACED — main generator, reordered to the requested structure
-# ─────────────────────────────────────────────────────────────────────────────
-def _generate_smoke_public_pdf(generation_data: dict, tests: list, scraped: dict, ai_data: dict) -> bytes:
-    buffer    = BytesIO()
-    url       = generation_data.get('url', '')
-    framework = generation_data.get('framework', 'Playwright')
- 
-    pass_count = sum(1 for t in tests if t.get('status') == 'pass')
-    fail_count = sum(1 for t in tests if t.get('status') == 'fail')
-    skip_count = sum(1 for t in tests if t.get('status') not in ('pass', 'fail'))
-    total      = len(tests) or 1
-    pass_rate  = round(pass_count / total * 100)
-    rate_color = '#10b981' if pass_rate >= 80 else '#f59e0b' if pass_rate >= 50 else '#ef4444'
- 
-    score, score_label, score_color = _compute_smoke_score(tests)
- 
-    doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        rightMargin=20*mm, leftMargin=22*mm,
-        topMargin=57*mm, bottomMargin=20*mm
-    )
- 
-    def on_page_smoke(canvas, doc):
-        W, H = A4
-        canvas.saveState()
-        canvas.setFillColor(NAVY)
-        canvas.rect(0, H - 52*mm, W, 52*mm, fill=1, stroke=0)
-        canvas.setFillColor(SMOKE_ACCENT)
-        canvas.rect(0, H - 54*mm, W, 2*mm, fill=1, stroke=0)
-        canvas.setFillColor(SMOKE_ACCENT)
-        canvas.rect(0, 0, 3, H - 54*mm, fill=1, stroke=0)
-        canvas.setFillColor(LIGHT_BG)
-        canvas.rect(0, 0, W, 14*mm, fill=1, stroke=0)
-        canvas.setFillColor(BORDER)
-        canvas.rect(0, 14*mm, W, 0.5, fill=1, stroke=0)
-        canvas.setFont('Helvetica', 7.5)
-        canvas.setFillColor(MUTED)
-        canvas.drawString(20*mm, 5*mm, 'Generated by NexTest — Smoke Test Report')
-        canvas.drawRightString(W - 20*mm, 5*mm, f'Page {doc.page}  •  {datetime.now().strftime("%Y-%m-%d")}')
-        canvas.restoreState()
- 
-    elements = []
- 
-    # ── 1. COVER ──────────────────────────────────────────────────────────
-    header_data = [[
-        Paragraph('<font color="#0EA5E9"><b>NEX</b></font><font color="#ffffff">TEST</font>',
-                  ParagraphStyle('SmLogo', fontSize=24, fontName='Helvetica-Bold')),
-        Paragraph(f'<font color="#64748b">Generated</font><br/>'
-                  f'<font color="#94a3b8">{datetime.now().strftime("%B %d, %Y  •  %H:%M")}</font>',
-                  ParagraphStyle('SmDate', fontSize=8.5, fontName='Helvetica', alignment=TA_RIGHT, leading=13)),
-    ]]
-    header_tbl = Table(header_data, colWidths=[90*mm, 78*mm])
-    header_tbl.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 0),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
-    ]))
-    elements.append(Spacer(1, -38*mm))
-    elements.append(header_tbl)
-    elements.append(Spacer(1, 6*mm))
-    elements.append(Paragraph('Smoke Test Report',
-                               ParagraphStyle('SmTitle', fontSize=22, textColor=WHITE,
-                                              fontName='Helvetica-Bold', spaceAfter=2)))
-    elements.append(Spacer(1, 14*mm))
- 
-    browser_disp = generation_data.get('browser', 'Chromium (headless)')
-    total_ms = 0
-    try:
-        for t in tests:
-            d = str(t.get('duration', '0'))
-            if d.endswith('ms'):
-                total_ms += float(d.replace('ms', '') or 0)
-            elif d.endswith('s'):
-                total_ms += float(d.replace('s', '') or 0) * 1000
-    except Exception:
-        total_ms = 0
-    exec_time_disp = f'{total_ms/1000:.2f}s' if total_ms else 'N/A'
- 
-    info_tbl = Table([
-        [Paragraph('<font color="#64748b">URL</font>', ParagraphStyle('SmIL1', fontSize=8, fontName='Helvetica-Bold', leading=12)),
-         Paragraph(f'<font color="#1e293b">{url}</font>', ParagraphStyle('SmIV1', fontSize=8.5, fontName='Helvetica', leading=12))],
-        [Paragraph('<font color="#64748b">Framework</font>', ParagraphStyle('SmIL2', fontSize=8, fontName='Helvetica-Bold', leading=12)),
-         Paragraph(f'<font color="#0EA5E9"><b>{framework}</b></font>', ParagraphStyle('SmIV2', fontSize=8.5, fontName='Helvetica', leading=12))],
-        [Paragraph('<font color="#64748b">Test Type</font>', ParagraphStyle('SmIL3', fontSize=8, fontName='Helvetica-Bold', leading=12)),
-         Paragraph('<font color="#0EA5E9"><b>Smoke Test</b></font>', ParagraphStyle('SmIV3', fontSize=8.5, fontName='Helvetica', leading=12))],
-        [Paragraph('<font color="#64748b">Browser</font>', ParagraphStyle('SmIL5', fontSize=8, fontName='Helvetica-Bold', leading=12)),
-         Paragraph(f'<font color="#1e293b">{browser_disp}</font>', ParagraphStyle('SmIV5', fontSize=8.5, fontName='Helvetica', leading=12))],
-        [Paragraph('<font color="#64748b">Execution Time</font>', ParagraphStyle('SmIL6', fontSize=8, fontName='Helvetica-Bold', leading=12)),
-         Paragraph(f'<font color="#1e293b">{exec_time_disp}</font>', ParagraphStyle('SmIV6', fontSize=8.5, fontName='Helvetica', leading=12))],
-        [Paragraph('<font color="#64748b">Generated</font>', ParagraphStyle('SmIL4', fontSize=8, fontName='Helvetica-Bold', leading=12)),
-         Paragraph(f'<font color="#1e293b">{datetime.now().strftime("%Y-%m-%d  %H:%M")}</font>', ParagraphStyle('SmIV4', fontSize=8.5, fontName='Helvetica', leading=12))],
-    ], colWidths=[32*mm, 136*mm])
-    info_tbl.setStyle(TableStyle([
-        ('BACKGROUND',    (0,0), (0,-1), LIGHT_BG),
-        ('PADDING',       (0,0), (-1,-1), 7),
-        ('LINEBELOW',     (0,0), (-1,-2), 0.4, BORDER),
-        ('BOX',           (0,0), (-1,-1), 0.8, BORDER_DARK),
-        ('ROWBACKGROUNDS',(0,0), (-1,-1), [WHITE, LIGHT_BG]),
-        ('LEFTPADDING',   (0,0), (0,-1), 10),
-        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
-    ]))
-    elements.append(info_tbl)
-    elements.append(Spacer(1, 20))
- 
-    # KPI cards
-    elements.append(section_header('', 'Test Summary', SMOKE_ACCENT))
-    elements.append(Spacer(1, 8))
-    stats_data = [[
-        stat_card(pass_count, 'PASSED', '#10b981', GREEN_BG),
-        stat_card(fail_count, 'FAILED', '#ef4444', RED_BG),
-        stat_card(skip_count, 'SKIPPED', '#f59e0b', ORANGE_BG),
-        stat_card(f'{pass_rate}%', 'PASS RATE', rate_color,
-                  GREEN_BG if pass_rate >= 80 else ORANGE_BG if pass_rate >= 50 else RED_BG),
-        stat_card(total, 'TOTAL', '#3b82f6', BLUE_BG),
-    ]]
-    outer = Table(stats_data, colWidths=[33.6*mm]*5)
-    outer.setStyle(TableStyle([
-        ('ALIGN',  (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('PADDING',(0,0), (-1,-1), 2),
-    ]))
-    elements.append(outer)
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#94a3b8" size="7"><i>Pass Rate is the raw proportion of checks that succeeded. '
-        'The Smoke Quality Score further below is severity-weighted — critical checks (page structure, '
-        'auth, HTTP/SSL, load time) count more than optional elements — which is why the two numbers can differ.'
-        '</i></font>', ParagraphStyle('SmRateNote2', fontSize=7, fontName='Helvetica', leading=9)))
-    elements.append(Spacer(1, 20))
-
-    _dbg("build_smoke_overview_hero", build_smoke_overview_hero, elements, tests, ai_data, score, score_label, score_color, pass_rate, url)
-
-    _smoke_chapter_header(elements, '1', 'Visual & Score Overview')
-
-    _dbg("build_smoke_key_metrics_cards", build_smoke_key_metrics_cards, elements, generation_data, tests)
-
-    # ── 2. SCREENSHOT ─────────────────────────────────────────────────────
-    _dbg("build_smoke_screenshot", build_smoke_screenshot, elements, generation_data, scraped)
- 
-    # ── 3. SCORE ──────────────────────────────────────────────────────────
-    _dbg("build_smoke_score_hero", build_smoke_score_hero, elements, score, score_label, score_color)
- 
-    _smoke_chapter_header(elements, '2', 'Test Coverage')
- 
-    # ── 4. METHODOLOGY (includes scenario plan) ──────────────────────────
-    _dbg("build_smoke_methodology", build_smoke_methodology, elements, tests, url)
- 
-    # ── 5. RESULTS BY CATEGORY ────────────────────────────────────────────
-    _dbg("build_smoke_category_summary", build_smoke_category_summary, elements, tests)
- 
-    _smoke_chapter_header(elements, '3', 'Charts & Detailed Results')
- 
-    # ── 6. CHARTS ─────────────────────────────────────────────────────────
-    try:
-        chart_img, cats_data = _make_smoke_category_chart(tests)
-
-        # Texte gris descriptif — AVANT le graphique
-        cat_desc = (
-            'This chart compares the number of passed and failed checks across each '
-            'smoke test category, helping you quickly spot which areas need attention.'
-        )
-
-        # AI Analysis — APRÈS le graphique
-        worst_cat = max(cats_data, key=lambda c: cats_data[c]['fail']) if cats_data else None
-        if worst_cat and cats_data[worst_cat]['fail'] > 0:
-            cat_insight = (
-                f'{worst_cat} currently has the most failures '
-                f'({cats_data[worst_cat]["fail"]}) — this is the category to prioritize first.'
-            )
-        else:
-            cat_insight = 'No category shows any failures — coverage is currently clean across the board.'
-
-        framed = Table([[chart_img]], colWidths=[161*mm])
-        framed.setStyle(TableStyle([
-            ('BOX', (0,0), (-1,-1), 1, SMOKE_ACCENT),
-            ('BACKGROUND', (0,0), (-1,-1), WHITE),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('TOPPADDING', (0,0), (-1,-1), 8),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ]))
-        elements.append(section_header('', 'Category Breakdown Chart', SMOKE_ACCENT))
-        elements.append(Spacer(1, 4))
-        elements.append(Paragraph(
-            f'<font color="#64748b" size="7.5"><i>{cat_desc}</i></font>',
-            ParagraphStyle('SmCatDesc', fontSize=7.5, fontName='Helvetica', leading=10)))
-        elements.append(Spacer(1, 8))
-        elements.append(framed)
-        elements.append(Spacer(1, 6))
-        elements.append(_smoke_insight_box(cat_insight, '#0EA5E9'))
-        elements.append(Spacer(1, 16))
-    except Exception as e:
-        print(f"[SMOKE PDF] category chart error: {e}")
-
-    try:
-        dist_img = _make_smoke_status_bar_chart(tests)
-
-        # Texte gris descriptif — AVANT le graphique
-        dist_desc = (
-            'This chart shows the overall distribution of test outcomes — how many checks '
-            'passed, failed, or were skipped during this smoke run.'
-        )
-
-        # AI Analysis — APRÈS le graphique
-        pass_c  = sum(1 for t in tests if t.get('status') == 'pass')
-        fail_c  = sum(1 for t in tests if t.get('status') == 'fail')
-        skip_c  = sum(1 for t in tests if t.get('status') not in ('pass', 'fail'))
-        total_c = pass_c + fail_c + skip_c or 1
-        dist_insight = (
-            f'Out of {total_c} executed checks: {pass_c} passed ({round(pass_c/total_c*100)}%), '
-            f'{fail_c} failed ({round(fail_c/total_c*100)}%), and {skip_c} skipped '
-            f'({round(skip_c/total_c*100)}%).'
-        )
-
-        framed_dist = Table([[dist_img]], colWidths=[161*mm])
-        framed_dist.setStyle(TableStyle([
-            ('BOX', (0,0), (-1,-1), 1, SMOKE_ACCENT),
-            ('BACKGROUND', (0,0), (-1,-1), WHITE),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('TOPPADDING', (0,0), (-1,-1), 8),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ]))
-        elements.append(section_header('', 'Pass / Fail / Skipped Distribution', SMOKE_ACCENT))
-        elements.append(Spacer(1, 4))
-        elements.append(Paragraph(
-            f'<font color="#64748b" size="7.5"><i>{dist_desc}</i></font>',
-            ParagraphStyle('SmDistDesc', fontSize=7.5, fontName='Helvetica', leading=10)))
-        elements.append(Spacer(1, 8))
-        elements.append(framed_dist)
-        elements.append(Spacer(1, 6))
-        elements.append(_smoke_insight_box(dist_insight, '#0EA5E9'))
-        elements.append(Spacer(1, 16))
-    except Exception as e:
-        print(f"[SMOKE PDF] status chart error: {e}")
-
-    _dbg("build_smoke_execution_timeline", build_smoke_execution_timeline, elements, generation_data, tests)
-
-    # ── 7. DETAILED RESULTS ──────────────────────────────────────────────
-    _dbg("build_smoke_detailed_results", build_smoke_detailed_results, elements, tests)
-
-    _dbg("build_smoke_top_findings", build_smoke_top_findings, elements, tests, scraped)
-
-    _smoke_chapter_header(elements, '4', 'AI Insights & Recommendations')
- 
-    # ── 8. AI ANALYSIS ───────────────────────────────────────────────────
-    _dbg("build_smoke_ai_analysis", build_smoke_ai_analysis, elements, ai_data, tests, score, pass_rate, url)
- 
-    # ── 9. AI RECOMMENDATIONS ────────────────────────────────────────────
-    _dbg("build_smoke_ai_recommendations_table", build_smoke_ai_recommendations_table, elements, ai_data)
- 
-    # ── 10. ACTION PLAN ──────────────────────────────────────────────────
-    _dbg("build_smoke_action_plan", build_smoke_action_plan, elements, ai_data)
-    _dbg("build_smoke_executive_summary", build_smoke_executive_summary, elements, ai_data, score, url)
- 
-    _smoke_chapter_header(elements, '5', 'Execution Context & Verdict')
- 
-    # ── 11. ENVIRONMENT & EXECUTION INFO ─────────────────────────────────
-    _dbg("build_smoke_environment_info", build_smoke_environment_info, elements, generation_data, tests)
- 
-    # ── 12. FINAL VERDICT ────────────────────────────────────────────────
-    elements.append(section_header('', 'Final AI Verdict', SMOKE_ACCENT))
-    elements.append(Spacer(1, 6))
-
-    BLOCKING_TYPES_VERDICT = {'body', 'heading', 'main_content', 'auth'}
-    HIGH_PRIORITY_TYPES_VERDICT = {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl', 'performance'}
-
-    def _is_high_priority_fail_verdict(t):
-        if t.get('status') != 'fail':
-            return False
-        priority = (t.get('priority') or t.get('severity') or '').lower()
-        return priority in ('high', 'critical') or t.get('type') in HIGH_PRIORITY_TYPES_VERDICT
-
-    critical_fail = any(t.get('status') == 'fail' and t.get('type') in BLOCKING_TYPES_VERDICT for t in tests)
-    high_priority_fail_count = sum(1 for t in tests if _is_high_priority_fail_verdict(t))
-
-    if critical_fail:
-        vc, vb, vbrd, vi = '#ef4444', HexColor('#fef2f2'), RED, '🔴'
-        risk_level = 'HIGH'
-        vt = (f'Smoke Test FAILED — critical checks did not pass on {url}. Core page structure, '
-              f'authentication, or connectivity issues were detected. Deployment is NOT recommended '
-              f'until these are resolved.')
-    elif high_priority_fail_count > 0:
-        vc, vb, vbrd, vi = '#b45309', HexColor('#fffbeb'), ORANGE, '🟡'
-        risk_level = 'MEDIUM'
-        vt = (f'Smoke Test passed with {high_priority_fail_count} high-priority issue(s) on {url}. '
-              f'Core functionality is operational, but the failed security check should be reviewed '
-              f'before deployment.')
-    elif fail_count > 0:
-        vc, vb, vbrd, vi = '#b45309', HexColor('#fffbeb'), ORANGE, '🟡'
-        risk_level = 'MEDIUM'
-        vt = (f'Smoke Test passed with {fail_count} non-critical issue(s) on {url}. Core functionality '
-              f'is operational but the failing checks should be reviewed before full deployment.')
-    else:
-        vc, vb, vbrd, vi = '#059669', HexColor('#f0fdf4'), GREEN, '🟢'
-        risk_level = 'LOW'
-        vt = (f'Smoke Test PASSED — all {pass_count} checks succeeded on {url}. The application is '
-              f'stable and ready to proceed to deeper functional and regression testing.')
-
-    final_tbl = Table([[Paragraph(
-        f'<font color="{vc}" size="9"><b>{vi}  Final AI Verdict</b></font><br/>'
-        f'<font color="{vc}" size="8">{vt}</font><br/><br/>'
-        f'<font color="#64748b" size="8"><b>Smoke Quality Score: </b></font>'
-        f'<font color="{vc}" size="8"><b>{score}/100</b></font>'
-        f'<font color="#94a3b8" size="8">    |    </font>'
-        f'<font color="#64748b" size="8"><b>Risk Level: </b></font>'
-        f'<font color="{vc}" size="8"><b>{risk_level}</b></font>'
-        f'<font color="#94a3b8" size="8">    |    </font>'
-        f'<font color="#64748b" size="8"><b>Overall Health: </b></font>'
-        f'<font color="{vc}" size="8"><b>{score_label}</b></font>',
-        ParagraphStyle('SmFV2', fontSize=8, fontName='Helvetica', leading=13))
-    ]], colWidths=[168*mm])
-    final_tbl.setStyle(TableStyle([
-        ('BACKGROUND',    (0,0), (-1,-1), vb),
-        ('BOX',           (0,0), (-1,-1), 2, vbrd),
-        ('LEFTPADDING',   (0,0), (-1,-1), 14),
-        ('RIGHTPADDING',  (0,0), (-1,-1), 14),
-        ('TOPPADDING',    (0,0), (-1,-1), 12),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 12),
-    ]))
-    elements.append(final_tbl)
-    elements.append(Spacer(1, 20))
-
-    # Certificate
-    elements.append(section_header('', 'Certificate of Smoke Test Validation', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Official validation summary confirming the outcome of this smoke test run — '
-        'issued automatically by NexTest AI based on the results above.'
-        '</i></font>',
-        ParagraphStyle('CertSectionInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-    smoke_cert_data = {
-        'global_score': score,
-        'score_label':  score_label,
-        'score_color':  score_color,
-    }
-    elements.append(_build_certificate_card(smoke_cert_data, url, title="CERTIFICATE OF SMOKE TEST VALIDATION"))
-    build_smoke_certificate_details(elements, generation_data, tests, score, url)
-    doc.build(elements, onFirstPage=on_page_smoke, onLaterPages=on_page_smoke)
-    return buffer.getvalue()
-
-def build_smoke_action_plan(elements, ai_data: dict):
-    """AI Generated Action Plan — numbered steps derived from ai_data.action_plan."""
-    action_plan = (ai_data or {}).get('action_plan', []) or []
-    if not action_plan:
-        return
-    elements.append(section_header('', 'AI Generated Action Plan', GOLD))
-    elements.append(Spacer(1, 8))
-
-    hdr = [
-        Paragraph('<font color="#ffffff"><b>#</b></font>', ParagraphStyle('SmAH0', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-        Paragraph('<font color="#ffffff"><b>Action</b></font>', ParagraphStyle('SmAH1', fontSize=8, fontName='Helvetica-Bold')),
-        Paragraph('<font color="#ffffff"><b>Status</b></font>', ParagraphStyle('SmAH2', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-    ]
-    rows = [hdr]
-    for i, step in enumerate(action_plan):
-        rows.append([
-            Paragraph(f'<font color="#64748b"><b>{i+1}</b></font>', ParagraphStyle('SmAID', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)),
-            Paragraph(f'<font color="#1e293b" size="8">{step}</font>', ParagraphStyle('SmAA', fontSize=8, fontName='Helvetica', leading=11)),
-            Paragraph('<font color="#64748b" size="7">⏳ To Do</font>', ParagraphStyle('SmAS', fontSize=7, fontName='Helvetica', alignment=TA_CENTER)),
-        ])
-    tbl = Table(rows, colWidths=[8*mm, 138*mm, 22*mm], repeatRows=1)
-    tbl.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), NAVY),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [WHITE, LIGHT_BG]),
-        ('PADDING',    (0,0), (-1,-1), 7),
-        ('LINEBELOW',  (0,0), (-1,-1), 0.4, BORDER),
-        ('BOX',        (0,0), (-1,-1), 0.8, GOLD),
-        ('VALIGN',     (0,0), (-1,-1), 'TOP'),
-        ('ALIGN',      (0,0), (0,-1), 'CENTER'),
-        ('ALIGN',      (2,0), (2,-1), 'CENTER'),
-    ]))
-    elements.append(tbl)
-    elements.append(Spacer(1, 16))
-
-
-def build_smoke_executive_summary(elements, ai_data: dict, score: int, url: str):
-    
-    """Executive Summary — Top Priority Actions, same pattern as k6 report."""
-    recs = (ai_data or {}).get('recommendations', []) or []
-    if not recs:
-        return
-    PRI_ORDER = {'high': 0, 'medium': 1, 'low': 2}
-    top = sorted(recs, key=lambda x: PRI_ORDER.get((x.get('priority') or 'medium').lower(), 1))[:2]
-
-    elements.append(Spacer(1, 10))
-    elements.append(section_header('', 'Executive Summary', GOLD))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph('<font color="#1e293b" size="9"><b>Top Priority Actions</b></font>',
-                               ParagraphStyle('SmExecH', fontSize=9, fontName='Helvetica-Bold')))
-    elements.append(Spacer(1, 8))
-    for i, item in enumerate(top):
-        card = Table([[Paragraph(
-            f'<font color="#c9a227" size="11"><b>{i+1}</b></font><br/>'
-            f'<font color="#4f46e5" size="8"><b>{(item.get("category","") or "").upper()}</b></font><br/>'
-            f'<font color="#1e293b" size="8.5"><b>{item.get("issue","")}</b></font><br/>'
-            f'<font color="#64748b" size="7.5">{item.get("fix","")}</font>',
-            ParagraphStyle('SmExecCard', fontSize=8.5, fontName='Helvetica', leading=12))
-        ]], colWidths=[168*mm])
-        card.setStyle(TableStyle([
-            ('BACKGROUND',    (0,0), (-1,-1), LIGHT_BG),
-            ('BOX',           (0,0), (-1,-1), 0.8, GOLD),
-            ('LEFTPADDING',   (0,0), (-1,-1), 14),
-            ('TOPPADDING',    (0,0), (-1,-1), 10),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-        ]))
-        elements.append(card)
-        elements.append(Spacer(1, 8))
-
-    insight = (
-        f'These {len(top)} action(s) are proactive optimizations — the current score of {score}/100 '
-        f'for {url} already reflects a healthy baseline.' if score >= 90 else
-        f'Addressing these {len(top)} action(s) targets the largest contributors to the current score '
-        f'of {score}/100 for {url}. Re-run the smoke suite after applying them to confirm improvement.'
-    )
-    elements.append(_smoke_insight_box(insight, '#c9a227'))
-    elements.append(Spacer(1, 8))
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW #1 — Smoke Test Overview (Hero Section)
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_overview_hero(elements, tests: list, ai_data: dict, score: int, score_label: str,
-                               score_color: str, pass_rate: int, url: str):
-    fail_count = sum(1 for t in tests if t.get('status') == 'fail')
-    critical_fail = any(
-        t.get('status') == 'fail' and t.get('type') in
-        {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl'}
-        for t in tests
-    )
-
-    if critical_fail:
-        overall_status, status_color = 'CRITICAL ISSUES', '#ef4444'
-        risk_level, risk_color = 'HIGH', '#ef4444'
-        deploy_text, deploy_color = 'NOT READY', '#ef4444'
-        status_explain = (
-            'One or more critical checks failed (page load, headings, main content, auth, HTTP status, '
-            'or SSL). These affect core functionality — deployment is not recommended until resolved.')
-    elif fail_count > 0:
-        overall_status, status_color = 'PASSED W/ WARNINGS', '#f59e0b'
-        risk_level, risk_color = 'MEDIUM', '#f59e0b'
-        deploy_text, deploy_color = 'READY W/ CAUTION', '#f59e0b'
-        status_explain = (
-            f'All critical checks passed, but {fail_count} secondary check(s) failed (e.g. images, '
-            f'pagination, minor UI elements). The application remains functional — review the failing '
-            f'checks below before deploying with confidence.')
-    else:
-        overall_status, status_color = 'ALL CHECKS PASSED', '#10b981'
-        risk_level, risk_color = 'LOW', '#10b981'
-        deploy_text, deploy_color = 'READY', '#10b981'
-        status_explain = (
-            'Every check passed, including all critical ones. The application is stable and ready to '
-            'move to the next testing phase.')
-
-    elements.append(section_header('', 'Smoke Test Overview', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        f'<font color="#64748b" size="7.5"><i>{status_explain}</i></font>',
-        ParagraphStyle('SmStatusExplain', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    def _hero_stat(label, value, color):
-        return Table([[Paragraph(
-            f'<font color="#94a3b8" size="7"><b>{label}</b></font><br/>'
-            f'<font color="{color}" size="12"><b>{value}</b></font>',
-            ParagraphStyle('HeroStat', fontSize=10, fontName='Helvetica', leading=16,
-                           alignment=TA_CENTER))
-        ]], colWidths=[40*mm], style=[
-            ('BACKGROUND', (0,0), (-1,-1), LIGHT_BG),
-            ('BOX', (0,0), (-1,-1), 1, HexColor(color)),
-            ('TOPPADDING', (0,0), (-1,-1), 10),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ])
-
-    row = Table([[
-        _hero_stat('OVERALL STATUS', overall_status, status_color),
-        _hero_stat('QUALITY SCORE', f'{score}/100', score_color),
-        _hero_stat('RISK LEVEL', risk_level, risk_color),
-        _hero_stat('DEPLOYMENT', deploy_text, deploy_color),
-    ]], colWidths=[42*mm]*4)
-    row.setStyle(TableStyle([
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('PADDING', (0,0), (-1,-1), 3),
-    ]))
-    elements.append(row)
-    elements.append(Spacer(1, 10))
-
-    ai_summary_text = (ai_data or {}).get('summary', '')
-    if not ai_summary_text:
-        pass_count = sum(1 for t in tests if t.get('status') == 'pass')
-        total = len(tests) or 1
-        ai_summary_text = (
-            f'This smoke run executed {total} critical checks on <b>{url}</b>, with {pass_count} passed '
-            f'and {fail_count} failed ({pass_rate}% pass rate). '
-            + ('Critical failures were detected and should be resolved before deployment.' if critical_fail
-               else 'No critical failures were detected — the build is a reasonable candidate for the next testing phase.')
-        )
-    elements.append(_smoke_insight_box(ai_summary_text, '#4f46e5', label='AI Summary'))
-    elements.append(Spacer(1, 16))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW #2 — Key Metrics Cards
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_key_metrics_cards(elements, generation_data: dict, tests: list):
-    elements.append(section_header('', 'Key Metrics', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Snapshot of this run\'s execution footprint — how long it took, how many checks fell into '
-        'each category, and where the critical checks are concentrated.'
-        '</i></font>',
-        ParagraphStyle('SmKMInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    def _parse_ms(d):
-        try:
-            s = str(d)
-            if s.endswith('ms'): return float(s.replace('ms', '') or 0)
-            if s.endswith('s'):  return float(s.replace('s', '') or 0) * 1000
-        except Exception:
-            pass
-        return 0
-
-    durations_ms = [_parse_ms(t.get('duration', '0')) for t in tests]
-    total_ms = sum(durations_ms)
-    avg_ms   = (total_ms / len(durations_ms)) if durations_ms else 0
-
-    HIGH_TYPES = {'body', 'heading', 'main_content', 'auth', 'http_status', 'ssl', 'performance'}
-    critical_count = sum(
-    1 for t in tests
-    if t.get('status') == 'fail' and (
-        (t.get('priority') or t.get('severity') or '').lower() in ('high', 'critical')
-        or t.get('type') in HIGH_TYPES
-    )
-)
-
-    cat_counts = {'Navigation': 0, 'Rendering': 0, 'Security': 0}
-    for t in tests:
-        label, _ = _smoke_category_label(t)
-        if label == 'Navigation': cat_counts['Navigation'] += 1
-        elif label == 'Rendering': cat_counts['Rendering'] += 1
-        elif label == 'Security': cat_counts['Security'] += 1
-
-    metrics = [
-        ('EXECUTION TIME',    f'{total_ms/1000:.2f}s' if total_ms else 'N/A', '#0EA5E9'),
-        ('CRITICAL CHECKS',   str(critical_count),                            '#ef4444'),
-        ('NAVIGATION CHECKS', str(cat_counts['Navigation']),                  '#10b981'),
-        ('RENDERING CHECKS',  str(cat_counts['Rendering']),                   '#8b5cf6'),
-        ('SECURITY CHECKS',   str(cat_counts['Security']),                    '#f59e0b'),
-        ('AVG TEST DURATION', f'{avg_ms:.0f}ms' if avg_ms else 'N/A',         '#ec4899'),
-    ]
-
-    def _metric_card(label, value, color):
-        cell = Table([[Paragraph(
-            f'<font color="{color}" size="7"><b>{label}</b></font><br/>'
-            f'<font color="#1e293b" size="11"><b>{value}</b></font>',
-            ParagraphStyle('KeyMetricC', fontSize=9, fontName='Helvetica', leading=15,
-                           alignment=TA_CENTER))
-        ]], colWidths=[54*mm])
-        cell.setStyle(TableStyle([
-            ('BACKGROUND',    (0,0), (-1,-1), WHITE),
-            ('BOX',           (0,0), (-1,-1), 1, HexColor(color)),
-            ('LINEABOVE',     (0,0), (-1,0),  3, HexColor(color)),
-            ('TOPPADDING',    (0,0), (-1,-1), 10),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-            ('ALIGN',         (0,0), (-1,-1), 'CENTER'),
-        ]))
-        return cell
-
-    card_rows = []
-    for i in range(0, len(metrics), 3):
-        chunk = metrics[i:i+3]
-        row_cells = [_metric_card(l, v, c) for l, v, c in chunk]
-        while len(row_cells) < 3:
-            row_cells.append(Paragraph('', ParagraphStyle('KeyMetricEmpty')))
-        card_rows.append(row_cells)
-
-    outer = Table(card_rows, colWidths=[56*mm]*3)
-    outer.setStyle(TableStyle([
-        ('ALIGN',  (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('PADDING',(0,0), (-1,-1), 3),
-    ]))
-    elements.append(outer)
-    elements.append(Spacer(1, 16))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW #3 — Execution Timeline
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_execution_timeline(elements, generation_data: dict, tests: list):
-    elements.append(section_header('', 'Execution Timeline', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Sequential phases of this smoke test run, from browser launch to report generation.'
-        '</i></font>', ParagraphStyle('SmTLInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    def _has(catkey):
-        return any(_smoke_category_label(t)[0].lower().replace(' ', '') == catkey for t in tests)
-
-    steps = [
-        ('Browser Started',   generation_data.get('browser', 'Chromium (headless)'), True),
-        ('Navigate to URL',   generation_data.get('url', ''), True),
-        ('DOM Loaded',        'Page structure captured', True),
-        ('Rendering Checks',  'Structure, headings, main content', _has('rendering')),
-        ('Navigation Checks', 'Menus, links, routing', _has('navigation')),
-        ('Image Validation',  'Image presence and loading', _has('images')),
-        ('Form Validation',   'Input fields and submission', _has('forms')),
-        ('AI Analysis',       'Recommendations and scoring', True),
-        ('Report Generated',  datetime.now().strftime('%Y-%m-%d %H:%M'), True),
-    ]
-
-    rows = []
-    for i, (title, detail, executed) in enumerate(steps):
-        dot_color = '#10b981' if executed else '#cbd5e1'
-        num_badge = Table([[Paragraph(
-            f'<font color="white" size="8"><b>{i+1}</b></font>',
-            ParagraphStyle('TLNum', fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER))
-        ]], colWidths=[7*mm], rowHeights=[7*mm])
-        num_badge.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), HexColor(dot_color)),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ]))
-        text_cell = Paragraph(
-            f'<font color="#1e293b" size="8.5"><b>{title}</b></font><br/>'
-            f'<font color="#94a3b8" size="7">{detail}</font>',
-            ParagraphStyle('TLText', fontSize=8.5, fontName='Helvetica', leading=11))
-        rows.append([num_badge, text_cell])
-
-    tbl = Table(rows, colWidths=[10*mm, 158*mm])
-    tbl.setStyle(TableStyle([
-        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
-        ('TOPPADDING',    (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('LINEBEFORE',    (0,0), (0,-1),  1.5, HexColor('#e2e8f0')),
-        ('LEFTPADDING',   (1,0), (1,-1),  10),
-    ]))
-    elements.append(tbl)
-    elements.append(Spacer(1, 16))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW #4 — Top Findings
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_top_findings(elements, tests: list, scraped: dict):
-    elements.append(section_header('', 'Top Findings', SMOKE_ACCENT))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        '<font color="#64748b" size="7.5"><i>'
-        'Quick-glance summary of the most relevant outcomes from this run.'
-        '</i></font>', ParagraphStyle('SmTFInfo', fontSize=7.5, fontName='Helvetica', leading=10)))
-    elements.append(Spacer(1, 8))
-
-    fails, passes = [], []
-    for t in tests:
-        name, status = t.get('name', ''), t.get('status')
-        if status == 'pass':
-            passes.append(name)
-        elif status == 'fail':
-            reason = t.get('reason', '')
-            fails.append(name + (f' — {reason[:60]}' if reason else ''))
-
-    display_list = [(False, f) for f in fails[:8]] + [(True, f) for f in passes[:8]]
-    if not display_list:
-        elements.append(Paragraph('<font color="#94a3b8" size="8">No findings to display.</font>',
-                                   ParagraphStyle('SmTFNone', fontSize=8, fontName='Helvetica')))
-        elements.append(Spacer(1, 16))
-        return
-
-    rows = []
-    for ok, text in display_list:
-        icon, color = ('✓', '#10b981') if ok else ('⚠', '#ef4444')
-        rows.append([Paragraph(
-            f'<font color="{color}" size="10"><b>{icon}</b></font>  '
-            f'<font color="#1e293b" size="8">{text[:90]}</font>',
-            ParagraphStyle('SmTFItem', fontSize=8, fontName='Helvetica', leading=13))])
-
-    tbl = Table(rows, colWidths=[168*mm])
-    tbl.setStyle(TableStyle([
-        ('LEFTPADDING',   (0,0), (-1,-1), 10),
-        ('TOPPADDING',    (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('LINEBELOW',     (0,0), (-1,-1), 0.3, BORDER),
-        ('BACKGROUND',    (0,0), (-1,-1), HexColor('#fafafa')),
-    ]))
-    elements.append(tbl)
-    elements.append(Spacer(1, 16))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW #5 — Enhanced Certificate Details
-# ─────────────────────────────────────────────────────────────────────────────
-def build_smoke_certificate_details(elements, generation_data: dict, tests: list, score: int, url: str):
-    grade, _ = _grade_from_score(score)
-
-    total_ms = 0
-    try:
-        for t in tests:
-            d = str(t.get('duration', '0'))
-            if d.endswith('ms'): total_ms += float(d.replace('ms', '') or 0)
-            elif d.endswith('s'): total_ms += float(d.replace('s', '') or 0) * 1000
-    except Exception:
-        pass
-    exec_time_disp = f'{total_ms/1000:.2f}s' if total_ms else 'N/A'
-
-    details = [
-        ('Validation Date',       datetime.now().strftime('%Y-%m-%d  %H:%M'), '#0EA5E9', HexColor('#f0f9ff')),
-        ('Framework',             generation_data.get('framework', 'Playwright'), '#0EA5E9', HexColor('#f0f9ff')),
-        ('Browser',               generation_data.get('browser', 'Chromium (headless)'), '#6366f1', HexColor('#eef2ff')),
-        ('Viewport',              generation_data.get('viewport', '1920×1080'), '#6366f1', HexColor('#eef2ff')),
-        ('Execution Time',        exec_time_disp, '#8b5cf6', HexColor('#f5f3ff')),
-        ('Smoke Quality Score',   f'{score}/100', '#8b5cf6', HexColor('#f5f3ff')),
-        ('Overall Grade',         grade, '#10b981', HexColor('#f0fdf4')),
-        ('AI Validation Status',  'Verified by NexTest AI', '#10b981', HexColor('#f0fdf4')),
-    ]
-
-    rows = []
-    row_styles = []
-    for i in range(0, len(details), 2):
-        chunk = details[i:i+2]
-        row = [Paragraph(
-            f'<font color="{color}" size="7.5"><b>{lbl}</b></font><br/>'
-            f'<font color="#1e293b" size="9">{val}</font>',
-            ParagraphStyle('CertDet', fontSize=8, fontName='Helvetica', leading=12))
-            for lbl, val, color, bg in chunk]
-        if len(row) < 2:
-            row.append(Paragraph('', ParagraphStyle('CertDetEmpty')))
-        rows.append(row)
-        ri = len(rows) - 1
-        left_color = chunk[0][2]
-        row_bg = chunk[0][3]
-        row_styles.append(('BACKGROUND',  (0, ri), (-1, ri), row_bg))
-        row_styles.append(('LINEBEFORE',  (0, ri), (0, ri), 3, HexColor(left_color)))
-        if len(chunk) > 1:
-            row_styles.append(('LINEBEFORE', (1, ri), (1, ri), 1, BORDER_DARK))
-
-    det_tbl = Table(rows, colWidths=[84*mm, 84*mm])
-    det_tbl.setStyle(TableStyle([
-        ('BOX',           (0,0), (-1,-1), 0.8, BORDER_DARK),
-        ('LINEBELOW',     (0,0), (-1,-2), 0.3, BORDER),
-        ('LEFTPADDING',   (0,0), (-1,-1), 10),
-        ('TOPPADDING',    (0,0), (-1,-1), 8),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
-    ] + row_styles))
-    elements.append(KeepTogether([
-        Spacer(1, 8),
-        Paragraph(
-            '<font color="#64748b" size="7.5"><i>'
-            'Technical details of this validation run — environment, timing, and scoring — '
-            'provided for traceability and audit purposes.'
-            '</i></font>',
-            ParagraphStyle('CertDetInfo', fontSize=7.5, fontName='Helvetica', leading=10)),
-        Spacer(1, 6),
-        det_tbl,
-    ]))
-    elements.append(Spacer(1, 10))
-
-    
 def generate_pdf(generation_data: dict) -> bytes:
     test_type = generation_data.get('test_type') or \
                 generation_data.get('result', {}).get('test_type', 'smoke')
@@ -10857,63 +9493,7 @@ def generate_pdf(generation_data: dict) -> bytes:
             []
         )
         return _generate_functional_pdf(generation_data, tests)
-    # ── SMOKE (nouveau style premium k6-like) ────────────────────────────────
-    if test_type == 'smoke':
-        tests = (
-            generation_data.get('execution_results') or
-            generation_data.get('test_cases') or
-            generation_data.get('result', {}).get('execution_results') or
-            generation_data.get('result', {}).get('test_cases') or
-            []
-        )
-        if test_type == 'smoke':
-            tests = (
-            generation_data.get('execution_results') or
-            generation_data.get('test_cases') or
-            generation_data.get('result', {}).get('execution_results') or
-            generation_data.get('result', {}).get('test_cases') or
-            []
-        )
-        scraped_smoke = generation_data.get('scraped', {}) or {}
-        if isinstance(scraped_smoke, list):
-            scraped_smoke = {}
-
-        def _extract_smoke_ai_data(gd: dict) -> dict:
-            """Cherche recommendations/action_plan/summary à plusieurs emplacements possibles
-            selon comment le frontend construit le payload envoyé à /generate-pdf."""
-            result_obj = gd.get('result', {}) or {}
-            candidates = [
-                gd.get('ai'),
-                result_obj.get('ai'),
-                gd.get('execution', {}).get('ai') if isinstance(gd.get('execution'), dict) else None,
-                gd.get('run_result', {}).get('ai') if isinstance(gd.get('run_result'), dict) else None,
-            ]
-            for c in candidates:
-                if c and isinstance(c, dict) and (c.get('recommendations') or c.get('action_plan') or c.get('summary')):
-                    return c
-
-            # Fallback : peut-être envoyés à plat, pas sous "ai"
-            flat = {}
-            for key in ('recommendations', 'action_plan', 'summary'):
-                val = gd.get(key) or result_obj.get(key)
-                if val:
-                    flat[key] = val
-            return flat
-
-        ai_data_smoke = _extract_smoke_ai_data(generation_data)
-        print(f"[SMOKE PDF] ai_data keys found: {list(ai_data_smoke.keys())} | "
-              f"recs={len(ai_data_smoke.get('recommendations', []))} | "
-              f"action_plan={len(ai_data_smoke.get('action_plan', []))}")
-        try:
-            result = _generate_smoke_public_pdf(generation_data, tests, scraped_smoke, ai_data_smoke)
-            print(f"[SMOKE PDF] _generate_smoke_public_pdf returned: type={type(result)}, "
-                  f"len={len(result) if result is not None else 'N/A (None!)'}")
-            return result
-        except Exception as e:
-            import traceback
-            print(f"[SMOKE PDF] EXCEPTION inside _generate_smoke_public_pdf: {e}")
-            traceback.print_exc()
-            raise
+ 
     # ── REGRESSION ───────────────────────────────────────────────────────────
     if test_type == 'regression':
         tests = (
@@ -11008,7 +9588,7 @@ def generate_pdf(generation_data: dict) -> bytes:
                 t['action'] = t.get('test_type', 'security_check')
  
         return _generate_security_pdf(generation_data, tests)
-    
+ 
     # ── SMOKE / REGRESSION (suite) ────────────────────────────────────────────
     from io import BytesIO
     buffer = BytesIO()
