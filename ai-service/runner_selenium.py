@@ -135,6 +135,7 @@ def _run_steps(steps: list) -> dict:
         })
 
     driver = _setup_driver()
+    page_screenshot_b64 = None
 
     try:
         # Initial page load
@@ -201,6 +202,12 @@ def _run_steps(steps: list) -> dict:
                 driver.quit()
                 return _fatal_result(f"Cannot load '{base_url}': {e}", len(steps))
 
+        # ── Capture screenshot de la page après chargement initial ──
+        try:
+            page_screenshot_b64 = base64.b64encode(driver.get_screenshot_as_png()).decode("utf-8")
+        except Exception as e:
+            print(f"[RUNNER-SELENIUM] page screenshot failed: {e}")
+
         for step in to_run:
             result = _run_one_step(driver, step, base_url)
             results.append(result)
@@ -225,6 +232,7 @@ def _run_steps(steps: list) -> dict:
         "total":      total,
         "duration_s": duration,
         "raw_output": "",
+        "screenshot": page_screenshot_b64,
     }
 
 

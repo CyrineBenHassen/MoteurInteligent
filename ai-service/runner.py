@@ -104,9 +104,6 @@ def _run_steps(steps: list) -> dict:
         if base_url:
             try:
                 _goto(page, base_url)
-                page_screenshot_b64 = base64.b64encode(
-                    page.screenshot(full_page=False)
-                ).decode("utf-8")
             except Exception as e:
                 try:
                     browser.close()
@@ -146,6 +143,13 @@ def _run_steps(steps: list) -> dict:
             except Exception as e:
                 print(f"[RUNNER] Login failed: {e}")
 
+        try:
+            page_screenshot_b64 = base64.b64encode(
+                page.screenshot(full_page=False)
+            ).decode("utf-8")
+        except Exception as e:
+            print(f"[RUNNER] Post-login screenshot failed: {e}")
+
         current_section = None
         for step in to_run:
             step_section = step.get("section")
@@ -170,6 +174,7 @@ def _run_steps(steps: list) -> dict:
     fail_count = sum(1 for r in results if r["status"] == "fail")
     skip_count = sum(1 for r in results if r["status"] == "skip")
     total      = len(results)
+    
     executed   = pass_count + fail_count
     pass_rate  = round(pass_count / executed * 100) if executed else 0
 

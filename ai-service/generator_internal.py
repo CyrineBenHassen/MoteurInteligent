@@ -775,7 +775,7 @@ def generate_internal_tests(
 
         # Meta
         "page_type":  page_type,
-        "test_type":  "smoke",
+        "test_type":  "internal_smoke",
         "url":        url,
 
         # Stats

@@ -3225,6 +3225,7 @@ if (docFiles.length > 0) {
 }
     const genData = res.data;
 genData.fresh = true;
+console.log('[DEBUG] genData:', JSON.stringify(genData, null, 2));
 
 if (genData.test_type === 'performance' || genData.result?.test_type === 'performance') {
   genData.result = genData.result || {};
@@ -7982,7 +7983,7 @@ useEffect(() => { setCurrentPage(1); }, [filter, rowsPerPage]);
   const isSecurity = testType === 'security';
   const isFunctional = testType === 'functional';
   const isSeo = testType === 'seo';
-  const isSmoke = testType === 'smoke';
+  const isSmoke = testType === 'smoke' || testType === 'internal_smoke';
 
   const EP_FW = {
   Selenium:   { letters: 'Se', color: '#43B02A' },
@@ -9028,7 +9029,23 @@ Return ONLY valid JSON array, no markdown.`;
 
   setPdfLoading(false);
 };
+const downloadXlsx_Smoke = async () => {
+  setDropdownOpen(false);
+  const genId = generation?.generation?.id;
+  if (!genId) return;
 
+  try {
+    const res = await api.get(`/generations/${genId}/xlsx`, { responseType: 'blob' });
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `smoke_report_${genId}.xlsx`;
+    link.click();
+  } catch (err) {
+    console.error('[XLSX Smoke] download error', err);
+    alert('Excel export failed: ' + (err.response?.data?.error || err.message));
+  }
+};
 const downloadCsv_Seo = async () => {
   setDropdownOpen(false);
   const genId = generation?.generation?.id;
@@ -9512,19 +9529,43 @@ const downloadHtml_Smoke = () => {
   const rateColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
 
   const ACCENT = '#0EA5E9';
-const rawScreenshot = generation?.result?.screenshot
-  || generation?.generation?.screenshot
-  || generation?.result?.scraped?.screenshot
-  || generation?.scraped?.screenshot
-  || runResults?.screenshot
-  || null;
-const screenshot = rawScreenshot ? rawScreenshot.replace(/^data:image\/\w+;base64,/, '') : null;
-console.log('[SMOKE HTML] screenshot trouvé:', !!rawScreenshot,
-  '| result.screenshot:', !!generation?.result?.screenshot,
-  '| generation.screenshot:', !!generation?.generation?.screenshot,
-  '| scraped.screenshot:', !!generation?.result?.scraped?.screenshot,
-  '| runResults.screenshot:', !!runResults?.screenshot);
 
+  // Screenshots: login (avant auth) + target page (après auth) — comme le PDF
+  const resultObj = generation?.generation?.result || generation?.result || {};
+
+    const scrapedObj =
+    generation?.generation?.scraped ||
+    generation?.scraped ||
+    resultObj?.scraped ||
+    runResults?.scraped ||
+    null;
+
+  const scrapedScreenshotRaw = scrapedObj?.screenshot || null;
+  const scrapedIsLogin = scrapedObj?.is_login_page === true;
+
+  // Le backend peut fournir DEUX screenshots séparés quand le login réussit :
+  // screenshot_login (page login avant soumission) + screenshot (page cible).
+  // Si le login a échoué, il n'y a que scraped.screenshot (= la page login elle-même).
+  const rawLogin = scrapedObj?.screenshot_login || (scrapedIsLogin ? scrapedScreenshotRaw : null);
+
+  const pageScreenshotRaw =
+    generation?.generation?.result?.screenshot ||
+    generation?.result?.screenshot ||
+    runResults?.screenshot ||
+    (!scrapedIsLogin ? scrapedScreenshotRaw : null) ||
+    null;
+
+  
+
+  const screenshotTest = !pageScreenshotRaw
+    ? (allTests.find(t => t.status === 'fail' && t.screenshot) || allTests.find(t => t.screenshot))
+    : null;
+  const rawTarget = pageScreenshotRaw || screenshotTest?.screenshot || null;
+
+  const cleanB64 = (raw) => raw ? raw.replace(/^data:image\/\w+;base64,/, '') : null;
+  const screenshotLogin  = cleanB64(rawLogin);
+  const screenshotTarget = cleanB64(rawTarget);
+  const isInternalRun = testType === 'internal_smoke' || !!screenshotLogin;
   // ── Smoke Quality Score (severity-weighted) ──────────────────────────────
   const HIGH_TYPES = new Set(['body','heading','main_content','auth','http_status','ssl','performance']);
   let totalW = 0, earnedW = 0;
@@ -9651,16 +9692,32 @@ console.log('[SMOKE HTML] screenshot trouvé:', !!rawScreenshot,
     </div>`;
 
   // ── 3. SCREENSHOT ─────────────────────────────────────────────────────────
-  const sectionScreenshot = `
+  const shotFrame = (imgB64, caption) => `
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px">${caption}</div>
+      ${imgB64
+        ? `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+            <img src="data:image/png;base64,${imgB64}" style="width:100%;display:block"/>
+          </div>`
+        : `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:32px;text-align:center;color:#94a3b8;font-size:12px">
+            No screenshot was captured for this step.
+          </div>`}
+    </div>`;
+
+  const sectionScreenshot = screenshotLogin && screenshotTarget ? `
+    ${secHdr('Page Screenshots')}
+    ${secDesc('Visual snapshots captured by Playwright during execution: the login page (before authentication) and the target page you requested (after authentication).')}
+    ${shotFrame(screenshotLogin, '1. Login Page (before authentication)')}
+    ${shotFrame(screenshotTarget, '2. Target Page (after authentication)')}
+  ` : screenshotLogin ? `
     ${secHdr('Page Screenshot')}
-    ${secDesc('Visual snapshot of the page as captured by Playwright at test execution time.')}
-    ${screenshot
-      ? `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:16px">
-          <img src="data:image/png;base64,${screenshot}" style="width:100%;display:block"/>
-        </div>`
-      : `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:40px;text-align:center;color:#94a3b8;font-size:12px;margin-bottom:16px">
-          No screenshot was captured for this run.
-        </div>`}`;
+    ${secDesc('Playwright was unable to reach the target page — this is the login screen it stopped on.')}
+    ${shotFrame(screenshotLogin, 'Login Page (authentication blocked)')}
+  ` : `
+    ${secHdr('Page Screenshot')}
+    ${secDesc('Visual snapshot of the target page as captured by Playwright after authentication.')}
+    ${shotFrame(screenshotTarget, 'Target Page')}
+  `;
 
   // ── 4. SCORE ──────────────────────────────────────────────────────────────
   const sectionScore = `
@@ -11107,12 +11164,12 @@ const downloadPdf = async () => {
 
             {dropdownOpen && (
               <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 6, boxShadow: '0 8px 32px rgba(0,0,0,.5), 0 0 0 1px rgba(99,102,241,.08)', zIndex: 200, minWidth: 190, animation: 'dFadeUp .18s var(--ease) both' }}>
-                <button onClick={isSeo ? downloadCsv_Seo : isFunctional ? downloadCsv_Functional : downloadCsv} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--green-bg)'; e.currentTarget.style.color = 'var(--green)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--sub)'; }}>
-                  <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#10b981', letterSpacing: .5 }}>{isSeo ? 'XLSX' : 'CSV'}</span>
-<div><div style={{ fontSize: 12, fontWeight: 700 }}>{isSeo ? 'rapport.xlsx' : 'rapport.csv'}</div><div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>{isSeo ? 'Classeur Excel' : 'Données tabulaires'}</div></div>
-                </button>
+                <button onClick={isSeo ? downloadCsv_Seo : isSmoke ? downloadXlsx_Smoke : isFunctional ? downloadCsv_Functional : downloadCsv} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
+  onMouseEnter={e => { e.currentTarget.style.background = 'var(--green-bg)'; e.currentTarget.style.color = 'var(--green)'; }}
+  onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--sub)'; }}>
+  <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#10b981', letterSpacing: .5 }}>{(isSeo || isSmoke) ? 'XLSX' : 'CSV'}</span>
+  <div><div style={{ fontSize: 12, fontWeight: 700 }}>{(isSeo || isSmoke) ? 'rapport.xlsx' : 'rapport.csv'}</div><div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>{(isSeo || isSmoke) ? 'Classeur Excel' : 'Données tabulaires'}</div></div>
+</button>
                 <button onClick={isSecurity ? downloadHtml_Security : isRegression ? downloadHtml_Regression : isFunctional ? downloadHtml_Functional : isSeo ? downloadHtml_Seo : isSmoke ? downloadHtml_Smoke : downloadHtml}
 
  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}

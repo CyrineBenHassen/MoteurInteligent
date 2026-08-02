@@ -484,10 +484,10 @@ public function downloadPdf($id)
             $payload['ai']          = $fullResult['ai'] ?? [];
         }
 
-        if ($testType === 'smoke') {
-    $payload['ai'] = $fullResult['ai'] ?? [];
-    $payload['screenshot'] = $fullResult['screenshot'] ?? null;
-}
+  if ($testType === 'smoke' || $testType === 'internal_smoke') {
+            $payload['ai'] = $fullResult['ai'] ?? [];
+            $payload['screenshot'] = $fullResult['screenshot'] ?? null;
+        }
 
         $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-pdf', $payload);
 
@@ -515,8 +515,8 @@ public function downloadXlsx($id)
 
     $isK6 = $generation->test_type === 'performance' && $generation->framework === 'k6';
 
-    if (!in_array($generation->test_type, ['seo', 'performance'])) {
-        return response()->json(['error' => 'XLSX export is only available for SEO or Performance reports'], 422);
+    if (!in_array($generation->test_type, ['seo', 'performance', 'smoke'])) {
+        return response()->json(['error' => 'XLSX export is only available for SEO, Performance, or Smoke reports'], 422);
     }
 
     $fullResult = $generation->result ?? [];
@@ -566,7 +566,21 @@ public function downloadXlsx($id)
             $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-performance-xlsx', $payload);
             $filename = "performance_report_{$id}.xlsx";
 
-        // ── SEO ──────────────────────────────────────────────────────
+        // ── SMOKE ────────────────────────────────────────────────────────
+        } elseif ($generation->test_type === 'smoke') {
+            $payload = [
+                'url'               => $generation->url,
+                'framework'         => $generation->framework,
+                'test_type'         => 'smoke',
+                'test_cases'        => $generation->test_cases ?? [],
+                'execution_results' => $generation->execution_results ?? $generation->test_cases ?? [],
+                'ai'                => $fullResult['ai'] ?? [],
+            ];
+
+            $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-smoke-xlsx', $payload);
+            $filename = "smoke_report_{$id}.xlsx";
+
+        // ── SEO ──────────────────────────────────────────────────────────
         } else {
             $payload = [
                 'url'               => $generation->url,
@@ -737,6 +751,9 @@ $docText = $this->extractDocText($request);
         $data   = $response->json();
         $result = $data['result'] ?? [];
 
+        $testType = $result['test_type'] ?? $testType;
+
+
         $testCases = $result['test_cases'] ?? [];
         $pass = $result['pass_count'] ?? 0;
         $fail = $result['fail_count'] ?? 0;
@@ -745,8 +762,9 @@ $docText = $this->extractDocText($request);
 
         // Run tests with existing runner
         $executionResults = [];
-$aiSummary = null;
-if (!empty($testCases)) {
+        $aiSummary = null;
+        $pageScreenshot = null;
+        if (!empty($testCases)) {
             $runResponse = Http::timeout(300)->post('http://127.0.0.1:8001/run', [
                 'script'     => $result['script'] ?? '',
                 'framework'  => $framework,
@@ -762,8 +780,18 @@ if (!empty($testCases)) {
                 $rate             = $runData['pass_rate']  ?? $rate;
                 $executionResults = $runData['results']    ?? [];
                 $aiSummary        = $runData['ai']         ?? null;
+                $pageScreenshot   = $runData['screenshot']  ?? null;
             }
         }
+
+        // Keep per-test failure screenshots only for failed checks (DB weight)
+        $executionResultsForDb = array_map(function ($r) {
+            $copy = $r;
+            if (isset($copy['screenshot']) && ($copy['status'] ?? null) !== 'fail') {
+                unset($copy['screenshot']);
+            }
+            return $copy;
+        }, $executionResults);
 
         $scraped = $data['scraped'] ?? [];
 
@@ -781,7 +809,7 @@ if (!empty($testCases)) {
             'script_selenium'     => $result['script_selenium']   ?? '',
             'script_playwright'   => $result['script_playwright'] ?? '',
             'script_cypress'      => $result['script_cypress']    ?? '',
-            'execution_results'   => $executionResults,
+            'execution_results'   => $executionResultsForDb,
             'load_time_ms'        => $scraped['load_time_ms']     ?? 0,
             'is_spa'              => $scraped['is_spa']           ?? false,
             'pass_count'          => $pass,
@@ -790,8 +818,10 @@ if (!empty($testCases)) {
             'pass_rate'           => $rate,
             'page_type' => ($scraped['is_login_page'] ?? false) ? 'login' : 'dashboard',
             'scraped'             => $scraped,
-            'result'              => $aiSummary ? ['ai' => $aiSummary] : null,
-
+            'result'              => ($aiSummary || $pageScreenshot) ? [
+                'ai'         => $aiSummary,
+                'screenshot' => $pageScreenshot,
+            ] : null,
         ]);
 
         $this->notifyN8n($generation, $pass, $fail, $skip, $rate, $url, $framework, $testType);
@@ -803,6 +833,7 @@ if (!empty($testCases)) {
                 'execution_results' => $executionResults,
                 'test_type'         => $testType,
                 'ai'                => $aiSummary,
+                'screenshot'        => $pageScreenshot, 
             ]),
             'scraped'    => $scraped,
             'test_type'  => $testType,

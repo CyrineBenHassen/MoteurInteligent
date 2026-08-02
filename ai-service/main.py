@@ -1033,7 +1033,7 @@ async def run_tests(data: dict):
     
     ai_summary = None 
 
-    if test_type in ("smoke", "functional"):
+    if test_type in ("smoke", "functional", "internal_smoke"):
         analyses_fn = _generate_smoke_analyses if test_type == "smoke" else _generate_functional_analyses
         summary_fn  = _generate_smoke_summary  if test_type == "smoke" else _generate_functional_summary
 
@@ -1119,6 +1119,9 @@ def generate_pdf_report(data: dict):
         test_type = data.get('test_type', '')
         if test_type == 'seo':
             pdf_bytes = generate_seo_pdf(data)
+        elif test_type == 'internal_smoke':
+            from internal_smoke_pdf import generate_internal_smoke_pdf
+            pdf_bytes = generate_internal_smoke_pdf(data)
         else:
             pdf_bytes = generate_pdf(data)
         
@@ -1140,7 +1143,33 @@ def generate_pdf_report(data: dict):
         print(traceback.format_exc())
         return {"error": str(e), "traceback": traceback.format_exc()}
     
+#Rapport XLSX — Smoke
+@app.post("/generate-smoke-xlsx")
+def generate_smoke_xlsx_report(data: dict):
+    try:
+        print(f"[XLSX-SMOKE] Received data keys: {list(data.keys())}")
 
+        tests   = data.get('execution_results') or data.get('test_cases') or []
+        ai_data = data.get('ai', {}) or {}
+
+        from pdf_generator import generate_smoke_xlsx
+        xlsx_bytes = generate_smoke_xlsx(data, tests, ai_data)
+
+        print(f"[XLSX-SMOKE] Generated {len(xlsx_bytes)} bytes")
+
+        if len(xlsx_bytes) < 100:
+            return {"error": f"XLSX too small: {xlsx_bytes}"}
+
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=nextest_smoke_report.xlsx"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[XLSX-SMOKE] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
 #Rapport XLSX
 @app.post("/generate-seo-xlsx")
 def generate_seo_xlsx_report(data: dict):
@@ -1169,6 +1198,8 @@ def generate_seo_xlsx_report(data: dict):
 #Rapport XLSX — Performance
 @app.post("/generate-performance-xlsx")
 def generate_performance_xlsx_report(data: dict):
+    
+
     try:
         print(f"[XLSX-PERF] Received data keys: {list(data.keys())}")
 
@@ -1298,7 +1329,7 @@ def generate_internal(data: dict):
     return {
         "url":        url,
         "framework":  framework,
-        "test_type":  test_type,
+        "test_type":  result.get("test_type", test_type),  
         "scraped":    scraped,
         "result":     result,
     }

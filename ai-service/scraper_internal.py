@@ -51,7 +51,15 @@ function stableCSS(el, fallback) {
     return fallback || tag;
 }
 """
-
+def _capture_screenshot_b64(page) -> str:
+    """Takes a full-page PNG screenshot and returns it as a base64 data-URI."""
+    try:
+        png_bytes = page.screenshot(full_page=True, type="png")
+        b64 = base64.b64encode(png_bytes).decode("utf-8")
+        return f"data:image/png;base64,{b64}"
+    except Exception as e:
+        print(f"[SCREENSHOT] capture failed: {e}")
+        return None
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN ENTRY POINT
@@ -411,6 +419,7 @@ def _scrape_login_page(login_url: str, wait_time: int = 2000) -> dict:
             pass
 
         has_captcha = len(captcha_elements) > 0 or len(captcha_inputs) > 0
+        screenshot_b64 = _capture_screenshot_b64(page)
 
         browser.close()
 
@@ -423,6 +432,7 @@ def _scrape_login_page(login_url: str, wait_time: int = 2000) -> dict:
             "http_status":    http_status,
             "load_time_ms":   load_time,
             "is_spa":         False,
+            "screenshot":     screenshot_b64,
 
             # Login form elements
             "email_inputs":     email_inputs,
@@ -713,6 +723,7 @@ def _scrape_with_credentials(
     }
     dashboard_result = None  # rempli seulement si le login réussit vraiment
     load_error       = None  # rempli si la page login ne charge pas du tout
+    login_screenshot_b64 = None  # ← AJOUT : screenshot de la page login avant soumission
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -769,6 +780,8 @@ def _scrape_with_credentials(
                         "Use cookie-based session injection instead."
                     )
 
+                login_screenshot_b64 = _capture_screenshot_b64(page)  # ← AJOUT
+
                 # Click submit anyway (to test form behavior)
                 submit = page.query_selector(
                     "button[type='submit'], input[type='submit'], "
@@ -819,6 +832,7 @@ def _scrape_with_credentials(
 
     if dashboard_result is not None:
         dashboard_result["login_result"] = login_result
+        dashboard_result["screenshot_login"] = login_screenshot_b64  # ← AJOUT
         return dashboard_result
 
     # Login échoué (captcha ou credentials invalides) — on rescrape la login page
@@ -831,6 +845,7 @@ def _scrape_with_credentials(
         "captcha_present": login_result["has_captcha"],
         "form_submitted":  True,
     }
+    login_page_data["screenshot_login"] = login_screenshot_b64  # ← AJOUT
 
     return login_page_data
 
@@ -1242,15 +1257,10 @@ def _scrape_dashboard_content(page, url: str) -> dict:
         }""")
     except Exception:
         pass
-    # ── Tag each source with its real kind (avoid mislabeling as "stat_card") ──
-    for c in stat_cards:     c["kind"] = "stat_card"
-    for c in charts:         c["kind"] = "chart"
-    for c in data_tables:    c["kind"] = "table"
-    for c in ant_tables:     c["kind"] = "table"
-    for c in filter_inputs:  c["kind"] = "filter_input"
-    for c in filter_buttons: c["kind"] = "filter_button"
     for c in row_action_buttons: c["kind"] = "row_action"
-    
+
+    screenshot_b64 = _capture_screenshot_b64(page)
+
     return {
         # Meta
         "url":            url,
@@ -1260,6 +1270,7 @@ def _scrape_dashboard_content(page, url: str) -> dict:
         "has_captcha":    False,
         "load_time_ms":   load_time,
         "is_spa":         is_spa,
+        "screenshot":     screenshot_b64,
 
         # Dashboard-specific
         "sidebar_items":    sidebar_items,
