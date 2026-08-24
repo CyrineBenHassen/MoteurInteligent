@@ -11,11 +11,13 @@
 # directly from pdf_generator so it shares the exact same visual identity as
 # your Public Smoke, SEO, and k6 Performance reports.
 #
-# ENTRY POINT
+# ENTRY POINTS
 # -----------
 #   generate_internal_smoke_pdf(generation_data: dict) -> bytes
+#   generate_internal_smoke_xlsx(generation_data: dict) -> bytes
 #
-# Expected `generation_data` shape (same conventions as your other reports):
+# Both take the exact same `generation_data` shape (same conventions as your
+# other reports):
 #   {
 #       'url': 'https://app.example.com/dashboard',
 #       'page_label': 'Dashboard' (optional, human-readable name of the tested page),
@@ -41,6 +43,19 @@
 #
 # Only categories/checks that actually have at least one test in
 # `execution_results` are rendered — nothing is assumed about page structure.
+#
+# WIRING generate_internal_smoke_xlsx INTO YOUR /generations/<id>/xlsx ROUTE
+# -----------------------------------------------------------------------------
+# Your XLSX endpoint presumably already dispatches by test_type. Add a branch:
+#
+#   if test_type == 'internal_smoke':
+#       from internal_smoke_pdf import generate_internal_smoke_xlsx
+#       return generate_internal_smoke_xlsx(generation_data)
+#
+# On the frontend, `isSmoke` already covers `testType === 'internal_smoke'`
+# (see ExecutionPanel.js), and the dropdown already shows an "XLSX" button
+# (not CSV) calling `downloadXlsx_Smoke`, which hits `/generations/:id/xlsx`.
+# No frontend change is required — only wiring the backend branch above.
 
 from io import BytesIO
 from datetime import datetime
@@ -63,6 +78,15 @@ from pdf_generator import (
     _grade_from_score, _make_score_gauge, _build_certificate_card, _perf_insight_box,
     build_smoke_certificate_details,
 )
+
+# ── XLSX-only imports (used by the generate_internal_smoke_xlsx section at the
+#    bottom of this file — the PDF-generation code above does not need these) ──
+import math
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from openpyxl.chart import BarChart, Reference
+from openpyxl.drawing.image import Image as XLImage
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1137,7 +1161,7 @@ def build_internal_action_plan(elements, ai_data):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# MAIN GENERATOR
+# MAIN PDF GENERATOR
 # ═════════════════════════════════════════════════════════════════════════════
 
 def _generate_internal_smoke_pdf(generation_data: dict, tests: list, scraped: dict, ai_data: dict) -> bytes:
@@ -1327,10 +1351,9 @@ def _generate_internal_smoke_pdf(generation_data: dict, tests: list, scraped: di
     return buffer.getvalue()
 
 
-def generate_internal_smoke_pdf(generation_data: dict) -> bytes:
-    """Public entry point — pass the same generation_data shape used by your
-    other report generators. Only checks actually present in
-    `execution_results` / `test_cases` are analyzed and rendered."""
+def _extract_internal_smoke_inputs(generation_data: dict):
+    """Shared extraction logic used by both the PDF and the XLSX entry points,
+    so the two reports are always built from the exact same data."""
     result = generation_data.get('result', {}) or {}
     tests = (
         generation_data.get('execution_results') or
@@ -1343,5 +1366,822 @@ def generate_internal_smoke_pdf(generation_data: dict) -> bytes:
     if isinstance(scraped, list):
         scraped = {}
     ai_data = generation_data.get('ai', result.get('ai', {})) or {}
+    return tests, scraped, ai_data
 
+
+def generate_internal_smoke_pdf(generation_data: dict) -> bytes:
+    """Public entry point — pass the same generation_data shape used by your
+    other report generators. Only checks actually present in
+    `execution_results` / `test_cases` are analyzed and rendered."""
+    tests, scraped, ai_data = _extract_internal_smoke_inputs(generation_data)
     return _generate_internal_smoke_pdf(generation_data, tests, scraped, ai_data)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# INTERNAL SMOKE TEST — XLSX REPORT (same data, workbook instead of PDF)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Same conventions as generate_smoke_xlsx / generate_performance_xlsx in
+# pdf_generator.py, same categories/scoring as the PDF above (INTERNAL_CATEGORY_*,
+# _internal_category_label, _compute_internal_smoke_score, _is_critical_internal_fail).
+
+_XLSX_FONT = "Calibri"
+_XLSX_THIN = Side(style="thin", color="E2E8F0")
+_XLSX_BORDER = Border(left=_XLSX_THIN, right=_XLSX_THIN, top=_XLSX_THIN, bottom=_XLSX_THIN)
+
+_INTERNAL_ACCENT_HEX = INTERNAL_ACCENT.hexval()[2:].upper() if hasattr(INTERNAL_ACCENT, 'hexval') else "0EA5E9"
+_GOLD_HEX = GOLD.hexval()[2:].upper() if hasattr(GOLD, 'hexval') else "C9A227"
+
+
+def _xlsx_header_row(ws, row, headers, col_start=1):
+    for i, h in enumerate(headers, start=col_start):
+        c = ws.cell(row=row, column=i, value=h)
+        c.font = Font(name=_XLSX_FONT, bold=True, color="FFFFFF", size=10)
+        c.fill = PatternFill("solid", fgColor="0A0F1E")
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = _XLSX_BORDER
+
+
+def _xlsx_autofit(ws, widths):
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+
+def _xlsx_title_banner(ws, title: str, color_hex: str):
+    ws.insert_rows(1, 2)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
+    c = ws.cell(row=1, column=1, value=title)
+    c.font = Font(name=_XLSX_FONT, bold=True, size=13, color=color_hex)
+    c.fill = PatternFill("solid", fgColor="0A0F1E")
+    for col in range(1, 7):
+        ws.cell(row=1, column=col).fill = PatternFill("solid", fgColor="0A0F1E")
+    ws.row_dimensions[1].height = 24
+
+
+def _xlsx_wrapped(ws, r, text, font, chars_per_line=95, min_rows=2, fill=None, end_col=6):
+    n_rows = max(min_rows, math.ceil(len(text) / chars_per_line) + 1)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r + n_rows - 1, end_column=end_col)
+    c = ws.cell(row=r, column=1, value=text)
+    c.font = font
+    c.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
+    if fill:
+        for row_ in range(r, r + n_rows):
+            for col_ in range(1, end_col + 1):
+                ws.cell(row=row_, column=col_).fill = PatternFill("solid", fgColor=fill)
+    return r + n_rows
+
+
+def _xlsx_parse_ms(d):
+    try:
+        s = str(d)
+        if s.endswith('ms'):
+            return float(s.replace('ms', '') or 0)
+        if s.endswith('s'):
+            return float(s.replace('s', '') or 0) * 1000
+    except Exception:
+        pass
+    return 0
+
+
+def _xlsx_decode_screenshot(raw, max_w_px=520):
+    """Decode a screenshot (data-uri, raw base64, path, or bytes) into an XLImage, or None."""
+    import base64, os
+    if not raw:
+        return None
+    try:
+        if isinstance(raw, str) and raw.startswith('data:image'):
+            img_bytes = base64.b64decode(raw.split(',', 1)[1])
+            buf = BytesIO(img_bytes)
+        elif isinstance(raw, str) and os.path.exists(raw):
+            buf = raw  # XLImage accepts a path directly
+        elif isinstance(raw, (bytes, bytearray)):
+            buf = BytesIO(raw)
+        elif isinstance(raw, str) and len(raw) > 200:
+            img_bytes = base64.b64decode(raw)
+            buf = BytesIO(img_bytes)
+        else:
+            return None
+        img = XLImage(buf)
+        if img.width and img.width > max_w_px:
+            ratio = max_w_px / float(img.width)
+            img.width = int(img.width * ratio)
+            img.height = int(img.height * ratio)
+        return img
+    except Exception:
+        return None
+
+
+def _generate_internal_smoke_xlsx(generation_data: dict, tests: list, scraped: dict, ai_data: dict) -> bytes:
+    page_label = _page_label(generation_data)
+    url = generation_data.get('url', '')
+    framework = generation_data.get('framework', 'Playwright')
+    auth_method = generation_data.get('auth_method', 'Authenticated session')
+
+    pass_count = sum(1 for t in tests if t.get('status') == 'pass')
+    fail_count = sum(1 for t in tests if t.get('status') == 'fail')
+    skip_count = sum(1 for t in tests if t.get('status') not in ('pass', 'fail'))
+    total = len(tests) or 1
+    pass_rate = round(pass_count / total * 100)
+    rate_color = "10B981" if pass_rate >= 80 else "F59E0B" if pass_rate >= 50 else "EF4444"
+
+    score, score_label, score_color_hex = _compute_internal_smoke_score(tests)
+    score_color = score_color_hex.lstrip('#').upper() if isinstance(score_color_hex, str) else "64748B"
+    grade, grade_color_hex = _grade_from_score(score)
+    grade_color = grade_color_hex.lstrip('#').upper() if isinstance(grade_color_hex, str) else "10B981"
+
+    critical_fail = any(_is_critical_internal_fail(t) for t in tests)
+
+    wb = Workbook()
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 1 — Overview
+    # ═══════════════════════════════════════════════════════════════════════
+    ws = wb.active
+    ws.title = "Overview"
+    ws.sheet_view.showGridLines = False
+
+    ws.merge_cells("A1:H3")
+    for r_ in range(1, 4):
+        for c_ in range(1, 9):
+            ws.cell(row=r_, column=c_).fill = PatternFill("solid", fgColor="0A0F1E")
+    ws["A1"] = "NEXTEST — Internal Smoke Test Report"
+    ws["A1"].font = Font(name=_XLSX_FONT, bold=True, size=20, color=_INTERNAL_ACCENT_HEX)
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
+
+    ws.merge_cells("A4:H4")
+    ws["A4"] = f"Generated {datetime.now().strftime('%B %d, %Y  •  %H:%M')}"
+    ws["A4"].font = Font(name=_XLSX_FONT, italic=True, size=9, color="64748B")
+
+    info_rows = [
+        ("URL", url),
+        ("Page", page_label),
+        ("Framework", framework),
+        ("Test Type", "Internal Smoke Test (Authenticated)"),
+        ("Authentication", auth_method),
+        ("Smoke Quality Score", f"{score}/100 — {score_label}"),
+        ("Generated", datetime.now().strftime("%Y-%m-%d %H:%M")),
+    ]
+    r = 6
+    for lbl, val in info_rows:
+        lc = ws.cell(row=r, column=1, value=lbl)
+        lc.font = Font(name=_XLSX_FONT, bold=True, color="64748B", size=9)
+        lc.fill = PatternFill("solid", fgColor="F8FAFC")
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=6)
+        vc = ws.cell(row=r, column=2, value=val)
+        vc.font = Font(name=_XLSX_FONT, size=10, color="1E293B", bold=(lbl == "Smoke Quality Score"))
+        for col in range(1, 7):
+            ws.cell(row=r, column=col).border = _XLSX_BORDER
+        r += 1
+
+    r += 2
+    stats = [
+        ("PASSED", pass_count, "10B981", "D1FAE5"),
+        ("FAILED", fail_count, "EF4444", "FEE2E2"),
+        ("SKIPPED", skip_count, "F59E0B", "FEF3C7"),
+        ("PASS RATE", f"{pass_rate}%", rate_color,
+         "D1FAE5" if pass_rate >= 80 else "FEF3C7" if pass_rate >= 50 else "FEE2E2"),
+        ("SCORE", score, score_color,
+         "D1FAE5" if score >= 80 else "FEF3C7" if score >= 50 else "FEE2E2"),
+        ("TOTAL", total, "3B82F6", "DBEAFE"),
+    ]
+    col = 1
+    for lbl, val, color, bg in stats:
+        c1 = ws.cell(row=r, column=col, value=val)
+        c1.font = Font(name=_XLSX_FONT, bold=True, size=16, color=color)
+        c1.alignment = Alignment(horizontal="center", vertical="center")
+        c1.fill = PatternFill("solid", fgColor=bg)
+        c1.border = _XLSX_BORDER
+        c2 = ws.cell(row=r + 1, column=col, value=lbl)
+        c2.font = Font(name=_XLSX_FONT, bold=True, size=8, color="64748B")
+        c2.alignment = Alignment(horizontal="center", vertical="center")
+        c2.fill = PatternFill("solid", fgColor=bg)
+        c2.border = _XLSX_BORDER
+        col += 1
+    ws.row_dimensions[r].height = 22
+    ws.row_dimensions[r + 1].height = 18
+    r += 3
+
+    # ── Overview hero (Overall Status / Quality Score / Risk / Next Steps) ──
+    if critical_fail:
+        overall_status, status_color = 'CRITICAL ISSUES', 'EF4444'
+        risk_level = 'HIGH'
+        deploy_text = 'NOT READY'
+        status_explain = (
+            'One or more critical checks failed on this authenticated page (authentication, page load, '
+            'console/network errors). These block reliable use of the page — resolve before proceeding.')
+    elif fail_count > 0:
+        overall_status, status_color = 'PASSED W/ WARNINGS', 'F59E0B'
+        risk_level = 'MEDIUM'
+        deploy_text = 'READY W/ CAUTION'
+        status_explain = (
+            f'Core access to the page is confirmed, but {fail_count} secondary check(s) failed on this page. '
+            f'Review the failing checks below.')
+    else:
+        overall_status, status_color = 'ALL CHECKS PASSED', '10B981'
+        risk_level = 'LOW'
+        deploy_text = 'READY'
+        status_explain = (
+            f'Every check executed on {page_label} passed, including authentication and page-load checks. '
+            f'This page is stable and ready for deeper functional testing.')
+
+    ws.cell(row=r, column=1, value="Test Execution Summary").font = Font(
+        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
+    r += 1
+    r = _xlsx_wrapped(ws, r, status_explain, Font(name=_XLSX_FONT, size=9, color="475569"))
+
+    hero_items = [
+        ("OVERALL STATUS", overall_status, status_color),
+        ("QUALITY SCORE", f"{score}/100", score_color),
+        ("RISK LEVEL", risk_level, status_color),
+        ("NEXT STEPS", deploy_text, status_color),
+    ]
+    col = 1
+    row_start_hero = r
+    for lbl, val, color in hero_items:
+        c1 = ws.cell(row=r, column=col, value=val)
+        c1.font = Font(name=_XLSX_FONT, bold=True, size=12, color=color)
+        c1.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c1.border = _XLSX_BORDER
+        c2 = ws.cell(row=r + 1, column=col, value=lbl)
+        c2.font = Font(name=_XLSX_FONT, bold=True, size=7.5, color="64748B")
+        c2.alignment = Alignment(horizontal="center", vertical="center")
+        c2.border = _XLSX_BORDER
+        col += 1
+    ws.row_dimensions[row_start_hero].height = 26
+    ws.row_dimensions[row_start_hero + 1].height = 16
+    r += 3
+
+    ai_summary_text = (ai_data or {}).get('summary', '')
+    if not ai_summary_text:
+        ai_summary_text = (
+            f'This smoke run executed {total} check(s) on the authenticated page {page_label}, '
+            f'with {pass_count} passed and {fail_count} failed ({pass_rate}% pass rate). '
+            + ('Critical failures were detected on this page.' if critical_fail
+               else 'No critical failures were detected on this page.'))
+    r = _xlsx_wrapped(ws, r, f"AI Summary: {ai_summary_text}",
+                       Font(name=_XLSX_FONT, size=9, color="4F46E5"), fill="F8FAFC")
+    r += 1
+
+    # ── Key Metrics ──
+    ws.cell(row=r, column=1, value="Key Metrics").font = Font(
+        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
+    r += 1
+
+    durations_ms = [_xlsx_parse_ms(t.get('duration', '0')) for t in tests]
+    total_ms = sum(durations_ms)
+    avg_ms = (total_ms / len(durations_ms)) if durations_ms else 0
+    critical_count = sum(1 for t in tests if _is_critical_internal_fail(t))
+
+    cat_counts = {}
+    for t in tests:
+        label, _ = _internal_category_label(t)
+        cat_counts[label] = cat_counts.get(label, 0) + 1
+    top_cats = sorted(cat_counts.items(), key=lambda x: -x[1])[:2]
+    top_cat_1 = top_cats[0] if len(top_cats) > 0 else ('—', 0)
+    top_cat_2 = top_cats[1] if len(top_cats) > 1 else ('—', 0)
+
+    key_metrics = [
+        ("EXECUTION TIME", f"{total_ms/1000:.2f}s" if total_ms else "N/A", _INTERNAL_ACCENT_HEX),
+        ("CRITICAL CHECKS", str(critical_count), "EF4444"),
+        (f"{top_cat_1[0].upper()} CHECKS", str(top_cat_1[1]), "10B981"),
+        (f"{top_cat_2[0].upper()} CHECKS", str(top_cat_2[1]), "8B5CF6"),
+        ("TOTAL CHECKS", str(len(tests)), "F59E0B"),
+        ("AVG CHECK DURATION", f"{avg_ms:.0f}ms" if avg_ms else "N/A", "EC4899"),
+    ]
+    col = 1
+    row_start_km = r
+    for i, (lbl, val, color) in enumerate(key_metrics):
+        if i == 3:
+            col = 1
+            r += 2
+        c1 = ws.cell(row=r, column=col, value=val)
+        c1.font = Font(name=_XLSX_FONT, bold=True, size=12, color=color)
+        c1.alignment = Alignment(horizontal="center", vertical="center")
+        c1.border = _XLSX_BORDER
+        c2 = ws.cell(row=r + 1, column=col, value=lbl)
+        c2.font = Font(name=_XLSX_FONT, bold=True, size=7.5, color="64748B")
+        c2.alignment = Alignment(horizontal="center", vertical="center")
+        c2.border = _XLSX_BORDER
+        col += 1
+    ws.row_dimensions[row_start_km].height = 22
+    r += 3
+
+    _xlsx_autofit(ws, [22, 22, 14, 14, 14, 14, 14, 14])
+    ws.freeze_panes = "A6"
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 2 — Screenshots (login / target page, if available)
+    # ═══════════════════════════════════════════════════════════════════════
+    result_obj = generation_data.get('result', {}) or {}
+    sc = scraped or {}
+    raw_login = generation_data.get('screenshot_login') or result_obj.get('screenshot_login') or sc.get('screenshot_login')
+    raw_target = generation_data.get('screenshot') or result_obj.get('screenshot') or sc.get('screenshot')
+    img_login = _xlsx_decode_screenshot(raw_login)
+    img_target = _xlsx_decode_screenshot(raw_target)
+
+    if img_login or img_target:
+        ws_shot = wb.create_sheet("Screenshots")
+        ws_shot.sheet_view.showGridLines = False
+        r_shot = 1
+        ws_shot.cell(row=r_shot, column=1, value="Page Screenshots").font = Font(
+            name=_XLSX_FONT, bold=True, size=14, color=_INTERNAL_ACCENT_HEX)
+        r_shot += 2
+        if img_login:
+            ws_shot.cell(row=r_shot, column=1, value="1. Login Page (before authentication)").font = Font(
+                name=_XLSX_FONT, bold=True, size=10, color="475569")
+            r_shot += 1
+            ws_shot.add_image(img_login, f"A{r_shot}")
+            r_shot += max(24, int((img_login.height or 300) / 15)) + 2
+        if img_target:
+            ws_shot.cell(row=r_shot, column=1, value="2. Target Page (after authentication)").font = Font(
+                name=_XLSX_FONT, bold=True, size=10, color="475569")
+            r_shot += 1
+            ws_shot.add_image(img_target, f"A{r_shot}")
+        _xlsx_autofit(ws_shot, [14] * 6)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 3 — Test Scenarios
+    # ═══════════════════════════════════════════════════════════════════════
+    ws2 = wb.create_sheet("Test Scenarios")
+    ws2.sheet_view.showGridLines = False
+
+    methodology_text = (
+        f"This report validates the stability of a single authenticated internal page — {page_label} — "
+        f"accessed via {auth_method}, before deeper functional or regression testing proceeds. NexTest "
+        f"does not test the surrounding application: only the elements actually detected on this specific "
+        f"page are analyzed. Checks are executed automatically using Playwright in headless Chromium, "
+        f"verifying element presence, visibility, and console/network health against the live "
+        f"authenticated DOM."
+    )
+    ws2.cell(row=1, column=1, value="Smoke Test Methodology").font = Font(
+        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
+    r2 = 2
+    r2 = _xlsx_wrapped(ws2, r2, methodology_text, Font(name=_XLSX_FONT, size=9, color="475569"), end_col=5)
+    r2 += 1
+
+    _xlsx_header_row(ws2, r2, ["#", "Scenario", "Category", "Priority", "Expected"])
+    ws2.freeze_panes = f"A{r2 + 1}"
+
+    for i, t in enumerate(tests, start=1):
+        row = r2 + i
+        cat_label, cat_color = _internal_category_label(t)
+        priority = (t.get('priority') or 'medium').lower()
+        pc = PRIORITY_COLORS.get(priority, '#f59e0b').lstrip('#').upper()
+        cc = cat_color.lstrip('#').upper() if isinstance(cat_color, str) else "64748B"
+        expected = t.get('reason') or t.get('expected') or t.get('description') or 'Element present and visible'
+        vals = [i, t.get('name', ''), cat_label.upper(), priority.upper(), str(expected)[:120]]
+        for col, v in enumerate(vals, start=1):
+            c = ws2.cell(row=row, column=col, value=v)
+            c.font = Font(name=_XLSX_FONT, size=9, bold=(col in (3, 4)),
+                          color=(cc if col == 3 else pc if col == 4 else "1E293B"))
+            c.alignment = Alignment(horizontal="center" if col in (1, 3, 4) else "left",
+                                     vertical="top", wrap_text=(col == 5))
+            c.border = _XLSX_BORDER
+    _xlsx_title_banner(ws2, "SMOKE TEST SCENARIOS", _INTERNAL_ACCENT_HEX)
+    _xlsx_autofit(ws2, [5, 40, 18, 12, 55])
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 4 — Results by Category
+    # ═══════════════════════════════════════════════════════════════════════
+    ws3 = wb.create_sheet("Results by Category")
+    ws3.sheet_view.showGridLines = False
+    _xlsx_header_row(ws3, 1, ["Category", "Total", "Passed", "Failed", "Pass Rate", "Verdict"])
+    ws3.freeze_panes = "A2"
+
+    cats = {c: {'pass': 0, 'fail': 0, 'total': 0} for c in INTERNAL_CATEGORY_ORDER}
+    for t in tests:
+        label, _ = _internal_category_label(t)
+        if label not in cats:
+            cats[label] = {'pass': 0, 'fail': 0, 'total': 0}
+        cats[label]['total'] += 1
+        if t.get('status') == 'pass':
+            cats[label]['pass'] += 1
+        elif t.get('status') == 'fail':
+            cats[label]['fail'] += 1
+
+    row = 2
+    for cat in INTERNAL_CATEGORY_ORDER:
+        d = cats[cat]
+        if d['total'] == 0:
+            continue
+        rate = round(d['pass'] / d['total'] * 100)
+        verdict = 'PASS' if d['fail'] == 0 else 'FAIL'
+        bg = "D1FAE5" if d['fail'] == 0 else "FEE2E2"
+        cc = INTERNAL_CATEGORY_META.get(cat, '#64748b').lstrip('#').upper()
+        vals = [cat, d['total'], d['pass'], d['fail'], f"{rate}%", verdict]
+        for col, v in enumerate(vals, start=1):
+            c = ws3.cell(row=row, column=col, value=v)
+            c.font = Font(name=_XLSX_FONT, size=9, bold=(col in (1, 6)),
+                          color=(cc if col == 1 else
+                                 ("EF4444" if (col == 6 and verdict == "FAIL") else
+                                  "10B981" if (col == 6 and verdict == "PASS") else "1E293B")))
+            c.fill = PatternFill("solid", fgColor=bg)
+            c.alignment = Alignment(horizontal="center" if col > 1 else "left", vertical="center")
+            c.border = _XLSX_BORDER
+        row += 1
+    _xlsx_title_banner(ws3, "RESULTS BY CATEGORY", _INTERNAL_ACCENT_HEX)
+    _xlsx_autofit(ws3, [24, 10, 10, 10, 12, 12])
+
+    hdr_row3 = 3
+    chart_end3 = row + 1
+    if chart_end3 >= hdr_row3 + 1:
+        chart3 = BarChart()
+        chart3.type = "col"
+        chart3.title = "Category Breakdown Chart"
+        chart3.y_axis.title = "Checks"
+        cats_ref3 = Reference(ws3, min_col=1, min_row=hdr_row3 + 1, max_row=chart_end3)
+        pass_ref3 = Reference(ws3, min_col=3, min_row=hdr_row3, max_row=chart_end3)
+        fail_ref3 = Reference(ws3, min_col=4, min_row=hdr_row3, max_row=chart_end3)
+        chart3.add_data(pass_ref3, titles_from_data=True)
+        chart3.add_data(fail_ref3, titles_from_data=True)
+        chart3.set_categories(cats_ref3)
+        chart3.series[0].graphicalProperties.solidFill = "10B981"
+        chart3.series[1].graphicalProperties.solidFill = "EF4444"
+        chart3.width = 18
+        chart3.height = 9
+        ws3.add_chart(chart3, f"A{chart_end3 + 2}")
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 5 — Detailed Results
+    # ═══════════════════════════════════════════════════════════════════════
+    ws4 = wb.create_sheet("Detailed Results")
+    ws4.sheet_view.showGridLines = False
+    _xlsx_header_row(ws4, 1, ["#", "Test Name", "Category", "Status", "Result / Reason", "Duration"])
+    ws4.freeze_panes = "A2"
+
+    STATUS_COLOR = {"pass": ("10B981", "D1FAE5"), "fail": ("EF4444", "FEE2E2"), "skip": ("F59E0B", "FFFBEB")}
+    for i, t in enumerate(tests, start=1):
+        row = i + 1
+        status = t.get('status', 'skip')
+        s_color, s_bg = STATUS_COLOR.get(status, ("94A3B8", "FFFFFF"))
+        cat_label, cat_color = _internal_category_label(t)
+        cc = cat_color.lstrip('#').upper() if isinstance(cat_color, str) else "64748B"
+        reason = t.get('reason') or t.get('reason_pass') or t.get('suite') or t.get('error') or '—'
+        vals = [i, t.get('name', ''), cat_label.upper(), status.upper(), str(reason)[:150], t.get('duration', '—')]
+        for col, v in enumerate(vals, start=1):
+            c = ws4.cell(row=row, column=col, value=v)
+            c.font = Font(name=_XLSX_FONT, size=9, bold=(col in (3, 4)),
+                          color=(cc if col == 3 else s_color if col == 4 else "1E293B"))
+            c.alignment = Alignment(horizontal="center" if col in (1, 3, 4, 6) else "left",
+                                     vertical="top", wrap_text=(col == 5))
+            c.border = _XLSX_BORDER
+            if col == 4:
+                c.fill = PatternFill("solid", fgColor=s_bg)
+        ws4.row_dimensions[row].height = 20
+    _xlsx_title_banner(ws4, "DETAILED SMOKE RESULTS", "0D9488")
+    _xlsx_autofit(ws4, [5, 42, 18, 12, 55, 12])
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 6 — AI Analysis (narrative — mirrors build_internal_smoke_quality_analysis
+    # and build_internal_ai_focus_sections above)
+    # ═══════════════════════════════════════════════════════════════════════
+    ws_ai = wb.create_sheet("AI Analysis")
+    ws_ai.sheet_view.showGridLines = False
+
+    r_ai = 1
+    ws_ai.cell(row=r_ai, column=1, value="AI Analysis").font = Font(
+        name=_XLSX_FONT, bold=True, size=14, color="4F46E5")
+    r_ai += 2
+
+    fail_n_total = sum(1 for t in tests if t.get('status') == 'fail')
+    auth_tests = [t for t in tests if _internal_category_label(t)[0] == 'Authentication']
+    auth_pass = auth_tests and all(t.get('status') == 'pass' for t in auth_tests)
+    auth_fail = any(t.get('status') == 'fail' for t in auth_tests)
+    nav_tests = [t for t in tests if _internal_category_label(t)[0] == 'Navigation']
+    nav_fail = any(t.get('status') == 'fail' for t in nav_tests)
+    js_tests = [t for t in tests if _internal_category_label(t)[0] == 'JavaScript']
+    js_fail = any(t.get('status') == 'fail' for t in js_tests)
+
+    stability_text = (
+        f'{page_label} demonstrates '
+        f'{"critical instability" if fail_n_total and critical_fail else "overall stability"} '
+        f'with a {pass_rate}% pass rate across {total} check(s) on this page. '
+        + (f'{"Authentication is confirmed working — the session remains valid throughout the run." if auth_pass else "Authentication issues were detected — session validity should be reviewed." if auth_fail else ""} ')
+        + (f'{"Navigation elements on this page are reliable." if nav_tests and not nav_fail else "Navigation elements on this page show failures that should be investigated." if nav_fail else ""} ')
+        + (f'{"No console or JavaScript errors were captured during rendering." if js_tests and not js_fail else "Console/JavaScript errors were captured during rendering — see Detailed Results." if js_fail else ""} ')
+        + ('This page is a reasonable candidate for the next testing phase.' if fail_n_total == 0
+           else 'Review the failing checks in the Detailed Results sheet before promoting this page to further testing.')
+    )
+    r_ai = _xlsx_wrapped(ws_ai, r_ai, stability_text, Font(name=_XLSX_FONT, size=9, color="475569"), end_col=5)
+    r_ai += 1
+
+    # Page Stability
+    critical_checks = [t for t in tests if t.get('type') in INTERNAL_HIGH_TYPES]
+    if critical_checks:
+        fail_n = sum(1 for t in critical_checks if t.get('status') == 'fail')
+        text = (f'All {len(critical_checks)} critical check(s) passed on {page_label} — the page loads '
+                f'reliably and the authenticated session holds.' if fail_n == 0 else
+                f'{fail_n} of {len(critical_checks)} critical check(s) failed on {page_label} — this affects '
+                f'the core reliability of the page and should be prioritized.')
+        ws_ai.cell(row=r_ai, column=1, value="Page Stability").font = Font(
+            name=_XLSX_FONT, bold=True, size=11, color=_INTERNAL_ACCENT_HEX)
+        r_ai += 1
+        r_ai = _xlsx_wrapped(ws_ai, r_ai, text, Font(name=_XLSX_FONT, size=9, color="475569"),
+                              fill="F8FAFC", end_col=5)
+        r_ai += 1
+
+    for title, catkey, color in [
+        ('Navigation Analysis', 'Navigation', '10B981'),
+        ('UI Components Analysis', 'UI Components', '8B5CF6'),
+        ('Forms Analysis', 'Forms', 'F59E0B'),
+        ('Tables Analysis', 'Tables', '0D9488'),
+        ('Rendering Analysis', 'Data Rendering', '3B82F6'),
+        ('JavaScript Analysis', 'JavaScript', 'EF4444'),
+    ]:
+        related = [t for t in tests if _internal_category_label(t)[0] == catkey]
+        total_n = len(related)
+        if total_n == 0:
+            continue
+        fail_n = sum(1 for t in related if t.get('status') == 'fail')
+        if fail_n == 0:
+            text = f'All {total_n} check(s) passed for {title.split(" Analysis")[0].lower()} on this page — fully operational, no issues detected.'
+        else:
+            failing = [t.get('name', '') for t in related if t.get('status') == 'fail'][:3]
+            text = f'{fail_n} of {total_n} check(s) failed: {", ".join(failing)}. Investigate before further testing.'
+        ws_ai.cell(row=r_ai, column=1, value=title).font = Font(
+            name=_XLSX_FONT, bold=True, size=11, color=color)
+        r_ai += 1
+        r_ai = _xlsx_wrapped(ws_ai, r_ai, text, Font(name=_XLSX_FONT, size=9, color="475569"),
+                              fill="F8FAFC", end_col=5)
+        r_ai += 1
+
+    # Deployment Readiness
+    if critical_fail:
+        depl_text = 'This page is NOT ready for further testing — critical checks (load, auth, console/network) failed.'
+        depl_color = 'EF4444'
+    elif fail_n_total > 0:
+        depl_text = f'This page is ready with caution — {fail_n_total} secondary check(s) failed. Review before proceeding.'
+        depl_color = 'F59E0B'
+    else:
+        depl_text = 'This page is ready — all checks passed, stable for the next testing phase.'
+        depl_color = '10B981'
+    ws_ai.cell(row=r_ai, column=1, value="Deployment Readiness").font = Font(
+        name=_XLSX_FONT, bold=True, size=11, color=depl_color)
+    r_ai += 1
+    r_ai = _xlsx_wrapped(ws_ai, r_ai, depl_text, Font(name=_XLSX_FONT, size=9, color="475569"),
+                          fill="F8FAFC", end_col=5)
+
+    _xlsx_autofit(ws_ai, [30, 30, 20, 20, 20])
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 7 — AI Recommendations
+    # ═══════════════════════════════════════════════════════════════════════
+    ws5 = wb.create_sheet("AI Recommendations")
+    ws5.sheet_view.showGridLines = False
+    _xlsx_header_row(ws5, 1, ["Priority", "Category", "Issue", "Recommendation", "Severity"])
+
+    recs = (ai_data or {}).get('recommendations', []) or []
+    PRI_BG = {"critical": "FEE2E2", "high": "FFF7ED", "medium": "FFFBEB", "low": "D1FAE5"}
+    PRI_COLOR = {"critical": "EF4444", "high": "F97316", "medium": "F59E0B", "low": "10B981"}
+    r = 2
+    for rec in recs:
+        priority = (rec.get('priority') or 'medium').lower()
+        severity = (rec.get('severity') or priority).upper()
+        vals = [priority.upper(), (rec.get('category', '—') or '—').upper(),
+                rec.get('issue', '')[:80], rec.get('fix', rec.get('recommendation', ''))[:90], severity]
+        for col, v in enumerate(vals, start=1):
+            c = ws5.cell(row=r, column=col, value=v)
+            c.font = Font(name=_XLSX_FONT, size=9, bold=(col in (1, 5)),
+                          color=PRI_COLOR.get(priority, "F59E0B") if col in (1, 5) else "1E293B")
+            c.alignment = Alignment(vertical="top", wrap_text=(col in (3, 4)),
+                                     horizontal="center" if col in (1, 5) else "left")
+            c.fill = PatternFill("solid", fgColor=PRI_BG.get(priority, "FFFBEB"))
+            c.border = _XLSX_BORDER
+        ws5.row_dimensions[r].height = 28
+        r += 1
+    if not recs:
+        ws5.merge_cells("A2:E2")
+        c = ws5.cell(row=2, column=1, value="No issues detected on this page — no recommendations needed for this run.")
+        c.font = Font(name=_XLSX_FONT, italic=True, size=9, color="94A3B8")
+    _xlsx_title_banner(ws5, "AI RECOMMENDATIONS", "4F46E5")
+    _xlsx_autofit(ws5, [12, 18, 40, 50, 12])
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 8 — Action Plan
+    # ═══════════════════════════════════════════════════════════════════════
+    ws6 = wb.create_sheet("Action Plan")
+    ws6.sheet_view.showGridLines = False
+    _xlsx_header_row(ws6, 1, ["Priority", "Category", "Action", "Expected Impact", "Status"])
+    ws6.freeze_panes = "A2"
+
+    action_plan = (ai_data or {}).get('action_plan', []) or []
+    r = 2
+    for item in action_plan:
+        if isinstance(item, str):
+            item = {'priority': 'medium', 'category': 'General', 'action': item,
+                     'impact': '—', 'status': 'To Do'}
+        priority = (item.get('priority') or 'medium').lower()
+        vals = [priority.upper(), (item.get('category', '') or '').upper(),
+                item.get('action', ''), item.get('impact', item.get('expected_impact', '')),
+                item.get('status', 'To Do')]
+        for col, v in enumerate(vals, start=1):
+            c = ws6.cell(row=r, column=col, value=v)
+            c.font = Font(name=_XLSX_FONT, size=9, bold=(col == 1),
+                          color=PRI_COLOR.get(priority, "F59E0B") if col == 1 else "1E293B")
+            c.alignment = Alignment(vertical="top", wrap_text=(col in (3, 4)),
+                                     horizontal="center" if col in (1, 5) else "left")
+            c.border = _XLSX_BORDER
+        ws6.row_dimensions[r].height = 28
+        r += 1
+    if not action_plan:
+        ws6.merge_cells("A2:E2")
+        c = ws6.cell(row=2, column=1, value="No action items generated for this run.")
+        c.font = Font(name=_XLSX_FONT, italic=True, size=9, color="94A3B8")
+    _xlsx_title_banner(ws6, "AI ACTION PLAN", _GOLD_HEX)
+    _xlsx_autofit(ws6, [12, 18, 45, 40, 12])
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 9 — Executive Summary
+    # ═══════════════════════════════════════════════════════════════════════
+    ws7 = wb.create_sheet("Executive Summary")
+    ws7.sheet_view.showGridLines = False
+
+    verdict_pass = fail_count == 0 and not critical_fail
+    verdict_color = "10B981" if verdict_pass else "EF4444" if critical_fail else "F59E0B"
+    verdict_bg = "D1FAE5" if verdict_pass else "FEE2E2" if critical_fail else "FFFBEB"
+    verdict_label = "PASS" if verdict_pass else "FAIL"
+
+    if critical_fail:
+        verdict_text = (
+            f'Internal Smoke Test FAILED — critical checks did not pass on {page_label}. Authentication, '
+            f'page load, or console/network issues were detected on this page. This page is NOT ready '
+            f'for further testing until resolved.')
+    elif fail_count > 0:
+        verdict_text = (
+            f'Internal Smoke Test passed with {fail_count} non-critical issue(s) on {page_label}. '
+            f'The page is accessible and stable, but the failing checks should be reviewed before '
+            f'proceeding to deeper testing.')
+    else:
+        verdict_text = (
+            f'Internal Smoke Test PASSED — all {pass_count} check(s) succeeded on {page_label}. '
+            f'This authenticated page is stable and ready for deeper functional and regression testing.')
+
+    ws7.merge_cells("A1:D1")
+    c = ws7.cell(row=1, column=1, value=f"[{verdict_label}] Final AI Verdict")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=13, color=verdict_color)
+    r = 2
+    r = _xlsx_wrapped(ws7, r, verdict_text, Font(name=_XLSX_FONT, size=9, color=verdict_color),
+                       fill=verdict_bg, end_col=4)
+    ws7.merge_cells(f"A{r}:D{r}")
+    c = ws7.cell(row=r, column=1,
+                 value=f"Smoke Quality Score: {score}/100  |  Risk Level: "
+                       f"{'HIGH' if critical_fail else 'MEDIUM' if fail_count else 'LOW'}  |  "
+                       f"Overall Health: {score_label}")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=10, color="1E293B")
+    r += 3
+
+    ws7.cell(row=r, column=1, value="Top Priority Actions").font = Font(
+        name=_XLSX_FONT, bold=True, size=12, color="1E293B")
+    r += 1
+    PRI_ORDER = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
+    top_recs = sorted(recs, key=lambda x: PRI_ORDER.get((x.get('priority') or 'medium').lower(), 2))[:3]
+    if not top_recs:
+        ws7.merge_cells(f"A{r}:D{r}")
+        c = ws7.cell(row=r, column=1, value="No priority actions flagged for this run.")
+        c.font = Font(name=_XLSX_FONT, italic=True, size=9, color="94A3B8")
+    for i, rec in enumerate(top_recs, start=1):
+        ws7.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+        c = ws7.cell(row=r, column=1,
+                      value=f"{i}. {(rec.get('category','—') or '—').upper()} — {rec.get('issue','')}")
+        c.font = Font(name=_XLSX_FONT, bold=True, size=10, color="EF4444")
+        r += 1
+        ws7.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+        c = ws7.cell(row=r, column=1, value=rec.get('fix', rec.get('recommendation', '—')))
+        c.font = Font(name=_XLSX_FONT, size=9, color="475569")
+        c.alignment = Alignment(wrap_text=True, vertical="top")
+        ws7.row_dimensions[r].height = 26
+        r += 2
+
+    _xlsx_autofit(ws7, [26, 26, 26, 26])
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 10 — Environment
+    # ═══════════════════════════════════════════════════════════════════════
+    ws8 = wb.create_sheet("Environment")
+    ws8.sheet_view.showGridLines = False
+    _xlsx_header_row(ws8, 1, ["Property", "Value"])
+    ws8.freeze_panes = "A2"
+
+    env_items = [
+        ("Browser", generation_data.get('browser', 'Chromium (headless)')),
+        ("Playwright Version", generation_data.get('playwright_version', 'N/A')),
+        ("Viewport", generation_data.get('viewport', '1920×1080')),
+        ("Headless Mode", 'Yes' if generation_data.get('headless', True) else 'No'),
+        ("Execution Time", f"{total_ms/1000:.2f}s" if total_ms else 'N/A'),
+        ("NexTest Version", generation_data.get('nextest_version', '1.0.0')),
+        ("Authentication Method", auth_method),
+        ("Smoke Quality Score", f"{score}/100"),
+        ("Overall Grade", grade),
+        ("Generated", datetime.now().strftime('%Y-%m-%d %H:%M')),
+    ]
+    r = 2
+    for lbl, val in env_items:
+        c1 = ws8.cell(row=r, column=1, value=lbl)
+        c1.font = Font(name=_XLSX_FONT, bold=True, size=9, color=_INTERNAL_ACCENT_HEX)
+        c1.fill = PatternFill("solid", fgColor="F8FAFC")
+        c1.border = _XLSX_BORDER
+        c2 = ws8.cell(row=r, column=2, value=val)
+        c2.font = Font(name=_XLSX_FONT, size=9, color="1E293B")
+        c2.border = _XLSX_BORDER
+        r += 1
+    _xlsx_title_banner(ws8, "EXECUTION ENVIRONMENT", _INTERNAL_ACCENT_HEX)
+    _xlsx_autofit(ws8, [26, 40])
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SHEET 11 — Certificate
+    # ═══════════════════════════════════════════════════════════════════════
+    ws9 = wb.create_sheet("Certificate")
+    ws9.sheet_view.showGridLines = False
+
+    ws9.merge_cells("A1:D1")
+    c = ws9.cell(row=1, column=1, value="CERTIFICATE OF INTERNAL SMOKE VALIDATION")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=13, color="94A3B8")
+    c.alignment = Alignment(horizontal="center")
+
+    ws9.merge_cells("A3:D3")
+    c = ws9.cell(row=3, column=1, value=url)
+    c.font = Font(name=_XLSX_FONT, italic=True, size=12, color="1E293B")
+    c.alignment = Alignment(horizontal="center")
+
+    ws9.merge_cells("A4:D4")
+    c = ws9.cell(row=4, column=1, value=page_label)
+    c.font = Font(name=_XLSX_FONT, size=10, color=_INTERNAL_ACCENT_HEX)
+    c.alignment = Alignment(horizontal="center")
+
+    ws9.merge_cells("A6:D6")
+    c = ws9.cell(row=6, column=1, value=f"{score} / 100")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=30, color=score_color)
+    c.alignment = Alignment(horizontal="center")
+
+    ws9.merge_cells("A8:B8")
+    c = ws9.cell(row=8, column=1, value=f"GRADE {grade}")
+    c.font = Font(name=_XLSX_FONT, bold=True, size=11, color="FFFFFF")
+    c.fill = PatternFill("solid", fgColor=grade_color)
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws9.merge_cells("C8:D8")
+    c = ws9.cell(row=8, column=3, value=score_label.upper())
+    c.font = Font(name=_XLSX_FONT, bold=True, size=11, color=score_color)
+    c.border = Border(left=Side(style="thin", color=score_color), right=Side(style="thin", color=score_color),
+                       top=Side(style="thin", color=score_color), bottom=Side(style="thin", color=score_color))
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws9.row_dimensions[8].height = 22
+
+    ws9.merge_cells("A10:D10")
+    c = ws9.cell(row=10, column=1,
+                  value=f"Validated by NexTest AI  •  {datetime.now().strftime('%Y-%m-%d')}")
+    c.font = Font(name=_XLSX_FONT, italic=True, size=8, color="94A3B8")
+    c.alignment = Alignment(horizontal="center")
+
+    cert_details = [
+        ("Validation Date", datetime.now().strftime('%Y-%m-%d  %H:%M')),
+        ("Framework", framework),
+        ("Browser", generation_data.get('browser', 'Chromium (headless)')),
+        ("Viewport", generation_data.get('viewport', '1920×1080')),
+        ("Execution Time", f"{total_ms/1000:.2f}s" if total_ms else 'N/A'),
+        ("Smoke Quality Score", f"{score}/100"),
+        ("Overall Grade", grade),
+        ("AI Validation Status", "Verified by NexTest AI"),
+    ]
+    r = 12
+    for lbl, val in cert_details:
+        c1 = ws9.cell(row=r, column=1, value=lbl)
+        c1.font = Font(name=_XLSX_FONT, bold=True, size=9, color=_INTERNAL_ACCENT_HEX)
+        c1.fill = PatternFill("solid", fgColor="F8FAFC")
+        c1.border = _XLSX_BORDER
+        ws9.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
+        c2 = ws9.cell(row=r, column=2, value=val)
+        c2.font = Font(name=_XLSX_FONT, size=9, color="1E293B")
+        for col in range(2, 5):
+            ws9.cell(row=r, column=col).border = _XLSX_BORDER
+        r += 1
+
+    _xlsx_autofit(ws9, [26, 26, 26, 26])
+
+    # ── Ordre final des feuilles ─────────────────────────────────────────────
+    sheet_order = [
+        "Overview",
+        "Screenshots",
+        "Test Scenarios",
+        "Results by Category",
+        "Detailed Results",
+        "AI Analysis",
+        "AI Recommendations",
+        "Action Plan",
+        "Executive Summary",
+        "Environment",
+        "Certificate",
+    ]
+    wb._sheets = [wb[name] for name in sheet_order if name in wb.sheetnames]
+    wb.active = 0
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
+def generate_internal_smoke_xlsx(generation_data: dict) -> bytes:
+    """Public entry point — same generation_data shape as generate_internal_smoke_pdf().
+    Only checks actually present in execution_results / test_cases are analyzed and rendered.
+    Produces the exact same sections/scoring/verdict as the PDF, as a workbook."""
+    tests, scraped, ai_data = _extract_internal_smoke_inputs(generation_data)
+    return _generate_internal_smoke_xlsx(generation_data, tests, scraped, ai_data)

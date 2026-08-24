@@ -489,11 +489,22 @@ public function downloadPdf($id)
             $payload['screenshot'] = $fullResult['screenshot'] ?? null;
         }
 
-        $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-pdf', $payload);
+        if ($testType === 'api') {
+    $payload['ai'] = $fullResult['ai'] ?? [];
+    $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-internal-api-pdf', $payload);
+} elseif ($testType === 'regression') {
+    $payload['ai'] = $fullResult['ai'] ?? [];
+    $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-internal-regression-pdf', $payload);
+} elseif ($testType === 'functional') {
+    $payload['ai'] = $fullResult['ai'] ?? [];
+    $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-pdf', $payload);
+} else {
+    $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-pdf', $payload);
+}
 
-        if ($response->failed()) {
-            return response()->json(['error' => 'PDF generation failed', 'detail' => $response->body()], 500);
-        }
+if ($response->failed()) {
+    return response()->json(['error' => 'PDF generation failed', 'detail' => $response->body()], 500);
+}
 
         $pdfBytes = $response->body();
 
@@ -515,9 +526,9 @@ public function downloadXlsx($id)
 
     $isK6 = $generation->test_type === 'performance' && $generation->framework === 'k6';
 
-    if (!in_array($generation->test_type, ['seo', 'performance', 'smoke'])) {
-        return response()->json(['error' => 'XLSX export is only available for SEO, Performance, or Smoke reports'], 422);
-    }
+    if (!in_array($generation->test_type, ['seo', 'performance', 'smoke', 'internal_smoke', 'security', 'api', 'regression', 'functional'])) {
+    return response()->json(['error' => 'XLSX export is only available for SEO, Performance, Smoke, Security, API, Regression, or Functional reports'], 422);
+}
 
     $fullResult = $generation->result ?? [];
     if (is_string($fullResult)) {
@@ -566,6 +577,22 @@ public function downloadXlsx($id)
             $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-performance-xlsx', $payload);
             $filename = "performance_report_{$id}.xlsx";
 
+        // ── INTERNAL SMOKE ───────────────────────────────────────────  ← NOUVEAU BLOC
+        } elseif ($generation->test_type === 'internal_smoke') {
+            $payload = [
+                'url'               => $generation->url,
+                'framework'         => $generation->framework,
+                'test_type'         => 'internal_smoke',
+                'test_cases'        => $generation->test_cases ?? [],
+                'execution_results' => $generation->execution_results ?? $generation->test_cases ?? [],
+                'scraped'           => $generation->scraped ?? [],
+                'ai'                => $fullResult['ai'] ?? [],
+                'screenshot'        => $fullResult['screenshot'] ?? null,
+            ];
+
+            $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-internal-smoke-xlsx', $payload);
+            $filename = "internal_smoke_report_{$id}.xlsx";
+
         // ── SMOKE ────────────────────────────────────────────────────────
         } elseif ($generation->test_type === 'smoke') {
             $payload = [
@@ -579,6 +606,63 @@ public function downloadXlsx($id)
 
             $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-smoke-xlsx', $payload);
             $filename = "smoke_report_{$id}.xlsx";
+
+
+            // ── SECURITY ─────────────────────────────────────────────────────
+        } elseif ($generation->test_type === 'security') {
+            $payload = [
+                'url'               => $generation->url,
+                'framework'         => $generation->framework,
+                'test_type'         => 'security',
+                'test_cases'        => $generation->test_cases ?? [],
+                'execution_results' => $generation->execution_results ?? $generation->test_cases ?? [],
+                'ai'                => $fullResult['ai'] ?? [],
+            ];
+
+            $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-security-xlsx', $payload);
+            $filename = "security_report_{$id}.xlsx";
+// ── REGRESSION ───────────────────────────────────────────────────
+        } elseif ($generation->test_type === 'regression') {
+            $payload = [
+                'url'               => $generation->url,
+                'framework'         => $generation->framework,
+                'test_type'         => 'regression',
+                'test_cases'        => $generation->test_cases ?? [],
+                'execution_results' => $generation->execution_results ?? $generation->test_cases ?? [],
+                'ai'                => $fullResult['ai'] ?? [],
+            ];
+
+            $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-internal-regression-xlsx', $payload);
+            $filename = "regression_report_{$id}.xlsx";
+
+
+        // ── FUNCTIONAL ────────────────────────────────────────────────────
+        } elseif ($generation->test_type === 'functional') {
+            $payload = [
+                'url'               => $generation->url,
+                'framework'         => $generation->framework,
+                'test_type'         => 'functional',
+                'test_cases'        => $generation->test_cases ?? [],
+                'execution_results' => $generation->execution_results ?? $generation->test_cases ?? [],
+                'ai'                => $fullResult['ai'] ?? [],
+            ];
+
+            $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-internal-functional-xlsx', $payload);
+            $filename = "functional_report_{$id}.xlsx";
+        
+        // ── API ──────────────────────────────────────────────────────────
+        } elseif ($generation->test_type === 'api') {
+            $payload = [
+                'url'               => $generation->url,
+                'framework'         => $generation->framework,
+                'test_type'         => 'api',
+                'test_cases'        => $generation->test_cases ?? [],
+                'execution_results' => $generation->execution_results ?? $generation->test_cases ?? [],
+                'ai'                => $fullResult['ai'] ?? [],
+            ];
+
+            $response = Http::timeout(60)->post('http://127.0.0.1:8001/generate-internal-api-xlsx', $payload);
+            $filename = "api_report_{$id}.xlsx";
 
         // ── SEO ──────────────────────────────────────────────────────────
         } else {

@@ -1739,9 +1739,16 @@ if (loading) return (
   );
 }
       
- //Modal de delete 
+//Modal de delete 
 function DeleteConfirmModal({ project, onConfirm, onCancel, loading }) {
+  const [confirmText, setConfirmText] = useState('');
+
+  useEffect(() => { setConfirmText(''); }, [project?.id]);
+
   if (!project) return null;
+
+  const isMatch = confirmText.trim() === project.name;
+
   return createPortal(
     <div onClick={onCancel}
       style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1753,23 +1760,61 @@ function DeleteConfirmModal({ project, onConfirm, onCancel, loading }) {
             <svg width="18" height="18" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>Delete Project</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>Delete your project</div>
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>This action cannot be undone</div>
           </div>
           <button onClick={onCancel} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>✕</button>
         </div>
         <div style={{ padding: '24px 28px' }}>
-          <p style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.7, marginBottom: 20 }}>
+          <p style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.7, marginBottom: 16 }}>
             Are you sure you want to delete <strong style={{ color: '#e2e8f0' }}>{project.name}</strong>? All generations and results associated with this project will be permanently removed.
           </p>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.6, display: 'block', marginBottom: 8 }}>
+              Type <strong style={{ color: '#ef4444' }}>{project.name}</strong> to confirm.
+            </label>
+            <input
+              value={confirmText}
+              onChange={e => setConfirmText(e.target.value)}
+              placeholder={project.name}
+              autoFocus
+              style={{
+                width: '100%', padding: '10px 14px', borderRadius: 10,
+                background: 'rgba(255,255,255,.03)',
+                border: `1.5px solid ${confirmText.length === 0 ? 'rgba(255,255,255,.08)' : isMatch ? 'rgba(16,185,129,.5)' : 'rgba(239,68,68,.5)'}`,
+                color: '#e2e8f0', fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                transition: 'border-color .2s',
+              }}
+            />
+          </div>
+
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={onCancel}
-              style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', color: '#94a3b8', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
               Cancel
             </button>
-            <button onClick={onConfirm} disabled={loading}
-              style={{ flex: 2, padding: '12px', borderRadius: 10, background: 'linear-gradient(135deg,#dc2626,#b91c1c)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? .7 : 1 }}>
-              {loading ? <><span className="spinner" /> Deleting…</> : <><svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg> Delete Project</>}
+            <button
+              onClick={onConfirm}
+              disabled={!isMatch || loading}
+              style={{
+                flex: 1, padding: '12px', borderRadius: 10,
+                background: isMatch ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'rgba(239,68,68,.12)',
+                border: 'none',
+                color: isMatch ? '#fff' : 'rgba(239,68,68,.4)',
+                fontSize: 13, fontWeight: 800,
+                cursor: isMatch && !loading ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: isMatch ? '0 4px 16px rgba(239,68,68,.35)' : 'none',
+                transition: 'all .2s',
+              }}>
+              {loading ? <><span className="spinner" /> Deleting...</> : (
+                <>
+                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
+                  Delete Project
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -1788,10 +1833,12 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
   const [search,     setSearch]     = useState('');
   const [filterType, setFilterType] = useState('all');
   const [editingProject, setEditingProject] = useState(null);
+  const [viewingProject, setViewingProject] = useState(null)
   const [editName,       setEditName]       = useState('');
   const [editDesc,       setEditDesc]       = useState('');
   const [editSaving,     setEditSaving]     = useState(false);
   const [deleting,   setDeleting]   = useState(null);
+  const [deleteSuccess, setDeleteSuccess] = useState('');
   const [projPage, setProjPage] = useState(1);
   const PROJ_PER_PAGE = 8;
 
@@ -1808,12 +1855,14 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
     }
   }, [editingProject]);
 
-  const handleDelete = async () => {
+ const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(deleteTarget.id);
     try {
       await api.delete(`/projects/${deleteTarget.id}`);
       setProjects(prev => prev.filter(p => p.id !== deleteTarget.id));
+      setDeleteSuccess('Your project deleted successfully');
+      setTimeout(() => setDeleteSuccess(''), 4000);
     } catch (err) { console.error(err); }
     setDeleting(null);
     setDeleteTarget(null);
@@ -1841,6 +1890,20 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
 
   return (
     <div className="panel">
+      {deleteSuccess && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '12px 18px', marginBottom: 20, borderRadius: 12,
+          background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)',
+          color: '#10b981', fontSize: 13, fontWeight: 700,
+          animation: 'dFadeUp .25s var(--ease) both',
+        }}>
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+          {deleteSuccess}
+        </div>
+      )}
       <div className="p-header" style={{ marginBottom: 32 }}>
         <div>
           <h1 className="p-title">{t('my')} <span className="g">{t('projects')}</span></h1>
@@ -1970,15 +2033,25 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                      <button onClick={(e) => { e.stopPropagation(); setEditingProject(project); }}
-                        style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--indigo-bg)'; e.currentTarget.style.borderColor = 'var(--indigo-border)'; e.currentTarget.style.color = 'var(--indigo2)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
-                        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setViewingProject(project); }}
+    style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
+    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(79,134,232,.1)'; e.currentTarget.style.borderColor = 'rgba(79,134,232,.3)'; e.currentTarget.style.color = '#4f86e8'; }}
+    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
+    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  </button>
+   {/* 2. EDIT - update */}
+  <button onClick={(e) => { e.stopPropagation(); setEditingProject(project); }}
+    style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
+    onMouseEnter={e => { e.currentTarget.style.background = 'var(--indigo-bg)'; e.currentTarget.style.borderColor = 'var(--indigo-border)'; e.currentTarget.style.color = 'var(--indigo2)'; }}
+    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}>
+    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+  </button>
                       <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(project); }}
                         style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s' }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.borderColor = 'var(--red-border)'; e.currentTarget.style.color = 'var(--red)'; }}
@@ -2101,7 +2174,70 @@ export function ProjectsListPanel({ onNewProject, onSelectProject }) {
         </div>,
         document.body
       )}
-
+      {viewingProject && createPortal(
+  <div onClick={() => setViewingProject(null)}
+    style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div onClick={e => e.stopPropagation()}
+      style={{ width: 480, background: '#0d1526', border: '1px solid rgba(79,134,232,.3)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif", animation: 'dFadeUp .2s ease both' }}>
+      <div style={{ height: 3, background: 'linear-gradient(90deg, transparent, #4f86e8, transparent)' }} />
+      <div style={{ padding: '24px 28px 18px', borderBottom: '1px solid rgba(255,255,255,.06)', display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 12, background: viewingProject.type === 'public' ? 'rgba(79,134,232,.1)' : 'rgba(139,92,246,.1)', border: `1px solid ${viewingProject.type === 'public' ? 'rgba(79,134,232,.2)' : 'rgba(139,92,246,.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {viewingProject.type === 'public'
+            ? <IconWorld size={20} stroke={1.5} style={{ color: '#4f86e8' }} />
+            : <IconLock size={20} stroke={1.5} style={{ color: '#8b5cf6' }} />}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>{viewingProject.name}</div>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{t('Project Details') || 'Project details'}</div>
+        </div>
+        <button onClick={() => setViewingProject(null)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>✕</button>
+      </div>
+      <div style={{ padding: '24px 28px' }}>
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: 8 }}>{t('plProjectNameLabel')}</label>
+          <div style={{ fontSize: 14, color: '#e2e8f0', padding: '12px 16px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1.5px solid rgba(255,255,255,.08)' }}>{viewingProject.name}</div>
+        </div>
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: 8 }}>{t('plDescriptionOptional')}</label>
+          <div style={{ fontSize: 13, color: viewingProject.description ? '#cbd5e1' : '#475569', fontStyle: viewingProject.description ? 'normal' : 'italic', lineHeight: 1.6, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1.5px solid rgba(255,255,255,.08)', minHeight: 44 }}>
+            {viewingProject.description || t('plNoDescription')}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: 8 }}>{t('Test Type') || 'Type'}</label>
+            <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '5px 10px', borderRadius: 20, color: viewingProject.type === 'public' ? '#4f86e8' : '#8b5cf6', background: viewingProject.type === 'public' ? 'rgba(79,134,232,.1)' : 'rgba(139,92,246,.1)', border: `1px solid ${viewingProject.type === 'public' ? 'rgba(79,134,232,.2)' : 'rgba(139,92,246,.2)'}` }}>
+              {viewingProject.type === 'public' ? t('publicBadge') : t('internalBadge')}
+            </span>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: 8 }}>{t('plGeneration')}</label>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{viewingProject.generations_count || 0}</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: 8 }}>{t('Date') || 'Created'}</label>
+            <div style={{ fontSize: 13, color: '#94a3b8' }}>{timeAgo(viewingProject.created_at)}</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => { setViewingProject(null); setEditingProject(viewingProject); }}
+            style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(79,134,232,.1)', border: '1px solid rgba(79,134,232,.3)', color: '#4f86e8', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Update
+          </button>
+          <button onClick={() => setViewingProject(null)}
+            style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'linear-gradient(135deg,#4f86e8,#3b6fd6)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 16px rgba(79,134,232,.35)' }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>,
+  document.body
+)}
       <DeleteConfirmModal
         project={deleteTarget}
         onConfirm={handleDelete}
@@ -2122,6 +2258,7 @@ export function ProjectDetailPanel({ project, onBack, onNewGeneration, setGenera
   const [filterTestType, setFilterTestType] = useState('all');
   const [search, setSearch] = useState('');
   const ITEMS_PER_PAGE = 5;
+  const normalizeTestType = (t) => t === 'internal_smoke' ? 'smoke' : (t || 'smoke');
 
   const isPublic = project?.type === 'public';
   const color    = isPublic ? '#4f86e8' : '#8b5cf6';
@@ -2248,10 +2385,11 @@ const totalFail      = generations.reduce((s, g) => s + (g.fail_count || 0), 0);
 const highPassCount  = generations.filter(g => (g.pass_rate || 0) >= 80).length;
 
 // Types actually present among this project's generations, used to build the filter bar
-const availableTestTypes = [...new Set(generations.map(g => g.test_type || 'smoke'))];
+const availableTestTypes = [...new Set(generations.map(g => normalizeTestType(g.test_type)))];
+
 
 const urlCards = generations
-  .filter(g => filterTestType === 'all' || (g.test_type || 'smoke') === filterTestType)
+    .filter(g => filterTestType === 'all' || normalizeTestType(g.test_type) === filterTestType)
   .filter(g => !search.trim() || (g.url || '').toLowerCase().includes(search.trim().toLowerCase()));
 
 const totalPages = Math.ceil(urlCards.length / ITEMS_PER_PAGE);
@@ -2411,7 +2549,7 @@ const paginatedCards = urlCards.slice(
           </button>
           {availableTestTypes.map(type => {
             const tc = TYPE_CONFIG[type] || TYPE_CONFIG.smoke;
-            const count = generations.filter(g => (g.test_type || 'smoke') === type).length;
+            const count = generations.filter(g => normalizeTestType(g.test_type) === type).length;
             const active = filterTestType === type;
             return (
               <button
@@ -2467,7 +2605,7 @@ const paginatedCards = urlCards.slice(
 {(() => {
   const groups = {};
   paginatedCards.forEach(item => {
-    const type = item.test_type || 'smoke';
+    const type = normalizeTestType(item.test_type);
     if (!groups[type]) groups[type] = [];
     groups[type].push(item);
   });
@@ -2853,15 +2991,35 @@ export function CreateProjectPanel({ onProjectCreated, goTo }) {
           </div>
 
           {/* Submit */}
-          <button
-            className={`cpv5-submit${isReady ? ' colored' : ''}`}
-            style={isReady ? { '--bc': '#6D5DFC', '--bshadow': 'rgba(109,93,252,.35)' } : {}}
-            disabled={!isReady || submitting}
-            onClick={handleSubmit}
-          >
-            {submitting ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />}
-            {t('cpLaunchProject')}
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => goTo('project')}
+              style={{
+                flex: 1, padding: '13px', borderRadius: 12,
+                background: 'var(--bg2, rgba(255,255,255,.04))',
+                border: '1.5px solid var(--border, rgba(255,255,255,.08))',
+                color: 'var(--muted, #94a3b8)', fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                transition: 'all .2s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,.3)'; e.currentTarget.style.color = '#ef4444'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border, rgba(255,255,255,.08))'; e.currentTarget.style.color = 'var(--muted, #94a3b8)'; }}
+            >
+              <X size={15} />
+              {t('plCancel')}
+            </button>
+            <button
+              className={`cpv5-submit${isReady ? ' colored' : ''}`}
+              style={{ flex: 2, ...(isReady ? { '--bc': '#6D5DFC', '--bshadow': 'rgba(109,93,252,.35)' } : {}) }}
+              disabled={!isReady || submitting}
+              onClick={handleSubmit}
+            >
+              {submitting ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />}
+              {t('cpLaunchProject')}
+            </button>
+          </div>
         </div>
 
         {/* ── RIGHT COLUMN ── */}
@@ -3435,7 +3593,7 @@ const formatSize = (bytes) => {
                   <span className="gp4-num">{isInternal ? '04' : '03'}</span>
                   <div><div className="gp4-section-title">Automated Testing Frameworks and Tools</div><div className="gp4-section-sub">Pick the automation tool that will power and execute your test scripts</div></div>
                  </div>
-                <div className="gp4-frameworks">
+                <div className="gp4-frameworks" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
                   {FRAMEWORKS.map(f => (
                     <div key={f.key} className={`gp4-fw-card${fw === f.key ? ' selected' : ''}${f.note ? ' gp4-fw-card--optional' : ''}`} onClick={() => setFw(f.key)} style={{ '--fw-color': f.color }}>
                       <div className={`gp4-fw-letter-badge ${f.letterClass}`}>{f.letters}</div>
@@ -3489,12 +3647,36 @@ const formatSize = (bytes) => {
               )}
             </div>
 
-            <button type="button" className="gp4-submit" disabled={loading || !isReady}
-              onClick={() => { if (!isReady) return; submit({ preventDefault: () => {} }); }}>
-              {loading ? (<><span className="spinner" /> {t('analyzingGenerating')}</>) : (
-                <><Wand2 size={15} strokeWidth={2.5} />{t('generateTests')}{isReady && <ArrowUpRight size={14} className="gp4-submit-arrow" />}</>
-              )}
-            </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: -24 }}>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => goTo('project')}
+                className="gp4-submit"
+                style={{
+                  width: '100%',
+                  marginTop: 0,
+                  background: 'rgba(239,68,68,.1)',
+                  border: '1.5px solid rgba(239,68,68,.3)',
+                  color: '#ef4444',
+                  boxShadow: 'none',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? .5 : 1,
+                  transition: 'all .2s',
+                }}
+                onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = 'rgba(239,68,68,.18)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,.5)'; } }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,.1)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,.3)'; }}
+              >
+                <X size={15} strokeWidth={2.5} />
+                Cancel
+              </button>
+               <button type="button" className="gp4-submit" style={{ width: '100%', marginTop: 0 }} disabled={loading || !isReady}
+                onClick={() => { if (!isReady) return; submit({ preventDefault: () => {} }); }}>
+                {loading ? (<><span className="spinner" /> {t('analyzingGenerating')}</>) : (
+                  <><Wand2 size={15} strokeWidth={2.5} />{t('generateTests')}{isReady && <ArrowUpRight size={14} className="gp4-submit-arrow" />}</>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="gp4-right">
@@ -4626,6 +4808,8 @@ function downloadHtml_PerformancePublic() {
  
   return html;
 }
+
+
 const downloadXlsx_Performance = async () => {
   setDropdownOpen(false);
   const genId = generation?.generation?.id;
@@ -7922,11 +8106,14 @@ return execution_results.map((r, i) => ({
   step_meta: r.step_meta || null,
   category:        r.category || 'api',
   priority:        r.priority || 'medium',
+  severity:        r.severity || r.priority || 'medium',
   screenshot:      r.screenshot ?? null,
   ai_analysis:     r.ai_analysis || null,
   http_status:     r.http_status || null,
   expected_status: r.expected_status || null,
   assertions_detail: r.assertions_detail || [],
+  method:          r.method || r.http_method || 'GET',      
+  endpoint:        r.endpoint || r.path || r.url || '',        
 }));
     }
     return (test_cases || []).map((tc, i) => ({ id: tc.id || i + 1, name: tc.name, status: 'skip', duration: '—', suite: 'Not executed', assertion_result: null, step_meta: null, category: tc.category || 'smoke', priority: tc.priority || 'medium' }));
@@ -7975,15 +8162,20 @@ useEffect(() => { setCurrentPage(1); }, [filter, rowsPerPage]);
     performance: { label: 'Performance', color: '#8b5cf6', bg: 'rgba(139,92,246,.1)',   border: 'rgba(139,92,246,.25)', letter: 'P' },
     api:         { label: 'API',         color: '#10b981', bg: 'rgba(16,185,129,.1)',   border: 'rgba(16,185,129,.25)', letter: 'A' },
     regression:  { label: 'Regression',  color: '#f97316', bg: 'rgba(249,115,22,.1)',   border: 'rgba(249,115,22,.25)', letter: 'R' },
+    internal_regression: { label: 'Internal Regression', color: '#f97316', bg: 'rgba(249,115,22,.1)', border: 'rgba(249,115,22,.25)', letter: 'R' },
     seo: { label: 'SEO', color: '#06b6d4', bg: 'rgba(6,182,212,.1)', border: 'rgba(6,182,212,.25)', letter: 'S' },
     security:    { label: 'Security',    color: '#ef4444', bg: 'rgba(239,68,68,.1)',    border: 'rgba(239,68,68,.25)',  letter: 'S' },
   };
   const ttBadge = TEST_TYPE_BADGE[testType] || TEST_TYPE_BADGE.smoke;
   const isRegression = testType === 'regression';
+  const isInternalRegression = testType === 'internal_regression';
+  console.log('[EP DEBUG] testType=', testType, 'isRegression=', isRegression, 'isInternalRegression=', isInternalRegression);
   const isSecurity = testType === 'security';
   const isFunctional = testType === 'functional';
   const isSeo = testType === 'seo';
   const isSmoke = testType === 'smoke' || testType === 'internal_smoke';
+  const isApi = testType === 'api';
+  
 
   const EP_FW = {
   Selenium:   { letters: 'Se', color: '#43B02A' },
@@ -8060,13 +8252,12 @@ useEffect(() => { setCurrentPage(1); }, [filter, rowsPerPage]);
   link.download = filename;
   link.click();
 };
-
   const downloadCsv = () => {
-    const headers = isRegression
+    const headers = (isRegression || isInternalRegression)
   ? ['ID', 'Test Name', 'Category', 'Severity', 'URL', 'Status', 'Reason', 'Duration']
   : ['ID', 'Test Name', 'Status', 'Duration', 'Category', 'Section', 'Suite/Reason'];
 
-const rows = isRegression
+const rows = (isRegression || isInternalRegression)
   ? tests.map(t => [t.id, `"${(t.name||'').replace(/"/g,'""')}"`, t.category||'navigation', t.severity||'medium', t.url||'—', t.status, `"${(t.suite||'').replace(/"/g,'""')}"`, t.duration])
   : tests.map(t => [t.id, `"${t.name.replace(/"/g,'""')}"`, t.status, t.duration, t.category||'smoke', t.section||'—', `"${(t.suite||'').replace(/"/g,'""')}"`]);
     const csv     = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -8094,6 +8285,7 @@ const downloadHtml_Security = () => {
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const genId   = generation?.generation?.id || 'nextest';
   const allTests = tests;
+
   const pass  = allTests.filter(t => t.status === 'pass').length;
   const fail  = allTests.filter(t => t.status === 'fail').length;
   const warn  = allTests.filter(t => t.status === 'warn').length;
@@ -8101,119 +8293,473 @@ const downloadHtml_Security = () => {
   const rate  = Math.round(pass / total * 100);
   const rateColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
 
+  const ACCENT = '#EF4444';
+
   const CAT_COLORS = {
     auth: '#6366f1', xss: '#ef4444', session: '#f59e0b',
     navigation: '#10b981', headers: '#3b82f6', info_exposure: '#8b5cf6',
   };
-  const SEV_COLORS = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#10b981' };
+  const SEV_COLORS = { critical: '#dc2626', high: '#ef4444', medium: '#f59e0b', low: '#10b981', informational: '#3b82f6' };
 
-  const secHdr = (emoji, title, color = '#ef4444') => `
+  // ── Weighted Security Score (mirrors PDF _compute_security_score) ───────
+  const HIGH_CATS = new Set(['auth', 'xss', 'session']);
+  let totalW = 0, earnedW = 0;
+  allTests.forEach(t => {
+    const cat = (t.category || 'auth').toLowerCase();
+    const sev = (t.severity || 'medium').toLowerCase();
+    const w = (HIGH_CATS.has(cat) || ['critical','high'].includes(sev)) ? 3 : 1;
+    totalW += w;
+    if (t.status === 'pass') earnedW += w;
+    else if (t.status === 'warn') earnedW += w * 0.5;
+  });
+  const score = totalW ? Math.round(earnedW / totalW * 100) : 0;
+  const scoreLabel = score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 50 ? 'Acceptable' : 'Critical';
+  const scoreColor = score >= 90 ? '#10b981' : score >= 75 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+  const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 50 ? 'C' : score >= 25 ? 'D' : 'F';
+  
+
+  const critical_fail = allTests.some(t => t.status === 'fail' && HIGH_CATS.has((t.category||'').toLowerCase()));
+  const overallStatus = critical_fail ? 'CRITICAL VULNERABILITIES' : (fail > 0 || warn > 0) ? 'ISSUES DETECTED' : 'ALL CHECKS PASSED';
+  const statusColor   = critical_fail ? '#ef4444' : (fail > 0 || warn > 0) ? '#f59e0b' : '#10b981';
+  const riskLevel      = critical_fail ? 'HIGH' : (fail > 0 || warn > 0) ? 'MEDIUM' : 'LOW';
+  const deployText     = critical_fail ? 'NOT READY' : (fail > 0 || warn > 0) ? 'READY W/ CAUTION' : 'READY';
+  const statusExplain  = critical_fail
+    ? 'One or more critical checks failed in Auth, XSS, or Session categories. These expose the application to real attack vectors — deployment is not recommended until resolved.'
+    : (fail > 0 || warn > 0)
+    ? `No critical auth/session/xss failures, but ${fail} check(s) failed and ${warn} raised warnings (headers, navigation, info exposure). Review before deploying with confidence.`
+    : 'Every security check passed, including authentication, XSS, and session checks. No vulnerabilities or warnings detected on the frontend.';
+
+  const secHdr = (title, color = ACCENT) => `
     <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;
       padding-bottom:8px;border-bottom:2.5px solid ${color}">
-      <span style="font-size:18px">${emoji}</span>
-      <span style="font-size:20px;font-weight:700;color:#e2e8f0">${title}</span>
+      <span style="font-size:20px;font-weight:700;color:#1e293b">${title}</span>
     </div>`;
-
-  const tblWrap = (inner, border = '#ef4444') => `
-    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;
-      overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">
-      ${inner}
-    </div>`;
-
+  const secDesc = (text) => `<p style="font-size:11px;color:#64748b;font-style:italic;margin-bottom:14px;line-height:1.6">${text}</p>`;
+  const tblWrap = (inner, border = ACCENT) => `
+    <div style="background:#fff;border:1px solid ${border}44;border-radius:12px;
+      overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">${inner}</div>`;
   const tblHdr = (cols) => `
     <table style="width:100%;border-collapse:collapse">
-      <thead><tr style="background:#040914">
+      <thead><tr style="background:#0a0f1e">
         ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};
           font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
           color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
       </tr></thead>`;
+  const insightBox = (text, color, label = 'AI Analysis') => `
+    <div style="background:#f8fafc;border:1px solid ${color}44;border-left:3px solid ${color};
+      border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11.5px;color:#475569;line-height:1.6">
+      <b style="color:${color}">${label}: </b>${text}
+    </div>`;
 
-  // ── SCENARIOS TABLE ──
-  const scenarioRows = allTests.map((t, i) => {
-    const cc  = CAT_COLORS[t.category] || '#64748b';
-    const sc  = SEV_COLORS[t.severity] || '#f59e0b';
-    const TYPE_MAP = {
-      no_token: ['AUTH','#6366f1'], xss_input: ['XSS','#ef4444'],
-      dom_inspect: ['SESSION','#f59e0b'], header_check: ['HEADERS','#3b82f6'],
-      direct_nav: ['NAV','#10b981'], logout: ['SESSION','#f59e0b'],
-    };
-    const [typeLabel, typeColor] = TYPE_MAP[t.test_type] || ['SEC','#64748b'];
-    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
-      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
-      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${(t.category||'').toUpperCase()}</span></td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${sc};font-weight:700;font-size:10px">${(t.severity||'medium').toUpperCase()}</span></td>
-      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${t.suite || 'Security check'}</td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${typeColor};font-weight:700;font-size:10px">${typeLabel}</span></td>
+  // ── 1. OVERVIEW HERO ──────────────────────────────────────────────────
+  const heroStats = [
+    { l: 'OVERALL STATUS', v: overallStatus, c: statusColor },
+    { l: 'SECURITY SCORE', v: `${score}/100`, c: scoreColor },
+    { l: 'RISK LEVEL',     v: riskLevel, c: statusColor },
+    { l: 'DEPLOYMENT',     v: deployText, c: statusColor },
+  ];
+  const aiResult = generation?.result?.ai || runResults?.ai || generation?._groq_recs || {};
+  const aiSummary = aiResult.summary || `This security audit executed ${total} checks against <b>${url}</b>, with ${pass} passed, ${fail} failed, and ${warn} warned (${rate}% pass rate). ${critical_fail ? 'Critical vulnerabilities were detected and must be resolved before deployment.' : 'No critical vulnerabilities were detected in this run.'}`;
+
+  const sectionOverview = `
+    ${secHdr('Security Test Overview')}
+    ${secDesc(statusExplain)}
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      ${heroStats.map(s => `
+        <div style="background:#f8fafc;border:1px solid ${s.c};border-radius:12px;padding:16px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:#94a3b8;margin-bottom:6px">${s.l}</div>
+          <div style="font-size:15px;font-weight:800;color:${s.c}">${s.v}</div>
+        </div>`).join('')}
+    </div>
+    ${insightBox(aiSummary, '#4f46e5', 'AI Summary')}`;
+
+  // ── 2. KEY METRICS ────────────────────────────────────────────────────
+  const parseMs = (d) => {
+    if (!d) return 0;
+    const s = String(d);
+    if (s.endsWith('ms')) return parseFloat(s) || 0;
+    if (s.endsWith('s'))  return (parseFloat(s) || 0) * 1000;
+    return 0;
+  };
+  const totalMs = allTests.reduce((sum, t) => sum + parseMs(t.duration), 0);
+  const avgMs   = allTests.length ? totalMs / allTests.length : 0;
+  const criticalCount = allTests.filter(t => t.status === 'fail' && HIGH_CATS.has((t.category||'').toLowerCase())).length;
+  const catCount = (c) => allTests.filter(t => (t.category||'').toLowerCase() === c).length;
+
+  const keyMetrics = [
+    { l: 'EXECUTION TIME',  v: totalMs ? `${(totalMs/1000).toFixed(2)}s` : 'N/A', c: '#0EA5E9' },
+    { l: 'CRITICAL CHECKS', v: String(criticalCount), c: '#ef4444' },
+    { l: 'AUTH CHECKS',     v: String(catCount('auth')), c: '#6366f1' },
+    { l: 'XSS CHECKS',      v: String(catCount('xss')), c: '#ef4444' },
+    { l: 'HEADER CHECKS',   v: String(catCount('headers')), c: '#3b82f6' },
+    { l: 'AVG TEST DURATION', v: avgMs ? `${avgMs.toFixed(0)}ms` : 'N/A', c: '#ec4899' },
+  ];
+  const sectionKeyMetrics = `
+    ${secHdr('Key Metrics')}
+    ${secDesc("Snapshot of this run's execution footprint — how long it took, how many checks fell into each category, and where critical checks are concentrated.")}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${keyMetrics.map(m => `
+        <div style="background:#fff;border:1px solid ${m.c};border-top:3px solid ${m.c};border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:${m.c};margin-bottom:6px">${m.l}</div>
+          <div style="font-size:14px;font-weight:800;color:#1e293b">${m.v}</div>
+        </div>`).join('')}
+    </div>`;
+
+  // ── 3. SECURITY SCORE ─────────────────────────────────────────────────
+  const sectionScore = `
+    ${secHdr('Security Score', scoreColor)}
+    <div style="display:flex;align-items:center;gap:24px;background:#f8fafc;border:1.5px solid ${scoreColor};border-radius:14px;padding:24px;margin-bottom:16px">
+      <div style="width:110px;height:110px;border-radius:50%;background:conic-gradient(${scoreColor} ${score*3.6}deg, #e2e8f0 0deg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <div style="width:82px;height:82px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:24px;font-weight:800;color:${scoreColor}">${score}</span>
+          <span style="font-size:10px;color:#94a3b8">/ 100</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:17px;font-weight:800;color:${scoreColor};margin-bottom:8px">${scoreLabel}</div>
+        <p style="font-size:12px;color:#475569;line-height:1.6;margin:0">
+          Security Score weighs high-blast-radius checks (Authentication, XSS, Session management) more heavily
+          than lower-impact checks (Headers, Navigation, Info Exposure). Excellent ≥ 90 · Good ≥ 75 ·
+          Acceptable ≥ 50 · Critical below.
+        </p>
+      </div>
+    </div>`;
+
+  // ── 4. VULNERABILITY SUMMARY (severity table — replaces the donut) ──────
+  const SEV_ORDER = ['Critical', 'High', 'Medium', 'Low', 'Informational'];
+  const sevCounts = { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 };
+  allTests.forEach(t => {
+    if (t.status !== 'fail') return;
+    const sev = (t.severity || 'medium').toLowerCase();
+    const label = { critical:'Critical', high:'High', medium:'Medium', low:'Low', informational:'Informational', info:'Informational' }[sev] || 'Medium';
+    sevCounts[label]++;
+  });
+  const vulnRows = SEV_ORDER.map(sev => {
+    const c = SEV_COLORS[sev.toLowerCase()];
+    return `<tr style="border-bottom:1px solid #f1f5f9;${sevCounts[sev] > 0 ? 'background:#f8fafc' : ''}">
+      <td style="padding:9px 14px;font-weight:700;color:${c}">${sev}</td>
+      <td style="padding:9px 14px;text-align:right;font-weight:800;color:${c}">${sevCounts[sev]}</td>
     </tr>`;
   }).join('');
+  const sectionVulnSummary = `
+    ${secHdr('Vulnerability Summary')}
+    ${tblWrap(`${tblHdr([{l:'Severity'},{l:'Count',align:'right'}])}<tbody>${vulnRows}</tbody></table>`)}`;
 
-  // CATEGORY SUMMARY
+  // ── 5. METHODOLOGY + SCENARIOS ────────────────────────────────────────
+  const scenarioRows = allTests.map((t, i) => {
+    const cat = (t.category || 'auth').toLowerCase();
+    const cc  = CAT_COLORS[cat] || '#64748b';
+    const sev = (t.severity || 'medium').toLowerCase();
+    const sc  = SEV_COLORS[sev] || '#f59e0b';
+    return `<tr style="border-bottom:1px solid #f1f5f9;background:${i%2===0?'#fff':'#f8fafc'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#1e293b;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${cat.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${sc};font-weight:700;font-size:10px">${sev.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#475569">${(t.suite || 'Security check').substring(0,60)}</td>
+    </tr>`;
+  }).join('');
+  const sectionMethodology = `
+    ${secHdr('Security Test Methodology')}
+    <p style="font-size:12px;color:#475569;line-height:1.7;margin-bottom:16px">
+      This security audit validates frontend attack surface exposure — unauthenticated access to protected
+      routes, XSS input sanitization, session/token handling, direct navigation bypass, security headers, and
+      information exposure in the DOM/localStorage. Tests run automatically using Playwright, authenticated
+      via a stored JWT token where applicable.
+    </p>
+    ${secHdr('Security Test Scenarios')}
+    ${secDesc(`Security test plan for <b>${url}</b> — ${total} scenarios executed by Playwright against the live frontend.`)}
+    ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Scenario'},{l:'Category',align:'center'},{l:'Severity',align:'center'},{l:'Detail'}])}
+      <tbody>${scenarioRows}</tbody></table>`)}`;
+
+  // ── 6. RESULTS BY CATEGORY ─────────────────────────────────────────────
   const cats = {};
   allTests.forEach(t => {
-    const c = t.category || 'auth';
-    if (!cats[c]) cats[c] = {pass:0, fail:0, warn:0, total:0};
+    const c = (t.category || 'auth').toLowerCase();
+    if (!cats[c]) cats[c] = { pass: 0, fail: 0, warn: 0, total: 0 };
     cats[c].total++;
-    if (t.status==='pass') cats[c].pass++;
-    else if (t.status==='fail') cats[c].fail++;
+    if (t.status === 'pass') cats[c].pass++;
+    else if (t.status === 'fail') cats[c].fail++;
     else cats[c].warn++;
   });
   const catRows = Object.entries(cats).map(([cat, d]) => {
     const cc = CAT_COLORS[cat] || '#64748b';
-    const vc = d.fail===0 ? '#10b981' : '#ef4444';
-    const vt = d.fail===0 ? '✅ PASS' : '❌ FAIL';
-    const bg = d.fail===0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
-    return `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
+    const vc = d.fail === 0 ? '#10b981' : '#ef4444';
+    const bg = d.fail === 0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
+    return `<tr style="background:${bg};border-bottom:1px solid #f1f5f9">
       <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
-      <td style="padding:10px 12px;text-align:center;color:#e2e8f0;font-weight:700">${d.total}</td>
+      <td style="padding:10px 12px;text-align:center;color:#1e293b;font-weight:700">${d.total}</td>
       <td style="padding:10px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
       <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
       <td style="padding:10px 12px;text-align:center;color:#f59e0b;font-weight:700">${d.warn}</td>
-      <td style="padding:10px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${vt}</span></td>
+      <td style="padding:10px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${d.fail===0?'✅ PASS':'❌ FAIL'}</span></td>
     </tr>`;
   }).join('');
+  const sectionCategorySummary = `
+    ${secHdr('Results by Category')}
+    ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Warn',align:'center'},{l:'Status',align:'center'}])}
+      <tbody>${catRows}</tbody></table>`)}`;
 
-  // DETAILED RESULTS
+  // ── 7. CHARTS (SVG) — category breakdown + pass/fail/warn distribution ──
+  const catEntries = Object.entries(cats);
+  const catYMax = Math.max(...catEntries.map(([,d]) => d.total), 1);
+  const chartW = 760, chartH = 300, mL = 44, mB = 80, mT = 24, mR = 24;
+  const plotW = chartW - mL - mR, plotH = chartH - mT - mB;
+  const barSlot = plotW / (catEntries.length || 1);
+  const barW = Math.min(46, barSlot * 0.5);
+  const catBars = catEntries.map(([cat, d], i) => {
+    const xCenter = mL + barSlot * i + barSlot / 2;
+    const x = xCenter - barW / 2;
+    const passH = (d.pass / catYMax) * plotH;
+    const failH = (d.fail / catYMax) * plotH;
+    const yBase = mT + plotH;
+    const passY = yBase - passH;
+    const failY = passY - failH;
+    return `
+      <rect x="${x}" y="${passY}" width="${barW}" height="${Math.max(passH,0)}" fill="#10b981" rx="2"/>
+      <rect x="${x}" y="${failY}" width="${barW}" height="${Math.max(failH,0)}" fill="#ef4444" rx="2"/>
+      <text x="0" y="0" font-size="10" fill="#475569" text-anchor="end" transform="translate(${xCenter},${yBase+12}) rotate(-30)">${cat.toUpperCase()}</text>`;
+  }).join('');
+  const catGrid = Array.from({length: catYMax+1}, (_,t) => {
+    const y = mT + plotH - (t/catYMax)*plotH;
+    return `<line x1="${mL}" y1="${y}" x2="${mL+plotW}" y2="${y}" stroke="#f1f5f9"/><text x="${mL-8}" y="${y+4}" font-size="10" fill="#94a3b8" text-anchor="end">${t}</text>`;
+  }).join('');
+
+  const worstCat = catEntries.length ? catEntries.reduce((a,b) => cats[b[0]].fail > cats[a[0]].fail ? b : a)[0] : null;
+  const catInsight = worstCat && cats[worstCat].fail > 0
+    ? `${worstCat.toUpperCase()} currently has the most issues (${cats[worstCat].fail} failed) — this is the category to prioritize first.`
+    : 'No category shows any failures — coverage is currently clean across the board.';
+
+  const distTotal = pass + fail + warn || 1;
+  const distItems = [
+    { l: 'Passed', v: pass, c: '#10b981' },
+    { l: 'Failed', v: fail, c: '#ef4444' },
+    { l: 'Warned', v: warn, c: '#f59e0b' },
+  ];
+  const distMax = Math.max(...distItems.map(d=>d.v), 1);
+  const distBars = distItems.map((d,i) => {
+    const y = 20 + i * 50;
+    const w = (d.v / distMax) * 500;
+    return `
+      <rect x="90" y="${y}" width="${w}" height="28" fill="${d.c}" rx="4"/>
+      <text x="80" y="${y+19}" font-size="12" fill="#475569" text-anchor="end" font-weight="700">${d.l}</text>
+      <text x="${100+w}" y="${y+19}" font-size="12" fill="#1e293b" font-weight="700">${d.v} (${Math.round(d.v/distTotal*100)}%)</text>`;
+  }).join('');
+  const distInsight = `Out of ${distTotal} executed checks: ${pass} passed (${Math.round(pass/distTotal*100)}%), ${fail} failed (${Math.round(fail/distTotal*100)}%), and ${warn} warned (${Math.round(warn/distTotal*100)}%).`;
+
+  const sectionCharts = `
+    ${secHdr('Category Breakdown Chart')}
+    ${secDesc('This chart compares passed and failed checks across each security category, helping you quickly spot which areas need attention.')}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px 20px 10px;margin-bottom:8px">
+      <svg viewBox="0 0 ${chartW} ${chartH}" style="width:100%;height:auto">
+        ${catGrid}
+        <line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT+plotH}" stroke="#cbd5e1"/>
+        <line x1="${mL}" y1="${mT+plotH}" x2="${mL+plotW}" y2="${mT+plotH}" stroke="#cbd5e1"/>
+        ${catBars}
+        <rect x="${chartW-150}" y="4" width="10" height="10" fill="#10b981"/><text x="${chartW-135}" y="13" font-size="10" fill="#475569">Passed</text>
+        <rect x="${chartW-75}" y="4" width="10" height="10" fill="#ef4444"/><text x="${chartW-60}" y="13" font-size="10" fill="#475569">Failed</text>
+      </svg>
+    </div>
+    ${insightBox(catInsight, ACCENT)}
+
+    ${secHdr('Pass / Fail / Warn Distribution')}
+    ${secDesc('This chart shows the overall distribution of test outcomes — how many checks passed, failed, or raised a warning during this security run.')}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:8px">
+      <svg viewBox="0 0 760 190" style="width:100%;height:auto">${distBars}</svg>
+    </div>
+    ${insightBox(distInsight, ACCENT)}`;
+
+  // ── 8. DETAILED RESULTS ────────────────────────────────────────────────
   const detailRows = allTests.map((t, i) => {
     const sc = t.status==='pass'?'#10b981':t.status==='fail'?'#ef4444':'#f59e0b';
     const sl = t.status==='pass'?'✓ PASS':t.status==='fail'?'✗ FAIL':'⚠ WARN';
     const sb = t.status==='pass'?'rgba(16,185,129,.06)':t.status==='fail'?'rgba(239,68,68,.06)':'rgba(245,158,11,.06)';
-    const cc = CAT_COLORS[t.category] || '#64748b';
-    const sevc = SEV_COLORS[t.severity] || '#f59e0b';
-    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+    const cat = (t.category || 'auth').toLowerCase();
+    const cc  = CAT_COLORS[cat] || '#64748b';
+    const sev = (t.severity || 'medium').toLowerCase();
+    const sevc = SEV_COLORS[sev] || '#f59e0b';
+    const reason = t.suite || t.reason || '—';
+    return `<tr style="border-bottom:1px solid #f1f5f9;background:${i%2===0?'#fff':'#f8fafc'}">
       <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
-      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${(t.category||'').toUpperCase()}</span></td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${sevc};font-weight:700;font-size:10px">${(t.severity||'medium').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-weight:700;color:#1e293b;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${cat.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${sevc};font-weight:700;font-size:10px">${sev.toUpperCase()}</span></td>
       <td style="padding:9px 12px;text-align:center;background:${sb}"><span style="color:${sc};font-weight:800;font-size:11px">${sl}</span></td>
-      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${t.suite||'—'}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#475569">${String(reason).substring(0,90)}</td>
       <td style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b;font-weight:700">${t.duration||'—'}</td>
     </tr>`;
   }).join('');
+  const sectionDetailedResults = `
+    ${secHdr('Detailed Security Test Results', '#0d9488')}
+    ${secDesc('Real results from Playwright execution against the live frontend. Every value comes directly from the test runner.')}
+    ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Category',align:'center'},{l:'Severity',align:'center'},{l:'Status',align:'center'},{l:'Result / Reason'},{l:'Duration',align:'center'}])}
+      <tbody>${detailRows}</tbody></table>`, '#0d9488')}`;
 
-  //AI RECOMMENDATIONS
-  const perfItems = allTests.filter(t => {
-    try { return parseInt((t.duration||'0').replace('ms','')) > 5000; } catch { return false; }
-  });
-  const recsHtml = `
-    <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#f59e0b">⚡ Performance</div>
-    ${perfItems.length > 0
-      ? perfItems.slice(0,3).map(t => `<div style="background:#0d1526;border-left:3px solid #f59e0b;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05)">• "${t.name}" took ${t.duration} — optimize redirect response time.</div>`).join('')
-      : '<div style="background:#0d1526;border-left:3px solid #f59e0b;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8">• All security tests executed within acceptable time range.</div>'
-    }
-    <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 14px;margin:10px 0 4px;font-weight:700;color:#818cf8">🔧 Reliability</div>
-    <div style="background:#0d1526;border-left:3px solid #818cf8;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05)">• ${fail > 0 ? `${fail} security check(s) failed — review authentication and XSS protection.` : 'All security checks passed — continue monitoring auth and XSS vectors.'}</div>
-    <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 14px;margin:10px 0 4px;font-weight:700;color:#10b981">👤 UX & Security</div>
-    <div style="background:#0d1526;border-left:3px solid #10b981;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8">• Auth routes correctly redirect unauthenticated users — session management is secure.</div>`;
+  // ── 9. TOP FINDINGS ────────────────────────────────────────────────────
+  const failList = allTests.filter(t=>t.status==='fail').map(t => t.name + (t.suite ? ` — ${t.suite.substring(0,60)}` : ''));
+  const warnList = allTests.filter(t=>t.status==='warn').map(t => t.name);
+  const passList = allTests.filter(t=>t.status==='pass').map(t => t.name);
+  const findings = [
+    ...failList.slice(0,6).map(f=>['fail',f]),
+    ...warnList.slice(0,4).map(w=>['warn',w]),
+    ...passList.slice(0,6).map(p=>['pass',p]),
+  ];
+  const sectionFindings = `
+    ${secHdr('Top Findings')}
+    ${secDesc('Quick-glance summary of the most relevant outcomes from this run.')}
+    <div style="background:#fafafa;border:1px solid #e2e8f0;border-radius:10px;padding:4px 0;margin-bottom:16px">
+      ${findings.length === 0
+        ? `<div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px">No findings to display.</div>`
+        : findings.map(([kind, text]) => {
+            const icon = kind==='pass' ? '✓' : '⚠';
+            const c = kind==='pass' ? '#10b981' : kind==='warn' ? '#f59e0b' : '#ef4444';
+            return `<div style="padding:8px 16px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#1e293b">
+              <span style="color:${c};font-weight:700">${icon}</span>&nbsp;${String(text).substring(0,90)}
+            </div>`;
+          }).join('')}
+    </div>`;
 
-  // ── FINAL VERDICT ──
-  const vc = fail > 0 ? '#ef4444' : '#059669';
-  const vb = fail > 0 ? 'rgba(239,68,68,.08)' : 'rgba(16,185,129,.08)';
-  const vi = fail > 0 ? '🔴' : '🟢';
-  const vt = fail > 0
-    ? `Security Test FAILED — ${fail} vulnerability/vulnerabilities detected. Fix before production.`
-    : `Security Test PASSED — All ${pass} security checks passed. No critical vulnerabilities detected.`;
+  // ── 10. AI ANALYSIS + RECOMMENDATIONS + ACTION PLAN ───────────────────
+  const aiRecs = aiResult.recommendations || [];
+  const aiActionPlan = aiResult.action_plan || [];
 
+  const subsectionDefs = [
+    ['Authentication Analysis', 'auth', '#6366f1'],
+    ['XSS Analysis', 'xss', '#ef4444'],
+    ['Session Analysis', 'session', '#f59e0b'],
+    ['Navigation Analysis', 'navigation', '#10b981'],
+    ['Headers Analysis', 'headers', '#3b82f6'],
+    ['Info Exposure Analysis', 'info_exposure', '#8b5cf6'],
+  ];
+  const subsectionsHtml = subsectionDefs.map(([title, catKey, color]) => {
+    const related = allTests.filter(t => (t.category||'').toLowerCase() === catKey);
+    if (!related.length) return '';
+    const failN = related.filter(t => t.status === 'fail').length;
+    const warnN = related.filter(t => t.status === 'warn').length;
+    const text = (failN === 0 && warnN === 0)
+      ? `All ${related.length} check(s) passed — this area is fully secured with no issues detected.`
+      : `${failN + warnN} of ${related.length} check(s) flagged in this area: ${related.filter(t=>t.status!=='pass').map(t=>t.name).slice(0,3).join(', ')}. Investigate before deployment.`;
+    return `<div style="font-size:13px;font-weight:700;color:${color};margin:14px 0 6px">${title}</div>${insightBox(text, color, 'Summary')}`;
+  }).join('');
+
+  const deployText2 = critical_fail
+    ? 'Deployment NOT recommended — critical auth/XSS/session vulnerabilities detected.'
+    : (fail > 0 || warn > 0)
+    ? `Deployment possible with caution — ${fail} failed / ${warn} warned check(s). Review before promoting to production.`
+    : 'Deployment ready — all security checks passed, no vulnerabilities detected.';
+  const deployColor = critical_fail ? '#ef4444' : (fail > 0 || warn > 0) ? '#f59e0b' : '#10b981';
+
+  const recRows = aiRecs.map(r => {
+    const pri = (r.priority || 'medium').toLowerCase();
+    const pc = pri === 'high' ? '#ef4444' : pri === 'medium' ? '#f59e0b' : '#10b981';
+    return `<tr style="border-bottom:1px solid #f1f5f9">
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${pri.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#4f46e5;font-weight:700">${(r.category||'').toUpperCase()}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#1e293b">${(r.issue||'').substring(0,70)}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#475569">${(r.fix||'').substring(0,80)}</td>
+    </tr>`;
+  }).join('');
+
+  const sectionAI = `
+    ${secHdr('AI Analysis', '#4f46e5')}
+    <p style="font-size:12px;color:#475569;line-height:1.7;margin-bottom:8px">${aiSummary}</p>
+    ${subsectionsHtml}
+    <div style="font-size:13px;font-weight:700;color:${deployColor};margin:14px 0 6px">Deployment Readiness</div>
+    ${insightBox(deployText2, deployColor, 'Summary')}
+
+    ${secHdr('AI Recommendations', '#4f46e5')}
+    ${secDesc('Consolidated recommendations derived from execution evidence and vulnerability analysis.')}
+    ${aiRecs.length > 0
+      ? tblWrap(`${tblHdr([{l:'Priority',align:'center'},{l:'Category'},{l:'Issue'},{l:'Recommended Fix'}])}<tbody>${recRows}</tbody></table>`, '#4f46e5')
+      : `<div style="color:#94a3b8;font-size:12px;padding:16px">No specific issues flagged by AI for this run.</div>`}
+
+    ${aiActionPlan.length > 0 ? `
+      ${secHdr('AI-Generated Action Plan', '#c9a227')}
+      ${aiActionPlan.map((step,i) => `
+        <div style="display:flex;gap:10px;padding:9px 14px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:4px;font-size:12px;color:#475569">
+          <span style="color:#c9a227;font-weight:700">${i+1}.</span> ${typeof step === 'string' ? step : (step.action || step.scenario || '')}
+        </div>`).join('')}` : ''}`;
+
+  // ── 11. EXECUTIVE SUMMARY ──────────────────────────────────────────────
+  const topRecs = aiRecs.slice().sort((a,b) => ({high:0,medium:1,low:2}[a.priority]??1) - ({high:0,medium:1,low:2}[b.priority]??1)).slice(0,2);
+  const sectionExec = topRecs.length ? `
+    ${secHdr('Executive Summary', '#c9a227')}
+    <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:10px">Top Priority Actions</div>
+    ${topRecs.map((r,i) => `
+      <div style="display:flex;gap:12px;background:#fafafa;border:1px solid #c9a227;border-radius:10px;padding:14px 16px;margin-bottom:8px">
+        <div style="width:22px;height:22px;border-radius:50%;background:#c9a227;color:#fff;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">${(r.category||'').toUpperCase()}</div>
+          <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:3px">${r.issue||''}</div>
+          <div style="font-size:12px;color:#64748b">${r.fix||''}</div>
+        </div>
+      </div>`).join('')}
+    ${insightBox(`These ${topRecs.length} action(s) target the largest contributors to the current score of ${score}/100. Re-run the security suite after applying them to confirm improvement.`, '#c9a227')}` : '';
+
+  // ── 12. ENVIRONMENT ─────────────────────────────────────────────────────
+  const sectionEnv = `
+    ${secHdr('Environment & Execution Info', ACCENT)}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${[
+        ['BROWSER', 'Chromium (headless)'],
+        ['FRAMEWORK', framework],
+        ['EXECUTION TIME', totalMs ? `${(totalMs/1000).toFixed(2)}s` : 'N/A'],
+        ['CHECKS RUN', String(total)],
+        ['AUTH METHOD', 'JWT (stored token)'],
+        ['NEXTEST VERSION', '1.0.0'],
+      ].map(([l,v]) => `
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid ${ACCENT};border-radius:8px;padding:10px 14px">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${ACCENT};margin-bottom:4px">${l}</div>
+          <div style="font-size:12px;font-weight:700;color:#1e293b">${v}</div>
+        </div>`).join('')}
+    </div>`;
+
+  // ── 13. FINAL VERDICT ─────────────────────────────────────────────────
+  const vc = critical_fail ? '#ef4444' : (fail > 0 || warn > 0) ? '#b45309' : '#059669';
+  const vb = critical_fail ? '#fef2f2' : (fail > 0 || warn > 0) ? '#fffbeb' : '#f0fdf4';
+  const vi = critical_fail ? '🔴' : (fail > 0 || warn > 0) ? '🟡' : '🟢';
+  const vt = critical_fail
+    ? `Security Test FAILED — critical vulnerabilities detected on ${url} (Auth/XSS/Session). These issues must be fixed before production deployment.`
+    : (fail > 0 || warn > 0)
+    ? `Security Test passed with ${fail} failed / ${warn} warned check(s) on ${url}. No critical auth/XSS/session issues, but the flagged checks should be reviewed before deployment.`
+    : `Security Test PASSED — all ${pass} security checks passed successfully on ${url}. No critical vulnerabilities detected on the frontend.`;
+  const healthStatus = critical_fail ? 'High Risk' : (fail > 0 || warn > 0) ? 'Requires Remediation' : scoreLabel;
+
+  const sectionVerdict = `
+    ${secHdr('Final AI Verdict', ACCENT)}
+    <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:18px 22px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:8px">${vi} Final Security Verdict</div>
+      <p style="font-size:13px;color:${vc};margin:0 0 12px;line-height:1.6">${vt}</p>
+      <div style="font-size:12px">
+        <span style="color:#64748b;font-weight:700">Security Score: </span><span style="color:${vc};font-weight:700">${score}/100</span>
+        <span style="color:#94a3b8;margin:0 10px">|</span>
+        <span style="color:#64748b;font-weight:700">Risk Level: </span><span style="color:${vc};font-weight:700">${riskLevel}</span>
+        <span style="color:#94a3b8;margin:0 10px">|</span>
+        <span style="color:#64748b;font-weight:700">Overall Health: </span><span style="color:${vc};font-weight:700">${healthStatus}</span>
+      </div>
+    </div>`;
+
+  // ── 14. CERTIFICATE ────────────────────────────────────────────────────
+  const sectionCert = `
+    ${secHdr('Certificate of Security Validation', ACCENT)}
+    ${secDesc('Official validation summary confirming the outcome of this security test run — issued automatically by NexTest AI based on the results above.')}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;margin-bottom:20px">
+      <div style="height:4px;background:${scoreColor}"></div>
+      <div style="padding:24px;text-align:center">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#94a3b8;margin-bottom:8px">CERTIFICATE OF SECURITY VALIDATION</div>
+        <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:10px">${url}</div>
+        <div style="font-size:38px;font-weight:800;color:${scoreColor};margin-bottom:10px">${score}<span style="font-size:16px;color:#cbd5e1">/100</span></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px">
+          <span style="background:${scoreColor};color:#fff;font-weight:700;font-size:12px;padding:5px 16px;border-radius:20px">GRADE ${grade}</span>
+          <span style="border:1px solid ${scoreColor};color:${scoreColor};font-weight:700;font-size:12px;padding:5px 16px;border-radius:20px">${scoreLabel.toUpperCase()}</span>
+        </div>
+      </div>
+      <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:10px;text-align:center;font-size:10px;color:#94a3b8">
+        Validated by <b style="color:#475569">NexTest AI</b> · ${dateStr}
+      </div>
+    </div>`;
+
+  // ── FULL HTML DOCUMENT ─────────────────────────────────────────────────
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8223,25 +8769,24 @@ const downloadHtml_Security = () => {
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#070e1c;color:#e2e8f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+  body{background:#f8fafc;color:#1e293b;font-family:'DM Sans',sans-serif;min-height:100vh}
   .page{max-width:1100px;margin:0 auto;padding:48px 32px 80px}
   table{width:100%;border-collapse:collapse}
-  @media print{body{background:#fff;color:#000}.no-print{display:none}.page{padding:10mm}@page{margin:15mm;size:A4}}
+  th,td{vertical-align:top}
+  @media print{body{background:#fff}.no-print{display:none}.page{padding:10mm}@page{margin:15mm;size:A4}}
 </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- HEADER -->
   <div style="background:linear-gradient(135deg,#0a0f1e 0%,#1a0a0a 50%,#0a0f1e 100%);
     border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
-    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;
-      background:linear-gradient(90deg,transparent,#ef4444,transparent)"></div>
-    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#ef4444"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,${ACCENT},transparent)"></div>
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:${ACCENT}"></div>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
       <div>
         <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px">
-          <span style="color:#ef4444">NEX</span>TEST
+          <span style="color:${ACCENT}">NEX</span>TEST
         </div>
         <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">Security Test Report</div>
         <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${timeStr}</div>
@@ -8249,9 +8794,9 @@ const downloadHtml_Security = () => {
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px">
       ${[
-        {l:'URL', v:`<span style="color:#ef9494;font-size:11px;word-break:break-all">${url}</span>`},
-        {l:'Framework', v:`<span style="color:#fff;font-weight:700">${framework}</span>`},
-        {l:'Test Type', v:`<span style="color:#ef4444;font-weight:700">Security Test</span>`},
+        {l:'URL', v:`<span style="color:#fca5a5;font-size:11px;word-break:break-all">${url}</span>`},
+        {l:'Framework', v:`<span style="color:${ACCENT};font-weight:700">${framework}</span>`},
+        {l:'Test Type', v:`<span style="color:${ACCENT};font-weight:700">Security Test</span>`},
         {l:'Generated', v:`<span style="color:#fff">${dateStr}</span>`},
       ].map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
         <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
@@ -8260,61 +8805,49 @@ const downloadHtml_Security = () => {
     </div>
   </div>
 
-  <!-- PRINT BUTTON -->
   <div class="no-print" style="margin-bottom:28px">
-    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,#ef4444,#dc2626);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,${ACCENT},#dc2626);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
       🖨 Print / Save as PDF
     </button>
   </div>
 
-  ${secHdr('🔒', 'Security Test Scenarios', '#ef4444')}
-  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Scenario'},{l:'Category',align:'center'},{l:'Severity',align:'center'},{l:'Expected Result'},{l:'Type',align:'center'}])}
-    <tbody>${scenarioRows}</tbody></table>`)}
-
-  ${secHdr('📊', 'Test Summary', '#ef4444')}
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px">
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:8px">
     ${[
-      {icon:'✅',val:pass,lbl:'PASSED',c:'#10b981',bg:'rgba(16,185,129,.08)',bd:'rgba(16,185,129,.25)'},
-      {icon:'❌',val:fail,lbl:'FAILED',c:'#ef4444',bg:'rgba(239,68,68,.08)',bd:'rgba(239,68,68,.25)'},
-      {icon:'⚠️',val:warn,lbl:'WARN',c:'#f59e0b',bg:'rgba(245,158,11,.08)',bd:'rgba(245,158,11,.25)'},
-      {icon:'🎯',val:`${rate}%`,lbl:'PASS RATE',c:rateColor,bg:`${rateColor}12`,bd:`${rateColor}33`},
-      {icon:'🔢',val:total,lbl:'TOTAL',c:'#3b82f6',bg:'rgba(59,130,246,.08)',bd:'rgba(59,130,246,.25)'},
+      {icon:'✅',val:pass,lbl:'PASSED',c:'#10b981',bg:'#d1fae5',bd:'#a7f3d0'},
+      {icon:'❌',val:fail,lbl:'FAILED',c:'#ef4444',bg:'#fee2e2',bd:'#fca5a5'},
+      {icon:'⚠️',val:warn,lbl:'WARNED',c:'#f59e0b',bg:'#fef3c7',bd:'#fde68a'},
+      {icon:'🎯',val:`${rate}%`,lbl:'PASS RATE',c:rateColor,bg:'#eff6ff',bd:'#bfdbfe'},
+      {icon:'🔢',val:total,lbl:'TOTAL',c:'#3b82f6',bg:'#dbeafe',bd:'#93c5fd'},
     ].map(s => `<div style="background:${s.bg};border:1px solid ${s.bd};border-radius:14px;padding:20px;text-align:center">
       <div style="font-size:20px;margin-bottom:8px">${s.icon}</div>
       <div style="font-size:36px;font-weight:700;color:${s.c};line-height:1;margin-bottom:4px">${s.val}</div>
       <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
     </div>`).join('')}
   </div>
+  <p style="font-size:10px;color:#94a3b8;font-style:italic;margin-bottom:20px">
+    Pass Rate is the raw proportion of checks that succeeded. The Security Score below is severity-weighted —
+    Auth/XSS/Session checks count more than Headers/Navigation/Info Exposure — which is why the two numbers can differ.
+  </p>
 
-  ${secHdr('📊', 'Results by Category', '#ef4444')}
-  ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Warn',align:'center'},{l:'Status',align:'center'}])}
-    <tbody>${catRows}</tbody></table>`)}
+  ${sectionOverview}
+  ${sectionKeyMetrics}
+  ${sectionScore}
+  ${sectionVulnSummary}
+  ${sectionMethodology}
+  ${sectionCategorySummary}
+  ${sectionCharts}
+  ${sectionDetailedResults}
+  ${sectionFindings}
+  ${sectionAI}
+  ${sectionExec}
+  ${sectionEnv}
+  ${sectionVerdict}
+  ${sectionCert}
 
-  ${secHdr('🧪', 'Detailed Security Test Results', '#0d9488')}
-  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Category',align:'center'},{l:'Severity',align:'center'},{l:'Status',align:'center'},{l:'Result / Reason'},{l:'Duration',align:'center'}])}
-    <tbody>${detailRows}</tbody></table>`, '#0d9488')}
-
-  ${secHdr('🤖', 'AI Recommendations', '#6366f1')}
-  ${recsHtml}
-
-  <!-- FINAL VERDICT -->
-  <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:16px 20px;margin-top:24px;display:flex;gap:12px;align-items:flex-start">
-    <span style="font-size:24px">${vi}</span>
-    <div>
-      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:6px">Final Security Verdict</div>
-      <p style="font-size:13px;color:${vc};margin:0;line-height:1.6">${vt}</p>
-    </div>
-  </div>
-
-  <!-- FOOTER -->
   <div style="margin-top:48px;padding:20px 28px;background:rgba(239,68,68,.04);border-radius:12px;
     display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid rgba(239,68,68,.15)">
-    <div style="font-size:14px;font-weight:700;color:#64748b">
-      <span style="color:#ef4444">NEX</span>TEST · Security Test Report
-    </div>
-    <div style="font-size:11px;color:#94a3b8">
-      Generated ${dateStr} · ${framework} · ${total} tests · ${rate}% pass rate
-    </div>
+    <div style="font-size:14px;font-weight:700;color:#64748b"><span style="color:${ACCENT}">NEX</span>TEST · Security Test Report</div>
+    <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${framework} · ${total} checks · ${rate}% pass rate · Score: ${score}/100</div>
   </div>
 
 </div>
@@ -8327,486 +8860,651 @@ const downloadHtml_Security = () => {
   link.download = `security_report_${genId}.html`;
   link.click();
   saveReportToStorage({
-    url,
-    framework,
-    testType: 'security',
-    passCount: pass,
-    failCount: fail,
+    url, framework, testType: 'security',
+    passCount: pass, failCount: fail,
     htmlContent: html,
     generationData: generation,
   });
   setDropdownOpen(false);
 };
 
-const downloadHtml_Functional = async () => {
-  // Show loading state 
-  setDropdownOpen(false);
-  setPdfLoading(true);
-
+const downloadHtml_Functional = () => {
   const now     = new Date();
   const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const genId   = generation?.generation?.id || 'nextest';
   const allTests = tests;
-
+ 
+  // Keep the same accent family NexTest already uses for Functional (indigo),
+  // matching the app's own TEST_TYPE_BADGE.functional color — same "colors" rule
+  // as the API report (which uses its own accent, orange), just Functional's own hue.
+  const ACCENT = '#ec4899';
+ 
+  const appName     = generation?.generation?.project_name || generation?.project_name || 'NexTest Application';
+  const environment  = generation?.generation?.environment || generation?.environment || 'Internal / Staging';
+ 
+  // ── Module classification (mirrors the API report's category classifier) ─
+  const MODULE_META = {
+    'Authentication':       '#6366f1',
+    'Dashboard':            '#0ea5e9',
+    'Project Management':   '#10b981',
+    'Test Generation':      '#f59e0b',
+    'Test Execution':       '#8b5cf6',
+    'Reports':              '#ec4899',
+    'User Management':      '#14b8a6',
+    'Settings':             '#64748b',
+  };
+  const MODULE_ORDER = Object.keys(MODULE_META);
+  const HIGH_MODULES = new Set(['Authentication', 'Project Management']);
+ 
+  const getModule = (t) => {
+    const cat  = (t.category || '').toLowerCase();
+    const name = (t.name || '').toLowerCase();
+    const hay  = `${cat} ${name}`;
+    if (/auth|login|logout|token|session|signin/.test(hay))                 return 'Authentication';
+    if (/dashboard|home|overview/.test(hay))                                return 'Dashboard';
+    if (/project|create project|edit project|delete project/.test(hay))    return 'Project Management';
+    if (/generate test|test generation|generate case/.test(hay))           return 'Test Generation';
+    if (/execute|execution|run test/.test(hay))                            return 'Test Execution';
+    if (/report|download report|pdf|xlsx|export/.test(hay))                return 'Reports';
+    if (/user management|manage user|profile|account/.test(hay))           return 'User Management';
+    if (/setting|config|preference/.test(hay))                             return 'Settings';
+    return 'Dashboard';
+  };
+ 
+  const getAction   = (t) => t.action || t.step_meta?.action || 'check_visible';
+  const getReason   = (t) => t.reason || t.reason_pass || t.suite || t.error || '—';
+ 
+  const parseMs = (d) => {
+    if (!d) return 0;
+    const s = String(d);
+    if (s.endsWith('ms')) return parseFloat(s) || 0;
+    if (s.endsWith('s'))  return (parseFloat(s) || 0) * 1000;
+    return 0;
+  };
+ 
   const pass  = allTests.filter(t => t.status === 'pass').length;
   const fail  = allTests.filter(t => t.status === 'fail').length;
-  const skip  = allTests.filter(t => t.status === 'skip').length;
+  const skip  = allTests.filter(t => t.status !== 'pass' && t.status !== 'fail').length;
   const total = allTests.length || 1;
-  const rate  = Math.round(pass / total * 100);
-  const rateColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
-
-  // Quality score
-  const failedCritical = allTests.filter(t => t.status === 'fail' && t.ai_analysis?.severity === 'high');
-  let quality = rate;
-  if (failedCritical.length) quality = Math.max(0, quality - failedCritical.length * 10);
-  quality = Math.min(100, Math.max(0, Math.round(quality)));
-  const risk = quality >= 80 ? 'LOW' : quality >= 60 ? 'MEDIUM' : 'HIGH';
-  const riskColor = quality >= 80 ? '#10b981' : quality >= 60 ? '#f59e0b' : '#ef4444';
-
-  //ACTION PLAN via LLaMA 
-  const failedTests = allTests.filter(t => t.status === 'fail');
-  let actionPlanItems = [];
-
-  try {
-    const prompt = `You are a QA engineer. Generate an action plan for these failed functional Playwright tests.
-
-Failed tests (${failedTests.length}):
-${JSON.stringify(failedTests.map(t => ({
-  name: t.name,
-  action: t.action || t.step_meta?.action || 'check_visible',
-  selector: t.selector || t.step_meta?.selector || '—',
-  reason: t.reason || t.suite || '—',
-  root_cause: t.ai_analysis?.root_cause || '—',
-  fix: t.ai_analysis?.fix || '—',
-})))}
-
-Return ONLY a JSON array of max 6 items. Each item must have:
-- scenario: string (what failed — be specific with test name)
-- category: one of "Selector Fix" | "Timing/Wait" | "Auth Flow" | "Page Load" | "Assertion" | "Element State"
-- priority: "HIGH" | "MEDIUM" | "LOW"
-- action: string (concrete fix action, max 80 chars)
-- responsible: one of "Frontend" | "QA" | "Backend" | "DevOps"
-- deadline: one of "Immediate" | "This Sprint" | "Next Sprint"
-- status: "To Do"
-
-Return ONLY valid JSON array, no markdown, no explanation.`;
-
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-    const data = await resp.json();
-    const text = (data.content?.[0]?.text || '[]').replace(/```json|```/g, '').trim();
-    actionPlanItems = JSON.parse(text);
-  } catch (e) {
-    console.error('[Action Plan]', e);
-    // Fallback statique si LLaMA échoue
-    actionPlanItems = failedTests.slice(0, 4).map(t => ({
-      scenario: t.name,
-      category: 'Selector Fix',
-      priority: t.ai_analysis?.severity === 'high' ? 'HIGH' : 'MEDIUM',
-      action: t.ai_analysis?.fix || 'Verify selector and add explicit wait',
-      responsible: 'QA',
-      deadline: 'This Sprint',
-      status: 'To Do',
-    }));
-  }
-
-  // ACTION PLAN HTML
-  const CAT_COLORS = {
-    'Selector Fix':   '#6366f1',
-    'Timing/Wait':    '#f59e0b',
-    'Auth Flow':      '#ef4444',
-    'Page Load':      '#10b981',
-    'Assertion':      '#8b5cf6',
-    'Element State':  '#0ea5e9',
+  const passRate = Math.round(pass / total * 100);
+  const rateColor = passRate >= 80 ? '#10b981' : passRate >= 50 ? '#f59e0b' : '#ef4444';
+ 
+  const totalMs = allTests.reduce((sum, t) => sum + parseMs(t.duration), 0);
+  const avgMs   = allTests.length ? totalMs / allTests.length : 0;
+ 
+  // ── Functional Health Score = severity-weighted pass rate ────────────────
+  let totalW = 0, earnedW = 0;
+  allTests.forEach(t => {
+    const mod = getModule(t);
+    const pri = (t.priority || t.severity || 'medium').toLowerCase();
+    const w = (HIGH_MODULES.has(mod) || ['critical','high'].includes(pri)) ? 3 : 1;
+    totalW += w;
+    if (t.status === 'pass') earnedW += w;
+  });
+  const score = totalW ? Math.round(earnedW / totalW * 100) : 0;
+  const scoreLabel = score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 50 ? 'Acceptable' : 'Critical';
+  const scoreColor = score >= 90 ? '#10b981' : score >= 75 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+  const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 50 ? 'C' : score >= 25 ? 'D' : 'F';
+ 
+  const isCriticalFunctionalFail = (t) => {
+    if (t.status !== 'fail') return false;
+    const pri = (t.priority || t.severity || '').toLowerCase();
+    if (['high','critical'].includes(pri)) return true;
+    if (HIGH_MODULES.has(getModule(t))) return true;
+    return false;
   };
-  const PRI_COLORS = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#10b981' };
-  const PRI_BGS   = { HIGH: 'rgba(239,68,68,.06)', MEDIUM: 'rgba(245,158,11,.06)', LOW: 'rgba(16,185,129,.06)' };
-  const RESP_COLORS = { Frontend: '#6366f1', QA: '#3b82f6', Backend: '#10b981', DevOps: '#f97316' };
-  const DEAD_COLORS = { Immediate: '#ef4444', 'This Sprint': '#f59e0b', 'Next Sprint': '#10b981' };
-
-  const actionPlanRows = actionPlanItems.map((item, i) => {
-    const pc  = PRI_COLORS[item.priority]  || '#f59e0b';
-    const pbg = PRI_BGS[item.priority]     || 'rgba(245,158,11,.06)';
-    const cc  = CAT_COLORS[item.category]  || '#64748b';
-    const rc  = RESP_COLORS[item.responsible] || '#64748b';
-    const dc  = DEAD_COLORS[item.deadline] || '#f59e0b';
-    return `
-      <tr style="background:${pbg};border-bottom:1px solid rgba(255,255,255,.05)">
-        <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
-        <td style="padding:9px 12px;font-size:12px;color:#e2e8f0">${(item.scenario||'').substring(0,60)}</td>
-        <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${item.category}</span></td>
-        <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${item.priority}</span></td>
-        <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${(item.action||'').substring(0,70)}</td>
-        <td style="padding:9px 12px;text-align:center"><span style="color:${rc};font-weight:700;font-size:10px">${item.responsible}</span></td>
-        <td style="padding:9px 12px;text-align:center"><span style="color:${dc};font-weight:700;font-size:10px">${item.deadline}</span></td>
-        <td style="padding:9px 12px;text-align:center"><span style="font-size:10px;color:#64748b">⏳ ${item.status}</span></td>
-      </tr>`;
-  }).join('');
-
-  const sectionActionPlan = actionPlanItems.length > 0 ? `
-    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;padding-bottom:8px;border-bottom:2.5px solid #c9a227">
-      <span style="font-size:18px">📋</span>
-      <span style="font-size:20px;font-weight:700;color:#e2e8f0">AI-Generated Action Plan</span>
-    </div>
-    <p style="font-size:11px;color:#64748b;font-style:italic;margin-bottom:12px">
-      Action plan generated by Claude AI based on real functional test failures.
-    </p>
-    <div style="background:#0d1526;border:1px solid rgba(201,162,39,.3);border-radius:12px;overflow:hidden;margin-bottom:16px">
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr style="background:#040914">
-          ${['#','Scenario','Category','Priority','Action','Responsible','Deadline','Status'].map(h =>
-            `<th style="padding:10px 12px;text-align:${['#','Priority','Responsible','Deadline','Status'].includes(h)?'center':'left'};font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">${h}</th>`
-          ).join('')}
-        </tr></thead>
-        <tbody>${actionPlanRows}</tbody>
-      </table>
-    </div>` : '';
-
-  // SECTIONS
-  const ACTION_COLORS = {
-    navigate: '#10b981', check_visible: '#3b82f6', fill: '#8b5cf6',
-    click: '#f97316', auth_success: '#10b981', auth_fail: '#ef4444',
-    check_text: '#0d9488', select: '#6366f1', hover: '#ec4899', logout: '#f59e0b',
-  };
-  const CAT_COLORS2 = {
-    navigation: '#10b981', form: '#8b5cf6', action: '#f97316',
-    authentication: '#6366f1', ui: '#3b82f6',
-  };
-
-  const getAction = (t) => t.action || t.step_meta?.action || 'check_visible';
-  const getSelector = (t) => t.selector || t.step_meta?.selector || t.step_meta?.value || '—';
-  const getReason = (t) => t.reason || t.reason_pass || t.suite || t.error || '—';
-
-  const secHdr = (emoji, title, color = '#6366f1') => `
-    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;padding-bottom:8px;border-bottom:2.5px solid ${color}">
-      <span style="font-size:18px">${emoji}</span>
+  const critical_fail = allTests.some(isCriticalFunctionalFail);
+ 
+  const overallStatus = critical_fail ? 'CRITICAL ISSUES' : fail > 0 ? 'PASSED W/ WARNINGS' : 'ALL CHECKS PASSED';
+  const statusColor   = critical_fail ? '#ef4444' : fail > 0 ? '#f59e0b' : '#10b981';
+  const riskLevel      = critical_fail ? 'HIGH' : fail > 0 ? 'MEDIUM' : 'LOW';
+  const deployText     = critical_fail ? 'NOT READY' : fail > 0 ? 'READY W/ CAUTION' : 'READY';
+  const statusExplain  = critical_fail
+    ? 'One or more critical functional checks failed (Authentication or Project Management workflows). These block core user journeys — resolve before the next deployment.'
+    : fail > 0
+    ? `Core workflows are confirmed, but ${fail} secondary check(s) failed. Review the failing modules below.`
+    : `Every functional scenario executed against ${appName} passed. The application's core workflows are stable and ready for the next testing phase.`;
+ 
+  const aiResult  = generation?.result?.ai || runResults?.ai || {};
+  const aiSummary = aiResult.summary || `This functional test run executed ${total} scenario(s) against <b>${appName}</b>, with ${pass} passed and ${fail} failed (${passRate}% pass rate). ${critical_fail ? 'Critical workflow failures were detected.' : 'No critical workflow failures were detected.'}`;
+  const aiRecs = aiResult.recommendations || [];
+  const aiActionPlan = aiResult.action_plan || [];
+ 
+  // ── Shared helpers (identical style to the API report) ───────────────────
+  const secHdr = (title, color = ACCENT) => `
+    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;
+      padding-bottom:8px;border-bottom:2.5px solid ${color}">
       <span style="font-size:20px;font-weight:700;color:#e2e8f0">${title}</span>
     </div>`;
-
-  const tblWrap = (inner, border = '#6366f1') => `
-    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">
-      ${inner}
-    </div>`;
-
+  const secDesc = (text) => `<p style="font-size:11px;color:#94a3b8;font-style:italic;margin-bottom:14px;line-height:1.6">${text}</p>`;
+  const tblWrap = (inner, border = ACCENT) => `
+    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;
+      overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">${inner}</div>`;
   const tblHdr = (cols) => `
     <table style="width:100%;border-collapse:collapse">
       <thead><tr style="background:#040914">
-        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
+        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};
+          font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+          color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
       </tr></thead>`;
-
-  //1. SCENARIOS
-  const EXPECTED_MAP = {
-    navigate: 'Page loads and DOM is ready',
-    check_visible: 'Element is visible in the DOM',
-    fill: 'Field accepts and retains the input value',
-    click: 'Element responds to click — action triggered',
-    auth_success: 'Login succeeds — redirected to dashboard',
-    auth_fail: 'Login rejected — error message displayed',
-    check_text: 'Expected text found in page content',
-    select: 'Option selected in dropdown',
-    hover: 'Hover state applied to element',
-    logout: 'Session cleared — redirected to login',
-  };
+  const insightBox = (text, color, label = 'AI Analysis') => `
+    <div style="background:#0d1526;border:1px solid ${color}44;border-left:3px solid ${color};
+      border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11.5px;color:#94a3b8;line-height:1.6">
+      <b style="color:${color}">${label}: </b>${text}
+    </div>`;
+ 
+  // ── 1. FUNCTIONAL TEST SUMMARY (overview hero) ────────────────────────────
+  const heroStats = [
+    { l: 'OVERALL STATUS', v: overallStatus, c: statusColor },
+    { l: 'FUNCTIONAL HEALTH SCORE', v: `${score}/100`, c: scoreColor },
+    { l: 'RISK LEVEL', v: riskLevel, c: statusColor },
+    { l: 'DEPLOYMENT', v: deployText, c: statusColor },
+  ];
+  const sectionOverview = `
+    ${secHdr('Functional Test Summary')}
+    ${secDesc(statusExplain)}
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      ${heroStats.map(s => `
+        <div style="background:#0d1526;border:1px solid ${s.c};border-radius:12px;padding:16px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:#64748b;margin-bottom:6px">${s.l}</div>
+          <div style="font-size:15px;font-weight:800;color:${s.c}">${s.v}</div>
+        </div>`).join('')}
+    </div>
+    ${insightBox(aiSummary, '#818cf8', 'AI Summary')}`;
+ 
+  // ── 2. KEY METRICS ─────────────────────────────────────────────────────
+  const criticalCount = allTests.filter(isCriticalFunctionalFail).length;
+  const uniqueModules = new Set(allTests.map(getModule)).size;
+  const stability = fail === 0 ? 'Stable' : critical_fail ? 'Unstable' : 'Mostly Stable';
+  const keyMetrics = [
+    { l: 'TOTAL EXECUTION TIME', v: totalMs ? `${(totalMs/1000).toFixed(2)}s` : 'N/A', c: '#0EA5E9' },
+    { l: 'AVERAGE TEST DURATION', v: avgMs ? `${avgMs.toFixed(0)}ms` : 'N/A', c: '#10b981' },
+    { l: 'FUNCTIONAL MODULES TESTED', v: String(uniqueModules), c: '#8b5cf6' },
+    { l: 'CRITICAL FUNCTIONAL CHECKS', v: String(criticalCount), c: '#ef4444' },
+    { l: 'OVERALL STABILITY', v: stability, c: stability === 'Stable' ? '#10b981' : stability === 'Unstable' ? '#ef4444' : '#f59e0b' },
+  ];
+  const sectionKeyMetrics = `
+    ${secHdr('Key Metrics')}
+    ${secDesc('Execution footprint for this functional run — timing, module coverage, and where the critical checks are concentrated.')}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${keyMetrics.map(m => `
+        <div style="background:#0d1526;border:1px solid ${m.c};border-top:3px solid ${m.c};border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:${m.c};margin-bottom:6px">${m.l}</div>
+          <div style="font-size:14px;font-weight:800;color:#e2e8f0">${m.v}</div>
+        </div>`).join('')}
+    </div>`;
+ 
+  // ── 3. FUNCTIONAL MODULES COVERED (replaces "API Endpoints Covered") ─────
+  const seenMods = {};
+  allTests.forEach(t => {
+    const m = getModule(t);
+    if (!seenMods[m]) seenMods[m] = { pass: 0, fail: 0, skip: 0 };
+    seenMods[m][t.status === 'pass' || t.status === 'fail' ? t.status : 'skip']++;
+  });
+  const moduleRows = MODULE_ORDER.filter(m => seenMods[m]).map((m, i) => {
+    const d = seenMods[m];
+    const mc = MODULE_META[m];
+    const totalN = d.pass + d.fail + d.skip;
+    const verdict = d.fail === 0 ? 'PASS' : 'FAIL';
+    const vc = d.fail === 0 ? '#10b981' : '#ef4444';
+    const bg = d.fail === 0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${mc};font-weight:700;font-size:11px">${m}</span></td>
+      <td style="padding:9px 12px;text-align:center;color:#e2e8f0">${totalN}</td>
+      <td style="padding:9px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
+      <td style="padding:9px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${verdict}</span></td>
+    </tr>`;
+  }).join('');
+  const sectionModules = moduleRows ? `
+    ${secHdr('Functional Modules Covered')}
+    ${secDesc(`Application modules exercised against <b>${appName}</b> during this run.`)}
+    ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Module',align:'center'},{l:'Checks',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Status',align:'center'}])}
+      <tbody>${moduleRows}</tbody></table>`)}` : '';
+ 
+  // ── 4. FUNCTIONAL HEALTH SCORE GAUGE ──────────────────────────────────────
+  const sectionScore = `
+    ${secHdr('Functional Health Score', scoreColor)}
+    <div style="display:flex;align-items:center;gap:24px;background:#0d1526;border:1.5px solid ${scoreColor};border-radius:14px;padding:24px;margin-bottom:16px">
+      <div style="width:110px;height:110px;border-radius:50%;background:conic-gradient(${scoreColor} ${score*3.6}deg, #1e293b 0deg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <div style="width:82px;height:82px;border-radius:50%;background:#0d1526;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:24px;font-weight:800;color:${scoreColor}">${score}</span>
+          <span style="font-size:10px;color:#64748b">/ 100</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:17px;font-weight:800;color:${scoreColor};margin-bottom:8px">${scoreLabel}</div>
+        <p style="font-size:12px;color:#94a3b8;line-height:1.6;margin:0">
+          The Functional Health Score weighs Authentication and Project Management checks three times as
+          heavily as secondary modules (Reports, Settings, User Management). Excellent ≥ 90 · Good ≥ 75 ·
+          Acceptable ≥ 50 · Critical below.
+        </p>
+      </div>
+    </div>`;
+ 
+  // ── 5. FUNCTIONAL TEST METHODOLOGY + SCENARIOS ────────────────────────────
   const scenarioRows = allTests.map((t, i) => {
-    const action = getAction(t);
-    const category = t.category || 'action';
-    const priority = t.priority || 'medium';
-    const ac = ACTION_COLORS[action] || '#64748b';
-    const cc = CAT_COLORS2[category] || '#64748b';
+    const mod = getModule(t);
+    const cc = MODULE_META[mod] || '#64748b';
+    const priority = (t.priority || 'medium').toLowerCase();
     const pc = priority === 'high' ? '#ef4444' : priority === 'medium' ? '#f59e0b' : '#10b981';
-    const expected = EXPECTED_MAP[action] || 'Step completes without error';
+    const action = getAction(t);
+    const expected = t.suite || t.expected || t.description || 'Workflow completes without error';
     return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
       <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
       <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${ac};font-weight:700;font-size:10px">${action.toUpperCase()}</span></td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${category.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${mod.toUpperCase()}</span></td>
       <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${priority.toUpperCase()}</span></td>
-      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${expected.substring(0,55)}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${String(expected).substring(0,65)}</td>
     </tr>`;
   }).join('');
-
-  //2. CATEGORY SUMMARY 
+  const sectionMethodology = `
+    ${secHdr('Functional Test Methodology')}
+    <p style="font-size:12px;color:#94a3b8;line-height:1.7;margin-bottom:16px">
+      This report validates the core business workflows and application features of
+      <b style="color:#e2e8f0">${appName}</b> by executing automated functional test scenarios — user login/logout,
+      project management (create/edit/delete), test case generation, test execution, report generation and download,
+      user settings, and dashboard loading. NexTest drives the application end-to-end with Playwright, exercising
+      real user journeys rather than isolated component checks.
+    </p>
+    ${secHdr('Functional Test Scenarios')}
+    ${secDesc(`Planned functional scenarios for <b>${appName}</b> — ${total} scenario(s), scoped to the workflows actually exercised in this run.`)}
+    ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Scenario'},{l:'Module',align:'center'},{l:'Priority',align:'center'},{l:'Expected'}])}
+      <tbody>${scenarioRows}</tbody></table>`)}`;
+ 
+  // ── 6. RESULTS BY CATEGORY (functional modules) ───────────────────────────
   const cats = {};
   allTests.forEach(t => {
-    const c = t.category || 'action';
-    if (!cats[c]) cats[c] = { pass: 0, fail: 0, skip: 0, total: 0, dur: 0 };
+    const c = getModule(t);
+    if (!cats[c]) cats[c] = { pass: 0, fail: 0, total: 0 };
     cats[c].total++;
-    if (t.status === 'pass') cats[c].pass++;
-    else if (t.status === 'fail') cats[c].fail++;
-    else cats[c].skip++;
-    try { cats[c].dur += parseInt((t.duration||'0').replace('ms','') || 0); } catch {}
+    if (t.status === 'pass') cats[c].pass++; else if (t.status === 'fail') cats[c].fail++;
   });
-  const catRows = Object.entries(cats).map(([cat, d]) => {
-    const cc = CAT_COLORS2[cat] || '#64748b';
-    const r  = Math.round(d.pass / d.total * 100);
+  const catRows = MODULE_ORDER.filter(c => cats[c]?.total > 0).map(cat => {
+    const d = cats[cat];
+    const cc = MODULE_META[cat];
+    const r = Math.round(d.pass / d.total * 100);
     const rc = r === 100 ? '#10b981' : r >= 60 ? '#f59e0b' : '#ef4444';
-    const avg = Math.round(d.dur / d.total);
     const vc = d.fail === 0 ? '#10b981' : '#ef4444';
-    const row_bg = d.fail === 0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
-    return `<tr style="background:${row_bg};border-bottom:1px solid rgba(255,255,255,.05)">
-      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
+    const bg = d.fail === 0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
+    return `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat}</td>
       <td style="padding:10px 12px;text-align:center;color:#e2e8f0;font-weight:700">${d.total}</td>
       <td style="padding:10px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
       <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
-      <td style="padding:10px 12px;text-align:center;color:#f59e0b;font-weight:700">${d.skip}</td>
       <td style="padding:10px 12px;text-align:center;color:${rc};font-weight:700">${r}%</td>
-      <td style="padding:10px 12px;text-align:center;color:#64748b">${avg}ms</td>
       <td style="padding:10px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${d.fail===0?'✅ PASS':'❌ FAIL'}</span></td>
     </tr>`;
   }).join('');
-
-  //3. DETAILED RESULTS 
+  const sectionCategorySummary = catRows ? `
+    ${secHdr('Results by Category')}
+    ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Pass Rate',align:'center'},{l:'Verdict',align:'center'}])}
+      <tbody>${catRows}</tbody></table>`)}` : '';
+ 
+  // ── 7. CHARTS — Bar (by module) + Donut (pass/fail/skip) ──────────────────
+  const catEntries = MODULE_ORDER.filter(c => cats[c]?.total > 0).map(c => [c, cats[c]]);
+  const catYMax = Math.max(...catEntries.map(([,d]) => d.total), 1);
+  const chartW = 760, chartH = 300, mL = 44, mB = 90, mT = 24, mR = 24;
+  const plotW = chartW - mL - mR, plotH = chartH - mT - mB;
+  const barSlot = plotW / (catEntries.length || 1);
+  const barW = Math.min(46, barSlot * 0.5);
+  const catBars = catEntries.map(([cat, d], i) => {
+    const xCenter = mL + barSlot * i + barSlot / 2;
+    const x = xCenter - barW / 2;
+    const passH = (d.pass / catYMax) * plotH;
+    const failH = (d.fail / catYMax) * plotH;
+    const yBase = mT + plotH;
+    const passY = yBase - passH;
+    const failY = passY - failH;
+    return `
+      <rect x="${x}" y="${passY}" width="${barW}" height="${Math.max(passH,0)}" fill="#10b981" rx="2"/>
+      <rect x="${x}" y="${failY}" width="${barW}" height="${Math.max(failH,0)}" fill="#ef4444" rx="2"/>
+      <text x="0" y="0" font-size="10" fill="#94a3b8" text-anchor="end" transform="translate(${xCenter},${yBase+12}) rotate(-30)">${cat.toUpperCase()}</text>`;
+  }).join('');
+  const catGrid = Array.from({length: catYMax+1}, (_,t) => {
+    const y = mT + plotH - (t/catYMax)*plotH;
+    return `<line x1="${mL}" y1="${y}" x2="${mL+plotW}" y2="${y}" stroke="#1e293b"/><text x="${mL-8}" y="${y+4}" font-size="10" fill="#64748b" text-anchor="end">${t}</text>`;
+  }).join('');
+  const worstCat = catEntries.length ? catEntries.reduce((a,b) => b[1].fail > a[1].fail ? b : a)[0] : null;
+  const catInsight = worstCat && cats[worstCat].fail > 0
+    ? `${worstCat} currently has the most failures (${cats[worstCat].fail}) — this is the module to prioritize first.`
+    : 'No module shows any failures — coverage is currently clean across the board.';
+ 
+  // Donut chart (pass / fail / skip) — SVG stroke-dasharray technique
+  const donutData = [
+    { l: 'Passed', v: pass, c: '#10b981' },
+    { l: 'Failed', v: fail, c: '#ef4444' },
+    { l: 'Skipped', v: skip, c: '#f59e0b' },
+  ];
+  const donutTotal = pass + fail + skip || 1;
+  const R = 70, CX = 100, CY = 100, STROKE = 26;
+  const CIRC = 2 * Math.PI * R;
+  let offsetAcc = 0;
+  const donutArcs = donutData.map(d => {
+    const frac = d.v / donutTotal;
+    const len = frac * CIRC;
+    const dash = `${len} ${CIRC - len}`;
+    const rotation = (offsetAcc / donutTotal) * 360 - 90;
+    offsetAcc += d.v;
+    return `<circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${d.c}" stroke-width="${STROKE}"
+      stroke-dasharray="${dash}" transform="rotate(${rotation} ${CX} ${CY})" stroke-linecap="butt"/>`;
+  }).join('');
+  const donutLegend = donutData.map(d => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="width:12px;height:12px;border-radius:3px;background:${d.c};flex-shrink:0"></span>
+      <span style="font-size:12px;color:#e2e8f0;font-weight:700">${d.l}</span>
+      <span style="font-size:12px;color:#64748b;margin-left:auto">${d.v} (${Math.round(d.v/donutTotal*100)}%)</span>
+    </div>`).join('');
+ 
+  const sectionCharts = `
+    ${secHdr('Functional Results by Module')}
+    ${secDesc('This chart compares passed and failed checks across each functional module, helping you quickly spot which area needs attention.')}
+    <div style="background:#0d1526;border:1px solid #1e293b;border-radius:12px;padding:20px 20px 10px;margin-bottom:8px">
+      <svg viewBox="0 0 ${chartW} ${chartH}" style="width:100%;height:auto">
+        ${catGrid}
+        <line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT+plotH}" stroke="#334155"/>
+        <line x1="${mL}" y1="${mT+plotH}" x2="${mL+plotW}" y2="${mT+plotH}" stroke="#334155"/>
+        ${catBars}
+        <rect x="${chartW-150}" y="4" width="10" height="10" fill="#10b981"/><text x="${chartW-135}" y="13" font-size="10" fill="#94a3b8">Passed</text>
+        <rect x="${chartW-75}" y="4" width="10" height="10" fill="#ef4444"/><text x="${chartW-60}" y="13" font-size="10" fill="#94a3b8">Failed</text>
+      </svg>
+    </div>
+    ${insightBox(catInsight, '#0EA5E9')}
+ 
+    ${secHdr('Functional Test Result Distribution')}
+    ${secDesc('Overall distribution of test outcomes across this functional run.')}
+    <div style="background:#0d1526;border:1px solid #1e293b;border-radius:12px;padding:20px;margin-bottom:8px;display:flex;align-items:center;gap:32px;flex-wrap:wrap">
+      <svg viewBox="0 0 200 200" style="width:180px;height:180px;flex-shrink:0">${donutArcs}</svg>
+      <div style="flex:1;min-width:180px">${donutLegend}</div>
+    </div>
+    ${insightBox(`Out of ${donutTotal} executed checks: ${pass} passed (${Math.round(pass/donutTotal*100)}%), ${fail} failed (${Math.round(fail/donutTotal*100)}%), and ${skip} skipped (${Math.round(skip/donutTotal*100)}%).`, '#0EA5E9')}`;
+ 
+  // ── 8. EXECUTION ENVIRONMENT ──────────────────────────────────────────────
+  const sectionEnv = `
+    ${secHdr('Execution Environment')}
+    ${secDesc('Application and framework details used to run this functional audit — for reproducibility of the results below.')}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${[
+        ['APPLICATION', appName, '#0EA5E9'],
+        ['ENVIRONMENT', environment, '#6366f1'],
+        ['FRAMEWORK', framework, '#f59e0b'],
+        ['TEST TYPE', 'Functional Testing', '#8b5cf6'],
+        ['TOTAL SCENARIOS', String(total), '#10b981'],
+        ['EXECUTION TIME', totalMs ? `${(totalMs/1000).toFixed(2)}s` : 'N/A', '#ec4899'],
+      ].map(([l,v,c]) => `
+        <div style="background:#0d1526;border:1px solid ${c};border-top:3px solid ${c};border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:${c};margin-bottom:6px">${l}</div>
+          <div style="font-size:12px;font-weight:800;color:#e2e8f0;word-break:break-all">${v}</div>
+        </div>`).join('')}
+    </div>`;
+ 
+  // ── 9. DETAILED FUNCTIONAL TEST RESULTS ───────────────────────────────────
   const detailRows = allTests.map((t, i) => {
     const sc = t.status==='pass'?'#10b981':t.status==='fail'?'#ef4444':'#f59e0b';
     const sl = t.status==='pass'?'✓ PASS':t.status==='fail'?'✗ FAIL':'■ SKIP';
     const sb = t.status==='pass'?'rgba(16,185,129,.06)':t.status==='fail'?'rgba(239,68,68,.06)':'rgba(245,158,11,.06)';
-    const action = getAction(t);
-    const selector = getSelector(t);
+    const mod = getModule(t);
+    const cc = MODULE_META[mod] || '#64748b';
+    const priority = (t.priority || 'medium').toLowerCase();
+    const pc = priority === 'high' ? '#ef4444' : priority === 'medium' ? '#f59e0b' : '#10b981';
     const reason = getReason(t);
-    const ac = ACTION_COLORS[action] || '#64748b';
-    const aiSev = t.ai_analysis?.severity || 'medium';
-    const sevC = aiSev === 'high' ? '#ef4444' : aiSev === 'medium' ? '#f59e0b' : '#10b981';
     return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
       <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
-      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${ac};font-weight:700;font-size:10px">${action.toUpperCase()}</span></td>
-      <td style="padding:9px 12px;font-size:10px;color:#818cf8;font-family:monospace">${selector.substring(0,30)}</td>
-      <td style="padding:9px 12px;text-align:center;background:${sb}"><span style="color:${sc};font-weight:800;font-size:11px">${sl}</span></td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${sevC};font-weight:700;font-size:10px">${aiSev.toUpperCase()}</span></td>
-      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${reason.substring(0,65)}</td>
-      <td style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b;font-weight:700">${t.duration||'—'}</td>
-    </tr>`;
-  }).join('');
-
-  //4. LLAMA ANALYSIS TABLE 
-  const llamaRows = allTests.map((t, i) => {
-    const ai = t.ai_analysis || {};
-    const sc = t.status==='pass'?'#10b981':'#ef4444';
-    const sl = t.status==='pass'?'✓ PASS':'✗ FAIL';
-    const sev = ai.severity || 'medium';
-    const sevc = sev==='high'?'#ef4444':sev==='medium'?'#f59e0b':'#10b981';
-    const bg = sev==='high'?'rgba(239,68,68,.04)':sev==='medium'?'rgba(245,158,11,.04)':'rgba(16,185,129,.04)';
-    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
-      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
       <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:12px">${t.name}</td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${sc};font-weight:800;font-size:10px">${sl}</span></td>
-      <td style="padding:9px 12px;font-size:11px;color:#475569">${(ai.root_cause||'—').substring(0,65)}</td>
-      <td style="padding:9px 12px;font-size:11px;color:#4f46e5">${(ai.fix||'—').substring(0,65)}</td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${sevc};font-weight:700;font-size:10px">${sev.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${mod.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${priority.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center;background:${sb}"><span style="color:${sc};font-weight:800;font-size:11px">${sl}</span></td>
+      <td style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b">${t.duration||'—'}</td>
+      <td style="padding:9px 12px;font-size:10px;color:#94a3b8">${String(reason).substring(0,60)}</td>
     </tr>`;
   }).join('');
-
-  // 5. VERDICT SUMMARY
-  const PASS_MSG = {
-    navigation:     'Page loads correctly — routing and URL resolution confirmed',
-    form:           'Form interactions work — fill and input fields respond correctly',
-    action:         'Button/click actions execute — UI interactions are operational',
-    authentication: 'Auth flows validated — login success and failure handled correctly',
-    ui:             'UI elements visible — DOM renders correctly',
-  };
-  const FAIL_MSG = {
-    navigation:     'Critical: page failed to load or selector timed out',
-    form:           'Moderate: form fields unreachable or fill action failed',
-    action:         'Moderate: click target not found or action not triggered',
-    authentication: 'Critical: authentication flow broken',
-    ui:             'Minor: element not visible or not rendered in DOM',
-  };
-  const verdictRows = Object.entries(cats).map(([cat, d]) => {
-    const cc = CAT_COLORS2[cat] || '#64748b';
-    const vc = d.fail > 0 ? '#ef4444' : '#10b981';
-    const vt = d.fail > 0 ? 'FAIL' : 'PASS';
-    const bg = d.fail > 0 ? 'rgba(239,68,68,.06)' : 'rgba(16,185,129,.06)';
-    const interp = d.fail > 0 ? (FAIL_MSG[cat]||`Failure in ${cat}`) : (PASS_MSG[cat]||`${cat} operational`);
-    return `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
-      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
-      <td style="padding:10px 12px;text-align:center"><span style="font-size:9px;font-weight:800;padding:3px 10px;border-radius:12px;color:${vc};background:${vc}18;border:1px solid ${vc}44">${vt}</span></td>
-      <td style="padding:10px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
-      <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
-      <td style="padding:10px 12px;text-align:center;color:#f59e0b;font-weight:700">${d.skip}</td>
-      <td style="padding:10px 12px;font-size:11px;color:#94a3b8">${interp}</td>
+  const sectionDetailedResults = `
+    ${secHdr('Detailed Functional Test Results', '#0d9488')}
+    ${secDesc('Real results from Playwright execution against the live application. Every value comes directly from the test runner.')}
+    ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Case'},{l:'Module',align:'center'},{l:'Priority',align:'center'},{l:'Status',align:'center'},{l:'Execution Time',align:'center'},{l:'Result'}])}
+      <tbody>${detailRows}</tbody></table>`, '#0d9488')}`;
+ 
+  // ── 10. AI RECOMMENDATIONS ────────────────────────────────────────────────
+  const recRows = aiRecs.map(r => {
+    const pri = (r.priority || 'medium').toLowerCase();
+    const pc = pri === 'high' ? '#ef4444' : pri === 'medium' ? '#f59e0b' : '#10b981';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${pri.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#818cf8;font-weight:700">${(r.category||'').toUpperCase()}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#e2e8f0">${(r.issue||'').substring(0,65)}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${(r.fix||'').substring(0,75)}</td>
     </tr>`;
   }).join('');
-
-  const authFail = (cats['authentication']?.fail||0) > 0;
-  const navFail  = (cats['navigation']?.fail||0) > 0;
-  const vc   = authFail||navFail ? '#ef4444' : fail > 0 ? '#b45309' : '#059669';
-  const vb   = authFail||navFail ? 'rgba(239,68,68,.08)' : fail > 0 ? 'rgba(245,158,11,.08)' : 'rgba(16,185,129,.08)';
-  const vi   = authFail||navFail ? '🔴' : fail > 0 ? '🟡' : '🟢';
-  const vt_v = authFail||navFail
-    ? 'Functional validation FAILED — critical auth or navigation steps are broken.'
+  const sectionRecs = `
+    ${secHdr('AI Recommendations', '#4f46e5')}
+    ${secDesc('Recommendations generated only for issues detected on this application.')}
+    ${aiRecs.length > 0
+      ? tblWrap(`${tblHdr([{l:'Priority',align:'center'},{l:'Category'},{l:'Issue'},{l:'Recommended Fix'}])}<tbody>${recRows}</tbody></table>`, '#4f46e5')
+      : `<div style="color:#64748b;font-size:12px;padding:16px">No issues detected on this application — no recommendations needed for this run.</div>`}`;
+ 
+  // ── 11. AI INSIGHTS — Functional / Failed / Stability Analysis ────────────
+  const related = (modName) => allTests.filter(t => getModule(t) === modName);
+  const narrative = (title, modName, color) => {
+    const r = related(modName);
+    if (!r.length) return '';
+    const failN = r.filter(t => t.status === 'fail').length;
+    const text = failN === 0
+      ? `All ${r.length} check(s) passed for ${title.split(' Analysis')[0].toLowerCase()} — fully operational, no issues detected.`
+      : `${failN} of ${r.length} check(s) failed: ${r.filter(t=>t.status==='fail').map(t=>t.name).slice(0,3).join(', ')}. Investigate before further testing.`;
+    return `<div style="font-size:13px;font-weight:700;color:${color};margin:14px 0 6px">${title}</div>${insightBox(text, color, 'Summary')}`;
+  };
+ 
+  const failedTests = allTests.filter(t => t.status === 'fail');
+  const failedAnalysisText = failedTests.length === 0
+    ? 'No functional failures were detected in this run — every tested workflow completed successfully.'
+    : `${failedTests.length} functionality/functionalities failed: ${failedTests.map(t=>t.name).slice(0,5).join(', ')}${failedTests.length > 5 ? '…' : ''}. These should be triaged before the next release.`;
+ 
+  const stabilityText = critical_fail
+    ? `Application stability is at risk — critical workflows (${[...new Set(allTests.filter(isCriticalFunctionalFail).map(getModule))].join(', ')}) show failures that affect core user journeys.`
     : fail > 0
-    ? `Functional validation passed with ${fail} non-critical step(s) failing. Core flows are operational.`
-    : `All ${pass} functional steps passed (${rate}%). Fill, click, navigate, and auth flows are fully operational.`;
-
-  // ── 6. AI RECOMMENDATIONS ──
-  const slow = allTests.filter(t => { try { return parseInt((t.duration||'0').replace('ms','')) > 10000; } catch { return false; } });
-  const failed = allTests.filter(t => t.status === 'fail');
-  const recsHtml = `
-    <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#f59e0b">⚡ Interaction Quality</div>
-    ${slow.length > 0
-      ? slow.slice(0,3).map(t => `<div style="background:#0d1526;border-left:3px solid #f59e0b;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05)">• "${t.name}" took ${t.duration} — add explicit Playwright wait.</div>`).join('')
-      : '<div style="background:#0d1526;border-left:3px solid #f59e0b;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8">• All interactions completed within acceptable time range.</div>'
-    }
-    <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 14px;margin:10px 0 4px;font-weight:700;color:#818cf8">🔧 Reliability</div>
-    <div style="background:#0d1526;border-left:3px solid #818cf8;padding:8px 14px 8px 16px;margin-bottom:2px;font-size:12px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05)">
-      ${failed.length > 0
-        ? `• Fix "${failed[0]?.name}" — ${getReason(failed[0]).substring(0,75)}`
-        : '• No interaction failures — all selectors resolved correctly.'}
-    </div>
-    <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 14px;margin:10px 0 4px;font-weight:700;color:#10b981">👤 Auth & UX Flows</div>
-    <div style="background:#0d1526;border-left:3px solid #10b981;padding:8px 14px 8px 16px;font-size:12px;color:#94a3b8">
-      ${(cats['authentication']?.pass||0) > 0
-        ? '• Auth flow validated — login success and failure paths both tested.'
-        : (cats['authentication']?.fail||0) > 0
-        ? '• Auth failure detected — check token injection and credentials.'
-        : '• No auth tests found — consider adding auth_success / auth_fail steps.'}
+    ? `Application is mostly stable — ${fail} non-critical issue(s) were detected, but core workflows remain functional.`
+    : `Application is stable — all functional checks passed with no regressions detected in this run.`;
+ 
+  const sectionFocused = `
+    ${secHdr('Functional Analysis', '#4f46e5')}
+    ${narrative('Authentication Analysis', 'Authentication', '#6366f1')}
+    ${narrative('Dashboard Analysis', 'Dashboard', '#0ea5e9')}
+    ${narrative('Project Management Analysis', 'Project Management', '#10b981')}
+    ${narrative('Test Generation Analysis', 'Test Generation', '#f59e0b')}
+    ${narrative('Test Execution Analysis', 'Test Execution', '#8b5cf6')}
+    ${narrative('Reports Analysis', 'Reports', '#ec4899')}
+    ${narrative('User Management Analysis', 'User Management', '#14b8a6')}
+    ${narrative('Settings Analysis', 'Settings', '#64748b')}
+ 
+    ${secHdr('Failed Functionalities Analysis', '#ef4444')}
+    ${insightBox(failedAnalysisText, '#ef4444', 'Summary')}
+ 
+    ${secHdr('Stability Analysis', '#0EA5E9')}
+    ${insightBox(stabilityText, '#0EA5E9', 'Summary')}`;
+ 
+  const actionRows = aiActionPlan.map((item, i) => {
+if (typeof item === 'string') item = { priority:'medium', category:'General', action:item, impact:null, status:'To Do' };
+    const pri = (item.priority || 'medium').toLowerCase();
+    const pc = pri === 'high' ? '#ef4444' : pri === 'medium' ? '#f59e0b' : '#10b981';
+    const categoryDisp = item.category || 'General';
+    const impactVal = item.impact || item.expected_impact || `Resolves this ${categoryDisp.toLowerCase()} issue and improves overall functional stability`;
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${pri.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center;font-size:11px;color:#818cf8;font-weight:700">${categoryDisp.toUpperCase()}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#e2e8f0">${item.action||''}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${impactVal}</td>
+      <td style="padding:9px 12px;text-align:center;font-size:10px;color:#64748b">⏳ ${item.status || 'To Do'}</td>
+    </tr>`;
+  }).join('');
+  const sectionActionPlan = aiActionPlan.length ? `
+    ${secHdr('AI Action Plan', '#c9a227')}
+    ${tblWrap(`${tblHdr([{l:'Priority',align:'center'},{l:'Category',align:'center'},{l:'Action'},{l:'Expected Impact'},{l:'Status',align:'center'}])}
+      <tbody>${actionRows}</tbody></table>`, '#c9a227')}` : '';
+ 
+  // ── 12. REPORT CONCLUSION — Final Verdict ─────────────────────────────────
+  const vc = critical_fail ? '#ef4444' : fail > 0 ? '#b45309' : '#059669';
+  const vb = critical_fail ? 'rgba(239,68,68,.08)' : fail > 0 ? 'rgba(245,158,11,.08)' : 'rgba(16,185,129,.08)';
+  const vi = critical_fail ? '🔴' : fail > 0 ? '🟡' : '🟢';
+  const vt = critical_fail
+    ? `Internal Functional Test FAILED — critical checks did not pass on ${appName}. Authentication or Project Management workflow issues were detected. This application is NOT ready for further testing until resolved.`
+    : fail > 0
+    ? `Internal Functional Test passed with ${fail} non-critical issue(s) on ${appName}. Core workflows are accessible and stable, but the failing checks should be reviewed before proceeding to deeper testing.`
+    : `Internal Functional Test PASSED — all ${pass} check(s) succeeded on ${appName}. This application is stable and ready for deeper regression testing.`;
+ 
+  const sectionVerdict = `
+    ${secHdr('Report Conclusion', ACCENT)}
+    <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:18px 22px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:8px">${vi} Final Functional Verdict</div>
+      <p style="font-size:13px;color:${vc};margin:0 0 12px;line-height:1.6">${vt}</p>
+      <div style="font-size:12px">
+        <span style="color:#64748b;font-weight:700">Functional Health Score: </span><span style="color:${vc};font-weight:700">${score}/100</span>
+        <span style="color:#475569;margin:0 10px">|</span>
+        <span style="color:#64748b;font-weight:700">Risk Level: </span><span style="color:${vc};font-weight:700">${riskLevel}</span>
+        <span style="color:#475569;margin:0 10px">|</span>
+        <span style="color:#64748b;font-weight:700">Deployment Readiness: </span><span style="color:${vc};font-weight:700">${scoreLabel}</span>
+      </div>
     </div>`;
-
-  //HTML
+ 
+  // ── 13. CERTIFICATE ───────────────────────────────────────────────────────
+  const sectionCert = `
+    ${secHdr('Certificate of Internal Functional Validation', ACCENT)}
+    ${secDesc('Official validation summary confirming the outcome of this functional test run — issued automatically by NexTest AI.')}
+    <div style="background:#0d1526;border:1px solid #1e293b;border-radius:14px;overflow:hidden;margin-bottom:20px">
+      <div style="height:4px;background:${scoreColor}"></div>
+      <div style="padding:24px;text-align:center">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;margin-bottom:8px">CERTIFICATE OF INTERNAL FUNCTIONAL VALIDATION</div>
+        <div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:10px">${appName}</div>
+        <div style="font-size:38px;font-weight:800;color:${scoreColor};margin-bottom:10px">${score}<span style="font-size:16px;color:#475569">/100</span></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px">
+          <span style="background:${scoreColor};color:#fff;font-weight:700;font-size:12px;padding:5px 16px;border-radius:20px">GRADE ${grade}</span>
+          <span style="border:1px solid ${scoreColor};color:${scoreColor};font-weight:700;font-size:12px;padding:5px 16px;border-radius:20px">${scoreLabel.toUpperCase()}</span>
+        </div>
+      </div>
+      <div style="background:#080f1e;border-top:1px solid #1e293b;padding:10px;text-align:center;font-size:10px;color:#64748b">
+        Validated by <b style="color:#94a3b8">NexTest AI</b> · ${dateStr}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #1e293b;border-radius:10px;overflow:hidden;margin-bottom:24px">
+      ${[
+        ['Validation Date', `${dateStr} ${timeStr}`, '#0EA5E9'],
+        ['Framework', framework, '#0EA5E9'],
+        ['Environment', environment, '#6366f1'],
+        ['Application', appName, '#6366f1'],
+        ['Execution Time', totalMs ? `${(totalMs/1000).toFixed(2)}s` : 'N/A', '#8b5cf6'],
+        ['Avg Test Duration', avgMs ? `${avgMs.toFixed(0)}ms` : 'N/A', '#8b5cf6'],
+        ['Overall Grade', grade, '#10b981'],
+        ['AI Validation Status', 'Verified by NexTest AI', '#10b981'],
+      ].map(([l,v,c]) => `
+        <div style="background:#0d1526;border-left:3px solid ${c};padding:12px 16px;border-bottom:1px solid #1e293b">
+          <div style="font-size:9px;font-weight:700;color:${c};margin-bottom:3px">${l}</div>
+          <div style="font-size:12px;color:#e2e8f0">${v}</div>
+        </div>`).join('')}
+    </div>`;
+ 
+  // ── FULL HTML DOCUMENT ─────────────────────────────────────────────────
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>NexTest Functional Report #${genId}</title>
+<title>NexTest Internal Functional Test Report #${genId}</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:#070e1c;color:#e2e8f0;font-family:'DM Sans',sans-serif;min-height:100vh}
   .page{max-width:1100px;margin:0 auto;padding:48px 32px 80px}
   table{width:100%;border-collapse:collapse}
+  th,td{vertical-align:top}
   @media print{body{background:#fff;color:#000}.no-print{display:none}.page{padding:10mm}@page{margin:15mm;size:A4}}
 </style>
 </head>
 <body>
 <div class="page">
-
-  <!-- HEADER -->
-  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#0a0f2e 50%,#0a0f1e 100%);border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
-    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,#6366f1,transparent)"></div>
-    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#6366f1"></div>
+ 
+  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#0f0f2e 50%,#0a0f1e 100%);
+    border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,${ACCENT},transparent)"></div>
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:${ACCENT}"></div>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
       <div>
-        <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px"><span style="color:#6366f1">NEX</span>TEST</div>
-        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">Functional Test Report</div>
+        <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px">
+          <span style="color:${ACCENT}">NEX</span>TEST
+        </div>
+        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">Internal Functional Test Report</div>
         <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${timeStr}</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px">
       ${[
-        {l:'URL',      v:`<span style="color:#a5b4fc;font-size:11px;word-break:break-all">${url}</span>`},
-        {l:'Framework',v:`<span style="color:#E2574C;font-weight:700">${framework}</span>`},
-        {l:'Test Type',v:`<span style="color:#6366f1;font-weight:700">Functional · Playwright</span>`},
-        {l:'Steps',    v:`<span style="color:#fff">${total} steps · ${pass} passed · ${fail} failed</span>`},
+        {l:'Application', v:`<span style="color:#a5b4fc;font-size:11px;word-break:break-all">${appName}</span>`},
+        {l:'Environment', v:`<span style="color:${ACCENT};font-weight:700">${environment}</span>`},
+        {l:'Test Framework', v:`<span style="color:${ACCENT};font-weight:700">${framework}</span>`},
+        {l:'Test Type', v:`<span style="color:#fff">Functional Testing</span>`},
       ].map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
         <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
         <div style="font-size:12px">${r.v}</div>
       </div>`).join('')}
     </div>
   </div>
-
-  <!-- PRINT BUTTON -->
+ 
   <div class="no-print" style="margin-bottom:28px">
-    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,${ACCENT},#4f46e5);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
       🖨 Print / Save as PDF
     </button>
   </div>
-
-  <!-- STAT CARDS -->
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px">
+ 
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:8px">
     ${[
-      {icon:'✅',val:pass,      lbl:'PASSED',    c:'#10b981',bg:'rgba(16,185,129,.08)',bd:'rgba(16,185,129,.25)'},
-      {icon:'❌',val:fail,      lbl:'FAILED',    c:'#ef4444',bg:'rgba(239,68,68,.08)', bd:'rgba(239,68,68,.25)'},
-      {icon:'⏭️',val:skip,      lbl:'SKIPPED',   c:'#f59e0b',bg:'rgba(245,158,11,.08)',bd:'rgba(245,158,11,.25)'},
-      {icon:'🎯',val:`${rate}%`,lbl:'PASS RATE', c:rateColor,bg:`${rateColor}12`,     bd:`${rateColor}33`},
-      {icon:'🔢',val:total,     lbl:'TOTAL',     c:'#3b82f6',bg:'rgba(59,130,246,.08)',bd:'rgba(59,130,246,.25)'},
+      {icon:'✅',val:pass,lbl:'PASSED',c:'#10b981',bg:'rgba(16,185,129,.08)',bd:'rgba(16,185,129,.25)'},
+      {icon:'❌',val:fail,lbl:'FAILED',c:'#ef4444',bg:'rgba(239,68,68,.08)',bd:'rgba(239,68,68,.25)'},
+      {icon:'⏭️',val:skip,lbl:'SKIPPED',c:'#f59e0b',bg:'rgba(245,158,11,.08)',bd:'rgba(245,158,11,.25)'},
+      {icon:'🎯',val:`${passRate}%`,lbl:'PASS RATE',c:rateColor,bg:`${rateColor}12`,bd:`${rateColor}33`},
+      {icon:'🔢',val:total,lbl:'TOTAL',c:'#3b82f6',bg:'rgba(59,130,246,.08)',bd:'rgba(59,130,246,.25)'},
     ].map(s => `<div style="background:${s.bg};border:1px solid ${s.bd};border-radius:14px;padding:20px;text-align:center">
       <div style="font-size:20px;margin-bottom:8px">${s.icon}</div>
       <div style="font-size:36px;font-weight:700;color:${s.c};line-height:1;margin-bottom:4px">${s.val}</div>
       <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
     </div>`).join('')}
   </div>
-
-  ${secHdr('⚙️', 'Functional Test Scenarios', '#6366f1')}
-  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Scenario'},{l:'Action',align:'center'},{l:'Category',align:'center'},{l:'Priority',align:'center'},{l:'Expected Result'}])}
-    <tbody>${scenarioRows}</tbody></table>`)}
-
-  ${secHdr('📊', 'Results by Category', '#6366f1')}
-  ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Skipped',align:'center'},{l:'Pass Rate',align:'center'},{l:'Avg Duration',align:'center'},{l:'Status',align:'center'}])}
-    <tbody>${catRows}</tbody></table>`)}
-
-  ${secHdr('🧪', 'Detailed Functional Results', '#0d9488')}
-  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Action',align:'center'},{l:'Selector / Value'},{l:'Status',align:'center'},{l:'Severity',align:'center'},{l:'Reason / Evidence'},{l:'Duration',align:'center'}])}
-    <tbody>${detailRows}</tbody></table>`, '#0d9488')}
-
-  ${secHdr('🤖', 'LLaMA Analysis — Root Cause & Fix', '#4f46e5')}
-  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Status',align:'center'},{l:'Root Cause'},{l:'Fix / Action'},{l:'Severity',align:'center'}])}
-    <tbody>${llamaRows}</tbody></table>`, '#4f46e5')}
-
-  ${secHdr('🏁', 'Execution Verdict Summary', '#c9a227')}
-  ${tblWrap(`${tblHdr([{l:'Category'},{l:'Verdict',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Skipped',align:'center'},{l:'Interpretation'}])}
-    <tbody>${verdictRows}</tbody></table>`, '#c9a227')}
-  <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:16px 20px;display:flex;gap:12px;align-items:flex-start;margin-bottom:28px">
-    <span style="font-size:24px">${vi}</span>
-    <div>
-      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:6px">Overall Functional Verdict</div>
-      <p style="font-size:13px;color:${vc};margin:0;line-height:1.6">${vt_v}</p>
-    </div>
-  </div>
-
+  <p style="font-size:10px;color:#64748b;font-style:italic;margin-bottom:20px">
+    Pass Rate is the raw proportion of scenarios that succeeded on this application. The Functional Health Score
+    further below is severity-weighted — Authentication and Project Management checks count more.
+  </p>
+ 
+  ${sectionOverview}
+  ${sectionKeyMetrics}
+  ${sectionModules}
+  ${sectionScore}
+  ${sectionMethodology}
+  ${sectionCategorySummary}
+  ${sectionCharts}
+  ${sectionEnv}
+  ${sectionDetailedResults}
+  ${sectionRecs}
+  ${sectionFocused}
   ${sectionActionPlan}
-
-  ${secHdr('🤖', 'AI Recommendations', '#6366f1')}
-  ${recsHtml}
-
-  <!-- FINAL VERDICT WITH QUALITY SCORE -->
-  <div style="background:${vb};border:2px solid ${vc};border-radius:14px;padding:20px 22px;display:flex;gap:14px;align-items:flex-start;margin-top:8px">
-    <span style="font-size:28px">${vi}</span>
-    <div style="flex:1">
-      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:8px">Final AI Verdict</div>
-      <p style="font-size:13px;color:${vc};margin:0 0 12px;line-height:1.6">${vt_v}</p>
-      <div style="display:flex;gap:24px;flex-wrap:wrap">
-        <div>
-          <span style="font-size:11px;color:#64748b;font-weight:700">Quality Score </span>
-          <span style="font-size:20px;font-weight:700;color:${vc}">${quality}<span style="font-size:12px">/100</span></span>
-        </div>
-        <div>
-          <span style="font-size:11px;color:#64748b;font-weight:700">Risk Level </span>
-          <span style="font-size:13px;font-weight:800;color:${riskColor};padding:3px 12px;border-radius:12px;background:${riskColor}18;border:1px solid ${riskColor}44">${risk}</span>
-        </div>
-        <div>
-          <span style="font-size:11px;color:#64748b;font-weight:700">Pass Rate </span>
-          <span style="font-size:20px;font-weight:700;color:${rateColor}">${rate}%</span>
-        </div>
-      </div>
-    </div>
+  ${sectionVerdict}
+  ${sectionCert}
+ 
+  <div style="margin-top:48px;padding:20px 28px;background:rgba(99,102,241,.04);border-radius:12px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid rgba(99,102,241,.15)">
+    <div style="font-size:14px;font-weight:700;color:#64748b"><span style="color:${ACCENT}">NEX</span>TEST · Internal Functional Test Report</div>
+    <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${framework} · ${total} scenarios · ${passRate}% pass rate · Score: ${score}/100</div>
   </div>
-
-  <!-- FOOTER -->
-  <div style="margin-top:48px;padding:20px 28px;background:rgba(99,102,241,.04);border-radius:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid rgba(99,102,241,.15)">
-    <div style="font-size:14px;font-weight:700;color:#64748b"><span style="color:#6366f1">NEX</span>TEST · Functional Test Report</div>
-    <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${framework} · ${total} steps · ${rate}% pass rate · Quality: ${quality}/100</div>
-  </div>
-
+ 
 </div>
 </body>
 </html>`;
-
+ 
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = `functional_report_${genId}.html`;
   link.click();
   saveReportToStorage({
-    url,
+    url: appName,
     framework,
     testType: 'functional',
     passCount: pass,
@@ -8814,8 +9512,10 @@ Return ONLY valid JSON array, no markdown, no explanation.`;
     htmlContent: html,
     generationData: generation,
   });
-  setPdfLoading(false);
+  setDropdownOpen(false);
 };
+ 
+
 const downloadCsv_Functional = async () => {
   setDropdownOpen(false);
   setPdfLoading(true);
@@ -9029,6 +9729,8 @@ Return ONLY valid JSON array, no markdown.`;
 
   setPdfLoading(false);
 };
+
+
 const downloadXlsx_Smoke = async () => {
   setDropdownOpen(false);
   const genId = generation?.generation?.id;
@@ -9046,6 +9748,76 @@ const downloadXlsx_Smoke = async () => {
     alert('Excel export failed: ' + (err.response?.data?.error || err.message));
   }
 };
+
+const downloadXlsx_Api = async () => {
+  setDropdownOpen(false);
+  const genId = generation?.generation?.id;
+  if (!genId) return;
+
+  try {
+    const res = await api.get(`/generations/${genId}/xlsx`, { responseType: 'blob' });
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `api_report_${genId}.xlsx`;
+    link.click();
+  } catch (err) {
+    console.error('[XLSX API] download error', err);
+    alert('Excel export failed: ' + (err.response?.data?.error || err.message));
+  }
+};
+const downloadXlsx_Regression = async () => {
+  setDropdownOpen(false);
+  const genId = generation?.generation?.id;
+  if (!genId) return;
+
+  try {
+    const res = await api.get(`/generations/${genId}/xlsx`, { responseType: 'blob' });
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `regression_report_${genId}.xlsx`;
+    link.click();
+  } catch (err) {
+    console.error('[XLSX Regression] download error', err);
+    alert('Excel export failed: ' + (err.response?.data?.error || err.message));
+  }
+};
+const downloadXlsx_Functional = async () => {
+  setDropdownOpen(false);
+  const genId = generation?.generation?.id;
+  if (!genId) return;
+
+  try {
+    const res = await api.get(`/generations/${genId}/xlsx`, { responseType: 'blob' });
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `functional_report_${genId}.xlsx`;
+    link.click();
+  } catch (err) {
+    console.error('[XLSX Functional] download error', err);
+    alert('Excel export failed: ' + (err.response?.data?.error || err.message));
+  }
+};
+const downloadXlsx_Security = async () => {
+  setDropdownOpen(false);
+  const genId = generation?.generation?.id;
+  if (!genId) return;
+
+  try {
+    const res = await api.get(`/generations/${genId}/xlsx`, { responseType: 'blob' });
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `security_report_${genId}.xlsx`;
+    link.click();
+  } catch (err) {
+    console.error('[XLSX Security] download error', err);
+    alert('Excel export failed: ' + (err.response?.data?.error || err.message));
+  }
+};
+
 const downloadCsv_Seo = async () => {
   setDropdownOpen(false);
   const genId = generation?.generation?.id;
@@ -9063,6 +9835,8 @@ const downloadCsv_Seo = async () => {
     alert('Excel export failed: ' + (err.response?.data?.error || err.message));
   }
 };
+
+
 
 const downloadHtml_Seo = () => {
   try{
@@ -9513,6 +10287,656 @@ ${(() => {
     console.error('[SEO HTML ERROR]', err);
     alert('Error: ' + err.message);
   }
+};
+
+
+const downloadHtml_Api = () => {
+  const now     = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const genId   = generation?.generation?.id || 'nextest';
+  const allTests = tests;
+
+  const ACCENT = '#f97316';
+  const authMethod = generation?.generation?.auth_method || generation?.auth_method || generation?.result?.auth_method || 'JWT';
+  const apiVersion  = generation?.generation?.api_version || generation?.result?.api_version || 'N/A';
+  const baseUrl = url;
+
+  // ── Category classification (mirrors PDF _api_category_label) ───────────
+  const API_CATEGORY_META = {
+    'Authentication':  '#6366f1',
+    'CRUD Operations': '#10b981',
+    'Validation':      '#f59e0b',
+    'Response Codes':  '#3b82f6',
+    'Performance':     '#8b5cf6',
+    'Error Handling':  '#ef4444',
+  };
+  const API_CATEGORY_ORDER = Object.keys(API_CATEGORY_META);
+  const API_HIGH_CATEGORIES = new Set(['Authentication', 'Error Handling']);
+
+  const METHOD_COLORS = {
+    GET: '#10b981', POST: '#3b82f6', PUT: '#f59e0b', DELETE: '#ef4444', PATCH: '#8b5cf6',
+  };
+
+  const getMethod   = (t) => (t.method || 'GET').toUpperCase();
+  const getEndpoint = (t) => t.endpoint || t.path || t.url || '';
+
+  const getApiCategory = (t) => {
+    const cat  = (t.category || '').toLowerCase();
+    const name = (t.name || '').toLowerCase();
+    const method = getMethod(t);
+    const hay = `${cat} ${name}`;
+    for (const label of API_CATEGORY_ORDER) {
+      if (cat.includes(label.toLowerCase())) return label;
+    }
+    if (/auth|login|token|jwt|unauthorized|forbidden|permission|logout/.test(hay)) return 'Authentication';
+    const hs = parseInt(t.http_status);
+    if (!isNaN(hs) && hs >= 500) return 'Error Handling';
+    if (/error|exception|invalid_id|not_found|timeout|crash|fail_gracefully/.test(hay)) return 'Error Handling';
+    if (/valid|required|missing|format|schema|malformed|constraint/.test(hay)) return 'Validation';
+    if (/status code|http_status|response code|status_code/.test(hay)) return 'Response Codes';
+    if (/slow|latency|response time|performance|duration|throughput/.test(hay)) return 'Performance';
+    if (['POST','PUT','DELETE','PATCH'].includes(method) || /create|update|delete|crud|fetch|list|retrieve/.test(hay)) return 'CRUD Operations';
+    return 'Response Codes';
+  };
+
+  const statusClass = (code) => {
+    const c = parseInt(code);
+    if (isNaN(c)) return '—';
+    if (c >= 200 && c < 300) return '2xx';
+    if (c >= 300 && c < 400) return '3xx';
+    if (c >= 400 && c < 500) return '4xx';
+    if (c >= 500) return '5xx';
+    return '—';
+  };
+
+  const isCriticalApiFail = (t) => {
+    if (t.status !== 'fail') return false;
+    const pri = (t.priority || t.severity || '').toLowerCase();
+    if (['high','critical'].includes(pri)) return true;
+    if (API_HIGH_CATEGORIES.has(getApiCategory(t))) return true;
+    const hs = parseInt(t.http_status);
+    if (!isNaN(hs) && hs >= 500) return true;
+    return false;
+  };
+
+  const parseMs = (d) => {
+    if (!d) return 0;
+    const s = String(d);
+    if (s.endsWith('ms')) return parseFloat(s) || 0;
+    if (s.endsWith('s'))  return (parseFloat(s) || 0) * 1000;
+    return 0;
+  };
+  const totalMs = allTests.reduce((sum, t) => sum + parseMs(t.duration), 0);
+  const avgMs   = allTests.length ? totalMs / allTests.length : 0;
+
+  const pass  = allTests.filter(t => t.status === 'pass').length;
+  const fail  = allTests.filter(t => t.status === 'fail').length;
+  const skip  = allTests.filter(t => t.status !== 'pass' && t.status !== 'fail').length;
+  const total = allTests.length || 1;
+  const passRate = Math.round(pass / total * 100);
+  const rateColor = passRate >= 80 ? '#10b981' : passRate >= 50 ? '#f59e0b' : '#ef4444';
+
+  // ── API Health Score = raw pass rate (aligned with pass rate everywhere) ──
+  const score = passRate;
+  const scoreLabel = score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 50 ? 'Acceptable' : 'Critical';
+  const scoreColor = score >= 90 ? '#10b981' : score >= 75 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+  const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 50 ? 'C' : score >= 25 ? 'D' : 'F';
+
+  const critical_fail = allTests.some(isCriticalApiFail);
+  const overallStatus = critical_fail ? 'CRITICAL ISSUES' : fail > 0 ? 'PASSED W/ WARNINGS' : 'ALL CHECKS PASSED';
+  const statusColor   = critical_fail ? '#ef4444' : fail > 0 ? '#f59e0b' : '#10b981';
+  const riskLevel      = critical_fail ? 'HIGH' : fail > 0 ? 'MEDIUM' : 'LOW';
+  const deployText     = critical_fail ? 'NOT READY' : fail > 0 ? 'READY W/ CAUTION' : 'READY';
+  const statusExplain  = critical_fail
+    ? 'One or more critical checks failed on this API (authentication, or a 5xx server error). These block reliable use of the API — resolve before proceeding.'
+    : fail > 0
+    ? `Core API access is confirmed, but ${fail} secondary check(s) failed (e.g. a validation rule or CRUD endpoint). Review the failing checks below.`
+    : `Every request executed against ${baseUrl} passed, including authentication checks. This API is stable and ready for deeper functional testing.`;
+
+  const aiResult  = generation?.result?.ai || runResults?.ai || {};
+  const aiSummary = aiResult.summary || `This API test run executed ${total} request(s) against <b>${baseUrl}</b>, with ${pass} passed and ${fail} failed (${passRate}% pass rate). ${critical_fail ? 'Critical failures were detected on this API.' : 'No critical failures were detected on this API.'}`;
+  const aiRecs = aiResult.recommendations || [];
+  const aiActionPlan = aiResult.action_plan || [];
+
+  // ── Helpers ───────────────────────────────────────────────────────────
+  const secHdr = (title, color = ACCENT) => `
+    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;
+      padding-bottom:8px;border-bottom:2.5px solid ${color}">
+      <span style="font-size:20px;font-weight:700;color:#e2e8f0">${title}</span>
+    </div>`;
+  const secDesc = (text) => `<p style="font-size:11px;color:#94a3b8;font-style:italic;margin-bottom:14px;line-height:1.6">${text}</p>`;
+  const tblWrap = (inner, border = ACCENT) => `
+    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;
+      overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">${inner}</div>`;
+  const tblHdr = (cols) => `
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#040914">
+        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};
+          font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+          color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
+      </tr></thead>`;
+  const insightBox = (text, color, label = 'AI Analysis') => `
+    <div style="background:#0d1526;border:1px solid ${color}44;border-left:3px solid ${color};
+      border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11.5px;color:#94a3b8;line-height:1.6">
+      <b style="color:${color}">${label}: </b>${text}
+    </div>`;
+
+  // ── 1. OVERVIEW HERO ──────────────────────────────────────────────────
+  const heroStats = [
+    { l: 'OVERALL STATUS', v: overallStatus, c: statusColor },
+    { l: 'API HEALTH SCORE', v: `${score}/100`, c: scoreColor },
+    { l: 'RISK LEVEL', v: riskLevel, c: statusColor },
+    { l: 'DEPLOYMENT', v: deployText, c: statusColor },
+  ];
+  const sectionOverview = `
+    ${secHdr('API Test Summary')}
+    ${secDesc(statusExplain)}
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      ${heroStats.map(s => `
+        <div style="background:#0d1526;border:1px solid ${s.c};border-radius:12px;padding:16px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:#64748b;margin-bottom:6px">${s.l}</div>
+          <div style="font-size:15px;font-weight:800;color:${s.c}">${s.v}</div>
+        </div>`).join('')}
+    </div>
+    ${insightBox(aiSummary, '#818cf8', 'AI Summary')}`;
+
+  // ── 2. KEY METRICS ────────────────────────────────────────────────────
+  const criticalCount = allTests.filter(isCriticalApiFail).length;
+  const uniqueEndpoints = new Set(allTests.map(t => `${getMethod(t)} ${getEndpoint(t)}`)).size;
+  const keyMetrics = [
+    { l: 'TOTAL EXECUTION TIME', v: totalMs ? `${(totalMs/1000).toFixed(2)}s` : 'N/A', c: '#0EA5E9' },
+    { l: 'AVERAGE RESPONSE TIME', v: avgMs ? `${avgMs.toFixed(0)}ms` : 'N/A', c: '#10b981' },
+    { l: 'TOTAL ENDPOINTS TESTED', v: String(uniqueEndpoints), c: '#8b5cf6' },
+    { l: 'CRITICAL API CHECKS', v: String(criticalCount), c: '#ef4444' },
+    { l: 'TOTAL REQUESTS', v: String(total), c: '#f59e0b' },
+    { l: 'AVG REQUEST DURATION', v: avgMs ? `${avgMs.toFixed(0)}ms` : 'N/A', c: '#ec4899' },
+  ];
+  const sectionKeyMetrics = `
+    ${secHdr('Key Metrics')}
+    ${secDesc('Execution footprint for this API test run — timing, endpoint coverage, and where the critical checks are concentrated.')}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${keyMetrics.map(m => `
+        <div style="background:#0d1526;border:1px solid ${m.c};border-top:3px solid ${m.c};border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:${m.c};margin-bottom:6px">${m.l}</div>
+          <div style="font-size:14px;font-weight:800;color:#e2e8f0">${m.v}</div>
+        </div>`).join('')}
+    </div>`;
+
+  // ── 3. ENDPOINTS COVERED ──────────────────────────────────────────────
+  const seen = {};
+  allTests.forEach(t => {
+    const key = `${getMethod(t)}|${getEndpoint(t)}`;
+    if (!seen[key]) seen[key] = { method: getMethod(t), path: getEndpoint(t), pass: 0, fail: 0, skip: 0 };
+    seen[key][t.status === 'pass' || t.status === 'fail' ? t.status : 'skip']++;
+  });
+  const endpointsArr = Object.values(seen).sort((a,b) => a.path.localeCompare(b.path));
+  const endpointRows = endpointsArr.map((e, i) => {
+    const mc = METHOD_COLORS[e.method] || '#64748b';
+    const totalN = e.pass + e.fail + e.skip;
+    const verdict = e.fail === 0 ? 'PASS' : 'FAIL';
+    const vc = e.fail === 0 ? '#10b981' : '#ef4444';
+    const bg = e.fail === 0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${mc};font-weight:700;font-size:11px">${e.method}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#818cf8;font-family:monospace">${(e.path||'—').substring(0,70)}</td>
+      <td style="padding:9px 12px;text-align:center;color:#e2e8f0">${totalN}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${verdict}</span></td>
+    </tr>`;
+  }).join('');
+  const sectionEndpoints = endpointsArr.length ? `
+    ${secHdr('API Endpoints Covered')}
+    ${secDesc(`Unique endpoints exercised against <b>${baseUrl}</b> during this run — one row per distinct method + path combination.`)}
+    ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Method',align:'center'},{l:'Endpoint'},{l:'Checks',align:'center'},{l:'Status',align:'center'}])}
+      <tbody>${endpointRows}</tbody></table>`)}` : '';
+
+  // ── 4. API HEALTH SCORE GAUGE ─────────────────────────────────────────
+  const sectionScore = `
+    ${secHdr('API Health Score', scoreColor)}
+    <div style="display:flex;align-items:center;gap:24px;background:#0d1526;border:1.5px solid ${scoreColor};border-radius:14px;padding:24px;margin-bottom:16px">
+      <div style="width:110px;height:110px;border-radius:50%;background:conic-gradient(${scoreColor} ${score*3.6}deg, #1e293b 0deg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <div style="width:82px;height:82px;border-radius:50%;background:#0d1526;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:24px;font-weight:800;color:${scoreColor}">${score}</span>
+          <span style="font-size:10px;color:#64748b">/ 100</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:17px;font-weight:800;color:${scoreColor};margin-bottom:8px">${scoreLabel}</div>
+        <p style="font-size:12px;color:#94a3b8;line-height:1.6;margin:0">
+          The API Health Score weighs critical checks (authentication, server errors) three times as heavily as
+          secondary checks (validation, CRUD, minor response code mismatches). Excellent ≥ 90 · Good ≥ 75 ·
+          Acceptable ≥ 50 · Critical below.
+        </p>
+      </div>
+    </div>`;
+
+  // ── 5. METHODOLOGY + SCENARIOS ────────────────────────────────────────
+  const scenarioRows = allTests.map((t, i) => {
+    const cat = getApiCategory(t);
+    const cc = API_CATEGORY_META[cat] || '#64748b';
+    const priority = (t.priority || 'medium').toLowerCase();
+    const pc = priority === 'high' ? '#ef4444' : priority === 'medium' ? '#f59e0b' : '#10b981';
+    const method = getMethod(t);
+    const mc = METHOD_COLORS[method] || '#64748b';
+    const expected = t.suite || t.expected || t.description || `Returns HTTP ${t.expected_status || 200}`;
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${mc};font-weight:700;font-size:10px">${method}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${cat.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${priority.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${String(expected).substring(0,65)}</td>
+    </tr>`;
+  }).join('');
+  const sectionMethodology = `
+    ${secHdr('API Test Methodology')}
+    <p style="font-size:12px;color:#94a3b8;line-height:1.7;margin-bottom:16px">
+      This report validates the reliability of the REST API at <b style="color:#e2e8f0">${baseUrl}</b>, accessed via
+      ${authMethod}, before deeper functional or regression testing proceeds. NexTest validates: HTTP status codes,
+      authentication, authorization, response body content, response time, JSON schema conformance, error handling,
+      and CRUD operations. Only the endpoints actually exercised in this run are analyzed.
+    </p>
+    ${secHdr('API Test Scenarios')}
+    ${secDesc(`Planned checks for <b>${baseUrl}</b> — ${total} scenario(s), scoped to the endpoints actually exercised in this run.`)}
+    ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Scenario'},{l:'Method',align:'center'},{l:'Category',align:'center'},{l:'Priority',align:'center'},{l:'Expected'}])}
+      <tbody>${scenarioRows}</tbody></table>`)}`;
+
+  // ── 6. CATEGORY SUMMARY ───────────────────────────────────────────────
+  const cats = {};
+  allTests.forEach(t => {
+    const c = getApiCategory(t);
+    if (!cats[c]) cats[c] = { pass: 0, fail: 0, total: 0 };
+    cats[c].total++;
+    if (t.status === 'pass') cats[c].pass++; else if (t.status === 'fail') cats[c].fail++;
+  });
+  const catRows = API_CATEGORY_ORDER.filter(c => cats[c]?.total > 0).map(cat => {
+    const d = cats[cat];
+    const cc = API_CATEGORY_META[cat];
+    const r = Math.round(d.pass / d.total * 100);
+    const rc = r === 100 ? '#10b981' : r >= 60 ? '#f59e0b' : '#ef4444';
+    const vc = d.fail === 0 ? '#10b981' : '#ef4444';
+    const bg = d.fail === 0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
+    return `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat}</td>
+      <td style="padding:10px 12px;text-align:center;color:#e2e8f0;font-weight:700">${d.total}</td>
+      <td style="padding:10px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
+      <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
+      <td style="padding:10px 12px;text-align:center;color:${rc};font-weight:700">${r}%</td>
+      <td style="padding:10px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${d.fail===0?'✅ PASS':'❌ FAIL'}</span></td>
+    </tr>`;
+  }).join('');
+  const sectionCategorySummary = catRows ? `
+    ${secHdr('Results by Category')}
+    ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Pass Rate',align:'center'},{l:'Verdict',align:'center'}])}
+      <tbody>${catRows}</tbody></table>`)}` : '';
+
+  // ── 7. CHARTS (SVG) ────────────────────────────────────────────────────
+  const catEntries = API_CATEGORY_ORDER.filter(c => cats[c]?.total > 0).map(c => [c, cats[c]]);
+  const catYMax = Math.max(...catEntries.map(([,d]) => d.total), 1);
+  const chartW = 760, chartH = 300, mL = 44, mB = 90, mT = 24, mR = 24;
+  const plotW = chartW - mL - mR, plotH = chartH - mT - mB;
+  const barSlot = plotW / (catEntries.length || 1);
+  const barW = Math.min(46, barSlot * 0.5);
+  const catBars = catEntries.map(([cat, d], i) => {
+    const xCenter = mL + barSlot * i + barSlot / 2;
+    const x = xCenter - barW / 2;
+    const passH = (d.pass / catYMax) * plotH;
+    const failH = (d.fail / catYMax) * plotH;
+    const yBase = mT + plotH;
+    const passY = yBase - passH;
+    const failY = passY - failH;
+    return `
+      <rect x="${x}" y="${passY}" width="${barW}" height="${Math.max(passH,0)}" fill="#10b981" rx="2"/>
+      <rect x="${x}" y="${failY}" width="${barW}" height="${Math.max(failH,0)}" fill="#ef4444" rx="2"/>
+      <text x="0" y="0" font-size="10" fill="#94a3b8" text-anchor="end" transform="translate(${xCenter},${yBase+12}) rotate(-30)">${cat.toUpperCase()}</text>`;
+  }).join('');
+  const catGrid = Array.from({length: catYMax+1}, (_,t) => {
+    const y = mT + plotH - (t/catYMax)*plotH;
+    return `<line x1="${mL}" y1="${y}" x2="${mL+plotW}" y2="${y}" stroke="#1e293b"/><text x="${mL-8}" y="${y+4}" font-size="10" fill="#64748b" text-anchor="end">${t}</text>`;
+  }).join('');
+  const worstCat = catEntries.length ? catEntries.reduce((a,b) => b[1].fail > a[1].fail ? b : a)[0] : null;
+  const catInsight = worstCat && cats[worstCat].fail > 0
+    ? `${worstCat} currently has the most failures (${cats[worstCat].fail}) — this is the area to prioritize first on this API.`
+    : 'No category shows any failures — coverage on this API is currently clean.';
+
+  const counts = { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 };
+  allTests.forEach(t => { const c = statusClass(t.http_status); if (counts[c] !== undefined) counts[c]++; });
+  const distTotal = Object.values(counts).reduce((a,b)=>a+b,0) || 1;
+  const distColors = { '2xx':'#10b981', '3xx':'#3b82f6', '4xx':'#f59e0b', '5xx':'#ef4444' };
+  const distMax = Math.max(...Object.values(counts), 1);
+  const distBars = Object.entries(counts).map(([l,v],i) => {
+    const y = 20 + i * 45;
+    const w = (v / distMax) * 500;
+    return `
+      <rect x="90" y="${y}" width="${w}" height="26" fill="${distColors[l]}" rx="4"/>
+      <text x="80" y="${y+18}" font-size="12" fill="#94a3b8" text-anchor="end" font-weight="700">${l}</text>
+      <text x="${100+w}" y="${y+18}" font-size="12" fill="#e2e8f0" font-weight="700">${v} (${Math.round(v/distTotal*100)}%)</text>`;
+  }).join('');
+  const distInsight = counts['5xx'] > 0
+    ? `${counts['5xx']} request(s) returned a 5xx server error — these indicate backend failures and should be prioritized immediately.`
+    : counts['4xx'] > 0
+    ? `${counts['4xx']} request(s) returned a 4xx client error out of ${distTotal} total — review authentication, validation, or resource IDs used in these requests.`
+    : `All ${distTotal} request(s) returned 2xx/3xx status codes — no client or server errors were detected on this API.`;
+
+  const sectionCharts = `
+    ${secHdr('API Category Breakdown')}
+    ${secDesc('This chart compares passed and failed requests across each API category, helping you quickly spot which area needs attention.')}
+    <div style="background:#0d1526;border:1px solid #1e293b;border-radius:12px;padding:20px 20px 10px;margin-bottom:8px">
+      <svg viewBox="0 0 ${chartW} ${chartH}" style="width:100%;height:auto">
+        ${catGrid}
+        <line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT+plotH}" stroke="#334155"/>
+        <line x1="${mL}" y1="${mT+plotH}" x2="${mL+plotW}" y2="${mT+plotH}" stroke="#334155"/>
+        ${catBars}
+        <rect x="${chartW-150}" y="4" width="10" height="10" fill="#10b981"/><text x="${chartW-135}" y="13" font-size="10" fill="#94a3b8">Passed</text>
+        <rect x="${chartW-75}" y="4" width="10" height="10" fill="#ef4444"/><text x="${chartW-60}" y="13" font-size="10" fill="#94a3b8">Failed</text>
+      </svg>
+    </div>
+    ${insightBox(catInsight, '#0EA5E9')}
+
+    ${secHdr('HTTP Status Code Distribution')}
+    ${secDesc('Breakdown of returned HTTP status classes across all executed requests.')}
+    <div style="background:#0d1526;border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:8px">
+      <svg viewBox="0 0 760 210" style="width:100%;height:auto">${distBars}</svg>
+    </div>
+    ${insightBox(distInsight, '#0EA5E9')}`;
+
+  // ── 8. ENVIRONMENT INFO ───────────────────────────────────────────────
+  const sectionEnv = `
+    ${secHdr('Execution Environment')}
+    ${secDesc('Framework and authentication method used to run this API audit — for reproducibility of the results below.')}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${[
+        ['FRAMEWORK', framework, '#0EA5E9'],
+        ['AUTHENTICATION METHOD', authMethod, '#6366f1'],
+        ['BASE URL', baseUrl, '#f59e0b'],
+        ['API VERSION', apiVersion, '#8b5cf6'],
+        ['TOTAL REQUESTS', String(total), '#10b981'],
+        ['EXECUTION TIME', totalMs ? `${(totalMs/1000).toFixed(2)}s` : 'N/A', '#ec4899'],
+      ].map(([l,v,c]) => `
+        <div style="background:#0d1526;border:1px solid ${c};border-top:3px solid ${c};border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:${c};margin-bottom:6px">${l}</div>
+          <div style="font-size:12px;font-weight:800;color:#e2e8f0;word-break:break-all">${v}</div>
+        </div>`).join('')}
+    </div>`;
+
+  // ── 9. DETAILED RESULTS ───────────────────────────────────────────────
+  const detailRows = allTests.map((t, i) => {
+    const sc = t.status==='pass'?'#10b981':t.status==='fail'?'#ef4444':'#f59e0b';
+    const sl = t.status==='pass'?'✓ PASS':t.status==='fail'?'✗ FAIL':'■ SKIP';
+    const sb = t.status==='pass'?'rgba(16,185,129,.06)':t.status==='fail'?'rgba(239,68,68,.06)':'rgba(245,158,11,.06)';
+    const cat = getApiCategory(t);
+    const cc = API_CATEGORY_META[cat] || '#64748b';
+    const method = getMethod(t);
+    const mc = METHOD_COLORS[method] || '#64748b';
+    const endpoint = getEndpoint(t);
+    const httpDisp = `${t.http_status ?? '—'}` + (t.expected_status && t.http_status !== t.expected_status ? ` / ${t.expected_status}` : '');
+    const reason = t.suite || '—';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
+      <td style="padding:9px 12px">
+        <div style="font-weight:700;color:#e2e8f0;font-size:12px">${(t.name||'').substring(0,32)}</div>
+        <div style="font-size:10px;color:#818cf8;font-family:monospace">${(endpoint||'').substring(0,38)}</div>
+      </td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${mc};font-weight:700;font-size:10px">${method}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:9px">${cat.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center;background:${sb}"><span style="color:${sc};font-weight:800;font-size:11px">${sl}</span></td>
+      <td style="padding:9px 12px;text-align:center;font-size:11px;color:#e2e8f0">${httpDisp}</td>
+      <td style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b">${t.duration||'—'}</td>
+      <td style="padding:9px 12px;font-size:10px;color:#94a3b8">${String(reason).substring(0,60)}</td>
+    </tr>`;
+  }).join('');
+  const sectionDetailedResults = `
+    ${secHdr('Detailed API Test Results', '#0d9488')}
+    ${secDesc('Real results from API execution. Every value comes directly from the test runner.')}
+    ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Endpoint'},{l:'Method',align:'center'},{l:'Category',align:'center'},{l:'Status',align:'center'},{l:'HTTP',align:'center'},{l:'Time',align:'center'},{l:'Result'}])}
+      <tbody>${detailRows}</tbody></table>`, '#0d9488')}`;
+
+  // ── 10. AI RECOMMENDATIONS ────────────────────────────────────────────
+  const recRows = aiRecs.map(r => {
+    const pri = (r.priority || 'medium').toLowerCase();
+    const pc = pri === 'high' ? '#ef4444' : pri === 'medium' ? '#f59e0b' : '#10b981';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${pri.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#818cf8;font-weight:700">${(r.category||'').toUpperCase()}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#e2e8f0">${(r.issue||'').substring(0,65)}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${(r.fix||'').substring(0,75)}</td>
+    </tr>`;
+  }).join('');
+  const sectionRecs = `
+    ${secHdr('AI Recommendations', '#4f46e5')}
+    ${secDesc('Recommendations generated only for issues detected on this API.')}
+    ${aiRecs.length > 0
+      ? tblWrap(`${tblHdr([{l:'Priority',align:'center'},{l:'Category'},{l:'Issue'},{l:'Recommended Fix'}])}<tbody>${recRows}</tbody></table>`, '#4f46e5')
+      : `<div style="color:#64748b;font-size:12px;padding:16px">No issues detected on this API — no recommendations needed for this run.</div>`}`;
+
+  // ── 11. FOCUSED AI ANALYSIS ───────────────────────────────────────────
+  const related = (catName) => allTests.filter(t => getApiCategory(t) === catName);
+  const narrative = (title, catName, color) => {
+    const r = related(catName);
+    if (!r.length) return '';
+    const failN = r.filter(t => t.status === 'fail').length;
+    const text = failN === 0
+      ? `All ${r.length} check(s) passed for ${title.split(' Analysis')[0].toLowerCase()} on this API — fully operational, no issues detected.`
+      : `${failN} of ${r.length} check(s) failed: ${r.filter(t=>t.status==='fail').map(t=>t.name).slice(0,3).join(', ')}. Investigate before further testing.`;
+    return `<div style="font-size:13px;font-weight:700;color:${color};margin:14px 0 6px">${title}</div>${insightBox(text, color, 'Summary')}`;
+  };
+  const criticalTests = allTests.filter(t => API_HIGH_CATEGORIES.has(getApiCategory(t)));
+  let reliabilityBlock = '';
+  if (criticalTests.length) {
+    const failN = criticalTests.filter(t => t.status === 'fail').length;
+    const text = failN === 0
+      ? `All ${criticalTests.length} critical check(s) passed on ${baseUrl} — the API responds reliably and authentication holds.`
+      : `${failN} of ${criticalTests.length} critical check(s) failed on ${baseUrl} — this affects the core reliability of the API and should be prioritized.`;
+    reliabilityBlock = `<div style="font-size:13px;font-weight:700;color:#0EA5E9;margin:14px 0 6px">API Reliability</div>${insightBox(text, '#0EA5E9', 'Summary')}`;
+  }
+  const depText = critical_fail
+    ? 'This API is NOT ready for further testing — critical checks (auth, server errors) failed.'
+    : fail > 0
+    ? `This API is ready with caution — ${fail} secondary check(s) failed. Review before proceeding.`
+    : 'This API is ready — all checks passed, stable for the next testing phase.';
+  const depColor = critical_fail ? '#ef4444' : fail > 0 ? '#f59e0b' : '#10b981';
+
+  const sectionFocused = `
+    ${secHdr('Focused AI Analysis', '#4f46e5')}
+    ${reliabilityBlock}
+    ${narrative('Authentication Analysis', 'Authentication', '#6366f1')}
+    ${narrative('Validation Analysis', 'Validation', '#f59e0b')}
+    ${narrative('CRUD Analysis', 'CRUD Operations', '#10b981')}
+    ${narrative('Error Handling Analysis', 'Error Handling', '#ef4444')}
+    ${narrative('Performance Analysis', 'Performance', '#8b5cf6')}
+    <div style="font-size:13px;font-weight:700;color:${depColor};margin:14px 0 6px">Deployment Readiness</div>
+    ${insightBox(depText, depColor, 'Summary')}`;
+
+  const actionRows = aiActionPlan.map((item, i) => {
+    if (typeof item === 'string') item = { priority:'medium', category:'General', action:item, impact:'—', status:'To Do' };
+    const pri = (item.priority || 'medium').toLowerCase();
+    const pc = pri === 'high' ? '#ef4444' : pri === 'medium' ? '#f59e0b' : '#10b981';
+    const categoryDisp = item.category || 'General';
+    const impactVal = item.impact || item.expected_impact || `Resolves this ${categoryDisp.toLowerCase()} issue and improves overall API reliability`;
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${pri.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center;font-size:11px;color:#818cf8;font-weight:700">${categoryDisp.toUpperCase()}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#e2e8f0">${item.action||''}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${impactVal}</td>
+      <td style="padding:9px 12px;text-align:center;font-size:10px;color:#64748b">⏳ ${item.status || 'To Do'}</td>
+    </tr>`;
+  }).join('');
+  const sectionActionPlan = aiActionPlan.length ? `
+    ${secHdr('AI Action Plan', '#c9a227')}
+    ${tblWrap(`${tblHdr([{l:'Priority',align:'center'},{l:'Category',align:'center'},{l:'Action'},{l:'Expected Impact'},{l:'Status',align:'center'}])}
+      <tbody>${actionRows}</tbody></table>`, '#c9a227')}` : '';
+
+  // ── 13. FINAL VERDICT ─────────────────────────────────────────────────
+  const vc = critical_fail ? '#ef4444' : fail > 0 ? '#b45309' : '#059669';
+  const vb = critical_fail ? 'rgba(239,68,68,.08)' : fail > 0 ? 'rgba(245,158,11,.08)' : 'rgba(16,185,129,.08)';
+  const vi = critical_fail ? '🔴' : fail > 0 ? '🟡' : '🟢';
+  const vt = critical_fail
+    ? `Internal API Test FAILED — critical checks did not pass on ${baseUrl}. Authentication or server-error issues were detected on this API. This API is NOT ready for further testing until resolved.`
+    : fail > 0
+    ? `Internal API Test passed with ${fail} non-critical issue(s) on ${baseUrl}. The API is accessible and stable, but the failing checks should be reviewed before proceeding to deeper testing.`
+    : `Internal API Test PASSED — all ${pass} check(s) succeeded on ${baseUrl}. This API is stable and ready for deeper functional and regression testing.`;
+
+  const sectionVerdict = `
+    ${secHdr('Final AI Verdict', ACCENT)}
+    <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:18px 22px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:8px">${vi} Final API Verdict</div>
+      <p style="font-size:13px;color:${vc};margin:0 0 12px;line-height:1.6">${vt}</p>
+      <div style="font-size:12px">
+        <span style="color:#64748b;font-weight:700">API Health Score: </span><span style="color:${vc};font-weight:700">${score}/100</span>
+        <span style="color:#475569;margin:0 10px">|</span>
+        <span style="color:#64748b;font-weight:700">Risk Level: </span><span style="color:${vc};font-weight:700">${riskLevel}</span>
+        <span style="color:#475569;margin:0 10px">|</span>
+        <span style="color:#64748b;font-weight:700">Deployment Readiness: </span><span style="color:${vc};font-weight:700">${scoreLabel}</span>
+      </div>
+    </div>`;
+
+  // ── 14. CERTIFICATE ───────────────────────────────────────────────────
+  const sectionCert = `
+    ${secHdr('Certificate of Internal API Validation', ACCENT)}
+    ${secDesc('Official validation summary confirming the outcome of this API test run — issued automatically by NexTest AI.')}
+    <div style="background:#0d1526;border:1px solid #1e293b;border-radius:14px;overflow:hidden;margin-bottom:20px">
+      <div style="height:4px;background:${scoreColor}"></div>
+      <div style="padding:24px;text-align:center">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;margin-bottom:8px">CERTIFICATE OF INTERNAL API VALIDATION</div>
+        <div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:10px">${baseUrl}</div>
+        <div style="font-size:38px;font-weight:800;color:${scoreColor};margin-bottom:10px">${score}<span style="font-size:16px;color:#475569">/100</span></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px">
+          <span style="background:${scoreColor};color:#fff;font-weight:700;font-size:12px;padding:5px 16px;border-radius:20px">GRADE ${grade}</span>
+          <span style="border:1px solid ${scoreColor};color:${scoreColor};font-weight:700;font-size:12px;padding:5px 16px;border-radius:20px">${scoreLabel.toUpperCase()}</span>
+        </div>
+      </div>
+      <div style="background:#080f1e;border-top:1px solid #1e293b;padding:10px;text-align:center;font-size:10px;color:#64748b">
+        Validated by <b style="color:#94a3b8">NexTest AI</b> · ${dateStr}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #1e293b;border-radius:10px;overflow:hidden;margin-bottom:24px">
+      ${[
+        ['Validation Date', `${dateStr} ${timeStr}`, '#0EA5E9'],
+        ['Framework', framework, '#0EA5E9'],
+        ['Authentication', authMethod, '#6366f1'],
+        ['Base API URL', baseUrl, '#6366f1'],
+        ['Execution Time', totalMs ? `${(totalMs/1000).toFixed(2)}s` : 'N/A', '#8b5cf6'],
+        ['Avg Response Time', avgMs ? `${avgMs.toFixed(0)}ms` : 'N/A', '#8b5cf6'],
+        ['Overall Grade', grade, '#10b981'],
+        ['AI Validation Status', 'Verified by NexTest AI', '#10b981'],
+      ].map(([l,v,c]) => `
+        <div style="background:#0d1526;border-left:3px solid ${c};padding:12px 16px;border-bottom:1px solid #1e293b">
+          <div style="font-size:9px;font-weight:700;color:${c};margin-bottom:3px">${l}</div>
+          <div style="font-size:12px;color:#e2e8f0">${v}</div>
+        </div>`).join('')}
+    </div>`;
+
+  // ── FULL HTML DOCUMENT ─────────────────────────────────────────────────
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NexTest API Report #${genId}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#070e1c;color:#e2e8f0;font-family:'DM Sans',sans-serif;min-height:100vh}
+  .page{max-width:1100px;margin:0 auto;padding:48px 32px 80px}
+  table{width:100%;border-collapse:collapse}
+  th,td{vertical-align:top}
+  @media print{body{background:#fff;color:#000}.no-print{display:none}.page{padding:10mm}@page{margin:15mm;size:A4}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#1a0f05 50%,#0a0f1e 100%);
+    border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,${ACCENT},transparent)"></div>
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:${ACCENT}"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
+      <div>
+        <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px">
+          <span style="color:${ACCENT}">NEX</span>TEST
+        </div>
+        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">Internal API Test Report</div>
+        <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${timeStr}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px">
+      ${[
+        {l:'Base API URL', v:`<span style="color:#fda47a;font-size:11px;word-break:break-all">${baseUrl}</span>`},
+        {l:'Framework', v:`<span style="color:${ACCENT};font-weight:700">${framework}</span>`},
+        {l:'Test Type', v:`<span style="color:${ACCENT};font-weight:700">Internal API Test</span>`},
+        {l:'Auth Method', v:`<span style="color:#fff">${authMethod}</span>`},
+      ].map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
+        <div style="font-size:12px">${r.v}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+
+  <div class="no-print" style="margin-bottom:28px">
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,${ACCENT},#ea580c);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+      🖨 Print / Save as PDF
+    </button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:8px">
+    ${[
+      {icon:'✅',val:pass,lbl:'PASSED',c:'#10b981',bg:'rgba(16,185,129,.08)',bd:'rgba(16,185,129,.25)'},
+      {icon:'❌',val:fail,lbl:'FAILED',c:'#ef4444',bg:'rgba(239,68,68,.08)',bd:'rgba(239,68,68,.25)'},
+      {icon:'⏭️',val:skip,lbl:'SKIPPED',c:'#f59e0b',bg:'rgba(245,158,11,.08)',bd:'rgba(245,158,11,.25)'},
+      {icon:'🎯',val:`${passRate}%`,lbl:'PASS RATE',c:rateColor,bg:`${rateColor}12`,bd:`${rateColor}33`},
+      {icon:'🔢',val:total,lbl:'TOTAL',c:'#3b82f6',bg:'rgba(59,130,246,.08)',bd:'rgba(59,130,246,.25)'},
+    ].map(s => `<div style="background:${s.bg};border:1px solid ${s.bd};border-radius:14px;padding:20px;text-align:center">
+      <div style="font-size:20px;margin-bottom:8px">${s.icon}</div>
+      <div style="font-size:36px;font-weight:700;color:${s.c};line-height:1;margin-bottom:4px">${s.val}</div>
+      <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
+    </div>`).join('')}
+  </div>
+  <p style="font-size:10px;color:#64748b;font-style:italic;margin-bottom:20px">
+    Pass Rate is the raw proportion of requests that succeeded on this API. The API Health Score further below is
+    severity-weighted — authentication and server-error checks count more.
+  </p>
+
+  ${sectionOverview}
+  ${sectionKeyMetrics}
+  ${sectionEndpoints}
+  ${sectionScore}
+  ${sectionMethodology}
+  ${sectionCategorySummary}
+  ${sectionCharts}
+  ${sectionEnv}
+  ${sectionDetailedResults}
+  ${sectionRecs}
+  ${sectionFocused}
+  ${sectionActionPlan}
+  ${sectionVerdict}
+  ${sectionCert}
+
+  <div style="margin-top:48px;padding:20px 28px;background:rgba(249,115,22,.04);border-radius:12px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid rgba(249,115,22,.15)">
+    <div style="font-size:14px;font-weight:700;color:#64748b"><span style="color:${ACCENT}">NEX</span>TEST · Internal API Test Report</div>
+    <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${framework} · ${total} requests · ${passRate}% pass rate · Score: ${score}/100</div>
+  </div>
+
+</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `api_report_${genId}.html`;
+  link.click();
+  saveReportToStorage({
+    url: baseUrl,
+    framework,
+    testType: 'api',
+    passCount: pass,
+    failCount: fail,
+    htmlContent: html,
+    generationData: generation,
+  });
+  setDropdownOpen(false);
 };
 const downloadHtml_Smoke = () => {
   const now     = new Date();
@@ -10139,9 +11563,12 @@ const downloadHtml_Regression = () => {
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const genId   = generation?.generation?.id || 'nextest';
   const allTests = tests;
+
+  const ACCENT = '#eab308';
+
   const pass  = allTests.filter(t => t.status === 'pass').length;
   const fail  = allTests.filter(t => t.status === 'fail').length;
-  const skip  = allTests.filter(t => t.status === 'skip').length;
+  const skip  = allTests.filter(t => t.status !== 'pass' && t.status !== 'fail').length;
   const total = allTests.length || 1;
   const rate  = Math.round(pass / total * 100);
   const rateColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
@@ -10149,121 +11576,414 @@ const downloadHtml_Regression = () => {
   const CAT_COLORS = {
     authentication:'#6366f1', navigation:'#10b981', content:'#3b82f6', functionality:'#8b5cf6',
   };
+  const CAT_ORDER = ['Authentication', 'Navigation', 'Content', 'Functionality'];
+  const catLabel = (t) => {
+    const c = (t.category || 'navigation').toLowerCase();
+    return { authentication:'Authentication', navigation:'Navigation', content:'Content', functionality:'Functionality' }[c]
+      || (c ? c.charAt(0).toUpperCase() + c.slice(1) : 'Navigation');
+  };
 
-  const secHdr = (emoji, title, color = '#f97316') => `
-    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;
-      padding-bottom:8px;border-bottom:2.5px solid ${color}">
-      <span style="font-size:18px">${emoji}</span>
+  const authMethod = (() => {
+    if (generation?.token || generation?.result?.token) return 'Token (JWT)';
+    if (generation?.cookies || generation?.result?.cookies) return 'Cookies';
+    if (generation?.generation?.username || generation?.username) return 'Credentials (username/password)';
+    return 'N/A';
+  })();
+
+  // ── Weighted score (mirrors PDF _compute_score) ─────────────────────────
+  const HIGH_CATS = new Set(['authentication']);
+  let totalW = 0, earnedW = 0;
+  allTests.forEach(t => {
+    const cat = (t.category || 'navigation').toLowerCase();
+    const sev = (t.severity || t.priority || 'medium').toLowerCase();
+    const w = (HIGH_CATS.has(cat) || ['critical','high'].includes(sev)) ? 3 : 1;
+    totalW += w;
+    if (t.status === 'pass') earnedW += w;
+  });
+  const score = totalW ? Math.round(earnedW / totalW * 100) : 0;
+  const scoreLabel = score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 50 ? 'Acceptable' : 'Critical';
+  const scoreColor = score >= 90 ? '#10b981' : score >= 75 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+  const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 50 ? 'C' : score >= 25 ? 'D' : 'F';
+
+  const isCriticalFail = (t) => t.status === 'fail' && ((t.category||'').toLowerCase() === 'authentication'
+    || ['critical','high'].includes((t.severity||t.priority||'').toLowerCase()));
+  const critical_fail = allTests.some(isCriticalFail);
+
+  const overallStatus = critical_fail ? 'CRITICAL ISSUES' : fail > 0 ? 'PASSED W/ WARNINGS' : 'ALL CHECKS PASSED';
+  const statusColor   = critical_fail ? '#ef4444' : fail > 0 ? '#f59e0b' : '#10b981';
+  const riskLevel      = critical_fail ? 'HIGH' : fail > 0 ? 'MEDIUM' : 'LOW';
+  const deployText     = critical_fail ? 'NOT READY' : fail > 0 ? 'READY W/ CAUTION' : 'READY';
+  const statusExplain  = critical_fail
+    ? 'One or more critical checks failed (authentication, or a critical/high severity page). These block core user journeys — resolve before the next deployment.'
+    : fail > 0
+    ? `Core authentication is confirmed, but ${fail} secondary check(s) failed. Review the failing pages below.`
+    : `Every regression check executed against ${url} passed, including authentication. This application is stable after the latest changes.`;
+
+  const aiResult  = generation?.result?.ai || runResults?.ai || {};
+  const aiSummary = aiResult.summary || `This internal regression run executed ${total} test(s) against <b>${url}</b>, with ${pass} passed and ${fail} failed (${rate}% pass rate). ${critical_fail ? 'Critical failures were detected on this application.' : 'No critical failures were detected on this application.'}`;
+  const aiRecs = aiResult.recommendations || [];
+  const aiActionPlan = aiResult.action_plan || [];
+
+  const secHdr = (title, color = ACCENT) => `
+    <div style="display:flex;align-items:center;gap:10px;margin:32px 0 12px;padding-bottom:8px;border-bottom:2.5px solid ${color}">
       <span style="font-size:20px;font-weight:700;color:#e2e8f0">${title}</span>
     </div>`;
-
-  const tblWrap = (inner, border = '#f97316') => `
-    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;
-      overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">
-      ${inner}
-    </div>`;
-
+  const secDesc = (text) => `<p style="font-size:11px;color:#94a3b8;font-style:italic;margin-bottom:14px;line-height:1.6">${text}</p>`;
+  const tblWrap = (inner, border = ACCENT) => `
+    <div style="background:#0d1526;border:1px solid ${border}44;border-radius:12px;overflow:hidden;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.3)">${inner}</div>`;
   const tblHdr = (cols) => `
     <table style="width:100%;border-collapse:collapse">
       <thead><tr style="background:#040914">
-        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};
-          font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
-          color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
+        ${cols.map(c => `<th style="padding:10px 12px;text-align:${c.align||'left'};font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700">${c.l}</th>`).join('')}
       </tr></thead>`;
+  const insightBox = (text, color, label = 'AI Analysis') => `
+    <div style="background:#0d1526;border:1px solid ${color}44;border-left:3px solid ${color};border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11.5px;color:#94a3b8;line-height:1.6">
+      <b style="color:${color}">${label}: </b>${text}
+    </div>`;
 
-  // ── SCENARIOS ──
+  // ── 1. OVERVIEW HERO ──────────────────────────────────────────────────
+  const heroStats = [
+    { l: 'OVERALL STATUS', v: overallStatus, c: statusColor },
+    { l: 'REGRESSION SCORE', v: `${score}/100`, c: scoreColor },
+    { l: 'RISK LEVEL', v: riskLevel, c: statusColor },
+    { l: 'DEPLOYMENT', v: deployText, c: statusColor },
+  ];
+  const sectionOverview = `
+    ${secHdr('Regression Test Overview')}
+    ${secDesc(statusExplain)}
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      ${heroStats.map(s => `
+        <div style="background:#0d1526;border:1px solid ${s.c};border-radius:12px;padding:16px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:#64748b;margin-bottom:6px">${s.l}</div>
+          <div style="font-size:15px;font-weight:800;color:${s.c}">${s.v}</div>
+        </div>`).join('')}
+    </div>
+    ${insightBox(aiSummary, '#818cf8', 'AI Summary')}`;
+
+  
+  // ── KEY METRICS ────────────────────────────────────────────────────────
+  const parseMsKM = (d) => {
+    if (!d) return 0;
+    const s = String(d);
+    if (s.endsWith('ms')) return parseFloat(s) || 0;
+    if (s.endsWith('s'))  return (parseFloat(s) || 0) * 1000;
+    return 0;
+  };
+  const totalMsKM = allTests.reduce((sum, t) => sum + parseMsKM(t.duration), 0);
+  const avgMsKM   = allTests.length ? totalMsKM / allTests.length : 0;
+  const criticalCount = allTests.filter(isCriticalFail).length;
+  const authCount = allTests.filter(t => (t.category||'').toLowerCase() === 'authentication').length;
+
+  const keyMetrics = [
+    { l: 'TOTAL EXECUTION TIME', v: totalMsKM ? `${(totalMsKM/1000).toFixed(2)}s` : 'N/A', c: '#0EA5E9' },
+    { l: 'AVERAGE TEST DURATION', v: avgMsKM ? `${avgMsKM.toFixed(0)}ms` : 'N/A', c: '#10b981' },
+    { l: 'TOTAL TESTS', v: String(total), c: '#8b5cf6' },
+    { l: 'CRITICAL CHECKS', v: String(criticalCount), c: '#ef4444' },
+    { l: 'AUTH CHECKS', v: String(authCount), c: '#f59e0b' },
+    { l: 'AVG RESPONSE TIME', v: avgMsKM ? `${avgMsKM.toFixed(0)}ms` : 'N/A', c: '#ec4899' },
+  ];
+  const sectionKeyMetrics = `
+    ${secHdr('Key Metrics')}
+    ${secDesc("Execution footprint for this regression run — timing, test volume, and where the critical checks are concentrated.")}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${keyMetrics.map(m => `
+        <div style="background:#0d1526;border:1px solid ${m.c};border-top:3px solid ${m.c};border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:${m.c};margin-bottom:6px">${m.l}</div>
+          <div style="font-size:14px;font-weight:800;color:#e2e8f0">${m.v}</div>
+        </div>`).join('')}
+    </div>`;
+  // ── 2. SCORE GAUGE ────────────────────────────────────────────────────
+  const sectionScore = `
+    ${secHdr('Regression Score', scoreColor)}
+    <div style="display:flex;align-items:center;gap:24px;background:#0d1526;border:1.5px solid ${scoreColor};border-radius:14px;padding:24px;margin-bottom:16px">
+      <div style="width:110px;height:110px;border-radius:50%;background:conic-gradient(${scoreColor} ${score*3.6}deg, #1e293b 0deg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <div style="width:82px;height:82px;border-radius:50%;background:#0d1526;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:24px;font-weight:800;color:${scoreColor}">${score}</span>
+          <span style="font-size:10px;color:#64748b">/ 100</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:17px;font-weight:800;color:${scoreColor};margin-bottom:8px">${scoreLabel}</div>
+        <p style="font-size:12px;color:#94a3b8;line-height:1.6;margin:0">
+          The Regression Score weighs authentication checks and critical/high severity pages three times
+          as heavily as low/medium severity checks. Excellent ≥ 90 · Good ≥ 75 · Acceptable ≥ 50 · Critical below.
+        </p>
+      </div>
+    </div>`;
+
+  // ── 3. SCENARIOS ──────────────────────────────────────────────────────
   const scenarioRows = allTests.map((t, i) => {
-    const cc  = CAT_COLORS[t.category] || '#64748b';
-    const pc  = t.priority==='high'?'#ef4444':t.priority==='medium'?'#f59e0b':'#10b981';
-    let expected = 'Test executes without errors';
-    if (/page loads/i.test(t.name)) expected = 'Page loads successfully with HTTP 200';
-    else if (/exists|visible/i.test(t.name)) expected = 'Element is visible and accessible in DOM';
-    else if (/clickable/i.test(t.name)) expected = 'Element responds to click interaction';
-    let typeLabel = 'E2E'; let typeColor = '#64748b';
-    if (/login|auth/i.test(t.name)) { typeLabel='AUTH'; typeColor='#6366f1'; }
-    else if (/page loads/i.test(t.name)) { typeLabel='NAV'; typeColor='#10b981'; }
-    else if (/exists|visible/i.test(t.name)) { typeLabel='UI'; typeColor='#3b82f6'; }
-    else if (/clickable/i.test(t.name)) { typeLabel='FUNC'; typeColor='#8b5cf6'; }
+    const cc  = CAT_COLORS[(t.category||'navigation').toLowerCase()] || '#64748b';
+    const pc  = (t.priority||t.severity||'medium').toLowerCase()==='high'?'#ef4444':(t.priority||t.severity||'medium').toLowerCase()==='medium'?'#f59e0b':'#10b981';
+    const priority = (t.priority || t.severity || 'medium').toLowerCase();
+    const expected = t.expected || t.description || 'Page/element behaves as expected';
     return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
       <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
       <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${(t.category||'navigation').toUpperCase()}</span></td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${(t.priority||'medium').toUpperCase()}</span></td>
-      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${expected}</td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${typeColor};font-weight:700;font-size:10px">${typeLabel}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${catLabel(t).toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${priority.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${String(expected).substring(0,75)}</td>
     </tr>`;
   }).join('');
+  const sectionScenarios = `
+    ${secHdr('Regression Test Scenarios', '#6366f1')}
+    ${secDesc(`Regression test plan for <b>${url}</b> — ${total} scenario(s) executed against the internal application.`)}
+    ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Scenario'},{l:'Category',align:'center'},{l:'Priority',align:'center'},{l:'Expected'}])}
+      <tbody>${scenarioRows}</tbody></table>`, '#6366f1')}`;
 
-  // ── CATEGORY SUMMARY ──
+  // ── 4. CATEGORY SUMMARY ──────────────────────────────────────────────
   const cats = {};
   allTests.forEach(t => {
-    const c = t.category || 'navigation';
-    if (!cats[c]) cats[c] = {pass:0,fail:0,total:0,dur:0};
+    const c = catLabel(t);
+    if (!cats[c]) cats[c] = { pass: 0, fail: 0, total: 0 };
     cats[c].total++;
-    if (t.status==='pass') cats[c].pass++;
-    else if (t.status==='fail') cats[c].fail++;
-    try { cats[c].dur += parseInt((t.duration||'0').replace('ms','')); } catch {}
+    if (t.status === 'pass') cats[c].pass++; else if (t.status === 'fail') cats[c].fail++;
   });
-  const catRows = Object.entries(cats).map(([cat, d]) => {
-    const cc = CAT_COLORS[cat] || '#64748b';
-    const r  = Math.round(d.pass/d.total*100);
-    const rc = r===100?'#10b981':r>=60?'#f59e0b':'#ef4444';
-    const vc = d.fail===0?'#10b981':'#ef4444';
-    const bg = d.fail===0?'rgba(16,185,129,.06)':'rgba(239,68,68,.06)';
-    const avg = Math.round(d.dur/d.total);
+  const catRows = CAT_ORDER.filter(c => cats[c]?.total > 0).map(cat => {
+    const d = cats[cat];
+    const cc = CAT_COLORS[cat.toLowerCase()] || '#64748b';
+    const r = Math.round(d.pass / d.total * 100);
+    const rc = r === 100 ? '#10b981' : r >= 60 ? '#f59e0b' : '#ef4444';
+    const vc = d.fail === 0 ? '#10b981' : '#ef4444';
+    const bg = d.fail === 0 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)';
     return `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
-      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat.toUpperCase()}</td>
+      <td style="padding:10px 12px;font-weight:700;color:${cc}">${cat}</td>
       <td style="padding:10px 12px;text-align:center;color:#e2e8f0;font-weight:700">${d.total}</td>
       <td style="padding:10px 12px;text-align:center;color:#10b981;font-weight:700">${d.pass}</td>
       <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:700">${d.fail}</td>
       <td style="padding:10px 12px;text-align:center;color:${rc};font-weight:700">${r}%</td>
-      <td style="padding:10px 12px;text-align:center;color:#64748b">${avg}ms</td>
       <td style="padding:10px 12px;text-align:center"><span style="color:${vc};font-weight:800;font-size:11px">${d.fail===0?'✅ PASS':'❌ FAIL'}</span></td>
     </tr>`;
   }).join('');
+  const sectionCategorySummary = catRows ? `
+    ${secHdr('Results by Category')}
+    ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Pass Rate',align:'center'},{l:'Verdict',align:'center'}])}
+      <tbody>${catRows}</tbody></table>`)}` : '';
 
-  // ── DETAILED RESULTS ──
+  // ── 5. CHART ──────────────────────────────────────────────────────────
+  const catEntries = CAT_ORDER.filter(c => cats[c]?.total > 0).map(c => [c, cats[c]]);
+  const catYMax = Math.max(...catEntries.map(([,d]) => d.total), 1);
+  const chartW = 760, chartH = 300, mL = 44, mB = 90, mT = 24, mR = 24;
+  const plotW = chartW - mL - mR, plotH = chartH - mT - mB;
+  const barSlot = plotW / (catEntries.length || 1);
+  const barW = Math.min(46, barSlot * 0.5);
+  const catBars = catEntries.map(([cat, d], i) => {
+    const xCenter = mL + barSlot * i + barSlot / 2;
+    const x = xCenter - barW / 2;
+    const passH = (d.pass / catYMax) * plotH;
+    const failH = (d.fail / catYMax) * plotH;
+    const yBase = mT + plotH;
+    const passY = yBase - passH;
+    const failY = passY - failH;
+    return `
+      <rect x="${x}" y="${passY}" width="${barW}" height="${Math.max(passH,0)}" fill="#10b981" rx="2"/>
+      <rect x="${x}" y="${failY}" width="${barW}" height="${Math.max(failH,0)}" fill="#ef4444" rx="2"/>
+      <text x="0" y="0" font-size="10" fill="#94a3b8" text-anchor="end" transform="translate(${xCenter},${yBase+12}) rotate(-30)">${cat.toUpperCase()}</text>`;
+  }).join('');
+  const catGrid = Array.from({length: catYMax+1}, (_,t) => {
+    const y = mT + plotH - (t/catYMax)*plotH;
+    return `<line x1="${mL}" y1="${y}" x2="${mL+plotW}" y2="${y}" stroke="#1e293b"/><text x="${mL-8}" y="${y+4}" font-size="10" fill="#64748b" text-anchor="end">${t}</text>`;
+  }).join('');
+  const worstCat = catEntries.length ? catEntries.reduce((a,b) => b[1].fail > a[1].fail ? b : a)[0] : null;
+  const catInsight = worstCat && cats[worstCat].fail > 0
+    ? `${worstCat} currently has the most failures (${cats[worstCat].fail}) — this is the category to prioritize first.`
+    : 'No category shows any failures — coverage is currently clean across the board.';
+  const sectionCharts = `
+    ${secHdr('Category Breakdown Chart')}
+    ${secDesc('This chart compares passed and failed tests across each regression category, helping you quickly spot which area needs attention.')}
+    <div style="background:#0d1526;border:1px solid #1e293b;border-radius:12px;padding:20px 20px 10px;margin-bottom:8px">
+      <svg viewBox="0 0 ${chartW} ${chartH}" style="width:100%;height:auto">
+        ${catGrid}
+        <line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT+plotH}" stroke="#334155"/>
+        <line x1="${mL}" y1="${mT+plotH}" x2="${mL+plotW}" y2="${mT+plotH}" stroke="#334155"/>
+        ${catBars}
+        <rect x="${chartW-150}" y="4" width="10" height="10" fill="#10b981"/><text x="${chartW-135}" y="13" font-size="10" fill="#94a3b8">Passed</text>
+        <rect x="${chartW-75}" y="4" width="10" height="10" fill="#ef4444"/><text x="${chartW-60}" y="13" font-size="10" fill="#94a3b8">Failed</text>
+      </svg>
+    </div>
+    ${insightBox(catInsight, '#0EA5E9')}`;
+
+  // ── 6. DETAILED RESULTS ──────────────────────────────────────────────
   const detailRows = allTests.map((t, i) => {
     const sc = t.status==='pass'?'#10b981':t.status==='fail'?'#ef4444':'#f59e0b';
     const sl = t.status==='pass'?'✓ PASS':t.status==='fail'?'✗ FAIL':'■ SKIP';
     const sb = t.status==='pass'?'rgba(16,185,129,.06)':t.status==='fail'?'rgba(239,68,68,.06)':'rgba(245,158,11,.06)';
-    const cc = CAT_COLORS[t.category] || '#64748b';
-    const pc = t.priority==='high'?'#ef4444':t.priority==='medium'?'#f59e0b':'#10b981';
+    const cc = CAT_COLORS[(t.category||'').toLowerCase()] || '#64748b';
+    const reason = t.reason || t.reason_pass || '—';
     return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${i%2===0?'#0d1526':'#080f1e'}">
       <td style="padding:9px 12px;color:#64748b;font-weight:700;text-align:center">${i+1}</td>
       <td style="padding:9px 12px;font-weight:700;color:#e2e8f0;font-size:13px">${t.name}</td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${(t.category||'').toUpperCase()}</span></td>
-      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${(t.priority||'medium').toUpperCase()}</span></td>
+      <td style="padding:9px 12px;text-align:center"><span style="color:${cc};font-weight:700;font-size:10px">${catLabel(t).toUpperCase()}</span></td>
       <td style="padding:9px 12px;text-align:center;background:${sb}"><span style="color:${sc};font-weight:800;font-size:11px">${sl}</span></td>
-      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${t.suite||'—'}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${String(reason).substring(0,90)}</td>
       <td style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b;font-weight:700">${t.duration||'—'}</td>
     </tr>`;
   }).join('');
+  const sectionDetailedResults = `
+    ${secHdr('Detailed Test Results', '#0d9488')}
+    ${secDesc('Real results from Playwright execution. Every value comes directly from the test runner.')}
+    ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Category',align:'center'},{l:'Status',align:'center'},{l:'Result / Reason'},{l:'Duration',align:'center'}])}
+      <tbody>${detailRows}</tbody></table>`, '#0d9488')}`;
 
-  // ── AI RECS ──
-  const slow = allTests.filter(t => { try { return parseInt((t.duration||'0').replace('ms','')) > 3000; } catch { return false; } });
-  const failed = allTests.filter(t => t.status === 'fail');
-  const recsHtml = `
-    <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#f59e0b">⚡ Performance</div>
-    <div style="background:#0d1526;border-left:3px solid #f59e0b;padding:8px 14px 8px 16px;margin-bottom:10px;font-size:12px;color:#94a3b8">${slow.length > 0 ? `• ${slow.length} test(s) exceeded 3000ms — optimize before next release.` : '• All tests executed within acceptable time range.'}</div>
-    <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#818cf8">🔧 Reliability</div>
-    <div style="background:#0d1526;border-left:3px solid #818cf8;padding:8px 14px 8px 16px;margin-bottom:10px;font-size:12px;color:#94a3b8">${failed.length > 0 ? `• Fix "${failed[0]?.name}" — ${failed[0]?.suite||'error detected'}.` : '• No reliability issues detected.'}</div>
-    <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 14px;margin-bottom:4px;font-weight:700;color:#10b981">👤 UX & Accessibility</div>
-    <div style="background:#0d1526;border-left:3px solid #10b981;padding:8px 14px 8px 16px;font-size:12px;color:#94a3b8">• Navigation pages verified. Application routing is stable.</div>`;
+  // ── 7. AI RECOMMENDATIONS ────────────────────────────────────────────
+  const recRows = aiRecs.map(r => {
+    const pri = (r.priority || 'medium').toLowerCase();
+    const pc = pri === 'high' ? '#ef4444' : pri === 'medium' ? '#f59e0b' : '#10b981';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:9px 12px;text-align:center"><span style="color:${pc};font-weight:700;font-size:10px">${pri.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:#818cf8;font-weight:700">${(r.category||'').toUpperCase()}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#e2e8f0">${(r.issue||'').substring(0,70)}</td>
+      <td style="padding:9px 12px;font-size:11px;color:#94a3b8">${(r.fix||'').substring(0,80)}</td>
+    </tr>`;
+  }).join('');
+  const sectionRecs = `
+    ${secHdr('AI Recommendations', '#4f46e5')}
+    ${secDesc('Recommendations generated only for issues detected on this application.')}
+    ${aiRecs.length > 0
+      ? tblWrap(`${tblHdr([{l:'Priority',align:'center'},{l:'Category'},{l:'Issue'},{l:'Recommended Fix'}])}<tbody>${recRows}</tbody></table>`, '#4f46e5')
+      : `<div style="color:#64748b;font-size:12px;padding:16px">No specific issues flagged by AI for this run.</div>`}`;
 
-  const vc = fail>0?'#ef4444':'#059669';
-  const vb = fail>0?'rgba(239,68,68,.08)':'rgba(16,185,129,.08)';
-  const vi = fail>0?'🔴':'🟢';
-  const vt = fail>0
-    ? `Regression Test FAILED — ${fail} page(s) failed. Fix before next deployment.`
-    : `Regression Test PASSED — All ${pass} tests passed. Application is stable.`;
+  // ── FOCUSED AI ANALYSIS ───────────────────────────────────────────────
+  const related = (catName) => allTests.filter(t => catLabel(t) === catName);
+  const narrative = (title, catName, color) => {
+    const r = related(catName);
+    if (!r.length) return '';
+    const failN = r.filter(t => t.status === 'fail').length;
+    const text = failN === 0
+      ? `All ${r.length} check(s) passed for ${title.split(' Analysis')[0].toLowerCase()} on this application — fully operational, no issues detected.`
+      : `${failN} of ${r.length} check(s) failed: ${r.filter(t=>t.status==='fail').map(t=>t.name).slice(0,3).join(', ')}. Investigate before the next deployment.`;
+    return `<div style="font-size:13px;font-weight:700;color:${color};margin:14px 0 6px">${title}</div>${insightBox(text, color, 'Summary')}`;
+  };
 
+  const criticalTests = allTests.filter(t => (t.category||'').toLowerCase() === 'authentication'
+    || ['critical','high'].includes((t.severity||t.priority||'').toLowerCase()));
+  let reliabilityBlock = '';
+  if (criticalTests.length) {
+    const failN = criticalTests.filter(t => t.status === 'fail').length;
+    const text = failN === 0
+      ? `All ${criticalTests.length} critical check(s) passed on ${url} — the application responds reliably and authentication holds.`
+      : `${failN} of ${criticalTests.length} critical check(s) failed on ${url} — this affects the core reliability of the application and should be prioritized.`;
+    reliabilityBlock = `<div style="font-size:13px;font-weight:700;color:#0EA5E9;margin:14px 0 6px">Application Reliability</div>${insightBox(text, '#0EA5E9', 'Summary')}`;
+  }
+
+  const depText = critical_fail
+    ? 'This application is NOT ready for the next deployment — critical checks (auth, high-severity pages) failed.'
+    : fail > 0
+    ? `This application is ready with caution — ${fail} secondary check(s) failed. Review before proceeding.`
+    : 'This application is ready — all checks passed, stable for the next deployment.';
+  const depColor = critical_fail ? '#ef4444' : fail > 0 ? '#f59e0b' : '#10b981';
+
+  const sectionFocused = `
+    ${secHdr('Focused AI Analysis', '#4f46e5')}
+    ${reliabilityBlock}
+    ${narrative('Authentication Analysis', 'Authentication', '#6366f1')}
+    ${narrative('Navigation Analysis', 'Navigation', '#10b981')}
+    ${narrative('Content Analysis', 'Content', '#3b82f6')}
+    ${narrative('Functionality Analysis', 'Functionality', '#8b5cf6')}
+    <div style="font-size:13px;font-weight:700;color:${depColor};margin:14px 0 6px">Deployment Readiness</div>
+    ${insightBox(depText, depColor, 'Summary')}`;
+
+  // ── 8. ACTION PLAN ────────────────────────────────────────────────────
+  const sectionActionPlan = aiActionPlan.length ? `
+    ${secHdr('AI-Generated Action Plan', '#c9a227')}
+    ${aiActionPlan.map((step,i) => `
+      <div style="display:flex;gap:10px;padding:9px 14px;background:#0d1526;border:1px solid #1e293b;border-radius:8px;margin-bottom:4px;font-size:12px;color:#94a3b8">
+        <span style="color:#c9a227;font-weight:700">${i+1}.</span> ${typeof step === 'string' ? step : (step.action || step.scenario || '')}
+      </div>`).join('')}` : '';
+
+  // ── 9. EXECUTIVE SUMMARY ──────────────────────────────────────────────
+  const topRecs = aiRecs.slice().sort((a,b) => ({high:0,medium:1,low:2}[a.priority]??1) - ({high:0,medium:1,low:2}[b.priority]??1)).slice(0,2);
+  const sectionExec = topRecs.length ? `
+    ${secHdr('Executive Summary', '#c9a227')}
+    <div style="font-size:13px;font-weight:700;color:#e2e8f0;margin-bottom:10px">Top Priority Actions</div>
+    ${topRecs.map((r,i) => `
+      <div style="display:flex;gap:12px;background:#0d1526;border:1px solid #c9a227;border-radius:10px;padding:14px 16px;margin-bottom:8px">
+        <div style="width:22px;height:22px;border-radius:50%;background:#c9a227;color:#0a0f1e;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">${(r.category||'').toUpperCase()}</div>
+          <div style="font-size:13px;font-weight:700;color:#e2e8f0;margin-bottom:3px">${r.issue||''}</div>
+          <div style="font-size:12px;color:#64748b">${r.fix||''}</div>
+        </div>
+      </div>`).join('')}
+    ${insightBox(`These ${topRecs.length} action(s) target the largest contributors to the current score of ${score}/100. Re-run the regression suite after applying them to confirm improvement.`, '#c9a227')}` : '';
+
+  // ── 10. ENVIRONMENT ───────────────────────────────────────────────────
+  const parseMs = (d) => {
+    if (!d) return 0;
+    const s = String(d);
+    if (s.endsWith('ms')) return parseFloat(s) || 0;
+    if (s.endsWith('s'))  return (parseFloat(s) || 0) * 1000;
+    return 0;
+  };
+  const totalMs = allTests.reduce((sum, t) => sum + parseMs(t.duration), 0);
+  const sectionEnv = `
+    ${secHdr('Execution Environment')}
+    ${secDesc('Framework and authentication method used to run this internal regression audit — for reproducibility of the results above.')}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${[
+        ['FRAMEWORK', framework, '#0EA5E9'],
+        ['AUTHENTICATION METHOD', authMethod, '#6366f1'],
+        ['BASE URL', url, '#f59e0b'],
+        ['TOTAL TESTS', String(total), '#10b981'],
+        ['EXECUTION TIME', totalMs ? `${(totalMs/1000).toFixed(2)}s` : 'N/A', '#ec4899'],
+        ['NEXTEST VERSION', '1.0.0', '#8b5cf6'],
+      ].map(([l,v,c]) => `
+        <div style="background:#0d1526;border:1px solid ${c};border-top:3px solid ${c};border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:${c};margin-bottom:6px">${l}</div>
+          <div style="font-size:12px;font-weight:800;color:#e2e8f0;word-break:break-all">${v}</div>
+        </div>`).join('')}
+    </div>`;
+
+  // ── 11. FINAL VERDICT ─────────────────────────────────────────────────
+  const vc = critical_fail ? '#ef4444' : fail > 0 ? '#b45309' : '#059669';
+  const vb = critical_fail ? 'rgba(239,68,68,.08)' : fail > 0 ? 'rgba(245,158,11,.08)' : 'rgba(16,185,129,.08)';
+  const vi = critical_fail ? '🔴' : fail > 0 ? '🟡' : '🟢';
+  const vt = critical_fail
+    ? `Internal Regression Test FAILED — critical checks did not pass on ${url}. Authentication or high-severity page issues were detected. This application is NOT ready for the next deployment until resolved.`
+    : fail > 0
+    ? `Internal Regression Test passed with ${fail} non-critical issue(s) on ${url}. The application is accessible and stable, but the failing checks should be reviewed before the next deployment.`
+    : `Internal Regression Test PASSED — all ${pass} test(s) succeeded on ${url}. This application is stable after the latest changes.`;
+  const sectionVerdict = `
+    ${secHdr('Final AI Verdict', ACCENT)}
+    <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:18px 22px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:8px">${vi} Final Regression Verdict</div>
+      <p style="font-size:13px;color:${vc};margin:0 0 12px;line-height:1.6">${vt}</p>
+      <div style="font-size:12px">
+        <span style="color:#64748b;font-weight:700">Regression Score: </span><span style="color:${vc};font-weight:700">${score}/100</span>
+        <span style="color:#475569;margin:0 10px">|</span>
+        <span style="color:#64748b;font-weight:700">Risk Level: </span><span style="color:${vc};font-weight:700">${riskLevel}</span>
+        <span style="color:#475569;margin:0 10px">|</span>
+        <span style="color:#64748b;font-weight:700">Deployment Readiness: </span><span style="color:${vc};font-weight:700">${scoreLabel}</span>
+      </div>
+    </div>`;
+
+  // ── 12. CERTIFICATE ───────────────────────────────────────────────────
+  const sectionCert = `
+    ${secHdr('Certificate of Internal Regression Validation', ACCENT)}
+    ${secDesc('Official validation summary confirming the outcome of this internal regression run — issued automatically by NexTest AI.')}
+    <div style="background:#0d1526;border:1px solid #1e293b;border-radius:14px;overflow:hidden;margin-bottom:20px">
+      <div style="height:4px;background:${scoreColor}"></div>
+      <div style="padding:24px;text-align:center">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;margin-bottom:8px">CERTIFICATE OF INTERNAL REGRESSION VALIDATION</div>
+        <div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:10px">${url}</div>
+        <div style="font-size:38px;font-weight:800;color:${scoreColor};margin-bottom:10px">${score}<span style="font-size:16px;color:#475569">/100</span></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px">
+          <span style="background:${scoreColor};color:#fff;font-weight:700;font-size:12px;padding:5px 16px;border-radius:20px">GRADE ${grade}</span>
+          <span style="border:1px solid ${scoreColor};color:${scoreColor};font-weight:700;font-size:12px;padding:5px 16px;border-radius:20px">${scoreLabel.toUpperCase()}</span>
+        </div>
+      </div>
+      <div style="background:#080f1e;border-top:1px solid #1e293b;padding:10px;text-align:center;font-size:10px;color:#64748b">
+        Validated by <b style="color:#94a3b8">NexTest AI</b> · ${dateStr}
+      </div>
+    </div>`;
+
+  // ── FULL HTML DOCUMENT ─────────────────────────────────────────────────
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>NexTest Regression Report #${genId}</title>
+<title>NexTest Internal Regression Report #${genId}</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -10276,25 +11996,25 @@ const downloadHtml_Regression = () => {
 <body>
 <div class="page">
 
-  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#1a0f05 50%,#0a0f1e 100%);
+  <div style="background:linear-gradient(135deg,#0a0f1e 0%,#1a1505 50%,#0a0f1e 100%);
     border-radius:20px;padding:40px 48px;margin-bottom:32px;position:relative;overflow:hidden">
-    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,#f97316,transparent)"></div>
-    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#f97316"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,${ACCENT},transparent)"></div>
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:${ACCENT}"></div>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
       <div>
         <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;margin-bottom:4px">
-          <span style="color:#f97316">NEX</span>TEST
+          <span style="color:${ACCENT}">NEX</span>TEST
         </div>
-        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">Regression Test Report</div>
+        <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">Internal Regression Test Report</div>
         <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${timeStr}</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px">
       ${[
-        {l:'URL',v:`<span style="color:#fda47a;font-size:11px;word-break:break-all">${url}</span>`},
-        {l:'Framework',v:`<span style="color:#f97316;font-weight:700">${framework}</span>`},
-        {l:'Test Type',v:`<span style="color:#f97316;font-weight:700">Regression Test</span>`},
-        {l:'Generated',v:`<span style="color:#fff">${dateStr}</span>`},
+        {l:'Base URL', v:`<span style="color:#fde68a;font-size:11px;word-break:break-all">${url}</span>`},
+        {l:'Framework', v:`<span style="color:${ACCENT};font-weight:700">${framework}</span>`},
+        {l:'Test Type', v:`<span style="color:${ACCENT};font-weight:700">Internal Regression Test</span>`},
+        {l:'Auth Method', v:`<span style="color:#fff">${authMethod}</span>`},
       ].map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px">
         <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4f6480;margin-bottom:5px">${r.l}</div>
         <div style="font-size:12px">${r.v}</div>
@@ -10303,15 +12023,12 @@ const downloadHtml_Regression = () => {
   </div>
 
   <div class="no-print" style="margin-bottom:28px">
-    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,#f97316,#ea580c);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨 Print / Save as PDF</button>
+    <button onclick="window.print()" style="padding:10px 24px;border-radius:10px;background:linear-gradient(135deg,${ACCENT},#ca8a04);border:none;color:#0a0f1e;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+      🖨 Print / Save as PDF
+    </button>
   </div>
 
-  ${secHdr('📋', 'Regression Test Scenarios', '#6366f1')}
-  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Scenario'},{l:'Category',align:'center'},{l:'Priority',align:'center'},{l:'Expected Result'},{l:'Type',align:'center'}])}
-    <tbody>${scenarioRows}</tbody></table>`, '#6366f1')}
-
-  ${secHdr('📊', 'Test Summary', '#f97316')}
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px">
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:8px">
     ${[
       {icon:'✅',val:pass,lbl:'PASSED',c:'#10b981',bg:'rgba(16,185,129,.08)',bd:'rgba(16,185,129,.25)'},
       {icon:'❌',val:fail,lbl:'FAILED',c:'#ef4444',bg:'rgba(239,68,68,.08)',bd:'rgba(239,68,68,.25)'},
@@ -10324,29 +12041,29 @@ const downloadHtml_Regression = () => {
       <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${s.c};opacity:.8;text-transform:uppercase">${s.lbl}</div>
     </div>`).join('')}
   </div>
+  <p style="font-size:10px;color:#64748b;font-style:italic;margin-bottom:20px">
+    Pass Rate is the raw proportion of tests that succeeded. The Regression Score below is severity-weighted —
+    Authentication and Critical/High severity checks count more.
+  </p>
 
-  ${secHdr('📊', 'Results by Category', '#6366f1')}
-  ${tblWrap(`${tblHdr([{l:'Category'},{l:'Total',align:'center'},{l:'Passed',align:'center'},{l:'Failed',align:'center'},{l:'Pass Rate',align:'center'},{l:'Avg Duration',align:'center'},{l:'Status',align:'center'}])}
-    <tbody>${catRows}</tbody></table>`, '#6366f1')}
-
-  ${secHdr('🧪', 'Detailed Test Results', '#0d9488')}
-  ${tblWrap(`${tblHdr([{l:'#',align:'center'},{l:'Test Name'},{l:'Category',align:'center'},{l:'Priority',align:'center'},{l:'Status',align:'center'},{l:'Result / Reason'},{l:'Duration',align:'center'}])}
-    <tbody>${detailRows}</tbody></table>`, '#0d9488')}
-
-  ${secHdr('🤖', 'AI Recommendations', '#6366f1')}
-  ${recsHtml}
-
-  <div style="background:${vb};border:2px solid ${vc};border-radius:12px;padding:16px 20px;margin-top:24px;display:flex;gap:12px;align-items:flex-start">
-    <span style="font-size:24px">${vi}</span>
-    <div>
-      <div style="font-size:14px;font-weight:700;color:${vc};margin-bottom:6px">Final Verdict</div>
-      <p style="font-size:13px;color:${vc};margin:0;line-height:1.6">${vt}</p>
-    </div>
-  </div>
-
-  <div style="margin-top:48px;padding:20px 28px;background:rgba(249,115,22,.04);border-radius:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid rgba(249,115,22,.15)">
-    <div style="font-size:14px;font-weight:700;color:#64748b"><span style="color:#f97316">NEX</span>TEST · Regression Test Report</div>
-    <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${framework} · ${total} tests · ${rate}% pass rate</div>
+  ${sectionOverview}
+  ${sectionKeyMetrics}
+  ${sectionScore}
+  ${sectionScenarios}
+  ${sectionCategorySummary}
+  ${sectionCharts}
+  ${sectionDetailedResults}
+  ${sectionRecs}
+  ${sectionFocused}
+  ${sectionActionPlan}
+  ${sectionExec}
+  ${sectionEnv}
+  ${sectionVerdict}
+  ${sectionCert}
+  <div style="margin-top:48px;padding:20px 28px;background:rgba(234,179,8,.04);border-radius:12px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid rgba(234,179,8,.15)">
+    <div style="font-size:14px;font-weight:700;color:#64748b"><span style="color:${ACCENT}">NEX</span>TEST · Internal Regression Test Report</div>
+    <div style="font-size:11px;color:#94a3b8">Generated ${dateStr} · ${framework} · ${total} tests · ${rate}% pass rate · Score: ${score}/100</div>
   </div>
 
 </div>
@@ -11164,13 +12881,13 @@ const downloadPdf = async () => {
 
             {dropdownOpen && (
               <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 6, boxShadow: '0 8px 32px rgba(0,0,0,.5), 0 0 0 1px rgba(99,102,241,.08)', zIndex: 200, minWidth: 190, animation: 'dFadeUp .18s var(--ease) both' }}>
-                <button onClick={isSeo ? downloadCsv_Seo : isSmoke ? downloadXlsx_Smoke : isFunctional ? downloadCsv_Functional : downloadCsv} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
+                <button onClick={isSeo ? downloadCsv_Seo : isSmoke ? downloadXlsx_Smoke : isApi ? downloadXlsx_Api : isSecurity ? downloadXlsx_Security : (isRegression || isInternalRegression) ? downloadXlsx_Regression : isFunctional ? downloadXlsx_Functional : downloadCsv} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
   onMouseEnter={e => { e.currentTarget.style.background = 'var(--green-bg)'; e.currentTarget.style.color = 'var(--green)'; }}
   onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--sub)'; }}>
-  <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#10b981', letterSpacing: .5 }}>{(isSeo || isSmoke) ? 'XLSX' : 'CSV'}</span>
-  <div><div style={{ fontSize: 12, fontWeight: 700 }}>{(isSeo || isSmoke) ? 'rapport.xlsx' : 'rapport.csv'}</div><div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>{(isSeo || isSmoke) ? 'Classeur Excel' : 'Données tabulaires'}</div></div>
+<span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#10b981', letterSpacing: .5 }}>{(isSeo || isSmoke || isSecurity || isApi || isRegression || isInternalRegression || isFunctional) ? 'XLSX' : 'CSV'}</span>
+<div><div style={{ fontSize: 12, fontWeight: 700 }}>{(isSeo || isSmoke || isSecurity || isApi || isRegression || isInternalRegression || isFunctional) ? 'rapport.xlsx' : 'rapport.csv'}</div><div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>{(isSeo || isSmoke || isApi || isRegression || isInternalRegression || isFunctional) ? 'Classeur Excel' : 'Données tabulaires'}</div></div>
 </button>
-                <button onClick={isSecurity ? downloadHtml_Security : isRegression ? downloadHtml_Regression : isFunctional ? downloadHtml_Functional : isSeo ? downloadHtml_Seo : isSmoke ? downloadHtml_Smoke : downloadHtml}
+                <button onClick={isApi ? downloadHtml_Api : isSecurity ? downloadHtml_Security : (isRegression || isInternalRegression) ? downloadHtml_Regression : isFunctional ? downloadHtml_Functional : isSeo ? downloadHtml_Seo : isSmoke ? downloadHtml_Smoke : downloadHtml}
 
  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', fontFamily: 'var(--D)', fontSize: 13, fontWeight: 600, transition: 'all .15s', textAlign: 'left' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'var(--indigo-bg)'; e.currentTarget.style.color = 'var(--indigo3)'; }}
@@ -16115,7 +17832,7 @@ const headerRef = useRef(null);
   const [generation,      setGeneration]    = useState(null);
   const [currentProject,  setCurrentProject] = useState(null);
   const [selectedPageUrl, setSelectedPageUrl] = useState('');
-  const [selectedTestType, setSelectedTestType] = useState('');   // ← AJOUTE ICI
+  const [selectedTestType, setSelectedTestType] = useState('');   
   const [selectedFramework, setSelectedFramework] = useState('');
   const [selectedUsername, setSelectedUsername] = useState('');
   const [selectedPassword, setSelectedPassword] = useState(''); 

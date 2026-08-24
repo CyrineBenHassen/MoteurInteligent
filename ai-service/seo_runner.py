@@ -78,7 +78,7 @@ Respond ONLY with a valid JSON object (no markdown, no backticks) with this exac
 Focus on the most impactful improvements. Only base your recommendations on the 17 checks listed above (issues, warnings, passed) — do not invent or suggest checks outside this list. Do NOT mention any technical error type (SSL, timeout, connection error, etc.) unless it appears verbatim in the ISSUES or WARNINGS lists above — describe only the SEO outcome, never a hypothetical cause you were not given. Provide at most 6 recommendations ordered by priority."""
     try:
         response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
             max_tokens=1200,
@@ -121,7 +121,7 @@ Rules:
 
     try:
         response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=1500,

@@ -56,7 +56,11 @@ from pydantic import BaseModel
 
 from seo_pdf_generator import generate_seo_pdf, generate_seo_xlsx
 
+from internal_api_pdf import generate_internal_api_pdf
 
+from internal_regression_pdf import generate_internal_regression_pdf, generate_internal_regression_xlsx
+
+from internal_functional_pdf import generate_internal_functional_pdf, generate_internal_functional_xlsx
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 _groq_client_smoke = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
@@ -131,7 +135,9 @@ Respond ONLY with valid JSON in this exact shape, no markdown:
   "recommendations": [
     {{"priority": "high|medium|low", "category": "navigation|forms|performance|accessibility|content|security", "issue": "what failed", "fix": "concrete actionable fix"}}
   ],
-  "action_plan": ["step 1", "step 2", "step 3"]
+  "action_plan": [
+    {{"priority": "high|medium|low", "category": "Forms|Navigation|Auth|UI|Assertion", "action": "concrete action to take", "impact": "expected result once fixed (e.g. 'Unblocks login flow for all users')", "status": "To Do"}}
+  ]
 }}
 
 Rules:
@@ -319,12 +325,14 @@ Respond ONLY with valid JSON in this exact shape, no markdown:
   "recommendations": [
     {{"priority": "high|medium|low", "category": "forms|navigation|auth|ui|assertion", "issue": "what failed", "fix": "concrete actionable fix"}}
   ],
-  "action_plan": ["step 1", "step 2", "step 3"]
+  "action_plan": [
+    {{"priority": "high|medium|low", "category": "Forms|Navigation|Auth|UI|Assertion", "action": "concrete action to take", "impact": "expected result once fixed (e.g. 'Unblocks login flow for all users')", "status": "To Do"}}
+  ]
 }}
 
 Rules:
 - Max 6 items in recommendations, ordered by priority (high first).
-- Max 3 items in action_plan.
+- Max 3 items in action_plan, each with a specific non-empty "impact" describing what improves once the action is done.
 - Be specific, no generic filler, no markdown fences."""
 
     try:
@@ -653,12 +661,14 @@ Respond ONLY with valid JSON in this exact shape, no markdown:
   "recommendations": [
     {{"priority": "high|medium|low", "category": "auth|validation|crud|performance", "issue": "what failed", "fix": "concrete actionable fix"}}
   ],
-  "action_plan": ["step 1", "step 2", "step 3"]
+  "action_plan": [
+    {{"priority": "high|medium|low", "category": "Auth|CRUD|Validation|Error Handling|Performance", "action": "concrete action to take", "impact": "expected result once fixed (e.g. 'Unblocks all authenticated endpoints')", "status": "To Do"}}
+  ]
 }}
 
 Rules:
 - Max 6 items in recommendations, ordered by priority (high first).
-- Max 3 items in action_plan.
+- Max 3 items in action_plan, each with a specific non-empty "impact" describing what improves once the action is done.
 - Be specific, no generic filler, no markdown fences."""
 
     try:
@@ -1122,6 +1132,10 @@ def generate_pdf_report(data: dict):
         elif test_type == 'internal_smoke':
             from internal_smoke_pdf import generate_internal_smoke_pdf
             pdf_bytes = generate_internal_smoke_pdf(data)
+        elif test_type in ('regression', 'internal_regression'):
+                pdf_bytes = generate_internal_regression_pdf(data)
+        elif test_type == 'functional':                     
+            pdf_bytes = generate_internal_functional_pdf(data)
         else:
             pdf_bytes = generate_pdf(data)
         
@@ -1168,6 +1182,160 @@ def generate_smoke_xlsx_report(data: dict):
     except Exception as e:
         import traceback
         print(f"[XLSX-SMOKE] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
+@app.post("/generate-internal-functional-xlsx")
+def generate_internal_functional_xlsx_report(data: dict):
+    try:
+        print(f"[XLSX-INTERNAL-FUNCTIONAL] Received data keys: {list(data.keys())}")
+        xlsx_bytes = generate_internal_functional_xlsx(data)
+        print(f"[XLSX-INTERNAL-FUNCTIONAL] Generated {len(xlsx_bytes)} bytes")
+        if len(xlsx_bytes) < 100:
+            return {"error": f"XLSX too small: {xlsx_bytes}"}
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=nextest_internal_functional_report.xlsx"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[XLSX-INTERNAL-FUNCTIONAL] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
+#Rapport XLSX — Security
+@app.post("/generate-security-xlsx")
+def generate_security_xlsx_report(data: dict):
+    try:
+        print(f"[XLSX-SECURITY] Received data keys: {list(data.keys())}")
+
+        tests = data.get('execution_results') or data.get('test_cases') or []
+        data['_groq_recs'] = data.get('ai', {}) or {}
+
+        from pdf_generator import generate_security_xlsx
+        xlsx_bytes = generate_security_xlsx(data, tests)
+
+        print(f"[XLSX-SECURITY] Generated {len(xlsx_bytes)} bytes")
+
+        if len(xlsx_bytes) < 100:
+            return {"error": f"XLSX too small: {xlsx_bytes}"}
+
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=nextest_security_report.xlsx"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[XLSX-SECURITY] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}    
+#Rapport XLSX — Internal Smoke
+@app.post("/generate-internal-smoke-xlsx")
+def generate_internal_smoke_xlsx_report(data: dict):
+    try:
+        print(f"[XLSX-INTERNAL-SMOKE] Received data keys: {list(data.keys())}")
+
+        from internal_smoke_pdf import generate_internal_smoke_xlsx
+        xlsx_bytes = generate_internal_smoke_xlsx(data)
+
+        print(f"[XLSX-INTERNAL-SMOKE] Generated {len(xlsx_bytes)} bytes")
+
+        if len(xlsx_bytes) < 100:
+            return {"error": f"XLSX too small: {xlsx_bytes}"}
+
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=nextest_internal_smoke_report.xlsx"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[XLSX-INTERNAL-SMOKE] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+@app.post("/generate-internal-api-pdf")
+def generate_internal_api_pdf_report(data: dict):
+    try:
+        print(f"[PDF-INTERNAL-API] Received data keys: {list(data.keys())}")
+
+        pdf_bytes = generate_internal_api_pdf(data)
+
+        print(f"[PDF-INTERNAL-API] Generated {len(pdf_bytes)} bytes")
+
+        if len(pdf_bytes) < 100:
+            print(f"[PDF-INTERNAL-API] WARNING — too small, content: {pdf_bytes}")
+            return {"error": f"PDF too small: {pdf_bytes}"}
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=nextest_internal_api_report.pdf"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[PDF-INTERNAL-API] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
+    
+@app.post("/generate-internal-api-xlsx")
+def generate_internal_api_xlsx_report(data: dict):
+    try:
+        print(f"[XLSX-INTERNAL-API] Received data keys: {list(data.keys())}")
+
+        from internal_api_pdf import generate_internal_api_xlsx
+        xlsx_bytes = generate_internal_api_xlsx(data)
+
+        print(f"[XLSX-INTERNAL-API] Generated {len(xlsx_bytes)} bytes")
+
+        if len(xlsx_bytes) < 100:
+            return {"error": f"XLSX too small: {xlsx_bytes}"}
+
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=nextest_internal_api_report.xlsx"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[XLSX-INTERNAL-API] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
+@app.post("/generate-internal-regression-pdf")
+def generate_internal_regression_pdf_report(data: dict):
+    try:
+        print(f"[PDF-INTERNAL-REGRESSION] Received data keys: {list(data.keys())}")
+        pdf_bytes = generate_internal_regression_pdf(data)
+        print(f"[PDF-INTERNAL-REGRESSION] Generated {len(pdf_bytes)} bytes")
+        if len(pdf_bytes) < 100:
+            return {"error": f"PDF too small: {pdf_bytes}"}
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=nextest_internal_regression_report.pdf"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[PDF-INTERNAL-REGRESSION] ERROR: {e}")
+        print(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+@app.post("/generate-internal-regression-xlsx")
+def generate_internal_regression_xlsx_report(data: dict):
+    try:
+        print(f"[XLSX-INTERNAL-REGRESSION] Received data keys: {list(data.keys())}")
+        xlsx_bytes = generate_internal_regression_xlsx(data)
+        print(f"[XLSX-INTERNAL-REGRESSION] Generated {len(xlsx_bytes)} bytes")
+        if len(xlsx_bytes) < 100:
+            return {"error": f"XLSX too small: {xlsx_bytes}"}
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=nextest_internal_regression_report.xlsx"}
+        )
+    except Exception as e:
+        import traceback
+        print(f"[XLSX-INTERNAL-REGRESSION] ERROR: {e}")
         print(traceback.format_exc())
         return {"error": str(e), "traceback": traceback.format_exc()}
 #Rapport XLSX
