@@ -12,6 +12,8 @@ frontend/.env
 frontend/.idea/
 frontend/.vscode/
 
+ai-service/.env
+
 # OS
 .DS_Store
 Thumbs.db
