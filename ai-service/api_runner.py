@@ -291,7 +291,7 @@ def _analyze_failures_with_llama(results: list) -> list:
 
     try:
         resp = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[
                 {"role": "system", "content": "You are an expert API QA engineer. Respond ONLY with valid JSON."},
                 {"role": "user", "content": f"""Analyze these API test results (pass, fail, and skip):

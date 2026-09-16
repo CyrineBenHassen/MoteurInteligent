@@ -999,7 +999,7 @@ const [aiLoading, setAiLoading] = useState(false);
   const totalPass = gens.reduce((s, g) => s + (g.pass_count || 0), 0);
   const totalFail = gens.reduce((s, g) => s + (g.fail_count || 0), 0);
   const totalSkip = gens.reduce((s, g) => s + (g.skip_count || 0), 0);
-  const avgRate   = gens.length ? Math.round(gens.reduce((s, g) => s + (g.pass_rate || 0), 0) / gens.length) : 0;
+  const avgRate   = (totalPass + totalFail + totalSkip) > 0 ? Math.round(totalPass / (totalPass + totalFail + totalSkip) * 100) : 0;
 
   // ── Cette semaine (0-6 jours) ──
   const thisWeekGens = gens.filter(g => {
@@ -1452,85 +1452,6 @@ if (loading) return (
   <ActivityHeatmap gens={allGens} projects={allProjects} />
 </div>
 
-{/* ── MOST TESTED APP ── */}
-{topUrls.length > 0 && (() => {
-  const top = topUrls[0];
-    const projectName = allProjects.find(p => p.id === top.project_id)?.name || top.url;
-
-  const rate = Math.round((top.pass / top.tests) * 100) || 0;
-  const isGood = rate >= 80;
-  const statusColor = isGood ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
-  const statusLabel = isGood ? t('dbStable') : rate >= 50 ? t('dbNeedsAttention') : t('dbCritical');
- return (
-    <div className="section-box" style={{ marginBottom: 24, padding: '18px 20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{
-            width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-            background: 'rgba(201,162,39,0.12)', border: '1px solid rgba(201,162,39,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="20" height="20" fill="none" stroke="#c9a227" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M12 2l3 6.5 7 1-5 5 1.5 7L12 18l-6.5 3.5L7 14.5l-5-5 7-1L12 2z"/>
-            </svg>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--muted)', marginBottom: 3 }}>
-  {t('dbMostTestedApp')}
-</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo2)', cursor: 'pointer' }}
-              onClick={() => window.open(top.url, '_blank', 'noopener,noreferrer')}
-              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
-              {projectName}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--C)' }}>{top.tests}</div>
-            <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>tests</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: statusColor, fontFamily: 'var(--C)' }}>{rate}%</div>
-            <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>{t('dbPassRateLabel')}</div>
-          </div>
-          <button
-            onClick={fetchAiVerdict}
-            disabled={aiLoading}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 11, fontWeight: 700, padding: '6px 14px', borderRadius: 20,
-              color: '#c9a227', background: 'rgba(201,162,39,0.12)', border: '1px solid rgba(201,162,39,0.3)',
-              cursor: aiLoading ? 'default' : 'pointer', opacity: aiLoading ? 0.6 : 1,
-            }}
-          >
-            <IconSparkles size={14} stroke={1.8} />
-            {aiLoading ? t('dbAiAnalyzing') : t('dbAiVerdictBtn')}
-          </button>
-        </div>
-      </div>
-
-      {aiVerdict && (
-        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border3)', display: 'flex', alignItems: 'center', gap: 12 }}>
-          {aiVerdict.rating && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <IconStarFilled
-                  key={i}
-                  size={15}
-                  style={{ color: i < aiVerdict.rating ? '#c9a227' : 'var(--border)' }}
-                />
-              ))}
-            </div>
-          )}
-          <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{aiVerdict.text}</div>
-        </div>
-      )}
-    </div>
-  );
-})()}
 
 
 
@@ -5272,19 +5193,19 @@ const downloadXlsx_Performance = async () => {
               }} index={i} />
             ))}
 
-            {actionPlan.length > 0 && (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Action Plan</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {actionPlan.map((step, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 10, padding: '9px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--sub)' }}>
-                      <span style={{ color: 'var(--indigo2)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
-                      {step}
-                    </div>
-                  ))}
+                   {actionPlan.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Action Plan</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {actionPlan.map((step, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, padding: '9px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--sub)' }}>
+                  <span style={{ color: 'var(--indigo2)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+                  {typeof step === 'string' ? step : (step.action || step.scenario || '')}
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
+          </div>
+        )}
           </>
         );
       }
@@ -7646,19 +7567,19 @@ const downloadHtml = () => {
               }} index={i} />
             ))}
 
-            {actionPlan.length > 0 && (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Action Plan</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {actionPlan.map((step, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 10, padding: '9px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--sub)' }}>
-                      <span style={{ color: 'var(--indigo2)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
-                      {step}
-                    </div>
-                  ))}
+                    {actionPlan.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Action Plan</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {actionPlan.map((step, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, padding: '9px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--sub)' }}>
+                  <span style={{ color: 'var(--indigo2)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+                  {typeof step === 'string' ? step : (step.action || step.scenario || '')}
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
+          </div>
+        )}
           </>
         );
       }
@@ -13704,14 +13625,14 @@ const downloadPdf = async () => {
           }} index={i} />
         ))}
 
-        {actionPlan.length > 0 && (
+                {actionPlan.length > 0 && (
           <div style={{ marginTop: 8 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Action Plan</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {actionPlan.map((step, i) => (
                 <div key={i} style={{ display: 'flex', gap: 10, padding: '9px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--sub)' }}>
                   <span style={{ color: 'var(--indigo2)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
-                  {step}
+                  {typeof step === 'string' ? step : (step.action || step.scenario || '')}
                 </div>
               ))}
             </div>

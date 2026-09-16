@@ -21,7 +21,7 @@ def _get_page_features(path: str, doc_text: str = "") -> list:
     print(f"[FUNCTIONAL_GENERATOR] Extracting features for {path} from doc_text via LLM...")
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[
                 {
                     "role": "system",

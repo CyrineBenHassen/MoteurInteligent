@@ -19,7 +19,7 @@ def _extract_pages_from_doc(doc_text: str, base_url: str) -> tuple:
     print("[SECURITY_GENERATOR] Extracting pages from doc_text via LLM...")
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+             model="openai/gpt-oss-120b",
             messages=[
                 {
                     "role": "system",
@@ -134,7 +134,7 @@ Return ONLY the JSON array. No markdown. No explanation."""
 
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+             model="openai/gpt-oss-120b",
             messages=[
                 {
                     "role": "system",

@@ -1418,7 +1418,7 @@ Rules:
                 "Content-Type": "application/json"
             },
             json={
-                "model": "llama-3.1-8b-instant",
+                'model':"openai/gpt-oss-120b",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 600,
                 "temperature": 0.3
@@ -2199,7 +2199,7 @@ Maximum 8 items. Focus on real issues found."""
                 "Content-Type": "application/json"
             },
             json={
-                "model": "llama-3.3-70b-versatile",
+                'model':"openai/gpt-oss-120b",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 1000,
                 "temperature": 0.3
@@ -2666,7 +2666,7 @@ Rules:
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": "llama-3.3-70b-versatile",
+                'model':"openai/gpt-oss-120b",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 500,
                 "temperature": 0.3
@@ -5225,7 +5225,7 @@ Return ONLY the JSON array, no markdown, no explanation. Maximum 6 items."""
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": "llama-3.3-70b-versatile",
+                'model':"openai/gpt-oss-120b",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 800,
                 "temperature": 0.3
@@ -5341,7 +5341,7 @@ Rules:
             'https://api.groq.com/openai/v1/chat/completions',
             headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
             json={
-                'model': 'llama-3.3-70b-versatile',
+                'model':"openai/gpt-oss-120b",
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 400,
                 'temperature': 0.3

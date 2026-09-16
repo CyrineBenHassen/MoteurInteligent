@@ -24,7 +24,7 @@ def _extract_pages_from_doc(doc_text: str) -> list:
     print("[REGRESSION_GENERATOR] Extracting pages from doc_text via LLM...")
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[
                 {
                     "role": "system",
@@ -155,7 +155,7 @@ Return ONLY the JSON array."""
 
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[
                 {
                     "role": "system",

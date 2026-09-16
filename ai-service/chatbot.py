@@ -71,7 +71,7 @@ Be concise (max 4-5 sentences), use bullet points if useful. Never repeat the sa
         )
 
         resp = groq_client.chat.completions.create(
-            model = "openai/gpt-oss-120b",
+            model="openai/gpt-oss-120b",
             messages=messages,
             temperature=0.3,
             max_tokens=600,

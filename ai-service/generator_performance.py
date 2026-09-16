@@ -186,7 +186,7 @@ Generate 4-6 specific recommendations based on the ACTUAL measured metrics above
     for attempt in range(3):
         try:
             resp = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="openai/gpt-oss-120b",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user",   "content": user_prompt},

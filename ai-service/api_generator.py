@@ -477,7 +477,7 @@ KNOWN_ENDPOINTS["auth_login"] = KNOWN_ENDPOINTS["auth"][:3]
 def _call_groq(system_prompt: str, user_prompt: str) -> str:
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_prompt},

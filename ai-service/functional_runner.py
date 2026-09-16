@@ -657,7 +657,7 @@ def _run_one_functional(page, tc: dict, base_url: str, username: str = "", passw
     )
 
         resp = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
             temperature=0.2,

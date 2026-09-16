@@ -107,7 +107,7 @@ Rules:
 
         try:
             response = _groq_client_smoke.chat.completions.create(
-                model="llama-3.1-8b-instant",
+                model="openai/gpt-oss-120b",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=800,
@@ -147,7 +147,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-                model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=1200,
@@ -190,7 +190,7 @@ Respond ONLY with a valid JSON object:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=150,
@@ -239,7 +239,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=2500,   # ← augmenté, suffisant même pour ~15-20 fails
@@ -296,7 +296,7 @@ Rules:
 
         try:
             response = _groq_client_smoke.chat.completions.create(
-                model="llama-3.1-8b-instant",
+                 model="openai/gpt-oss-120b",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=800,
@@ -337,7 +337,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=1200,
@@ -382,7 +382,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=2000,
@@ -439,7 +439,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=1200,
@@ -499,7 +499,7 @@ Rules:
 
         try:
             response = _groq_client_smoke.chat.completions.create(
-                model="llama-3.1-8b-instant",
+                model="openai/gpt-oss-120b",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=800,
@@ -538,7 +538,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=1200,
@@ -619,7 +619,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=1200,
@@ -673,7 +673,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=1200,
@@ -714,7 +714,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=1500,
@@ -773,7 +773,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=2000,
@@ -830,7 +830,7 @@ Rules:
 
     try:
         response = _groq_client_smoke.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=1200,

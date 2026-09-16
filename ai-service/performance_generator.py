@@ -104,7 +104,7 @@ Documentation:
 """
     try:
         response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
             max_tokens=500,
@@ -275,7 +275,7 @@ Start directly with: import http from 'k6/http';"""
 
     try:
         response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,   # lower = more deterministic = less hallucination
             max_tokens=4000,

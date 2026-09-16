@@ -488,7 +488,7 @@ def _call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> s
             api_key=os.getenv("GROQ_API_KEY"),
         )
         resp = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             max_tokens=max_tokens,
             temperature=0.2,
             messages=[
